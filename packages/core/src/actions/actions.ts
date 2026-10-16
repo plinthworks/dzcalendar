@@ -63,6 +63,9 @@ export interface ActionLabels {
   readonly openEvent: string;
   readonly skippedHour: string;
   readonly deleteEvent: string;
+  /** Grab mode (the keyboard's drag) on the event, from the menu. */
+  readonly moveEvent: string;
+  readonly resizeEvent: string;
   /** The recurrence scope sub-menu. */
   readonly scopeThis: string;
   readonly scopeFollowing: string;
@@ -81,6 +84,10 @@ export interface ActionContext {
   readonly onOpen?: (instance: EventInstance) => void;
   /** Runs an editing entry's command (through the calendar's history, so it can be undone). Without it, no editing entries. */
   readonly onCommand?: (command: Command) => void;
+  /** "Move…" and "Change duration…": the calendar holds the event for the keyboard (grab mode). Without it, no such entries. */
+  readonly onGrab?: (instance: EventInstance, kind: 'move' | 'resize') => void;
+  /** Whether the view lets this event's length change (a month draws a timed event's day, not its hours). Default yes. */
+  readonly canResize?: (instance: EventInstance) => boolean;
 }
 
 /**
@@ -121,6 +128,12 @@ export function actionsFor(target: ActionTarget, ctx: ActionContext): ActionItem
     if (ctx.onOpen) {
       const open = ctx.onOpen;
       out.push({ id: 'event.open', label: ctx.labels.openEvent, enabled: true, run: () => open(target.instance) });
+    }
+    const ev = target.instance.event;
+    if (ctx.onGrab && ev.display !== 'background') {
+      const grab = ctx.onGrab;
+      if (ev.perms.start) out.push({ id: 'event.move', label: ctx.labels.moveEvent, enabled: true, shortcut: 'M', run: () => grab(target.instance, 'move') });
+      if (ev.perms.duration && (ctx.canResize?.(target.instance) ?? true)) out.push({ id: 'event.resize', label: ctx.labels.resizeEvent, enabled: true, run: () => grab(target.instance, 'resize') });
     }
     if (ctx.onCommand) out.push(deleteEntry(target.instance, ctx.labels, ctx.onCommand));
   }

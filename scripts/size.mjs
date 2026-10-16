@@ -7,17 +7,25 @@ import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { minifyCssLiteral } from './css-literal.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const src = (p) => join(root, 'packages', p, 'src', 'index.ts');
 const alias = { '@dzcalendar/core': src('core'), '@dzcalendar/dom': src('dom'), '@dzcalendar/rrule': src('rrule') };
+/** What `npm run build` ships: the structural CSS minified. */
+const shippedCss = {
+  name: 'shipped-css',
+  setup(b) {
+    b.onLoad({ filter: /[\\/]dom[\\/]src[\\/]styles\.ts$/ }, async (a) => ({ contents: await minifyCssLiteral(readFileSync(a.path, 'utf8')), loader: 'ts' }));
+  },
+};
 
 async function bundle(entry, external) {
   // An alias would resolve a package before `external` sees its name and
   // bundle it anyway (it once counted all of core inside dom): alias only
   // what is not meant to stay out.
   const kept = Object.fromEntries(Object.entries(alias).filter(([name]) => !external.includes(name)));
-  const r = await build({ entryPoints: [entry], bundle: true, minify: true, format: 'esm', platform: 'neutral', mainFields: ['module', 'main'], write: false, external, alias: kept, logLevel: 'error' });
+  const r = await build({ entryPoints: [entry], bundle: true, minify: true, format: 'esm', platform: 'neutral', mainFields: ['module', 'main'], write: false, external, alias: kept, plugins: [shippedCss], logLevel: 'error' });
   return gzipSync(r.outputFiles[0].contents, { level: 9 }).length;
 }
 

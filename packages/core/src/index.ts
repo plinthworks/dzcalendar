@@ -61,6 +61,8 @@ export type { Placement, Violation, ConstraintSpec, OverlapFn, RulesContext } fr
 export { rebaseRule, splitRule, countBefore } from '@dzcalendar/rrule';
 export { proposeMove, proposeResize, isUnchanged, selectionBetween, commandFor } from './interaction/propose.js';
 export type { Hit, InteractionContext, Proposal, Selection } from './interaction/propose.js';
+export { intentFor, stepHit, eventHit, grabStep, heldEvent } from './interaction/keymap.js';
+export type { Intent, KeyContext, KeyLike, KeyMode, Step } from './interaction/keymap.js';
 export { applyCommand } from './commands/apply.js';
 export { createHistory } from './commands/history.js';
 export type { History, HistoryOptions } from './commands/history.js';

@@ -105,7 +105,8 @@ $emit: true !default;
   [data-theme='light'] { --tz-color-scheme: light; }
   [data-theme='dark'] { --tz-color-scheme: dark; }
 
-  .dz-toolbar__btn:hover:not(:disabled) { background: var(--tz-bg-raised); }
+  // Not the pressed view button: its accent background carries white text.
+  .dz-toolbar__btn:hover:not(:disabled):not([aria-pressed='true']) { background: var(--tz-bg-raised); }
   .dz-ev:hover { filter: brightness(0.97); }
   .dz-tg__head,
   .dz-tg__allday { background: var(--tz-bg); }

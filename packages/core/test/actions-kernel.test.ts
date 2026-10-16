@@ -9,6 +9,8 @@ const labels = {
   openEvent: 'Open',
   skippedHour: 'skipped',
   deleteEvent: 'Delete',
+  moveEvent: 'Move…',
+  resizeEvent: 'Change duration…',
   scopeThis: 'This',
   scopeFollowing: 'Following',
   scopeAll: 'All',

@@ -21,7 +21,7 @@ export function createPopover(doc: Document, container: HTMLElement): PopoverHos
   panel.setAttribute('popover', 'manual');
   panel.hidden = true;
   const header = h(doc, 'div', 'dz-pop__head');
-  const title = h(doc, 'h3', 'dz-pop__title');
+  const title = h(doc, 'h2', 'dz-pop__title');
   title.id = `dz-pop-${++popoverIds}`;
   panel.setAttribute('aria-labelledby', title.id);
   const closeBtn = h(doc, 'button', 'dz-pop__close', '×') as HTMLButtonElement;

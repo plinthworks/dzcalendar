@@ -1,6 +1,6 @@
 import { Temporal, formatTemporal, locateNow } from '@dzcalendar/core';
-import type { AllDayBar, AxisBand, PlacedTimed, PlainDate, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
-import type { Box, InteractionSurface } from '../interact/surface.js';
+import type { AllDayBar, AxisBand, Hit, PlacedTimed, PlainDate, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
+import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
 import { handles } from '../interact/handles.js';
 import type { ViewController, ViewCtx } from '../host.js';
 import { registerView } from '../host.js';
@@ -79,7 +79,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     () => h(doc, 'div', 'dz-tg__dayhead'),
     (el, it) => {
       const { date, axis } = it.column;
-      el.setAttribute('role', 'columnheader');
+      // Seen, not read: each column's group says its day (and a length other than 24 h) itself.
+      el.setAttribute('aria-hidden', 'true');
       el.classList.toggle('dz-tg__dayhead--today', it.today);
       el.replaceChildren(
         h(doc, 'span', 'dz-tg__dayhead-weekday', formatTemporal(date, { weekday: 'short' }, ctx.locale)),
@@ -163,7 +164,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const { column } = it;
     const p = parts.get(it.key)!;
     el.dataset['date'] = column.key;
-    el.setAttribute('aria-label', formatTemporal(column.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale));
+    const name = formatTemporal(column.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale);
+    const length = column.axis.day.lengthMinutes;
+    el.setAttribute('aria-label', length === 1440 ? name : length === 0 ? `${name}, ${ctx.messages.dayDoesNotExist}` : `${name}, ${formatMinutes(length, ctx.locale)}`);
     el.classList.toggle('dz-tg__col--today', it.today);
     el.classList.toggle('dz-tg__col--folded', column.folded);
     el.style.setProperty('--dz-len', String(column.axis.length));
@@ -260,6 +263,146 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     );
   }
 
+  // ── keyboard: a cursor on the grid, drawn where a pointer would hit ───────
+  // One focusable node, replaced on each move (focus moving is what screen
+  // readers say reliably). Placed in the grid by `grid-column`, so it scrolls
+  // with the hours and needs no measuring. Until it has a place it rests in
+  // the all-day row: tabbing to it scrolls nothing, and it is then put at
+  // the hour in view.
+  const cursorHits = new WeakMap<Element, Hit>();
+  let cursorNode = h(doc, 'div', 'dz-cursor');
+  cursorNode.tabIndex = 0;
+  cursorNode.setAttribute('role', 'button');
+  cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
+  // An absolutely placed grid child: its end line must be named, `auto` would run to the grid's edge.
+  cursorNode.style.gridColumn = '2 / span 1';
+  allday.prepend(cursorNode);
+
+  const columnOf = (date: PlainDate) => model?.columns.find((c) => c.key === date.toString());
+  const snapMs = () => Math.max(1, ctx.snapMinutes) * 60_000;
+  /** The minutes-to-pixels scale of a drawn column (one layout read). */
+  const pxOf = (col: TimeGridColumn) => {
+    const el = columns.get(col.key);
+    return el && col.axis.length > 0 ? el.getBoundingClientRect().height / col.axis.length : 0;
+  };
+  /** The slot at a position of a column; in a skipped hour, the first moment after it. */
+  const slotAt = (col: TimeGridColumn, minutes: number): Hit => {
+    const p = Math.max(0, Math.min(col.axis.length - ctx.snapMinutes, minutes));
+    const at = col.axis.fromPosition(p);
+    const band = at.exists ? undefined : col.axis.bands.find((b) => b.kind === 'gap' && p >= b.from && p < b.to);
+    return { kind: 'slot', date: col.date, instant: band ? col.axis.fromPosition(band.to).instant : at.instant };
+  };
+  /** The first slot below the top of the scrolled hours. */
+  const topSlot = (col: TimeGridColumn): Hit | null => {
+    if (col.folded || col.axis.length === 0) return null;
+    const px = pxOf(col);
+    const snap = Math.max(1, ctx.snapMinutes);
+    return slotAt(col, px > 0 ? Math.ceil(body.scrollTop / px / snap) * snap : 0);
+  };
+  const usable = (c: TimeGridColumn) => !c.folded && c.axis.length > 0;
+
+  const keys: KeyboardSurface = {
+    allDayRow: true,
+    home() {
+      const cols = model?.columns ?? [];
+      const today = ctx.kernel.getState().today;
+      const col = cols.find((c) => c.date.equals(today) && usable(c)) ?? cols.find(usable);
+      return col ? topSlot(col) : null;
+    },
+    fit(hit) {
+      const cols = model?.columns ?? [];
+      if (cols.length === 0) return null;
+      const col = columnOf(hit.date);
+      if (!col) return Temporal.PlainDate.compare(hit.date, cols[0]!.date) < 0 ? 'prev' : 'next';
+      if (hit.kind === 'day') return hit.allDayRow ? hit : { kind: 'day', date: hit.date, allDayRow: true };
+      if (!usable(col)) return null;
+      const s = col.axis.start.epochMilliseconds;
+      const last = Math.max(s, col.axis.end.epochMilliseconds - snapMs());
+      const ms = Math.max(s, Math.min(last, hit.instant.epochMilliseconds));
+      return ms === hit.instant.epochMilliseconds ? hit : { kind: 'slot', date: hit.date, instant: Temporal.Instant.fromEpochMilliseconds(ms) };
+    },
+    showCursor(hit, label) {
+      const cols = model?.columns ?? [];
+      const index = cols.findIndex((c) => c.date.equals(hit.date));
+      if (index < 0) return;
+      const node = h(doc, 'div', 'dz-cursor');
+      node.tabIndex = 0;
+      node.setAttribute('role', 'button');
+      node.setAttribute('aria-label', label);
+      node.style.gridColumn = `${index + 2} / span 1`;
+      if (hit.kind === 'slot') {
+        const axis = cols[index]!.axis;
+        const top = axis.toPosition(hit.instant);
+        const end = axis.toEndPosition(Temporal.Instant.fromEpochMilliseconds(hit.instant.epochMilliseconds + snapMs()));
+        node.style.setProperty('--t', String(top));
+        node.style.setProperty('--h', String(Math.max(end - top, 1)));
+        // First in the grid: in the tab order before the hours' events.
+        grid.prepend(node);
+      } else {
+        allday.prepend(node);
+      }
+      cursorHits.set(node, hit);
+      const old = cursorNode;
+      cursorNode = node;
+      node.focus();
+      old.remove();
+    },
+    isCursor: (el) => el === cursorNode,
+    cursorAt: (el) => (el === cursorNode ? (cursorHits.get(el) ?? null) : null),
+    lineEdge(hit, edge) {
+      const cols = model?.columns ?? [];
+      if (hit.kind === 'day') {
+        const col = edge === 'start' ? cols[0] : cols[cols.length - 1];
+        return col ? { kind: 'day', date: col.date, allDayRow: true } : hit;
+      }
+      const col = columnOf(hit.date);
+      if (!col || !usable(col)) return hit;
+      return edge === 'start' ? slotAt(col, 0) : slotAt(col, col.axis.length);
+    },
+    itemsAt: () => [],
+    itemsAround(node) {
+      const host = node.closest('.dz-tg__col, .dz-tg__allday-track');
+      return host ? [...host.querySelectorAll<HTMLElement>('[data-event-id][tabindex]')] : [];
+    },
+    nodeFor(eventId, date) {
+      const all = [...root.querySelectorAll<HTMLElement>('[data-event-id][tabindex]')].filter((n) => n.dataset['eventId'] === eventId);
+      if (date) {
+        const inColumn = all.find((n) => n.closest<HTMLElement>('.dz-tg__col')?.dataset['date'] === date.toString());
+        if (inColumn) return inColumn;
+      }
+      return all[0] ?? null;
+    },
+    cursorFor(node) {
+      const inst = model ? findSegment(model, node.dataset['key'] ?? '')?.instance : undefined;
+      const colEl = node.closest<HTMLElement>('.dz-tg__col');
+      const col = colEl ? model?.columns.find((c) => c.key === colEl.dataset['date']) : undefined;
+      if (col && usable(col)) {
+        const start = inst && !inst.event.allDay ? (inst.event.start as ZonedDateTime).toInstant() : col.axis.start;
+        const f = keys.fit({ kind: 'slot', date: col.date, instant: start });
+        return f && typeof f === 'object' ? f : null;
+      }
+      // An all-day bar: the first day it shows on.
+      const bar = model?.allDay.bars.find((b) => b.segment.key === node.dataset['key']);
+      const day = bar ? model?.columns[bar.segment.dayIndex] : undefined;
+      return day ? { kind: 'day', date: day.date, allDayRow: true } : null;
+    },
+    firstSlot(date) {
+      const col = columnOf(date);
+      return col ? topSlot(col) : null;
+    },
+    reveal(hit) {
+      if (hit.kind !== 'slot') return;
+      const col = columnOf(hit.date);
+      if (!col || !usable(col)) return;
+      const px = pxOf(col);
+      if (px <= 0) return;
+      const y = col.axis.toPosition(hit.instant) * px;
+      const room = ctx.snapMinutes * px * 2;
+      if (y - room < body.scrollTop) body.scrollTop = Math.max(0, y - room);
+      else if (y + room > body.scrollTop + body.clientHeight) body.scrollTop = y + room - body.clientHeight;
+    },
+  };
+
   // ── gestures: geometry read once per gesture, then arithmetic ─────────────
   interface ColGeo {
     readonly left: number;
@@ -278,6 +421,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     root,
     scroller: body,
     family: 'timeGrid',
+    keys,
     accepts: (target) => target.closest('.dz-tg__col, .dz-tg__allday-track') !== null,
     measure(origin) {
       const m = model;
@@ -360,6 +504,15 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const seg = findSegment(model, evEl.dataset['key'] ?? '');
       return seg ? { target: { kind: 'event', instance: seg.instance }, anchor: evEl } : null;
     }
+    // The keyboard's cursor: the very slot (or all-day day) it stands on.
+    const cur = keys.cursorAt(target);
+    if (cur) {
+      if (cur.kind === 'day') return { target: { kind: 'day', date: cur.date }, anchor: target as HTMLElement };
+      const c = columnOf(cur.date);
+      if (!c) return null;
+      const r = c.axis.fromPosition(c.axis.toPosition(cur.instant), { prefer: { offset: cur.instant.toZonedDateTimeISO(ctx.zone).offset } });
+      return { target: { kind: 'slot', date: cur.date, instant: cur.instant, exists: true, ambiguous: r.ambiguous, alternative: r.ambiguous ? (r.instant.equals(cur.instant) ? r.alternative : r.instant) : null }, anchor: target as HTMLElement };
+    }
     const colEl = target.closest<HTMLElement>('.dz-tg__col');
     if (!colEl) return null;
     const col = model.columns.find((c) => c.key === colEl.dataset['date']);
@@ -393,6 +546,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const cols = m.columns.map((column): ColumnItem => ({ key: column.key, sig: `${idOf(column)}|${epoch}`, column, today: column.date.equals(state.today) }));
       root.style.setProperty('--dz-cols', String(m.columns.length));
       alldayLabel.textContent = ctx.messages.allDay;
+      if (!cursorHits.has(cursorNode)) cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
       heads.sync(cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${c.today}|${epoch}` })));
       bars.sync([
         ...m.allDay.background.map((segment) => ({

@@ -32,4 +32,46 @@ export interface InteractionSurface<G = unknown> {
   instanceOf(node: HTMLElement): EventInstance | null;
   /** The day or moment an empty spot stands for (a click with no drag). */
   readonly family: 'timeGrid' | 'dayGrid';
+  /** The keyboard's side of the view (Phase 8): its cursor, its lines, its events by day. */
+  readonly keys?: KeyboardSurface;
+  /** The node that takes the focus for an event node a pointer pressed (a month gives its cell's item). */
+  focusTarget?(node: HTMLElement): HTMLElement;
+}
+
+/**
+ * What a view gives the keyboard. The cursor is a Hit, like a pointer's: the
+ * view only says where it may stand and draws it; moving it, selecting from
+ * it and holding an event are the same code for every view.
+ */
+export interface KeyboardSurface {
+  /** Where the cursor stands when the grid first takes the focus: today if shown (else the first day), at the hour scrolled to. */
+  home(): Hit | null;
+  /**
+   * The hit kept inside what is drawn (a slot clamped to its column's hours);
+   * 'prev' / 'next' when its day is not shown — the caller changes period;
+   * null on a day that has no time (skipped by its zone).
+   */
+  fit(hit: Hit): Hit | 'prev' | 'next' | null;
+  /** Draws the cursor at `hit` and focuses it. */
+  showCursor(hit: Hit, label: string): void;
+  /** Whether an element is the cursor (a month cell, the time grid's cursor), placed or not yet. */
+  isCursor(el: Element): boolean;
+  /** The hit the cursor element stands for; null when it has no place yet (or `el` is not the cursor). */
+  cursorAt(el: Element): Hit | null;
+  /** The first or last place of the cursor's line: the week row of a month, the hours of a day. */
+  lineEdge(hit: Hit, edge: 'start' | 'end'): Hit;
+  /** The events the keyboard walks through from the cursor's day (Enter on a month cell). */
+  itemsAt(hit: Hit): HTMLElement[];
+  /** The events next to a focused one, in reading order (its day). */
+  itemsAround(node: HTMLElement): HTMLElement[];
+  /** The node to focus for an event, on `date` when given (after a keyboard move, a delete…). */
+  nodeFor(eventId: string, date?: PlainDate): HTMLElement | null;
+  /** The hit the cursor goes back to from a focused event (Escape). */
+  cursorFor(node: HTMLElement): Hit | null;
+  /** A time grid with an all-day row above its hours: up from the first slot goes there, down from it comes back (`firstSlot`). */
+  readonly allDayRow: boolean;
+  /** The top slot in view on a day (from the all-day row down into the hours). */
+  firstSlot?(date: PlainDate): Hit | null;
+  /** Scrolls so that `hit` is in view (a held event's edge going below the fold). */
+  reveal(hit: Hit): void;
 }

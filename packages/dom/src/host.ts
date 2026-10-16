@@ -2,12 +2,10 @@ import type { ActionItem, ActionTarget, CalendarKernel, Command, CommandResult, 
 import type { InteractionSurface } from './interact/surface.js';
 import type { LiveSettings } from './settings.js';
 
-/** What `chooseScope` is told: which occurrence, where it would go, by which gesture. */
-export interface ScopeRequest {
-  readonly instance: EventInstance;
-  readonly proposal: Proposal;
-  readonly kind: 'move' | 'resize';
-}
+/** What `chooseScope` is told: which occurrence, and what is done to it (where it would go, for a gesture). */
+export type ScopeRequest =
+  | { readonly instance: EventInstance; readonly kind: 'move' | 'resize'; readonly proposal: Proposal }
+  | { readonly instance: EventInstance; readonly kind: 'delete' };
 import type { DzMessages } from './messages.js';
 import type { MotionAdapter } from './motion.js';
 import type { FrameScheduler } from './render/frame.js';

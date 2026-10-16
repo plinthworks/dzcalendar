@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { minifyCssLiteral } from './css-literal.mjs';
 
 // fileURLToPath, not .pathname: a folder with a space would come back as %20.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -70,6 +71,9 @@ function typescript(name) {
 }
 
 for (const name of PACKAGES) typescript(name);
+// The structural CSS as it ships: comments and spaces out.
+const styles = join(pkg('dom'), 'dist', 'styles.js');
+writeFileSync(styles, await minifyCssLiteral(readFileSync(styles, 'utf8')));
 theme();
 
 /** The theme ships its CSS and SCSS as they are, compiled first. */

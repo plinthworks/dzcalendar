@@ -52,7 +52,8 @@ describe('month view', () => {
     ]);
     expect(text(host.querySelector('[data-key^="f|"] .dz-bar__time'))).toBe('02:30');
     expect(text(host.querySelector('[data-key^="s|"] .dz-bar__time'))).toBe('02:30*');
-    expect(host.querySelector('[data-key^="s|"]')!.getAttribute('aria-label')).toContain('(+01:00)');
+    // What is read is the day's item for the event (the bar is drawn, not read).
+    expect(host.querySelector('[data-key^="item:s|"]')!.getAttribute('aria-label')).toContain('(+01:00)');
   });
 
   it('a Tokyo event late at night lands on the Paris day it happens', () => {
@@ -116,7 +117,8 @@ describe('context menu', () => {
   it('Shift+F10 on a focused event opens its menu; Escape returns focus to it', () => {
     const opened: string[] = [];
     const host = mount([{ id: 'x', title: 'X', start: '2026-10-21' }], { onEventOpen: (i: { key: string }) => opened.push(i.key) });
-    const bar = host.querySelector<HTMLElement>('[data-key^="x|"]')!;
+    // In a month the focus is on the event's item in its cell.
+    const bar = host.querySelector<HTMLElement>('[data-key^="item:x|"]')!;
     bar.focus();
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true }));
     const menu = host.querySelector<HTMLElement>('.dz-menu')!;

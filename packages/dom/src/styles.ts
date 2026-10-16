@@ -382,9 +382,29 @@ export const DZ_CSS = `
 .dz-ev--selected { outline: 2px solid var(--dz-accent, var(--tz-accent, Highlight)); outline-offset: 1px; touch-action: none; z-index: 4; }
 .dz-ev--selected[data-resize-end]::after { height: 14px; background: linear-gradient(transparent 5px, var(--dz-accent, var(--tz-accent, Highlight)) 5px 8px, transparent 8px); }
 .dz-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* ── keyboard: the time grid's cursor, a month's cells and their items ───── */
+.dz-tg__allday { position: relative; }
+.dz-cursor { position: absolute; grid-row: 1; inset-inline: 1px; z-index: 5; pointer-events: none; box-sizing: border-box; border-radius: var(--dz-radius, var(--tz-radius, 0.375rem)); opacity: 0; }
+.dz-tg__grid > .dz-cursor { top: calc(var(--t, 0) * var(--dz-minute, 0.8px)); height: calc(var(--h, 15) * var(--dz-minute, 0.8px)); }
+.dz-tg__allday > .dz-cursor { inset-block: 2px; }
+.dz-cursor:focus { opacity: 1; outline: 2px solid var(--dz-accent, var(--tz-accent, Highlight)); outline-offset: -2px; background: color-mix(in srgb, var(--dz-accent, var(--tz-accent, Highlight)) 12%, transparent); }
+.dz-dg__cell:focus-visible { outline: 2px solid var(--dz-accent, var(--tz-accent, Highlight)); outline-offset: -2px; }
+/* A cell's events for the keyboard and screen readers: heard, not seen — the focus ring is drawn on the bar (or "+N"). */
+.dz-dg__items { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.dz-bar.dz-focus, .dz-more.dz-focus { outline: 2px solid var(--dz-accent, var(--tz-accent, Highlight)); outline-offset: 1px; z-index: 3; }
+.dz-grabbing .dz-ev--source { opacity: 0.35; }
+/* A finger's selection: two handles to pull its ends. */
+.dz-ghost--armed { box-shadow: none; overflow: visible; }
+.dz-ghost__handle { position: absolute; inset-inline-start: 50%; width: 24px; height: 24px; margin-inline-start: -12px; pointer-events: auto; touch-action: none; }
+.dz-ghost__handle::before { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: var(--dz-bg, var(--tz-bg, Canvas)); border: 2px solid var(--dz-accent, var(--tz-accent, Highlight)); }
+.dz-ghost__handle--start { top: -12px; }
+.dz-ghost__handle--end { bottom: -12px; }
+.dz-dg .dz-ghost__handle { top: 50%; bottom: auto; margin-top: -12px; }
+.dz-dg .dz-ghost__handle--start { inset-inline-start: -12px; margin-inline-start: 0; }
+.dz-dg .dz-ghost__handle--end { inset-inline-start: auto; inset-inline-end: -12px; margin-inline-start: 0; }
 @media (forced-colors: active) {
   .dz-ghost { border: 2px solid Highlight; }
-  .dz-menu__item:focus-visible, .dz-more:focus-visible, .dz-pop__close:focus-visible, .dz-dg__num:focus-visible { outline: 2px solid Highlight; }
+  .dz-menu__item:focus-visible, .dz-more:focus-visible, .dz-pop__close:focus-visible, .dz-dg__num:focus-visible, .dz-cursor:focus, .dz-dg__cell:focus-visible, .dz-focus { outline: 2px solid Highlight; }
   .dz-ev, .dz-bar { border: 1px solid CanvasText; }
   .dz-band--gap, .dz-band--repeat { border: 1px dashed CanvasText; }
 }

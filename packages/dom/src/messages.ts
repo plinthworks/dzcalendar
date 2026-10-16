@@ -60,6 +60,44 @@ export interface DzMessages {
   readonly skippedHour: string;
   /** The context menu's accessible name. */
   readonly actions: string;
+  /** A resize from the start, said after it. */
+  eventResizedStart(parts: { title: string; time: string }): string;
+  /** The keyboard cursor's name on a slot: "Tuesday 20 October, 09:30". */
+  cursorSlot(parts: { date: string; time: string }): string;
+  /** On the all-day row of a time grid. */
+  cursorAllDay(parts: { date: string }): string;
+  /** The time grid's cursor before it has a place: what it is. */
+  readonly timeSlots: string;
+  /** From one moment or day to another. */
+  range(parts: { from: string; to: string }): string;
+  /** Said as Shift+arrows grow a selection. */
+  selected(parts: { span: string }): string;
+  /** Why a place is refused, from a rule's code. */
+  violation(code: 'constraint' | 'overlap' | 'allow' | 'valid-range' | 'not-editable'): string;
+  /** A step that cannot go anywhere (the end of the hours, a refused place). */
+  readonly noFurther: string;
+  readonly notEditable: string;
+  readonly cannotMove: string;
+  readonly cannotResize: string;
+  /** Grab mode: held, and the keys that work. */
+  grabbed(parts: { title: string }): string;
+  readonly grabHelp: string;
+  readonly grabHelpResize: string;
+  /** Added when the start can be pulled too (`eventResizableFromStart`). */
+  readonly grabHelpStart: string;
+  readonly grabCancelled: string;
+  /** `undo`: the key that undoes it here ("⌘Z", "Ctrl+Z"), empty when the calendar's undo keys are off. */
+  eventDeleted(parts: { title: string; undo: string }): string;
+  /** Grab mode: a timed event put on the all-day row, a day event put in the hours (with the length it gets). */
+  readonly becomesAllDay: string;
+  becomesTimed(parts: { length: string }): string;
+  /** The menu asking how far a delete of an occurrence reaches. */
+  readonly deleteWhich: string;
+  readonly undone: string;
+  readonly redone: string;
+  /** Context menu: grab mode by another way in. */
+  readonly moveEvent: string;
+  readonly resizeEvent: string;
 }
 
 export const EN: DzMessages = {
@@ -98,6 +136,31 @@ export const EN: DzMessages = {
   scopeAll: 'All events',
   skippedHour: 'This hour does not exist today; the event starts when it ends',
   actions: 'Actions',
+  eventResizedStart: ({ title, time }) => (time ? `${title} now starts at ${time}` : `${title} resized`),
+  cursorSlot: ({ date, time }) => `${date}, ${time}`,
+  cursorAllDay: ({ date }) => `${date}, all day`,
+  timeSlots: 'Time slots',
+  range: ({ from, to }) => `${from} to ${to}`,
+  selected: ({ span }) => `Selected: ${span}`,
+  violation: (code) =>
+    ({ constraint: 'outside the allowed hours', overlap: 'overlaps another event', allow: 'refused by the application', 'valid-range': 'outside the dates shown', 'not-editable': 'cannot be changed' })[code],
+  noFurther: 'Cannot go further',
+  notEditable: 'This event cannot be changed',
+  cannotMove: 'This event cannot be moved',
+  cannotResize: 'This length cannot be changed here',
+  grabbed: ({ title }) => `${title} grabbed.`,
+  grabHelp: 'Arrows move it, Page Up and Page Down by a week, Shift with arrows changes its end, Enter puts it down, Escape cancels.',
+  grabHelpResize: 'Arrows change its end, Enter puts it down, Escape cancels.',
+  grabHelpStart: 'Alt and Shift with arrows change its start.',
+  grabCancelled: 'Move cancelled',
+  eventDeleted: ({ title, undo }) => (undo ? `${title} deleted. ${undo} to undo.` : `${title} deleted.`),
+  becomesAllDay: 'It becomes an all-day event',
+  becomesTimed: ({ length }) => `It becomes a timed event of ${length}`,
+  deleteWhich: 'Delete which events?',
+  undone: 'Undone',
+  redone: 'Redone',
+  moveEvent: 'Move…',
+  resizeEvent: 'Change duration…',
 };
 
 export const FR: DzMessages = {
@@ -136,4 +199,29 @@ export const FR: DzMessages = {
   scopeAll: 'Tous les événements',
   skippedHour: "Cette heure n'existe pas aujourd'hui ; l'événement commence à sa fin",
   actions: 'Actions',
+  eventResizedStart: ({ title, time }) => (time ? `« ${title} » commence maintenant à ${time}` : `« ${title} » redimensionné`),
+  cursorSlot: ({ date, time }) => `${date}, ${time}`,
+  cursorAllDay: ({ date }) => `${date}, journée`,
+  timeSlots: 'Créneaux horaires',
+  range: ({ from, to }) => `${from} à ${to}`,
+  selected: ({ span }) => `Sélection : ${span}`,
+  violation: (code) =>
+    ({ constraint: 'en dehors des heures permises', overlap: 'chevauche un autre événement', allow: "refusé par l'application", 'valid-range': 'en dehors des dates affichables', 'not-editable': 'non modifiable' })[code],
+  noFurther: 'Impossible d’aller plus loin',
+  notEditable: 'Cet événement ne peut pas être modifié',
+  cannotMove: 'Cet événement ne peut pas être déplacé',
+  cannotResize: 'Cette durée ne peut pas être changée ici',
+  grabbed: ({ title }) => `« ${title} » saisi.`,
+  grabHelp: 'Flèches pour le déplacer, Page précédente et suivante d’une semaine, Maj et flèches pour sa fin, Entrée pour le poser, Échap pour annuler.',
+  grabHelpResize: 'Flèches pour sa fin, Entrée pour le poser, Échap pour annuler.',
+  grabHelpStart: 'Alt, Maj et flèches pour son début.',
+  grabCancelled: 'Déplacement annulé',
+  eventDeleted: ({ title, undo }) => (undo ? `« ${title} » supprimé. ${undo} pour annuler.` : `« ${title} » supprimé.`),
+  becomesAllDay: 'Il devient un événement sur la journée',
+  becomesTimed: ({ length }) => `Il devient un événement horaire de ${length}`,
+  deleteWhich: 'Supprimer quels événements ?',
+  undone: 'Annulé',
+  redone: 'Rétabli',
+  moveEvent: 'Déplacer…',
+  resizeEvent: 'Changer la durée…',
 };

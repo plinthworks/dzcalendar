@@ -1,6 +1,6 @@
 import { Temporal, formatTemporal } from '@dzcalendar/core';
-import type { DayGridBar, DayGridModel, DayGridWeek, KernelState, PlainDate, Segment, ZonedDateTime } from '@dzcalendar/core';
-import type { Box, InteractionSurface } from '../interact/surface.js';
+import type { DayGridBar, DayGridModel, DayGridWeek, Hit, KernelState, PlainDate, Segment, ZonedDateTime } from '@dzcalendar/core';
+import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
 import type { ViewController, ViewCtx } from '../host.js';
 import { registerView } from '../host.js';
 import { attachMenuTriggers } from '../menu.js';
@@ -36,6 +36,14 @@ interface CellItem {
   readonly outside: boolean;
   readonly closed: boolean;
   readonly count: number;
+  /** Every event on this day, hidden by "+N" or not: the cell lists them for the keyboard and screen readers. */
+  readonly segs: readonly Segment[];
+}
+
+interface ItemOfDay {
+  readonly key: string;
+  readonly sig: string;
+  readonly seg: Segment;
 }
 
 interface MoreItem {
@@ -81,6 +89,9 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
   let state: KernelState | null = null;
   const parts = new Map<string, WeekParts>();
   let created: HTMLElement[] = [];
+  /** The keyboard's day: its cell is the grid's tab stop. */
+  let cursorDate: PlainDate | null = null;
+  const itemLists = new WeakMap<HTMLElement, { readonly host: HTMLElement; readonly list: KeyedList<ItemOfDay> }>();
 
   const weeks = new KeyedList<WeekItem>(
     body,
@@ -88,8 +99,11 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
       const el = h(doc, 'div', 'dz-dg__week');
       el.setAttribute('role', 'row');
       const cells = contentsHost(doc, 'dz-dg__cells');
+      // What is drawn across the days is seen, not read: each cell lists its own events.
       const barsHost = contentsHost(doc, 'dz-dg__bars');
+      barsHost.setAttribute('aria-hidden', 'true');
       const more = contentsHost(doc, 'dz-dg__mores');
+      more.setAttribute('aria-hidden', 'true');
       el.append(cells, barsHost, more);
       const p: WeekParts = {
         week: null,
@@ -100,7 +114,8 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
           (m) => {
             const link = h(doc, 'button', 'dz-more') as HTMLButtonElement;
             link.type = 'button';
-            link.setAttribute('aria-haspopup', 'dialog');
+            // A pointer's way to the hidden events; the keyboard reaches them in the cell.
+            link.tabIndex = -1;
             link.addEventListener('click', () => p.week && openMore(link, p.week, Number(link.dataset['col'])));
             void m;
             return link;
@@ -130,11 +145,13 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     el.style.setProperty('--lanes', String(shown));
     p.cells.sync(
       week.dates.map((date, i): CellItem => {
-        const count = week.segments.filter((sg) => sg.dayIndex - week.firstColumn <= i && i < sg.dayIndex - week.firstColumn + sg.dayCount).length;
+        const segs = week.segments.filter((sg) => sg.dayIndex - week.firstColumn <= i && i < sg.dayIndex - week.firstColumn + sg.dayCount);
+        const count = segs.length;
         const today = date.equals(s.today);
         const outside = week.outside[i] ?? false;
         const closed = week.closed[i] ?? false;
-        return { key: date.toString(), sig: `${i}|${today}|${outside}|${closed}|${count}|${ctx.epoch}`, date, col: i, today, outside, closed, count };
+        const items = segs.map((sg) => `${sg.key}:${sg.instance.event.revision}`).join(',');
+        return { key: date.toString(), sig: `${i}|${today}|${outside}|${closed}|${items}|${ctx.epoch}`, date, col: i, today, outside, closed, count, segs };
       }),
     );
     const items: BarItem[] = [];
@@ -188,9 +205,9 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     else cell.removeAttribute('aria-current');
     const long = formatTemporal(c.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, ctx.locale);
     cell.setAttribute('aria-label', ctx.messages.dayLabel({ date: long, count: c.count }));
-    cell.tabIndex = -1;
-    // The day number leads to that day, where a day view exists. One tab stop
-    // per cell is the job of Phase 8's roving focus: until then it is not a stop.
+    // Roving focus: the cursor's cell is the grid's one tab stop.
+    cell.tabIndex = cursorDate?.equals(c.date) ? 0 : -1;
+    // The day number leads to that day, where a day view exists (the context menu's "Go to this day" too).
     const dayView = ctx.kernel.getViewSpec('timeGridDay') ? 'timeGridDay' : ctx.kernel.getViewSpec('dayGridDay') ? 'dayGridDay' : null;
     const num = h(doc, dayView ? 'button' : 'span', 'dz-dg__num', formatTemporal(c.date, { day: 'numeric' }, ctx.locale));
     if (dayView) {
@@ -199,7 +216,33 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
       num.setAttribute('aria-label', `${ctx.messages.goToDay}, ${long}`);
       num.addEventListener('click', () => ctx.kernel.setView(dayView, c.date));
     }
-    cell.replaceChildren(num);
+    let items = itemLists.get(cell);
+    if (!items) {
+      const host = h(doc, 'div', 'dz-dg__items');
+      items = { host, list: new KeyedList<ItemOfDay>(host, () => h(doc, 'div', 'dz-dg__item'), (n, it) => drawItem(n, it.seg)) };
+      itemLists.set(cell, items);
+      cell.append(host);
+    }
+    // The number is redrawn; the list keeps its nodes (and the focus on one of them).
+    const old = cell.querySelector(':scope > .dz-dg__num');
+    if (old) old.replaceWith(num);
+    else cell.prepend(num);
+    items.list.sync(c.segs.map((seg) => ({ key: `item:${seg.key}`, sig: `${seg.instance.event.revision}|${ctx.epoch}`, seg })));
+  }
+
+  /** The cell's own button for an event: what the keyboard focuses and a screen reader reads in the day. */
+  function drawItem(el: HTMLElement, seg: Segment): void {
+    const ev = seg.instance.event;
+    const title = ev.title || ctx.messages.untitled;
+    const reading = startReadingOf(ev, ctx.zone);
+    const labels = timeLabels(ctx, ev, reading ? { start: reading } : {});
+    el.setAttribute('role', 'button');
+    el.tabIndex = -1;
+    el.dataset['segment'] = seg.key;
+    el.dataset['eventId'] = ev.id;
+    if (ev.ref) el.dataset['seriesId'] = ev.ref.seriesId;
+    else delete el.dataset['seriesId'];
+    el.setAttribute('aria-label', ctx.messages.eventLabel({ title, time: labels.spoken }));
   }
 
   function drawBar(el: HTMLElement, it: BarItem, changed: { pos: boolean; content: boolean; created: boolean }): void {
@@ -235,9 +278,6 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
         ? [doc.createTextNode(title)]
         : [h(doc, 'span', 'dz-bar__time', labels.text.split(' – ')[0]), doc.createTextNode(` ${title}`)];
     fillEvent(ctx, el, { instance: s.instance, segment: s, timeText: labels.text, displayZone: ctx.zone, family: 'dayGrid' }, fallback, changed.created);
-    el.tabIndex = 0;
-    el.setAttribute('role', 'button');
-    el.setAttribute('aria-label', ctx.messages.eventLabel({ title, time: labels.spoken }));
   }
 
   function openMore(link: HTMLElement, week: DayGridWeek, col: number): void {
@@ -283,12 +323,108 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     const seg = item ? segmentByKey(item.dataset['segment'] ?? '') : undefined;
     if (seg) ctx.live().onEventClick?.(seg.instance);
   });
+  // …and by keyboard: Enter or Space, as on a button.
+  ctx.scope.on(ctx.popoverElement, 'keydown', (e) => {
+    const ke = e as KeyboardEvent;
+    if (ke.key !== 'Enter' && ke.key !== ' ') return;
+    const item = (ke.target as Element | null)?.closest<HTMLElement>('.dz-bar');
+    const seg = item ? segmentByKey(item.dataset['segment'] ?? '') : undefined;
+    if (!seg) return;
+    ke.preventDefault();
+    ctx.live().onEventClick?.(seg.instance);
+  });
 
   attachMenuTriggers(ctx, ctx.popoverElement, (target) => {
     const item = target.closest<HTMLElement>('.dz-bar');
     const seg = item ? segmentByKey(item.dataset['segment'] ?? '') : undefined;
     return item && seg ? { target: { kind: 'event', instance: seg.instance }, anchor: item } : null;
   });
+
+  // ── keyboard: the cells are the cursor, their items the events ─────────
+  const cellOf = (date: PlainDate) => body.querySelector<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"]`);
+  const shownDates = () => (model?.weeks ?? []).flatMap((w) => w.dates);
+  const homeDate = (): PlainDate | null => {
+    const dates = shownDates();
+    const st = state ?? ctx.kernel.getState();
+    return dates.find((d) => d.equals(st.today)) ?? dates.find((d) => Temporal.PlainDate.compare(d, st.range.activeStart) >= 0) ?? dates[0] ?? null;
+  };
+  /** One tab stop: the cursor's cell. */
+  function rove(date: PlainDate | null): void {
+    cursorDate = date;
+    for (const c of body.querySelectorAll<HTMLElement>('.dz-dg__cell')) c.tabIndex = date && c.dataset['date'] === date.toString() ? 0 : -1;
+  }
+  const weekOf = (date: PlainDate) => model?.weeks.find((w) => w.dates.some((d) => d.equals(date)));
+  /** The bars (or the "+N" link) that show an event on one day: where its focus ring is drawn. */
+  function visualsOf(item: HTMLElement): HTMLElement[] {
+    const cell = item.closest<HTMLElement>('.dz-dg__cell');
+    const row = cell?.closest<HTMLElement>('.dz-dg__week');
+    if (!cell || !row) return [];
+    const col = Number(cell.style.getPropertyValue('--col'));
+    const bars = [...row.querySelectorAll<HTMLElement>('.dz-bar')].filter((b) => {
+      if (b.dataset['segment'] !== item.dataset['segment']) return false;
+      const from = Number(b.style.getPropertyValue('--col'));
+      return from <= col && col < from + Number(b.style.getPropertyValue('--span'));
+    });
+    if (bars.length > 0) return bars;
+    const more = [...row.querySelectorAll<HTMLElement>('.dz-more')].find((m) => Number(m.dataset['col']) === col);
+    return more ? [more] : [];
+  }
+  ctx.scope.on(root, 'focusin', (e) => {
+    const t = e.target as Element | null;
+    if (t?.matches('.dz-dg__item')) for (const v of visualsOf(t as HTMLElement)) v.classList.add('dz-focus');
+    if (t?.matches('.dz-dg__cell') && t instanceof HTMLElement && t.dataset['date'] && cursorDate?.toString() !== t.dataset['date']) rove(Temporal.PlainDate.from(t.dataset['date']));
+  });
+  ctx.scope.on(root, 'focusout', (e) => {
+    const t = e.target as Element | null;
+    if (t?.matches('.dz-dg__item')) for (const v of root.querySelectorAll('.dz-focus')) v.classList.remove('dz-focus');
+  });
+
+  const keys: KeyboardSurface = {
+    allDayRow: false,
+    home() {
+      const d = homeDate();
+      return d ? { kind: 'day', date: d } : null;
+    },
+    fit(hit) {
+      const dates = shownDates();
+      if (dates.length === 0) return null;
+      if (dates.some((d) => d.equals(hit.date))) return hit.kind === 'day' && !hit.allDayRow ? hit : { kind: 'day', date: hit.date };
+      return Temporal.PlainDate.compare(hit.date, dates[0]!) < 0 ? 'prev' : 'next';
+    },
+    showCursor(hit) {
+      rove(hit.date);
+      cellOf(hit.date)?.focus();
+    },
+    isCursor: (el) => el.matches('.dz-dg__cell'),
+    cursorAt: (el) => (el.matches('.dz-dg__cell') && el instanceof HTMLElement && el.dataset['date'] ? { kind: 'day', date: Temporal.PlainDate.from(el.dataset['date']) } : null),
+    lineEdge(hit, edge) {
+      const w = weekOf(hit.date);
+      const d = w ? (edge === 'start' ? w.dates[0] : w.dates[w.dates.length - 1]) : undefined;
+      return d ? { kind: 'day', date: d } : hit;
+    },
+    itemsAt: (hit) => [...(cellOf(hit.date)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])],
+    itemsAround: (node) => [...(node.closest('.dz-dg__items')?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])],
+    nodeFor(eventId, date) {
+      const inCell = date ? [...(cellOf(date)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])].find((n) => n.dataset['eventId'] === eventId) : undefined;
+      return inCell ?? [...body.querySelectorAll<HTMLElement>('.dz-dg__item')].find((n) => n.dataset['eventId'] === eventId) ?? null;
+    },
+    cursorFor(node) {
+      const date = node.closest<HTMLElement>('.dz-dg__cell')?.dataset['date'];
+      return date ? { kind: 'day', date: Temporal.PlainDate.from(date) } : null;
+    },
+    reveal() {
+      /* the month does not scroll */
+    },
+  };
+
+  /** A pointer pressed a bar: the focus goes to its item in the cell where it starts in that row. */
+  function focusTarget(node: HTMLElement): HTMLElement {
+    if (!node.matches('.dz-bar')) return node;
+    const row = node.closest<HTMLElement>('.dz-dg__week');
+    const col = node.style.getPropertyValue('--col');
+    const cell = [...(row?.querySelectorAll<HTMLElement>('.dz-dg__cell') ?? [])].find((c) => c.style.getPropertyValue('--col') === col);
+    return [...(cell?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])].find((i) => i.dataset['segment'] === node.dataset['segment']) ?? node;
+  }
 
   // ── gestures: geometry read once per gesture ─────────────────────────────
   interface WeekGeo {
@@ -307,6 +443,8 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     root,
     scroller: null,
     family: 'dayGrid',
+    keys,
+    focusTarget,
     accepts: (target) => target.closest('.dz-dg__week') !== null,
     measure(origin) {
       const weeksGeo: WeekGeo[] = [];
@@ -371,10 +509,12 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
 
   attachMenuTriggers(ctx, root, (target) => {
     if (!model) return null;
-    const barEl = target.closest<HTMLElement>('.dz-bar:not(.dz-bar--bg)');
+    const barEl = target.closest<HTMLElement>('.dz-bar:not(.dz-bar--bg), .dz-dg__item');
     if (barEl) {
       const seg = segmentByKey(barEl.dataset['segment'] ?? '');
-      return seg ? { target: { kind: 'event', instance: seg.instance }, anchor: barEl } : null;
+      // A cell's item is hidden: the menu opens under its cell, and the focus comes back to it.
+      const anchor = barEl.matches('.dz-dg__item') ? (barEl.closest<HTMLElement>('.dz-dg__cell') ?? barEl) : barEl;
+      return seg ? { target: { kind: 'event', instance: seg.instance }, anchor, focus: barEl.matches('.dz-dg__item') ? barEl : focusTarget(barEl) } : null;
     }
     const cell = target.closest<HTMLElement>('.dz-dg__cell');
     if (!cell) return null;
@@ -400,9 +540,14 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
         }),
       );
       root.style.setProperty('--dz-cols', String(first?.dates.length ?? 7));
+      root.setAttribute('aria-label', s.title);
+      // The cursor stays on its day while it is shown; otherwise today, or the period's first day.
+      if (!cursorDate || !m.weeks.some((w) => w.dates.some((d) => d.equals(cursorDate!)))) cursorDate = homeDate();
       root.classList.toggle('dz-dg--month', s.view.alignment === 'month');
       weeks.sync(m.weeks.map((week) => ({ key: week.dates[0]?.toString() ?? '', sig: `${idOf(week)}|${s.today.toString()}|${m.maxLanes}|${ctx.epoch}`, week })));
       for (const key of parts.keys()) if (!m.weeks.some((w) => w.dates[0]?.toString() === key)) parts.delete(key);
+      // A cell whose content did not change was not redrawn: the tab stop is set on all of them.
+      rove(cursorDate);
       return created;
     },
     tick() {

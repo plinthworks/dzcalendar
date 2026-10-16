@@ -1,7 +1,8 @@
-import { actionsFor, assertBusinessHours, createKernel, formatTemporal, isValidZone, Temporal } from '@dzcalendar/core';
-import type { Command, CommandResult, EditScope, Instant, Proposal, ZonedDateTime } from '@dzcalendar/core';
+import { actionsFor, assertBusinessHours, createKernel, formatTemporal, intentFor, isValidZone, Temporal } from '@dzcalendar/core';
+import type { Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
 import { attachInteractions } from './interact/host.js';
+import type { Interactions } from './interact/host.js';
 import type { LiveSettings } from './settings.js';
 import type { ActionItem, CalendarKernel, CreateRequest, DurationLike, EventInput, EventInstance, KernelOptions, NavDirection, PlainDate, ZoneId } from '@dzcalendar/core';
 import type { CalendarHooks, MenuHook, ViewController, ViewCtx } from './host.js';
@@ -73,6 +74,8 @@ export interface CalendarInstance {
   run(cmd: Command, opts?: { readonly validate?: boolean }): CommandResult;
   undo(): boolean;
   redo(): boolean;
+  /** Shows a selection (null clears it), as if a person had made it; `onSelect` is not called. */
+  select(selection: Selection | null): void;
   destroy(): void;
 }
 
@@ -154,6 +157,22 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   liveRegion.setAttribute('aria-live', 'polite');
   liveRegion.setAttribute('role', 'status');
   root.append(liveRegion);
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or Ctrl+Y) anywhere in the calendar, but not in a field an application put there.
+  scope.on(root, 'keydown', (e) => {
+    const ke = e as KeyboardEvent;
+    // Only where the person may change things: an application's own commands are not theirs to undo.
+    if (ke.defaultPrevented || settings.current.keyboardUndo === false || settings.current.editable !== true) return;
+    const t = ke.target as HTMLElement | null;
+    if (t?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], .dz-menu')) return;
+    const intent = intentFor(ke, { mode: 'cursor', rtl: root.dir === 'rtl', grid: 'day' });
+    if (intent?.kind !== 'undo' && intent?.kind !== 'redo') return;
+    ke.preventDefault();
+    const focused = (doc.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-event-id]')?.dataset['eventId'] ?? null;
+    const done = intent.kind === 'undo' ? kernel.history.undo() : kernel.history.redo();
+    if (done) ctx.announce(intent.kind === 'undo' ? ctx.messages.undone : ctx.messages.redone);
+    // The focused node may have gone with the change: the event where it now is, else the cursor.
+    if (done && !root.contains(doc.activeElement)) interactions?.refocus(focused);
+  });
   /** A short menu at a point: resolves with the value chosen, or null when it closes without one. */
   function choose<T>(label: string, choices: readonly { id: string; label: string; value: T }[], at: { x: number; y: number }): Promise<T | null> {
     return new Promise((resolve) => {
@@ -208,6 +227,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             if (!r.ok) settings.current.onCommandRefused?.(r, cmd);
           },
         }),
+        ...(live.editable && interactions && {
+          onGrab: (inst: EventInstance, kind: 'move' | 'resize') => interactions?.grab(inst, kind),
+          // A month draws a timed event's day, not its hours: it only moves there, as under the pointer.
+          canResize: (inst: EventInstance) => mountedFamily !== 'dayGrid' || inst.event.allDay,
+        }),
         ...(drawable('timeGridDay') && { onGoToDay: (d: PlainDate) => kernel.setView('timeGridDay', d) }),
       });
       const items: readonly ActionItem[] | null = live.contextMenu ? live.contextMenu({ target, state }, defaults) : defaults;
@@ -221,12 +245,13 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     announce(text) {
       // Emptied first, so the same words twice are said twice.
       liveRegion.textContent = '';
-      requestAnimationFrame(() => (liveRegion.textContent = text));
+      // Two in one frame: the last is said.
+      (win ?? globalThis).requestAnimationFrame(() => (liveRegion.textContent = text));
     },
     chooseScope(request, at) {
       const own = settings.current.chooseScope;
       if (own) return Promise.resolve(own(request));
-      return choose<EditScope>(ctx.messages.changeWhich, [
+      return choose<EditScope>(request.kind === 'delete' ? ctx.messages.deleteWhich : ctx.messages.changeWhich, [
         { id: 'this', label: ctx.messages.scopeThis, value: 'this' },
         { id: 'following', label: ctx.messages.scopeFollowing, value: 'following' },
         { id: 'all', label: ctx.messages.scopeAll, value: 'all' },
@@ -264,6 +289,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   root.append(toolbar.element);
 
   let view: ViewController | null = null;
+  let interactions: Interactions | null = null;
   let viewScope: Scope | null = null;
   let mountedFamily: string | null = null;
   let firstPaint = true;
@@ -283,7 +309,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     viewScope = new Scope();
     const viewCtx = Object.assign(Object.create(ctx) as ViewCtx, { scope: viewScope });
     view = factory(viewCtx);
-    if (view.surface) attachInteractions(viewCtx, view.surface);
+    interactions = view.surface ? attachInteractions(viewCtx, view.surface) : null;
     mountedFamily = family;
     root.append(view.element);
     firstPaint = true;
@@ -303,6 +329,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     root.dataset['view'] = state.view.type;
     root.classList.toggle('dz-editable', settings.current.editable === true);
     const created = v.render(vm.model, state);
+    interactions?.refresh();
     if (options.nowIndicator !== false) v.tick(kernel.now(), state);
     if (!firstPaint && pendingDir) ctx.motion.viewChange?.(v.body, pendingDir);
     else if (!firstPaint && created.length > 0) ctx.motion.eventsEnter?.(created);
@@ -466,6 +493,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     run: (cmd, opts) => kernel.run(cmd, opts),
     undo: () => kernel.history.undo(),
     redo: () => kernel.history.redo(),
+    select: (sel) => interactions?.select(sel),
     destroy() {
       scope.dispose();
       viewScope?.dispose();

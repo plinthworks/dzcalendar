@@ -39,6 +39,8 @@ export interface LiveSettings {
   readonly eventResizableFromStart?: boolean;
   /** A gesture dropped where the rules refuse it (the proposal and its violations). */
   readonly onProposalRefused?: (proposal: Proposal) => void;
+  /** Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo inside the calendar. Default true. */
+  readonly keyboardUndo?: boolean;
 }
 
 type Handler<K extends keyof LiveSettings> = {
@@ -60,6 +62,7 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   dragEdgeNavigate: {},
   eventResizableFromStart: {},
   onProposalRefused: {},
+  keyboardUndo: {},
   snapMinutes: {
     check: (v) => {
       if (!Number.isInteger(v) || v < 1 || v > 1440) throw new RangeError(`snapMinutes must be a whole number of minutes from 1 to 1440: ${v}`);

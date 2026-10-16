@@ -38,6 +38,8 @@ Ils existent déjà dans `dzcalendar/packages/core/src/zone.ts` avec leur signat
 - **`isQuietDay(date, zone)`.** Il dit qu'aucune transition ne tombe entre le jour d'avant et le jour d'après, avec un cache par zone et par numéro de jour. Une heure ne peut être sautée ou répétée que près d'une transition. Vérifié contre toutes les transitions de 1840 à 2040 dans 15 zones.
 - **Coût.** `resolveWallTime` coûte environ 7 µs (non minifié). Deux lectures (`earlier` puis `later`) suffisent à classer un cas : si elles donnent le même instant, l'heure est normale ; sinon, si la lecture `earlier` retombe sur l'heure murale demandée, l'heure est répétée ; sinon, c'est un trou. Voir `placeWall` dans `dzcalendar/packages/core/src/event/parse-temporal.ts`.
 
+- **Bug probable : un jour entier sauté est lu comme « ambigu ».** Constaté en Phase 8 (revue de code) : `resolveWallTime(2011-12-30, 08:00, 'Pacific/Apia')` répond `ambiguous` avec deux instants (2011-12-29T18:00Z et 2011-12-30T18:00Z), alors que le 30 décembre 2011 n'a pas existé à Apia (passage de −10:00 à +14:00). Attendu : `exists: false`. DzCalendar contourne côté clavier (un jour sauté est enjambé depuis le point de départ), mais la primitive devrait le dire. Cas à écrire à la main dans les tests de tzslot.
+
 ## Informations utiles pour les pickers
 
 - **`Intl.DateTimeFormat#format`** lève une exception sur `PlainDate` et `ZonedDateTime` avec le polyfill, qui ne patche pas `Intl`. Ce qui fonctionne : `zdt.toLocaleString(...)`, ou `format(epochMs)` avec l'option `timeZone`.

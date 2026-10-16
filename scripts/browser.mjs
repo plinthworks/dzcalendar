@@ -6,7 +6,26 @@
  */
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+
+const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
+/** axe-core's violations inside `selector`: the WCAG 2.0–2.2 A and AA rules and axe's best practices. */
+async function axeViolations(p, selector = 'body') {
+  if (!(await p.evaluate(() => 'axe' in window))) await p.addScriptTag({ content: AXE });
+  return p.evaluate(async (sel) => {
+    const r = await window.axe.run(document.querySelector(sel), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'] } });
+    // WCAG 2.5.8's "essential" exception: an event's height and width are its duration and its share of
+    // the column; narrow ones have the keyboard and the context menu as alternatives (see the ACR).
+    // Only events may fall under it — any other small target is still a failure.
+    const isEvent = (n) => document.querySelector(String(n.target[n.target.length - 1]))?.matches('.dz-ev, .dz-bar') === true;
+    return r.violations
+      .map((v) => (v.id === 'target-size' ? { ...v, nodes: v.nodes.filter((n) => !isEvent(n)) } : v))
+      .filter((v) => v.nodes.length > 0)
+      .map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(', ')}`);
+  }, selector);
+}
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({ configFile: `${root}/vite.config.ts`, server: { port: 4611, strictPort: false }, logLevel: 'error' });
@@ -399,6 +418,164 @@ try {
       const s1 = await p.$eval('.dz-tg__body', (e) => e.scrollTop);
       check('touch: a finger on empty time scrolls the grid', s1 > s0 + 50, `${s0} → ${s1}`);
       check('touch: no console error', errors.length === 0, errors.join(' | '));
+      await ctx.close();
+    }
+
+    // ── Phase 8: axe-core on every view; the keyboard where layout matters ──
+    {
+      const { p, errors } = await page('/');
+      await p.waitForSelector('.dz-ev');
+      for (const v of ['timeGridWeek', 'dayGridMonth', 'timeGridDay']) {
+        await p.click(`.dz-toolbar__view[data-view="${v}"]`);
+        await p.mouse.move(5, 5); // not left hovering the pressed button
+        await p.waitForTimeout(200);
+        const found = await axeViolations(p, '.dz-cal');
+        check(`axe: ${v} has no violation`, found.length === 0, found.join(' | '));
+      }
+      // The context menu open, with its scope sub-menu.
+      await p.click('.dz-toolbar__view[data-view="timeGridWeek"]');
+      await p.click('.dz-ev[data-series-id="standup"]', { button: 'right' });
+      await p.keyboard.press('ArrowDown');
+      const withMenu = await axeViolations(p, '.dz-cal');
+      check('axe: the open context menu has no violation', withMenu.length === 0, withMenu.join(' | '));
+      await p.keyboard.press('Escape');
+      // Right to left.
+      await p.evaluate(() => window.__dz().update({ locale: 'he-IL' }));
+      await p.waitForTimeout(200);
+      const rtl = await axeViolations(p, '.dz-cal');
+      check('axe: right to left has no violation', rtl.length === 0, rtl.join(' | '));
+      await p.evaluate(() => window.__dz().update({ locale: 'fr-FR' }));
+      // States a person passes through: the cursor focused, an event held, a selection drawn, the "+N" panel open.
+      await p.focus('.dz-cursor');
+      await p.keyboard.press('ArrowDown');
+      await p.keyboard.press('ArrowDown', { modifiers: ['Shift'] });
+      const withSelection = await axeViolations(p, '.dz-cal');
+      check('axe: the cursor focused and a selection drawn — no violation', withSelection.length === 0, withSelection.join(' | '));
+      await p.keyboard.press('Escape');
+      await p.focus('.dz-ev[data-event-id="lunch"]');
+      await p.keyboard.press('m');
+      await p.keyboard.press('ArrowDown');
+      const holding = await axeViolations(p, '.dz-cal');
+      check('axe: an event held by keyboard — no violation', holding.length === 0, holding.join(' | '));
+      await p.keyboard.press('Escape');
+      await p.click('.dz-toolbar__view[data-view="dayGridMonth"]');
+      await p.evaluate(() => window.__dz().kernel.setOptions({ dayGrid: { maxLanes: 2 } }));
+      if (await p.$('.dz-more')) {
+        await p.click('.dz-more');
+        const panel = await axeViolations(p, '.dz-cal');
+        check('axe: the "+N" panel open — no violation', panel.length === 0, panel.join(' | '));
+        await p.keyboard.press('Escape');
+      } else check('axe: the "+N" panel open — no violation', false, 'no "+N" link with 2 lanes');
+      check('axe: no console error', errors.length === 0, errors.join(' | '));
+      await p.close();
+    }
+    {
+      const { p, errors } = await page('/dst.html');
+      await p.waitForSelector('.dz-band--repeat');
+      const found = await axeViolations(p, 'body');
+      check('axe: the four-zone clock-change page has no violation', found.length === 0, found.join(' | '));
+      check('axe dst: no console error', errors.length === 0, errors.join(' | '));
+      await p.close();
+    }
+
+    // The time grid's cursor: tabbing in puts it on the first slot in view, at a slot boundary, in its column.
+    {
+      const { p, errors } = await page('/');
+      await p.waitForSelector('.dz-ev');
+      await p.focus('.dz-cursor');
+      const at = async () =>
+        p.evaluate(() => {
+          const c = document.activeElement;
+          const r = c.getBoundingClientRect();
+          const col = document.querySelectorAll('.dz-tg__col')[parseInt(c.style.gridColumn, 10) - 2].getBoundingClientRect();
+          const px = col.height / Number(getComputedStyle(document.querySelector('.dz-tg__col')).getPropertyValue('--dz-len'));
+          const body = document.querySelector('.dz-tg__body').getBoundingClientRect();
+          return { label: c.getAttribute('aria-label'), minutes: (r.top - col.top) / px, inside: r.left >= col.left - 1 && r.right <= col.right + 1, visible: r.top >= body.top - 1 && r.bottom <= body.bottom + 1, opacity: getComputedStyle(c).opacity };
+        });
+      const first = await at();
+      check('keyboard: the cursor lands on a slot in view, in its column, visible', first.inside && first.visible && first.opacity === '1' && Math.abs(first.minutes - Math.round(first.minutes / 15) * 15) < 0.5, JSON.stringify(first));
+      for (let k = 0; k < 4; k++) await p.keyboard.press('ArrowDown');
+      const later = await at();
+      check('keyboard: four slots down is one hour lower on screen (±0.5 min)', Math.abs(later.minutes - first.minutes - 60) < 0.5, JSON.stringify({ first, later }));
+
+      // Grab "Déjeuner" (Mon 12:30): two slots down, one day on — the ghost sits at Tue 13:00; Enter moves it there.
+      await p.focus('.dz-ev[data-event-id="lunch"]');
+      await p.keyboard.press('m');
+      for (const k of ['ArrowDown', 'ArrowDown', 'ArrowRight']) await p.keyboard.press(k);
+      const tue = await colCenter(p, 1);
+      const ghost = await p.$eval('.dz-ghost', (g) => g.getBoundingClientRect().toJSON());
+      check('keyboard grab: the preview is at Tuesday 13:00 (±1 px)', Math.abs(ghost.top - (tue.top + 780 * tue.px)) <= 1 && Math.abs(ghost.left + ghost.width / 2 - tue.x) < ghost.width, JSON.stringify({ ghost, tue }));
+      await p.keyboard.press('Enter');
+      await p.waitForTimeout(100);
+      const moved = await ev(p, 'lunch');
+      const focus = await p.evaluate(() => ({ id: document.activeElement?.dataset.eventId, col: document.activeElement?.closest('.dz-tg__col')?.dataset.date }));
+      check('keyboard grab: Enter moves it, and the focus follows it', moved[0] === '2026-10-20T13:00:00+02:00[Europe/Paris]' && focus.id === 'lunch' && focus.col === '2026-10-20', JSON.stringify({ moved, focus }));
+
+      // WCAG 2.5.7 without a drag: "Move…" from the context menu, then a click where it should go.
+      await p.click('.dz-ev[data-event-id="design"]', { button: 'right' });
+      await p.click('.dz-menu [data-action="event.move"]');
+      const thu = await colCenter(p, 3);
+      await p.mouse.click(thu.x, thu.top + 900 * thu.px + 2);
+      await p.waitForTimeout(100);
+      const placed = await ev(p, 'design');
+      check('single pointer: "Move…" then a click puts the event there (Thursday 15:00)', placed?.[0] === '2026-10-22T15:00:00+02:00[Europe/Paris]', JSON.stringify(placed));
+
+      // A month cell's item is focused: its ring is drawn on the bar it stands for.
+      await p.click('.dz-toolbar__view[data-view="dayGridMonth"]');
+      await p.focus('.dz-dg__cell[data-date="2026-10-21"]');
+      await p.keyboard.press('Enter');
+      const ring = await p.evaluate(() => {
+        const id = document.activeElement?.dataset.segment;
+        const bar = [...document.querySelectorAll('.dz-bar.dz-focus')].find((b) => b.dataset.segment === id);
+        return bar ? getComputedStyle(bar).outlineStyle : null;
+      });
+      check('keyboard month: the focused item’s bar shows the focus ring', ring === 'solid', String(ring));
+      check('keyboard: no console error', errors.length === 0, errors.join(' | '));
+      await p.close();
+    }
+
+    // A selection stays on screen after the mouse lets go; a click elsewhere clears it.
+    {
+      const { p } = await page('/');
+      await p.waitForSelector('.dz-ev');
+      const thu = await colCenter(p, 3);
+      const y = (await p.$eval('.dz-tg__body', (b) => b.getBoundingClientRect().top)) + 300;
+      await drag(p, { x: thu.x, y }, { x: thu.x, y: y + 60 });
+      const kept = await p.$$eval('.dz-ghost--armed', (g) => g.length);
+      await p.mouse.click(thu.x, y + 200);
+      const after = await p.$$eval('.dz-ghost--armed', (g) => g.length);
+      check('selection: it stays drawn after the drop, and a click elsewhere clears it', kept === 1 && after === 0, JSON.stringify({ kept, after }));
+      await p.close();
+    }
+
+    // Touch: a tap selects one slot with two handles; pulling the end handle extends it.
+    {
+      const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 }, hasTouch: true });
+      const p = await ctx.newPage();
+      const errors = [];
+      p.on('pageerror', (e) => errors.push(e.message));
+      await p.emulateMedia({ reducedMotion: 'reduce' });
+      await p.goto(new URL('/', base).href, { waitUntil: 'networkidle' });
+      await p.waitForSelector('.dz-ev');
+      const cdp = await ctx.newCDPSession(p);
+      const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+      const thu = await colCenter(p, 3);
+      const y = (await p.$eval('.dz-tg__body', (b) => b.getBoundingClientRect().top)) + 300;
+      await touch('touchStart', thu.x, y);
+      await touch('touchEnd', thu.x, y);
+      const handles = await p.$$eval('.dz-ghost__handle', (hs) => hs.map((h) => { const r = h.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width }; }));
+      const first = await p.textContent('#status');
+      const end = handles[1];
+      if (end) {
+        await touch('touchStart', end.x, end.y);
+        for (let k = 1; k <= 6; k++) await touch('touchMove', end.x, end.y + (90 * k) / 6);
+        await touch('touchEnd', end.x, end.y + 90);
+      }
+      const second = await p.textContent('#status');
+      const minutes = (t) => { const m = /T(\d\d):(\d\d).*→ .*T(\d\d):(\d\d)/.exec(t ?? ''); return m ? (Number(m[3]) * 60 + Number(m[4])) - (Number(m[1]) * 60 + Number(m[2])) : null; };
+      check('touch: a tap selects one slot, with two handles of 24 px', handles.length === 2 && handles.every((h) => h.w >= 24) && minutes(first) === 15, JSON.stringify({ handles, first }));
+      check('touch: pulling the end handle makes the selection longer, at once', (minutes(second) ?? 0) >= 90, String(second));
+      check('touch handles: no console error', errors.length === 0, errors.join(' | '));
       await ctx.close();
     }
   }

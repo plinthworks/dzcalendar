@@ -755,6 +755,102 @@ From the Phase 5 architect review, to do with the editing:
 - Dragging between calendars / external drop; timeline (Phase 10+).
 - Keyboard grab mode: Phase 8 (the proposals are already shared).
 
-## Next — Phase 8: keyboard and accessibility
+## Phase 8 — keyboard and accessibility ✅ (2026-10-16)
 
-See `ARCHITECTURE.md` J. Phase 8.
+- Core `interaction/keymap.ts`: `intentFor(key, { mode, rtl, grid })` (cursor,
+  event, grab; arrows by grid, RTL swapped, undo/redo), `stepHit` (days keep
+  the wall time and the pass; into a gap, the first moment after it; slots
+  step in elapsed time — both passes of a repeated hour, none of a skipped
+  one), `eventHit`, `grabStep` (eventHit → stepHit → the view's `fit` →
+  `proposeMove` / `proposeResize`), `heldEvent`. Parity: key sequences
+  propose exactly what the mouse does (core tests).
+- DOM `interact/keyboard.ts` on every view with `surface.keys`
+  (`KeyboardSurface`): a cursor that is a Hit, Shift selection
+  (`selectionBetween`), event mode (Enter = click, M / Alt+Enter = grab,
+  Delete with the scope chooser, Escape back, arrows through the day), grab
+  mode (each step said with its violations, Enter through `commitProposal`,
+  Escape / Tab let go, the period changes at its edge, a press on the time
+  puts it there), undo/redo keys on the calendar (`keyboardUndo`).
+  Context menu: "Move…", "Change duration…".
+- Time grid: a focusable cursor placed by `grid-column` in the scrolling
+  grid, replaced at each move (spoken as a focus change), resting in the
+  all-day row until first focused; day headers hidden from assistive
+  technology, column groups named with their real length.
+- Month: one tab stop (roving), each gridcell holds a button per event of
+  its day (those behind "+N" too); bars and "+N" are drawn, not read, and
+  wear the focus ring of the item focused.
+- Selection kept on screen (pointer, touch, keyboard), cleared by a click,
+  Escape or another period; a tap selects a slot with two 24 px handles to
+  pull; `instance.select()`.
+- Messages (EN/FR): cursor names, selection, violation reasons, grab mode,
+  delete, undo/redo, resize from the start.
+- axe-core 4.13.0 (pinned dev dependency) in `npm run test:browser`: week,
+  month, day, menu and sub-menu open, RTL, the four-zone page — no
+  violation. Found by it: the selected view button lost its background on
+  hover (white on light grey) — fixed in the theme.
+- ACR draft: `site/a11y-conformance.md` (WCAG 2.2 A/AA). Behaviour sheet:
+  `docs/behaviors/keyboard.md`.
+- The structural CSS ships minified (`scripts/css-literal.mjs`, in the
+  build and in the size measurement): −1 kB gzip, same 132 rules in Chrome.
+- Size: core 29.6 kB, dom 29.2 kB, motion-gsap 0.9 kB. Budgets raised by the
+  owner (2026-10-16) to core 30 kB and dom 30 kB (were 28 / 26): the
+  complete keyboard, the ARIA structure and their words in EN and FR; the
+  5 % tolerance stays.
+
+### Reviews (architect; code review in real Chrome), fixed
+- Shift+F10 on the time grid's cursor opened nothing (the menu looked for a
+  column): it now opens the menu of that very slot, both readings in a
+  repeated hour.
+- A screen reader's bare `click` (VoiceOver, NVDA browse mode, TalkBack) did
+  nothing on the cursor or an event: it does what Enter does.
+- Timed ↔ all-day by keyboard was not said: each step and the drop say it
+  ("It becomes a timed event of 1 hour").
+- Keys taken from a link or a field an application puts inside an event:
+  the keyboard acts only when the event itself has the focus.
+- The application changing the period under a focused cursor: every arrow
+  changed period again — the first one now brings the cursor home.
+- Ctrl/Cmd+Z (and a pointer drop to another column, older) left the focus
+  on `<body>`: it follows the event, else the cursor (`Interactions.refocus`).
+- Apia, a day its zone skipped: a step over it lost the wall time (00:00) —
+  the retry starts from the original hit. Cause upstream: tzslot reads a
+  skipped whole day as ambiguous (`docs/for-tzslot.md`).
+- Grab mode: released when the focus leaves the calendar or the window
+  blurs; Alt+arrows swallowed (no history.back); Tab lets go and moves on;
+  dimming re-applied after a period change; "Change duration…" makes plain
+  arrows pull the end; the help names only the keys that work here.
+- "Change duration…" no longer offered for a timed event in a month
+  (`ActionContext.canResize`); undo keys only when `editable`; the undo hint
+  says ⌘Z on a Mac, nothing when the keys are off.
+- Public types exported (`ScopeRequest`, `KeyboardSurface`,
+  `InteractionSurface`, `LiveSettings`); `css-literal` throws rather than
+  ship unminified CSS; the "+N" panel's title is an `h2` (heading order).
+- axe now runs WCAG 2.0–2.2 A/AA + best-practice tags, also with an event
+  held, a selection drawn and the "+N" panel open. `target-size` (2.5.8)
+  flags narrow side-by-side events on the four-zone page: allowed for
+  events only (the "essential" exception, see the ACR).
+- Tests: 16 more acceptance paths (time-grid traversal, RTL in grab mode,
+  start resize, all-day → timed, month timed event, crossing a month,
+  "All events" chosen by keyboard, the reading chooser, Delete on an
+  occurrence, Space, menu on the cursor, bare clicks) and 5 for the fixes.
+  684 tests; browser 67/67.
+
+### Manual (not automatable here)
+- Screen readers: NVDA (Firefox, Chrome), JAWS, VoiceOver macOS and iOS,
+  TalkBack. On iOS, check that touch exploration activates a month cell's
+  hidden event items (they are 1 × 1 px).
+
+### Not done in Phase 8, on purpose
+- `hiddenDays`: `fit` would change period for a hidden day (no DOM option
+  yet; Phase 10).
+- Conformance cases for the keymap and `stepHit` / `grabStep` (ports).
+- A grab mixing move and resize announces only its last kind.
+- After `setView` week → month, the first lane measurement can give 1
+  (older than Phase 8; to look at with the CSS pass).
+- `aria-keyshortcuts` on events and the cursor; remappable keys.
+- `--dz-target-min` and the week at 320 px: the CSS pass.
+- `too-many-occurrences` drawn by the DOM (Phase 5 note): with the
+  problems panel, later.
+
+## Next — Phase 9: sources, iCal
+
+See `ARCHITECTURE.md` J. Phase 9.

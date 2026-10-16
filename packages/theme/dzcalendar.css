@@ -41,7 +41,7 @@
   --tz-color-scheme: dark;
 }
 
-.dz-toolbar__btn:hover:not(:disabled) {
+.dz-toolbar__btn:hover:not(:disabled):not([aria-pressed=true]) {
   background: var(--tz-bg-raised);
 }
 

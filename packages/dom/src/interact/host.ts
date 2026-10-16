@@ -1,8 +1,10 @@
-import { isUnchanged, proposeMove, proposeResize, selectionBetween } from '@dzcalendar/core';
-import type { EventInstance, Hit, InteractionContext, Proposal, Selection } from '@dzcalendar/core';
+import { Temporal, isUnchanged, proposeMove, proposeResize, selectionBetween } from '@dzcalendar/core';
+import type { EventInstance, Hit, InteractionContext, PlainDate, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
 import { h } from '../render/reconcile.js';
 import { commitProposal, timeOf } from './commit.js';
+import { clearGhosts, syncGhosts } from './ghosts.js';
+import { attachKeyboard } from './keyboard.js';
 import type { Box, InteractionSurface } from './surface.js';
 
 /** Pixels a pointer travels before a press becomes a drag: a finger wobbles more than a mouse. */
@@ -29,6 +31,8 @@ interface Press {
   readonly mode: Mode;
   readonly instance: EventInstance | null;
   readonly node: HTMLElement | null;
+  /** A selection handle was pulled: the other end stays where it is. */
+  readonly anchor?: Hit;
 }
 
 interface Gesture<G> {
@@ -57,6 +61,34 @@ interface Gesture<G> {
 const hitKey = (hit: Hit | null) =>
   !hit ? '' : hit.kind === 'slot' ? `s|${hit.instant.epochMilliseconds}|${hit.gap ? 1 : 0}|${hit.resourceId ?? ''}` : `d|${hit.date}|${hit.allDayRow ? 1 : 0}|${hit.resourceId ?? ''}`;
 
+/** What the pointer and the keyboard share on one view. */
+export interface InteractionShared<G = unknown> {
+  readonly surface: InteractionSurface<G>;
+  /** The preview layer (ghosts, the selection). */
+  readonly layer: HTMLElement;
+  /** A drop is waiting for a choice (scope, reading): no new gesture until it settles. */
+  busy: boolean;
+  /** The keyboard holds an event (grab mode): pointer presses do not start gestures. */
+  holding: boolean;
+  /** The context proposals are made in: the store now, the rules, the snap. */
+  interaction(inst: EventInstance | null): InteractionContext;
+  layerOrigin(): { x: number; y: number };
+  /** The selection on screen, until it is cleared — a pointer's, a finger's (with handles) or the keyboard's. */
+  readonly selection: Selection | null;
+  showSelection(sel: Selection | null, o?: { readonly handles?: boolean }): void;
+}
+
+/** What the calendar holds of a view's interactions. */
+export interface Interactions {
+  /** After a paint: the selection is drawn again where the view now shows it. */
+  refresh(): void;
+  /** The context menu's "Move…" and "Change duration…": the keyboard's grab mode on this event. */
+  grab(instance: EventInstance, kind: 'move' | 'resize'): void;
+  select(sel: Selection | null): void;
+  /** Gives the focus back after the calendar changed under it (undo, redo): to the event, else the cursor. */
+  refocus(eventId: string | null): void;
+}
+
 /**
  * Pointer gestures on a view: drag and resize events, select time, click.
  * Mouse, pen and touch take one path. A touch on an event first selects it
@@ -64,9 +96,9 @@ const hitKey = (hit: Hit | null) =>
  * once, with no long press, and only that event blocks scrolling
  * (`touch-action: none` on it alone). What goes where is decided by the
  * core (`proposeMove`, `proposeResize`), and what happens on a drop by
- * `commitProposal` — the same for the keyboard.
+ * `commitProposal` — the same for the keyboard, attached here too.
  */
-export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<G>): void {
+export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<G>): Interactions {
   const doc = ctx.doc;
   const win = doc.defaultView!;
   const root = surface.root;
@@ -76,22 +108,64 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
 
   let press: Press | null = null;
   let gesture: Gesture<G> | null = null;
-  /** A drop is waiting for a choice (scope, reading): no new gesture until it settles. */
-  let busy = false;
   let selected: HTMLElement | null = null;
 
-  const interaction = (inst: EventInstance | null): InteractionContext => {
-    const state = ctx.kernel.getState();
-    const rules = ctx.rules();
-    return {
-      snap: ctx.kernel.store.snapshot,
-      displayZone: state.timeZone,
-      snapMinutes: ctx.snapMinutes,
-      ...(rules && { rules }),
-      // A series may move as a whole (the scope is asked on the drop): its own occurrences are not in the way of the preview.
-      ...(inst?.event.ref && { movingSeries: inst.event.ref.seriesId }),
-    };
+  // ── the selection on screen ─────────────────────────────────────────────
+  let selection: Selection | null = null;
+  let selectionHandles = false;
+  const selectionGhosts: HTMLElement[] = [];
+  let selectionFrame = 0;
+  let rangeKey = '';
+  const rangeNow = () => {
+    const r = ctx.kernel.getState().range;
+    return `${r.start}|${r.end}`;
   };
+  function drawSelection(): void {
+    selectionFrame = 0;
+    if (!selection) return clearGhosts(selectionGhosts);
+    const geo = surface.measure(shared.layerOrigin());
+    syncGhosts(layer, selectionGhosts, surface.boxesFor(geo, selection, 0), { kind: 'select', handles: selectionHandles }, { invalid: false, time: '' });
+    for (const g of selectionGhosts) g.classList.add('dz-ghost--armed');
+  }
+  const queueSelection = () => {
+    if (selection && !selectionFrame) selectionFrame = win.requestAnimationFrame(drawSelection);
+  };
+
+  const shared: InteractionShared<G> = {
+    surface,
+    layer,
+    busy: false,
+    holding: false,
+    interaction(inst) {
+      const state = ctx.kernel.getState();
+      const rules = ctx.rules();
+      return {
+        snap: ctx.kernel.store.snapshot,
+        displayZone: state.timeZone,
+        snapMinutes: ctx.snapMinutes,
+        ...(rules && { rules }),
+        // A series may move as a whole (the scope is asked on the drop): its own occurrences are not in the way of the preview.
+        ...(inst?.event.ref && { movingSeries: inst.event.ref.seriesId }),
+      };
+    },
+    layerOrigin() {
+      const r = layer.getBoundingClientRect();
+      return { x: r.left, y: r.top };
+    },
+    get selection() {
+      return selection;
+    },
+    showSelection(sel, o = {}) {
+      selection = sel;
+      selectionHandles = o.handles === true;
+      rangeKey = rangeNow();
+      if (selectionFrame) win.cancelAnimationFrame(selectionFrame);
+      selectionFrame = 0;
+      drawSelection();
+    },
+  };
+  const interaction = shared.interaction;
+  const layerOrigin = shared.layerOrigin;
 
   const select = (node: HTMLElement | null) => {
     if (selected === node) return;
@@ -124,10 +198,18 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
 
   ctx.scope.on(root, 'pointerdown', (e) => {
     const pe = e as PointerEvent;
-    if (gesture || busy || (pe.pointerType === 'mouse' && pe.button !== 0) || !(pe.target instanceof Element)) return;
+    if (gesture || shared.busy || shared.holding || (pe.pointerType === 'mouse' && pe.button !== 0) || !(pe.target instanceof Element)) return;
+    const type = (pe.pointerType === 'touch' || pe.pointerType === 'pen' ? pe.pointerType : 'mouse') as Press['type'];
+    // A selection's handle: the other end stays, this one follows the pointer.
+    const handle = pe.target.closest('.dz-ghost__handle');
+    if (handle && selection) {
+      const anchor = endHit(selection, handle.classList.contains('dz-ghost__handle--start') ? 'end' : 'start');
+      press = { id: pe.pointerId, type, x0: pe.clientX, y0: pe.clientY, at: win.performance.now(), mode: { kind: 'select' }, instance: null, node: null, anchor };
+      pe.preventDefault();
+      return;
+    }
     // Headers, the gutter, links, buttons and the scrollbar are not the calendar's time.
     if (pe.target.closest('.dz-more, .dz-dg__num, button, a') || !surface.accepts(pe.target)) return;
-    const type = (pe.pointerType === 'touch' || pe.pointerType === 'pen' ? pe.pointerType : 'mouse') as Press['type'];
     const node = pe.target.closest<HTMLElement>('.dz-ev, .dz-bar');
     const inst = node ? surface.instanceOf(node) : null;
     const base = { id: pe.pointerId, type, x0: pe.clientX, y0: pe.clientY, at: win.performance.now() };
@@ -137,7 +219,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       press = { ...base, mode: draggable ? modeAt(node, inst, pe.clientX, pe.clientY, type) : { kind: 'move' }, instance: draggable ? inst : null, node };
       if (draggable && type !== 'touch') {
         pe.preventDefault(); // no text selection while dragging…
-        node.focus({ preventScroll: true }); // …which also cancels the focus a click gives: given back here.
+        (surface.focusTarget?.(node) ?? node).focus({ preventScroll: true }); // …which also cancels the focus a click gives: given back here.
       }
       return;
     }
@@ -156,8 +238,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     if (Math.hypot(pe.clientX - press.x0, pe.clientY - press.y0) < THRESHOLD[press.type]) return;
     const p = press;
     press = null;
-    // A finger moving from an unselected event, or from empty space, is a scroll.
-    if (p.type === 'touch' && (p.mode.kind === 'select' || !p.instance)) return;
+    // A finger moving from an unselected event, or from empty space, is a scroll — not from a selection's handle.
+    if (p.type === 'touch' && !p.anchor && (p.mode.kind === 'select' || !p.instance)) return;
     if (p.mode.kind !== 'select' && !p.instance) return;
     if (p.mode.kind === 'select' && !ctx.live().selectable) return;
     start(p, pe);
@@ -198,6 +280,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       cancel();
     }
   });
+  ctx.scope.on(win, 'resize', queueSelection);
 
   // Scroll is followed by events, never read during a move.
   if (surface.scroller) {
@@ -206,6 +289,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       sc,
       'scroll',
       () => {
+        queueSelection();
         if (!gesture) return;
         gesture.scrollY = sc.scrollTop - gesture.scroll0;
         queue();
@@ -226,6 +310,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
 
   ctx.scope.add(() => {
     if (gesture) cancel();
+    if (selectionFrame) win.cancelAnimationFrame(selectionFrame);
     layer.remove();
   });
 
@@ -237,18 +322,18 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       return;
     }
     select(null);
+    shared.showSelection(null);
     const geo = surface.measure(layerOrigin());
     const hit = surface.hitAt(geo, pe.clientX, pe.clientY, 0);
     if (!hit) return;
     const live = ctx.live();
     live.onDateClick?.(hit.kind === 'slot' ? { allDay: false, date: hit.date, instant: hit.instant } : { allDay: true, date: hit.date });
-    // A tap on a touch screen selects one slot (adjusting it by handles: Phase 8).
-    if (p.type === 'touch' && live.selectable && live.onSelect) live.onSelect(selectionBetween(interaction(null), hit, hit));
-  }
-
-  function layerOrigin(): { x: number; y: number } {
-    const r = layer.getBoundingClientRect();
-    return { x: r.left, y: r.top };
+    // A tap on a touch screen selects one slot, with two handles to pull its ends.
+    if (p.type === 'touch' && live.selectable) {
+      const sel = selectionBetween(interaction(null), hit, hit);
+      shared.showSelection(sel, { handles: true });
+      live.onSelect?.(sel);
+    }
   }
 
   /** The scroller's box and the layer's width: read when the geometry is. */
@@ -271,8 +356,9 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     // One read for the whole gesture.
     const origin = layerOrigin();
     const geo = surface.measure(origin);
-    const grab = surface.hitAt(geo, p.x0, p.y0, 0);
+    const grab = p.anchor ?? surface.hitAt(geo, p.x0, p.y0, 0);
     if (!grab) return;
+    if (p.mode.kind === 'select') shared.showSelection(null);
     const id = p.instance?.event.id;
     gesture = {
       press: p,
@@ -288,7 +374,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       selection: null,
       ghosts: [],
       // Every piece of the event dims, not only the one pressed.
-      sources: id ? [...root.querySelectorAll<HTMLElement>(`[data-event-id="${cssEscape(id)}"]`)] : [],
+      sources: id ? [...root.querySelectorAll<HTMLElement>(`:is(.dz-ev, .dz-bar)[data-event-id="${cssEscape(id)}"]`)] : [],
       frame: 0,
       edgeSince: 0,
       edgeSide: null,
@@ -342,30 +428,11 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
   function draw(g: Gesture<G>): void {
     const span = g.press.mode.kind === 'select' ? g.selection : g.proposal;
     const boxes: Box[] = span ? surface.boxesFor(g.geo, span, g.scrollY) : [];
-    const select = g.press.mode.kind === 'select';
-    while (g.ghosts.length < boxes.length) {
-      const el = h(doc, 'div', select ? 'dz-ghost dz-ghost--select' : 'dz-ghost');
-      if (!select && g.press.node) {
-        // The event's colour and the application's own classes — not its place or its state.
-        const accent = g.press.node.style.getPropertyValue('--dz-event-accent');
-        if (accent) el.style.setProperty('--dz-event-accent', accent);
-        for (const c of g.press.instance?.event.classNames ?? []) el.classList.add(c);
-        el.append(h(doc, 'span', 'dz-ghost__title', g.press.instance?.event.title || ctx.messages.untitled));
-      }
-      layer.append(el);
-      g.ghosts.push(el);
-    }
-    while (g.ghosts.length > boxes.length) g.ghosts.pop()!.remove();
-    const invalid = g.proposal ? !g.proposal.valid : false;
-    boxes.forEach((b, i) => {
-      const el = g.ghosts[i]!;
-      el.style.setProperty('--gx', `${b.x}px`);
-      el.style.setProperty('--gy', `${b.y}px`);
-      el.style.setProperty('--gw', `${b.w}px`);
-      el.style.setProperty('--gh', `${b.h}px`);
-      el.classList.toggle('dz-event--invalid', invalid);
-    });
-    g.ghosts[0]?.setAttribute('data-time', g.proposal ? timeOf(ctx, g.press.mode.kind === 'resize' && g.press.mode.edge === 'end' ? g.proposal.end : g.proposal.start, g.proposal) : '');
+    const time = g.proposal ? timeOf(ctx, g.press.mode.kind === 'resize' && g.press.mode.edge === 'end' ? g.proposal.end : g.proposal.start, g.proposal) : '';
+    const look = g.press.mode.kind === 'select'
+      ? { kind: 'select' as const, handles: g.press.type === 'touch' }
+      : { kind: 'event' as const, node: g.press.node, instance: g.press.instance, title: g.press.instance?.event.title || ctx.messages.untitled };
+    syncGhosts(layer, g.ghosts, boxes, look, { invalid: g.proposal ? !g.proposal.valid : false, time });
   }
 
   /** Near the scroller's top or bottom edge, inside it, it scrolls — faster the closer — and the hit follows by the scroll event. */
@@ -420,14 +487,9 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     return g;
   }
 
-  function clearGhosts(g: Gesture<G>): void {
-    for (const el of g.ghosts) el.remove();
-    g.ghosts = [];
-  }
-
   function cancel(): void {
     const g = end();
-    if (g) clearGhosts(g);
+    if (g) clearGhosts(g.ghosts);
   }
 
   let dropping = false;
@@ -441,19 +503,22 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     end();
     dropping = false;
     if (g.press.mode.kind === 'select') {
-      clearGhosts(g);
+      clearGhosts(g.ghosts);
+      // The selection stays on screen until a click elsewhere or Escape; a finger's keeps its handles.
+      shared.showSelection(g.selection, { handles: g.press.type === 'touch' });
       if (g.selection) ctx.live().onSelect?.(g.selection);
       return;
     }
     const p = g.proposal;
     const inst = g.press.instance;
-    if (!p || !inst || isUnchanged(p)) return clearGhosts(g);
-    busy = true;
+    if (!p || !inst || isUnchanged(p)) return clearGhosts(g.ghosts);
+    shared.busy = true;
     try {
-      const landed = await commitProposal(ctx, {
+      const outcome = await commitProposal(ctx, {
         instance: inst,
         proposal: p,
         kind: g.press.mode.kind === 'resize' ? 'resize' : 'move',
+        ...(g.press.mode.kind === 'resize' && { edge: g.press.mode.edge }),
         at: { x: g.x, y: g.y },
         from: g.ghosts[0] ? g.ghosts[0].getBoundingClientRect() : null,
         source: g.press.node,
@@ -461,18 +526,44 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
         root,
       });
       // On a touch screen the event stays selected where it landed, ready for the next drag.
-      if (landed && g.press.type === 'touch') {
-        const node = root.querySelector<HTMLElement>(`[data-event-id="${cssEscape(inst.event.id)}"]`);
-        if (node) select(node);
-      }
+      if (outcome.done && g.press.type === 'touch' && outcome.landed) select(outcome.landed);
+      // The pressed node went with the old place (another column, another week): the focus follows the event.
+      if (outcome.done && outcome.eventId && g.press.type !== 'touch' && !root.contains(doc.activeElement)) keyboard.refocus(outcome.eventId);
     } catch (err) {
       // An application callback (chooseScope, a hook) failed: the gesture still ends, the error stays visible.
       void Promise.reject(err);
     } finally {
-      busy = false;
-      clearGhosts(g);
+      shared.busy = false;
+      clearGhosts(g.ghosts);
     }
   }
+
+  /** The hit at one end of a selection: its first slot or day, or its last. */
+  function endHit(sel: Selection, end: 'start' | 'end'): Hit {
+    const row = surface.family === 'timeGrid' ? { allDayRow: true } : {};
+    if (sel.allDay) {
+      const date = end === 'start' ? (sel.start as PlainDate) : (sel.end as PlainDate).subtract({ days: 1 });
+      return { kind: 'day', date, ...row };
+    }
+    const zone = ctx.kernel.getState().timeZone;
+    // The last slot holds the minute before the end.
+    const instant = end === 'start' ? (sel.start as ZonedDateTime).toInstant() : Temporal.Instant.fromEpochMilliseconds((sel.end as ZonedDateTime).epochMilliseconds - 60_000);
+    return { kind: 'slot', date: instant.toZonedDateTimeISO(zone).toPlainDate(), instant };
+  }
+
+  const keyboard = attachKeyboard(ctx, shared);
+
+  return {
+    refresh() {
+      if (!selection) return;
+      // Another period: the selection was of the one left.
+      if (rangeNow() !== rangeKey) return shared.showSelection(null);
+      queueSelection();
+    },
+    grab: (instance, kind) => keyboard.grab(instance, kind),
+    select: (sel) => shared.showSelection(sel),
+    refocus: (id) => keyboard.refocus(id),
+  };
 }
 
 const cssEscape = (s: string) => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, '\\$&'));

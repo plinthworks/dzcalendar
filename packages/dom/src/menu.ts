@@ -2,7 +2,8 @@ import type { ActionItem, ActionTarget } from '@dzcalendar/core';
 import type { ViewCtx } from './host.js';
 import { h } from './render/reconcile.js';
 
-export type ResolveTarget = (el: Element, point: { x: number; y: number } | null) => { target: ActionTarget; anchor: HTMLElement } | null;
+/** `focus`: where the focus returns when the menu closes (default: the anchor if focusable, else what had it). */
+export type ResolveTarget = (el: Element, point: { x: number; y: number } | null) => { target: ActionTarget; anchor: HTMLElement; focus?: HTMLElement } | null;
 
 const LONG_PRESS_MS = 500;
 const MOVE_TOLERANCE = 8;
@@ -16,7 +17,7 @@ export function attachMenuTriggers(ctx: ViewCtx, root: HTMLElement, resolve: Res
   const open = (el: Element, point: { x: number; y: number } | null): boolean => {
     const hit = resolve(el, point);
     if (!hit) return false;
-    const focus = (hit.anchor.matches('[tabindex]') ? hit.anchor : ctx.doc.activeElement) as HTMLElement | null;
+    const focus = hit.focus ?? ((hit.anchor.matches('[tabindex]') ? hit.anchor : ctx.doc.activeElement) as HTMLElement | null);
     return ctx.openMenu(hit.target, point ?? hit.anchor, focus);
   };
 
