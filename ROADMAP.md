@@ -373,7 +373,12 @@ clip their time label; ticks in `elapsed` mode follow elapsed minutes.
 7. `build.mjs` for dom, theme, motion-gsap; a size script and `size-budget.json`;
    `test:browser` (alignment, layout count) with playwright-core.
 8. `docs/behaviors/*` sheets: "+N", dayCount, fixedWeekCount, minimum
-   height, week numbers.
+   height, week numbers, business hours, context menu. ✅
+
+Owner's request added to Phase 4 (2026-10-16): **a context menu on cells and
+events** — every action reachable without a gesture (right-click, touch long
+press, Menu key / Shift+F10). Shell and read actions in Phase 4, editing
+actions in Phase 6/7, "Move…" by keyboard in Phase 8. See ARCHITECTURE D.3 bis.
 
 ## Next — Phase 4: day grid month/week/day and "+N"
 

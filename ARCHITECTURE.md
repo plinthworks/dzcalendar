@@ -18,6 +18,7 @@ Elles priment sur le reste du document quand il dit autre chose.
 | Gratuit / Pro (K.5, K.9) | **Tout en MIT pour l'instant.** Le paquet `@dzcalendar/pro` reste une frontière de code (plugins via `registerView`), sans licence FSL ni clé tant que le modèle économique n'est pas décidé. |
 | From scratch (K.11) | **`CLEANROOM.md` adopté** : seul le comportement observable / la doc publique de FullCalendar est consulté ; chaque comportement imité est décrit dans `docs/behaviors/*.md` avec nos mots. |
 | Polyfill (K.2) | **Import statique conservé**, comme dans tzslot. |
+| Menu contextuel (2026-10-16) | **Toutes les actions accessibles par un menu contextuel** sur la cellule et sur l'événement (clic droit, appui long tactile, touche Menu / Maj+F10). Voir D.3 bis et `docs/behaviors/context-menu.md`. |
 
 Restent ouvertes : K.3, K.4, K.6–K.8, K.10, K.12–K.16.
 
@@ -856,6 +857,35 @@ L'impression désactive la virtualisation (D.9).
   - Suppression : `Suppr`. Annuler/rétablir : `Ctrl/Cmd+Z`, `Ctrl/Cmd+Maj+Z` (désactivable).
   - RTL : les flèches gauche/droite sont inversées (`intentFor(..., {rtl})`).
 
+### D.3 bis Menu contextuel (décision du propriétaire)
+
+Toute action est accessible par un menu contextuel sur la **cellule** (créneau, jour) et sur l'**événement** : c'est l'alternative au glisser exigée par WCAG 2.2 (SC 2.5.7), et la seule que l'étude de marché trouve chez un concurrent (MUI X).
+
+**Cœur, pur (`core/actions/`)** :
+```ts
+export type ActionTarget =
+  | { kind: 'slot'; instant: Instant; reading: { exists: boolean; ambiguous: boolean; alternative: Instant | null }; date: PlainDate; resourceId?: ResourceId }
+  | { kind: 'day'; date: PlainDate; resourceId?: ResourceId }
+  | { kind: 'event'; instance: EventInstance };
+export interface ActionItem {
+  readonly id: string;                       // 'event.create', 'event.delete', 'view.goToDay', ou celui de l'application
+  readonly label: MessageKey | string;
+  readonly command?: Command;                // les actions intégrées SONT des commandes (B.14) : validées, annulables
+  readonly enabled: boolean; readonly reason?: Violation | ProblemCode;   // désactivée avec sa raison, pas cachée
+  readonly shortcut?: string; readonly icon?: string;
+  readonly children?: readonly ActionItem[]; // ex. « cette occurrence / les suivantes / toutes » (séries, Phase 6)
+}
+export function actionsFor(target: ActionTarget, snap: StoreSnapshot, ctx: ActionContext): ActionItem[];
+```
+- La cible d'un créneau vient de `ColumnAxis.fromPosition` : dans l'heure répétée, le menu propose **les deux lectures** (« 02:30 (+02:00) » / « 02:30 (+01:00) ») ; dans un trou, 03:00 avec la raison.
+- Intégrées : créneau → « Nouvel événement ici » (`onCreateRequest` à l'application en Phase 4, commande directe dès que l'éditeur existe), « Coller », « Aller à ce jour » ; événement → « Ouvrir », « Dupliquer », « Déplacer… » (entre dans le mode grab du clavier, Phase 8), « Changer la durée… », « Supprimer » ; série → sous-menu de portée (Phase 6).
+
+**DOM (`dom/menu/`)** : `role="menu"`/`menuitem`, flèches, Début/Fin, recherche par frappe, Échap restitue le focus, sous-menus ; `popover` natif **dans** `.dz-cal` (thème, `color-scheme`, `dir`), placé au pointeur ou ancré à l'élément focalisé, retourné pour rester visible. Déclencheurs : `contextmenu` (souris), appui long tactile de 500 ms annulé par tout défilement (ne bloque jamais le scroll), touche Menu et `Maj+F10` sur la cellule ou l'événement focalisé.
+
+**Hook** : `contextMenu?: (ctx: ContextMenuCtx, defaults: readonly ActionItem[]) => readonly ActionItem[] | null` — garder, réordonner, ajouter des actions métier, ou `null` pour laisser le menu du navigateur. Les items sont des données rendues par le calendrier (thème, RTL, a11y sans effort pour l'application).
+
+**Phasage** : coquille du menu + actions de lecture (aller au jour, actions de l'application, « Nouvel événement » par callback) en **Phase 4**, avec le popover « +N » dont il partage l'ancrage ; actions d'édition branchées sur les commandes en **Phase 6/7** ; « Déplacer… » au clavier en **Phase 8** (mode grab).
+
 ### D.4 Popover « +N »
 
 `popover/popover.ts` : le lien « +N autres » ouvre un popover listant les segments cachés du jour. Il utilise l'attribut `popover` HTML et le **CSS anchor positioning** quand il est disponible (Baseline janv. 2026 d'après le doc d'analyse), avec un repli JS minimal (~1 ko : placement sous/au-dessus, retournement) sinon. Focus piégé et restitué, `Échap` ferme, les événements du popover sont des segments normaux (focusables, déplaçables au clavier).
@@ -1244,6 +1274,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 - **Livrables / fichiers** : `dom/views/daygrid/*`, `popover/*`, `now.ts` (indicateur « maintenant »), business hours en fond (timeGrid et dayGrid), `rules/business-hours`.
 - **Acceptation** : `computeOverflow` appliqué en navigateur (« +N » exact) ; popover ouvert au clavier, focus restitué ; business hours à travers un changement d'heure (intervalle de vraie durée) ; mise à jour fine : modifier un événement ne ré-exécute pas `content` des autres (test jsdom par compteur) ; `LayoutCount ≤ 1` par mise à jour (navigateur).
 - **Dépend de** : P3.
+- **Ajout (décision du propriétaire)** : coquille du menu contextuel (`dom/menu/`, `core/actions/`) sur cellules et événements — clic droit, appui long tactile, touche Menu / Maj+F10 — avec les actions de lecture et celles de l'application ; « Nouvel événement ici » par callback, y compris les deux lectures d'une heure répétée.
 
 ### Phase 5 : récurrence (`@dzcalendar/rrule` puis séries dans core)
 - **Livrables / fichiers** : `rrule/*` ; `core/recurrence/{series,expand,keys}` ; branchement `queryInstances`.
