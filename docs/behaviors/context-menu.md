@@ -37,7 +37,21 @@ occurrence / This and following / All" before an edit applies.
 - **Touch**: a long press (500 ms, cancelled by any scroll movement) opens
   it, never blocking scrolling — unlike a mandatory long press to drag.
 
+## Delivered in Phase 4 — and what comes later
+- **Phase 4**: the menu itself (mouse, touch long press, Menu key /
+  Shift+F10), "New event here" (`onCreateRequest({ allDay, start })`: a
+  moment snapped to the slot in a time grid — both readings of a repeated
+  hour — or a date in a month), "Go to this day", "Open" (`onEventOpen`), the
+  `contextMenu(ctx, defaults)` hook, disabled entries with a reason, typed
+  type-ahead, closing on any change of the calendar.
+- **Phases 6–7**: editing entries as commands (Duplicate, Change duration…,
+  Delete, Paste), sub-menus (rendered `children`) and the recurrence scope.
+- **Phase 8**: "Move…" into the keyboard grab mode; the menu anchored on the
+  keyboard cursor of the time grid.
+
 ## Tests
-`packages/core/test/actions.test.ts` (which actions a target gets, DST
-targets), `packages/dom/test/context-menu.test.ts` (opening by mouse, touch,
-keyboard; focus return; disabled items with a reason).
+`packages/core/test/actions-kernel.test.ts` (which entries a target gets, the
+two readings, a skipped hour, a whole day), `packages/dom/test/daygrid.test.ts`
+and `review4.test.ts` (mouse, Shift+F10, focus return, the hook, slot snap,
+type-ahead, closing on navigation). The touch long press was checked in real
+Chrome with touch emulation during review.

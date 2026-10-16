@@ -25,6 +25,26 @@ export interface DzMessages {
   eventLabel(parts: { title: string; time: string }): string;
   readonly untitled: string;
   readonly now: string;
+  /** The link standing for what a crowded day cannot show: "+3 more". */
+  moreLink(parts: { count: number }): string;
+  /** Its spoken name: "3 more events, Wednesday 21 October". */
+  moreLabel(parts: { count: number; date: string }): string;
+  readonly closePopover: string;
+  /** The view switcher's buttons. */
+  readonly views: Readonly<Record<string, string>>;
+  /** Context menu entries. */
+  newEventAt(parts: { time: string }): string;
+  newEventOn(parts: { date: string }): string;
+  /** A month cell's spoken name: "Wednesday 21 October 2026, 3 events". */
+  dayLabel(parts: { date: string; count: number }): string;
+  /** The view switcher's accessible name. */
+  readonly viewSwitcher: string;
+  readonly goToDay: string;
+  readonly openEvent: string;
+  /** Under "New event at 03:00" when the click was in an hour that does not exist. */
+  readonly skippedHour: string;
+  /** The context menu's accessible name. */
+  readonly actions: string;
 }
 
 export const EN: DzMessages = {
@@ -40,6 +60,18 @@ export const EN: DzMessages = {
   eventLabel: ({ title, time }) => `${title}, ${time}`,
   untitled: '(no title)',
   now: 'Now',
+  moreLink: ({ count }) => `+${count} more`,
+  moreLabel: ({ count, date }) => `${count} more ${count === 1 ? 'event' : 'events'}, ${date}`,
+  closePopover: 'Close',
+  views: { dayGridMonth: 'Month', dayGridWeek: 'Week', dayGridDay: 'Day', timeGridWeek: 'Week', timeGridDay: 'Day' },
+  newEventAt: ({ time }) => `New event at ${time}`,
+  newEventOn: ({ date }) => `New all-day event on ${date}`,
+  dayLabel: ({ date, count }) => (count === 0 ? date : `${date}, ${count} ${count === 1 ? 'event' : 'events'}`),
+  viewSwitcher: 'View',
+  goToDay: 'Go to this day',
+  openEvent: 'Open',
+  skippedHour: 'This hour does not exist today; the event starts when it ends',
+  actions: 'Actions',
 };
 
 export const FR: DzMessages = {
@@ -55,4 +87,16 @@ export const FR: DzMessages = {
   eventLabel: ({ title, time }) => `${title}, ${time}`,
   untitled: '(sans titre)',
   now: 'Maintenant',
+  moreLink: ({ count }) => `+${count} autre${count > 1 ? 's' : ''}`,
+  moreLabel: ({ count, date }) => `${count} autre${count > 1 ? 's' : ''} événement${count > 1 ? 's' : ''}, ${date}`,
+  closePopover: 'Fermer',
+  views: { dayGridMonth: 'Mois', dayGridWeek: 'Semaine', dayGridDay: 'Jour', timeGridWeek: 'Semaine', timeGridDay: 'Jour' },
+  newEventAt: ({ time }) => `Nouvel événement à ${time}`,
+  newEventOn: ({ date }) => `Nouvel événement le ${date}`,
+  dayLabel: ({ date, count }) => (count === 0 ? date : `${date}, ${count} événement${count > 1 ? 's' : ''}`),
+  viewSwitcher: 'Vue',
+  goToDay: 'Aller à ce jour',
+  openEvent: 'Ouvrir',
+  skippedHour: "Cette heure n'existe pas aujourd'hui ; l'événement commence à sa fin",
+  actions: 'Actions',
 };

@@ -1,4 +1,8 @@
 import { epochDay as epochDayOf } from '../days.js';
+import { subtractSpans } from '../intervals.js';
+import { businessIntervals } from '../rules/business-hours.js';
+import type { BusinessHoursInput } from '../rules/business-hours.js';
+import { Temporal } from '../temporal.js';
 import { layoutColumn } from '../layout/column.js';
 import { packLanes } from '../layout/rows.js';
 import { buildColumnAxis } from '../project/time-axis.js';
@@ -23,6 +27,8 @@ export interface TimeGridOptions {
   /** Gutter tick step, in minutes. Default 60. */
   readonly slotMinutes?: number;
   readonly resourceId?: string;
+  /** Hours outside are shaded (`offHours` on each column). */
+  readonly businessHours?: BusinessHoursInput;
 }
 
 /**
@@ -70,6 +76,8 @@ export interface TimeGridColumn {
   readonly events: readonly PlacedTimed[];
   /** `display: 'background'` events: full width, under the others. */
   readonly background: readonly PlacedTimed[];
+  /** Stretches outside business hours, in axis minutes. Empty without `businessHours`. */
+  readonly offHours: readonly { readonly top: number; readonly height: number }[];
 }
 
 export interface AllDayBar {
@@ -133,7 +141,7 @@ function endReadingOf(start: Instant, end: Instant, zone: ZoneId, repeats: reado
  */
 export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: TimeGridOptions, axis: ColumnAxis = axisFor(date, o)): TimeGridColumn {
   const key = date.toString();
-  if (axis.length === 0) return { key, date, axis, folded: true, events: [], background: [] };
+  if (axis.length === 0) return { key, date, axis, folded: true, events: [], background: [], offHours: [] };
 
   const day = axis.day;
   const instances = snap.queryInstances(viewWindow(date, date.add({ days: 1 }), o.displayZone), queryOpts(o));
@@ -187,7 +195,18 @@ export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: Tim
   const byKey = new Map(fg.map((s) => [s.key, s]));
   const events = placements.map((p) => place(byKey.get(p.key)!, p));
   const background = segs.filter((s) => isBackground(s.instance.event.display)).map((s) => place(s, { left: 0, width: 1, lane: 0, lanes: 1, z: -1 }));
-  return { key, date, axis, folded: false, events, background };
+  return { key, date, axis, folded: false, events, background, offHours: offHoursOf(date, axis, o) };
+}
+
+/** What is not open, inside the axis's hours, as positions. Read with `toEndPosition` at the ends. */
+function offHoursOf(date: PlainDate, axis: ColumnAxis, o: TimeGridOptions): TimeGridColumn['offHours'] {
+  if (o.businessHours === undefined || o.businessHours === false) return [];
+  const open = businessIntervals(date, date.add({ days: 1 }), o.businessHours, o.displayZone);
+  const closed = subtractSpans([{ s: axis.start.epochMilliseconds, e: axis.end.epochMilliseconds }], open);
+  return closed.map((x) => {
+    const top = axis.toPosition(Temporal.Instant.fromEpochMilliseconds(x.s));
+    return { top, height: Math.max(0, axis.toEndPosition(Temporal.Instant.fromEpochMilliseconds(x.e)) - top) };
+  });
 }
 
 function buildAllDay(range: ViewRange, snap: StoreSnapshot, o: TimeGridOptions): TimeGridModel['allDay'] {

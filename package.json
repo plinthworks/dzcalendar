@@ -11,7 +11,9 @@
     "build": "node scripts/build.mjs",
     "bench": "node scripts/bench.mjs",
     "build:theme": "sass --no-source-map --style=expanded packages/theme/dzcalendar.scss packages/theme/dzcalendar.css",
-    "start": "vite"
+    "start": "vite",
+    "size": "node scripts/size.mjs",
+    "test:browser": "node scripts/browser.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",

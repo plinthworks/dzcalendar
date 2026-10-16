@@ -67,6 +67,20 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 4 (revues, détail dans ROADMAP.md)
+
+- **D.1** — contrat réel : `ViewController { element, body, render(model, state), tick, scrollTo?, destroy }`, enregistré par `registerView(family, factory)` ; chaque vue reçoit un `ViewCtx` dérivé avec son propre `Scope`. `KeyedList` (signatures position/contenu) remplace `reconcile()`. `FrameScheduler` (lecture puis écriture) sert à mesurer ; coalescence des dessins en Phase 7. À ajouter (optionnels) : `hitTest`, `focusFor`, `nodeFor`. Fichiers à plat : `host.ts`, `menu.ts`, `popover.ts`, `toolbar.ts`.
+- **D.3 bis** — `ActionItem { id, label, enabled, reason?, shortcut?, icon?, children?, command?, run? }` ; `actionsFor(target, ctx)` sans snapshot ; `ContextMenuCtx = { target, state }` ; `onCreateRequest(CreateRequest)` avec `allDay` ; moment calé sur `snapMinutes`. Sous-menus rendus : Phases 5–6.
+- **D.4** — popover : repli JS seul (pas d'ancrage CSS) ; contenu rendu par `render/event.ts` (hooks), fermé à tout changement du calendrier.
+- **D.5** — hooks livrés : `event.content` (texte si chaîne), `didMount` (+ cleanup), `willUnmount` ; erreurs d'un hook rapportées, défaut dessiné. `didUpdate`, `isSelected`, `isMirror`, hooks `day`/`moreLink`/`nowIndicator` : Phases 7–8.
+- **D.6** — dette : dans le mois, les barres sont filles de la `row`, pas d'une cellule ; arrêts de tabulation multiples. Réglé avec le focus itinérant (Phase 8).
+- **D.7** — `CalendarUpdate` : messages, locale, timeZone, view, date, motion, events, hooks, businessHours ; tout est validé avant de toucher au kernel ; valeurs égales sans effet (comparaison superficielle des hooks et messages). `settings.ts` avant la Phase 6.
+- **B.13** — `businessIntervals(from, to, input, zone)` ; règles validées à la configuration (`assertBusinessHours`, RangeError). `validateProposal` : Phase 6.
+- **B.18** — kernel : registre `registerModelFamily`, `setOptions` (no-op si égal), `setEvents`, `batch`, `refreshToday`, `getViewSpec`, causes et direction ; `DayGridModel` porte `maxLanes` et `options` ; mise à jour fine du mois (`updateDayGridModel`, semaines intactes réutilisées).
+- **F** — nouvelles classes et jetons : `.dz-dg__*`, `.dz-bar--timed`, `.dz-more`, `.dz-pop*`, `.dz-menu*`, `.dz-off`, `.dz-probe` ; `--dz-day-head`, `--dz-week-min`, `--dz-off-bg`, `--dz-outside-bg`.
+- **G.1** — mesuré : dom 13,7 ko gzip (CSS de structure inclus), core 19,3 ko sans polyfill (80 % du budget avant la récurrence : sous-entrées à envisager).
+- **J Phase 4** — atteints : « +N » exact (jsdom et Chrome), popover au clavier, business hours à travers un changement d'heure (cœur), mise à jour fine sans relancer le contenu des voisins, ≤ 1 layout par modification (Chrome, CDP).
+
 ---
 
 ## 0. Ce que tzslot fait déjà, et que DzCalendar reprend à l'identique

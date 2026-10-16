@@ -36,6 +36,8 @@ npm run spike          # Phase 0 polyfill questions, results in ROADMAP.md
 npm run bench          # budgets (perf/budgets.json) on a MINIFIED bundle — exits 1 over budget
 npm start              # playground on http://localhost:4600 (tzslot's is 4500) — often already running; don't kill it
 npm run build:theme    # after editing packages/theme/dzcalendar.scss (a test fails if the CSS drifts)
+npm run size           # gzip per package against size-budget.json
+npm run test:browser   # layout checks in system Chrome on its own Vite server (port 4611)
 ```
 
 ## Working rules

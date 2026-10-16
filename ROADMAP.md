@@ -380,6 +380,105 @@ events** — every action reachable without a gesture (right-click, touch long
 press, Menu key / Shift+F10). Shell and read actions in Phase 4, editing
 actions in Phase 6/7, "Move…" by keyboard in Phase 8. See ARCHITECTURE D.3 bis.
 
-## Next — Phase 4: day grid month/week/day and "+N"
+## Phase 4 — day grid, "+N", business hours, context menu ✅ (2026-10-16)
+
+**Step 4.0 (structure, from the Phase 3 architect review)**
+- Kernel: a registry of model families (`registerModelFamily`; the Pro's
+  timeline will plug in there), `setOptions`, `setEvents` (diffed by the
+  store: same content, no change), `batch` (one `state` event), `causes` and
+  `direction` on state events, `getViewSpec`.
+- DOM: a view host (`registerView(family, factory)`), one renderer per
+  family, mounted and unmounted as the view changes; `ViewCtx` with an
+  `epoch` that moves when words or hooks change (nodes are redrawn in place,
+  never cleared — focus survives); a lifecycle `Scope` (listeners, timers,
+  observers released at once); a `FrameScheduler` (reads before writes);
+  two-level signatures in `KeyedList` (position vs content);
+  `render/event.ts` shared by the time grid, the month and the popover, with
+  content hooks (`content`, `didMount` + cleanup, `willUnmount`); a toolbar
+  with a view switcher; the minute timer pauses while the tab is hidden.
+- `npm run build` builds core, dom, motion-gsap and theme; `npm run size`
+  (budgets in `size-budget.json`); `npm run test:browser` (its own Vite
+  server, system Chrome, 12 layout checks).
+- Behaviour sheets: "+N", day count, fixed week count, minimum height, week
+  numbers, business hours, context menu.
+
+**Phase 4 proper**
+- Month / week / day grid: six weeks (or fitted), padding days dimmed (or
+  empty with `showNonCurrentDates: false`), today, all-day bars across days,
+  timed events as a dot with their start, the day number leads to that day.
+- **"+N"**: `dayMaxLanes` (number or `'auto'`, measured once per resize via
+  the scheduler and a single ResizeObserver); the last lane gives way to the
+  link; the panel is a native popover inside the calendar listing every event
+  of the day, Escape closes it, focus returns to the link.
+- **Business hours** in the core (`businessIntervals`: wall times in the
+  rule's own zone, true lengths across clock changes — a 22:00–06:00 shift on
+  the 25-hour night is 9 h); shaded off-hours in the time grid, hatched
+  closed days in the month.
+- **Context menu** (owner's request): right-click, touch long press, Menu
+  key / Shift+F10 on cells, slots and events; `actionsFor` in the core (both
+  readings of a repeated 02:30, a skipped hour says where it lands);
+  `contextMenu(ctx, defaults)` hook (keep, replace, add, or null for the
+  browser's menu); `onCreateRequest`, `onEventOpen`.
+- The two 02:30s are told apart in the month too ("02:30" / "02:30*").
+
+Measured: dom **13.7 kB** gzip (budget 30), core 19.3 kB without the
+polyfill, theme 1.0 kB, motion-gsap 0.4 kB; 352 tests; 12/12 browser checks.
+
+Found on the way:
+- The size script counted all of core inside dom (an alias resolved it before
+  `external` saw its name): 29.3 kB reported, 13.7 kB real.
+- `sideEffects: false` on dom would have let a bundler drop the views'
+  self-registration: dom now lists its side-effect modules.
+- The month's "+N" sat on lane 0 on first paint (the rows read the previous
+  model): the model is set before drawing.
+
+### Reviews (architect + code review in jsdom and real Chrome), fixed before closing Phase 4
+
+- **Critical: after a change of zone, labels kept the old zone's hours**
+  (positions moved, text did not: zone was not in the content signature).
+  A change of zone or locale now moves the epoch.
+- The month rebuilt every cell and "+N" link on any change: focus lost, the
+  open panel's anchor detached. `updateDayGridModel` keeps untouched rows'
+  objects; cells and links are keyed by date.
+- `'auto'` lanes counted the day-number button, not the grid's track and
+  gaps: the last bar overflowed by 3 px at some heights. Now read from the
+  row's own tracks; a month is capped at 4 lanes until measured; a week or a
+  day of the day grid is never capped.
+- Listeners piled up with each change of view family: each view has its own
+  `Scope`, released when another mounts.
+- The "+N" panel ignored the content hooks and had no context menu: it now
+  draws through `fillEvent` (mounted on open, unmounted on close) and takes
+  the same menu.
+- Equal options (`setOptions`, `update({ businessHours })`) were not no-ops.
+- `update()` refused a bad view only after changing the zone: everything is
+  validated before the kernel moves.
+- The minute timer stopped with `nowIndicator: false` (today froze at
+  midnight) and died on a detached host: it always runs.
+- Menu: closes on any change, on scroll and resize; never steals focus on
+  destroy; clamped to the viewport; RTL-aligned; repeated letters cycle;
+  visible focus in forced colours; no iOS callout on long press.
+- API fixed before anyone depends on it: `onCreateRequest({ allDay, start,
+  resourceId? })` (a month day is a date, not "midnight"); `ActionItem`
+  gains `command?` and `icon?`; slot moments snap (`snapMinutes`, 15).
+- Bars keep their keys when "+N" cuts them (`|p{k}` always); business-hours
+  rules are validated when set; a throwing hook is reported and the default
+  drawn; the probe used for measuring no longer looks like an event.
+- `npm run test:browser` now also checks: "+N" exact, bars inside their rows
+  after resizes, the panel, and **at most one layout per event change**
+  (Chrome's `LayoutCount`, via CDP). 17/17.
+
+### Planned from the reviews (not blocking Phase 5)
+- `settings.ts` (a handler per option, live callbacks) — before Phase 6.
+- `ViewController.hitTest / focusFor / nodeFor`; one `InteractionHost` for
+  right-click, long press and drag — Phase 7.
+- Month ARIA structure (bars inside cells) and roving focus — Phase 8.
+- Per-instance registries alongside the global ones; extensible `ModelOptions`.
+
+## Next — Phase 5: recurrence
+
+Carried from the Phase 4 review: a structured or escaped instance key (an id
+may contain `|`), `seriesTouched` handled by the models' updates, one query
+per window cached per snapshot, `Mutation` beyond events, menu sub-menus for
+the recurrence scope.
 
 See `ARCHITECTURE.md` J. Phase 4.

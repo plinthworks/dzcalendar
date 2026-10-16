@@ -1,18 +1,30 @@
 /**
- * Keyed reconciliation without a virtual DOM. Each item has a key and a
- * signature; a node whose signature did not change is not touched at all —
- * no attribute written, no content hook run. That is how changing one event
- * leaves the hundred others alone.
+ * Keyed reconciliation without a virtual DOM. Each item has a key and two
+ * signatures: `pos` (where it is drawn — written as CSS variables) and
+ * `content` (what it shows). A neighbour moving changes only `pos`: the node's
+ * content, and any content hook, is left alone (FullCalendar #5594).
+ *
+ * A KeyedList owns its container: nothing else may insert children there
+ * (use a `display: contents` host when a container has other children).
  */
 export interface Keyed {
   readonly key: string;
-  /** Anything that changes when the node must be redrawn: revision, position, label. */
+  /** Where it is drawn. */
   readonly sig: string;
+  /** What it shows. Absent: content follows `sig`. */
+  readonly content?: string;
+}
+
+export interface Changed {
+  readonly pos: boolean;
+  readonly content: boolean;
+  readonly created: boolean;
 }
 
 interface Entry {
   el: HTMLElement;
   sig: string;
+  content: string | undefined;
 }
 
 export class KeyedList<T extends Keyed> {
@@ -21,7 +33,8 @@ export class KeyedList<T extends Keyed> {
   constructor(
     private readonly container: HTMLElement,
     private readonly create: (item: T) => HTMLElement,
-    private readonly update: (el: HTMLElement, item: T) => void,
+    private readonly update: (el: HTMLElement, item: T, changed: Changed) => void,
+    private readonly removed?: (el: HTMLElement) => void,
   ) {}
 
   /** Brings the container to `items`, in order. Returns the nodes created, for an entrance animation. */
@@ -35,20 +48,26 @@ export class KeyedList<T extends Keyed> {
       if (!entry) {
         const el = this.create(item);
         el.dataset['key'] = item.key;
-        this.update(el, item);
-        entry = { el, sig: item.sig };
+        this.update(el, item, { pos: true, content: true, created: true });
+        entry = { el, sig: item.sig, content: item.content };
         this.nodes.set(item.key, entry);
         created.push(el);
-      } else if (entry.sig !== item.sig) {
-        this.update(entry.el, item);
-        entry.sig = item.sig;
+      } else {
+        const pos = entry.sig !== item.sig;
+        const content = item.content === undefined ? pos : entry.content !== item.content;
+        if (pos || content) {
+          this.update(entry.el, item, { pos, content, created: false });
+          entry.sig = item.sig;
+          entry.content = item.content;
+        }
       }
-      // Only move a node that is out of place: moving costs a layout.
+      // Only move a node that is out of place: moving costs a layout and may lose focus.
       if (entry.el !== cursor) this.container.insertBefore(entry.el, cursor);
       else cursor = cursor.nextSibling;
     }
     for (const [key, entry] of this.nodes) {
       if (seen.has(key)) continue;
+      this.removed?.(entry.el);
       entry.el.remove();
       this.nodes.delete(key);
     }
@@ -60,7 +79,10 @@ export class KeyedList<T extends Keyed> {
   }
 
   clear(): void {
-    for (const { el } of this.nodes.values()) el.remove();
+    for (const { el } of this.nodes.values()) {
+      this.removed?.(el);
+      el.remove();
+    }
     this.nodes.clear();
   }
 }
@@ -70,5 +92,12 @@ export function h(doc: Document, tag: string, className: string, text?: string):
   const el = doc.createElement(tag);
   el.className = className;
   if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+/** A host that takes part in its parent's grid as if its children were the parent's. */
+export function contentsHost(doc: Document, className: string): HTMLElement {
+  const el = h(doc, 'div', className);
+  el.style.display = 'contents';
   return el;
 }

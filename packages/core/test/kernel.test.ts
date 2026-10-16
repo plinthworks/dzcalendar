@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Temporal, createEventStore, createKernel, createHistory, createIdGenerator } from '../src/index.js';
-import type { KernelEvent } from '../src/index.js';
+import type { KernelEvent, TimeGridModel } from '../src/index.js';
 
 const now = () => Temporal.Instant.from('2026-10-21T08:00:00Z');
 
@@ -32,8 +32,9 @@ describe('kernel', () => {
     });
     const m2 = k.viewModel();
     expect(m2).not.toBe(m1);
-    if (m1.family !== 'timeGrid' || m2.family !== 'timeGrid') throw new Error('timeGrid expected');
-    expect(m2.model.columns.map((c, i) => c === m1.model.columns[i])).toEqual([true, true, true, true, false, true, true]);
+    expect([m1.family, m2.family]).toEqual(['timeGrid', 'timeGrid']);
+    const [a, b] = [m1.model as TimeGridModel, m2.model as TimeGridModel];
+    expect(b.columns.map((c, i) => c === a.columns[i])).toEqual([true, true, true, true, false, true, true]);
     expect(events.map((e) => e.type)).toEqual(['store']);
   });
 
@@ -47,9 +48,8 @@ describe('kernel', () => {
       event: { id: 'call', start: '2026-10-21T23:30[UTC]' },
     });
     const dayOfCall = kernels.map((k) => {
-      const vm = k.viewModel();
-      if (vm.family !== 'timeGrid') throw new Error();
-      return vm.model.columns.find((c) => c.events.length > 0)!.key;
+      const vm = k.viewModel().model as TimeGridModel;
+      return vm.columns.find((c) => c.events.length > 0)!.key;
     });
     expect(dayOfCall).toEqual(['2026-10-22', '2026-10-21', '2026-10-22', '2026-10-22']);
   });

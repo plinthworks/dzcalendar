@@ -8,6 +8,8 @@ const zones = ['Europe/Paris', 'America/Chicago', 'Asia/Tokyo', 'Australia/Lord_
 const zoneSelect = document.querySelector<HTMLSelectElement>('#zone')!;
 zoneSelect.append(...zones.map((z) => new Option(z, z)));
 const host = document.querySelector<HTMLElement>('#cal')!;
+const status = document.querySelector<HTMLElement>('#status')!;
+const say = (text: string) => (status.textContent = text);
 
 let cal = make('wall');
 
@@ -18,9 +20,16 @@ function make(axis: 'wall' | 'elapsed') {
     initialDate: Temporal.PlainDate.from('2026-10-21'),
     events: DEMO_EVENTS,
     timeGrid: { axis, slotMinutes: 60 },
+    businessHours: { daysOfWeek: [1, 2, 3, 4, 5], start: '09:00', end: '18:00' },
+    onCreateRequest: (r) =>
+      say(r.allDay ? `Nouvel événement demandé le ${r.start.toString()} (journée)` : `Nouvel événement demandé à ${r.start.toZonedDateTimeISO(zoneSelect.value).toString({ smallestUnit: 'minute' })}`),
+    onEventOpen: (inst) => say(`Ouvrir « ${inst.event.title} »`),
     motion: (document.querySelector<HTMLInputElement>('#motion')!).checked ? createGsapMotion() : NO_MOTION,
   });
 }
+
+// For the browser checks (npm run test:browser): the live calendar.
+(window as unknown as { __dz: () => typeof cal }).__dz = () => cal;
 
 zoneSelect.addEventListener('change', () => cal.update({ timeZone: zoneSelect.value }));
 document.querySelector<HTMLSelectElement>('#axis')!.addEventListener('change', (e) => {

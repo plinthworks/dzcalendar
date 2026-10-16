@@ -19,4 +19,13 @@ export const DEMO_EVENTS: EventInput[] = [
   { id: 'second-0230', title: '02:30, second passage', start: '2026-10-25T02:30+01:00[Europe/Paris]', duration: { minutes: 30 }, tone: 'red' },
   { id: 'night', title: 'Garde de nuit', start: '2026-10-25T00:00+02:00[Europe/Paris]', end: '2026-10-25T06:00+01:00[Europe/Paris]', tone: 'slate' },
   { id: 'focus', title: 'Bloc concentration', start: '2026-10-22T08:00[Europe/Paris]', end: '2026-10-22T12:00[Europe/Paris]', display: 'background' },
+  // A crowded Wednesday, for "+N" in the month view.
+  ...['Revue de code', 'Point produit', 'Support', 'Démo client', 'Rétrospective', 'Apéro équipe'].map((title, i) => ({
+    id: `busy-${i}`,
+    title,
+    start: `2026-10-28T${String(9 + i).padStart(2, '0')}:00[Europe/Paris]`,
+    duration: { minutes: 45 },
+    tone: ['blue', 'green', 'amber', 'violet', 'red', 'slate'][i],
+  })),
+  { id: 'holiday', title: 'Toussaint', start: '2026-11-01', tone: 'green' },
 ];

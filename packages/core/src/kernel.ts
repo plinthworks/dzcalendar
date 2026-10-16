@@ -3,14 +3,16 @@ import type { EventInput } from './event/types.js';
 import { formatRangeTitle, formatTemporal } from './format/intl.js';
 import { weekRulesFor } from './format/week.js';
 import { createIdGenerator } from './ids.js';
+import { assertBusinessHours } from './rules/business-hours.js';
+import type { BusinessHoursInput } from './rules/business-hours.js';
 import { arraySource, loadStaticSource } from './source/array-source.js';
 import type { StoreChange } from './store/changes.js';
 import { createEventStore } from './store/store.js';
-import type { EventStore } from './store/store.js';
+import type { EventStore, StoreSnapshot } from './store/store.js';
 import { Temporal } from './temporal.js';
 import type { Instant, PlainDate, Weekday, ZoneId } from './temporal.js';
 import { BUILTIN_VIEWS } from './views/builtin.js';
-import { buildDayGridModel } from './views/daygrid.js';
+import { buildDayGridModel, updateDayGridModel } from './views/daygrid.js';
 import type { DayGridModel, DayGridOptions } from './views/daygrid.js';
 import { navigate } from './views/nav.js';
 import type { NavDirection } from './views/nav.js';
@@ -20,7 +22,14 @@ import { buildTimeGridModel, updateTimeGridModel } from './views/timegrid.js';
 import type { TimeGridModel, TimeGridOptions } from './views/timegrid.js';
 import { isValidZone } from './zone.js';
 
-export interface KernelOptions {
+/** Options that shape the models; changeable at any time with `setOptions`. */
+export interface ModelOptions {
+  readonly timeGrid?: Omit<TimeGridOptions, 'displayZone' | 'businessHours'>;
+  readonly dayGrid?: Omit<DayGridOptions, 'displayZone' | 'businessHours' | 'showNonCurrentDates'>;
+  readonly businessHours?: BusinessHoursInput;
+}
+
+export interface KernelOptions extends ModelOptions {
   readonly timeZone: ZoneId;
   readonly locale: string;
   /** Default: the locale's. */
@@ -30,17 +39,12 @@ export interface KernelOptions {
   readonly initialView?: string;
   /** Added to (and overriding) the built-in views. */
   readonly views?: Readonly<Record<string, ViewSpec>>;
-  /**
-   * A store to share: four kernels on one store show the same events in four
-   * zones. Default: a store of the kernel's own.
-   */
+  /** A store to share: four kernels on one store show the same events in four zones. */
   readonly store?: EventStore;
-  /** Loaded as an array source named "events". */
+  /** Loaded as an array source named "events"; replaced with `setEvents`. */
   readonly events?: readonly EventInput[];
   /** Injectable for tests. Default: the system clock. */
   readonly now?: () => Instant;
-  readonly timeGrid?: Omit<TimeGridOptions, 'displayZone'>;
-  readonly dayGrid?: Omit<DayGridOptions, 'displayZone'>;
 }
 
 export interface KernelState {
@@ -54,11 +58,58 @@ export interface KernelState {
   readonly today: PlainDate;
 }
 
-export type ViewModel =
-  | { readonly family: 'timeGrid'; readonly model: TimeGridModel }
-  | { readonly family: 'dayGrid'; readonly model: DayGridModel };
+/** What a family's model is built from, and how it follows the store. */
+export interface ModelFamily<M = unknown> {
+  build(range: ViewRange, snap: StoreSnapshot, ctx: { readonly displayZone: ZoneId; readonly view: ViewSpec; readonly options: ModelOptions }): M;
+  /** Optional fine update after a store change; absent means rebuild. */
+  update?(prev: M, snap: StoreSnapshot, change: StoreChange): M;
+}
 
-export type KernelEvent = { readonly type: 'state'; readonly state: KernelState } | { readonly type: 'store'; readonly change: StoreChange };
+const FAMILIES = new Map<string, ModelFamily>();
+
+/** Built-ins register here; so do the Pro's timeline and custom families. */
+export function registerModelFamily<M>(family: string, f: ModelFamily<M>): void {
+  FAMILIES.set(family, f as ModelFamily);
+}
+
+registerModelFamily<TimeGridModel>('timeGrid', {
+  build: (range, snap, { displayZone, options }) =>
+    buildTimeGridModel(range, snap, {
+      ...options.timeGrid,
+      displayZone,
+      ...(options.businessHours !== undefined && { businessHours: options.businessHours }),
+    }),
+  update: updateTimeGridModel,
+});
+registerModelFamily<DayGridModel>('dayGrid', {
+  build: (range, snap, { displayZone, view, options }) =>
+    buildDayGridModel(range, snap, {
+      ...options.dayGrid,
+      displayZone,
+      showNonCurrentDates: view.showNonCurrentDates,
+      ...(options.businessHours !== undefined && { businessHours: options.businessHours }),
+    }),
+  update: updateDayGridModel,
+});
+
+/** The model of the current view; `family` tells a renderer what `model` is. */
+export interface ViewModel<M = unknown> {
+  readonly family: string;
+  readonly model: M;
+}
+
+export type StateCause = 'navigate' | 'view' | 'zone' | 'locale' | 'options' | 'today';
+
+export type KernelEvent =
+  | {
+      readonly type: 'state';
+      readonly state: KernelState;
+      /** Every cause since the last event: a batch of three changes is one event with three causes. */
+      readonly causes: readonly StateCause[];
+      /** Which way the dates moved, when they moved. */
+      readonly direction?: 'prev' | 'next' | 'other';
+    }
+  | { readonly type: 'store'; readonly change: StoreChange };
 
 export interface CalendarKernel {
   readonly store: EventStore;
@@ -70,15 +121,22 @@ export interface CalendarKernel {
   setTimeZone(zone: ZoneId): void;
   /** Titles, and the first weekday unless one was given, follow the new locale. */
   setLocale(locale: string): void;
+  /** Shallow-merged per key (`timeGrid`, `dayGrid`) over the current options. */
+  setOptions(options: ModelOptions): void;
   /**
-   * Re-reads today from the clock. Call it from a timer: past midnight, the
-   * highlighted day must move with the now line. True when it changed.
+   * Replaces the "events" source. Unchanged events keep their objects and
+   * revisions (the store diffs), so a framework passing a new array with the
+   * same content redraws nothing.
    */
+  setEvents(events: readonly EventInput[]): NormalizationReport;
+  /** Several changes, one `state` event at the end. */
+  batch(fn: () => void): void;
+  /** Re-reads today from the clock (call it from a timer). True when it changed. */
   refreshToday(): boolean;
-  /** Memoized; after a store change only the touched columns are rebuilt. */
+  /** Memoized; after a store change only what changed is rebuilt (where the family can). */
   viewModel(): ViewModel;
   now(): Instant;
-  /** What loading `events` reported: rejected inputs and every guess made. */
+  /** What the last `events`/`setEvents` load reported. */
   getProblems(): NormalizationReport | null;
   subscribe(fn: (e: KernelEvent) => void): () => void;
   destroy(): void;
@@ -87,22 +145,26 @@ export interface CalendarKernel {
 const systemNow = (): Instant => Temporal.Now.instant();
 
 /**
- * The calendar without a screen: date, view, zone, navigation, title, and the
- * view model kept in step with the store. Shared by the DOM, Angular and the
- * native ports, so none of them re-implements memoization or titles.
- *
- * Commands, history, selection and the source manager join in their phases.
+ * The calendar without a screen: date, view, zone, locale, options,
+ * navigation, title, and the view model kept in step with the store. Shared
+ * by the DOM, Angular and the native ports. It has no timer of its own.
  */
 export function createKernel(o: KernelOptions): CalendarKernel {
   if (!isValidZone(o.timeZone)) throw new RangeError(`timeZone is not a time zone: ${o.timeZone}`);
+  if (o.businessHours !== undefined) assertBusinessHours(o.businessHours);
   const views = { ...BUILTIN_VIEWS, ...o.views };
   const now = o.now ?? systemNow;
   const store = o.store ?? createEventStore();
-  let locale = o.locale;
-  let firstDay = o.firstDay ?? weekRulesFor(locale).firstDay;
   const listeners = new Set<(e: KernelEvent) => void>();
 
   let timeZone = o.timeZone;
+  let locale = o.locale;
+  let firstDay = o.firstDay ?? weekRulesFor(locale).firstDay;
+  let options: ModelOptions = {
+    ...(o.timeGrid && { timeGrid: o.timeGrid }),
+    ...(o.dayGrid && { dayGrid: o.dayGrid }),
+    ...(o.businessHours !== undefined && { businessHours: o.businessHours }),
+  };
   const todayIn = (zone: ZoneId) => now().toZonedDateTimeISO(zone).toPlainDate();
   let date = o.initialDate ?? todayIn(timeZone);
   const viewOf = (type: string) => {
@@ -113,16 +175,19 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   let view = viewOf(o.initialView ?? 'timeGridWeek');
 
   let problems: NormalizationReport | null = null;
-  if (o.events) {
-    problems = loadStaticSource(store, arraySource('events', o.events), { displayZone: timeZone, newId: createIdGenerator('ev') }).report;
-  }
+  const idGen = createIdGenerator('ev');
+  const loadEvents = (events: readonly EventInput[]) =>
+    (problems = loadStaticSource(store, arraySource('events', events), { displayZone: timeZone, newId: idGen }).report);
+  if (o.events) loadEvents(o.events);
 
   const nav = (): NavContext => ({ firstDay, today: todayIn(timeZone) });
   let state = computeState();
   let model: ViewModel | null = null;
+  let held = 0;
+  let pending: StateCause[] = [];
+  let direction: 'prev' | 'next' | 'other' | undefined;
 
   function titleFor(range: ViewRange, spec: ViewSpec): string {
-    const last = range.activeEnd.subtract({ days: 1 });
     switch (spec.alignment) {
       case 'month':
         return formatTemporal(range.activeStart, { month: 'long', year: 'numeric' }, locale);
@@ -130,10 +195,10 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         return formatTemporal(range.activeStart, { year: 'numeric' }, locale);
       default: {
         const first = range.dates[0] ?? range.activeStart;
-        const lastShown = range.dates[range.dates.length - 1] ?? last;
-        return first.equals(lastShown)
+        const last = range.dates[range.dates.length - 1] ?? range.activeEnd.subtract({ days: 1 });
+        return first.equals(last)
           ? formatTemporal(first, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, locale)
-          : formatRangeTitle(first, lastShown, { day: 'numeric', month: 'short', year: 'numeric' }, locale);
+          : formatRangeTitle(first, last, { day: 'numeric', month: 'short', year: 'numeric' }, locale);
       }
     }
   }
@@ -156,57 +221,101 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       }
     }
   };
-  const changeState = () => {
+  const flush = () => {
+    if (held > 0 || pending.length === 0) return;
+    const causes = [...new Set(pending)];
+    pending = [];
+    const dir = direction;
+    direction = undefined;
+    emit({ type: 'state', state, causes, ...(dir && { direction: dir }) });
+  };
+  const changeState = (cause: StateCause) => {
     state = computeState();
     model = null;
-    emit({ type: 'state', state });
+    pending.push(cause);
+    flush();
   };
 
   const unsubscribe = store.subscribe((change) => {
-    if (model?.family === 'timeGrid') model = { family: 'timeGrid', model: updateTimeGridModel(model.model, store.snapshot, change) };
-    else model = null;
+    const family = model ? FAMILIES.get(model.family) : undefined;
+    model = model && family?.update ? { family: model.family, model: family.update(model.model, store.snapshot, change) } : null;
     emit({ type: 'store', change });
   });
 
   return {
     store,
     getState: () => state,
+    getViewSpec: (type) => views[type],
     setView(type, at) {
-      view = viewOf(type);
+      const spec = viewOf(type);
+      if (spec === view && (!at || at.equals(date))) return;
+      view = spec;
       if (at) date = at;
-      changeState();
+      direction ??= 'other';
+      changeState('view');
     },
     navigate(dir) {
-      date = navigate(date, view, dir, nav());
-      changeState();
+      const next = navigate(date, view, dir, nav());
+      if (next.equals(date)) return;
+      direction ??= dir === 'prev' || dir === 'next' ? dir : 'other';
+      date = next;
+      changeState('navigate');
     },
     setTimeZone(zone) {
       if (!isValidZone(zone)) throw new RangeError(`not a time zone: ${zone}`);
+      if (zone === timeZone) return;
       // Not a store change: every column's days are different days now.
       timeZone = zone;
-      changeState();
+      changeState('zone');
     },
-    getViewSpec: (type) => views[type],
     setLocale(next) {
+      if (next === locale) return;
       locale = next;
       if (o.firstDay === undefined) firstDay = weekRulesFor(next).firstDay;
-      changeState();
+      changeState('locale');
+    },
+    setOptions(next) {
+      if (next.businessHours !== undefined) assertBusinessHours(next.businessHours);
+      // Equal values (per key, one level deep) change nothing and say nothing.
+      const same = (a: object | undefined, b: object | undefined) =>
+        a === b || (a !== undefined && b !== undefined && Object.entries(b).every(([k, v]) => (a as Record<string, unknown>)[k] === v));
+      if (
+        (!next.timeGrid || same(options.timeGrid, next.timeGrid)) &&
+        (!next.dayGrid || same(options.dayGrid, next.dayGrid)) &&
+        (!('businessHours' in next) || next.businessHours === options.businessHours)
+      ) {
+        return;
+      }
+      options = {
+        ...options,
+        ...(next.timeGrid && { timeGrid: { ...options.timeGrid, ...next.timeGrid } }),
+        ...(next.dayGrid && { dayGrid: { ...options.dayGrid, ...next.dayGrid } }),
+        ...('businessHours' in next && { businessHours: next.businessHours }),
+      } as ModelOptions;
+      changeState('options');
+    },
+    setEvents(events) {
+      return loadEvents(events);
+    },
+    batch(fn) {
+      held++;
+      try {
+        fn();
+      } finally {
+        held--;
+        flush();
+      }
     },
     refreshToday() {
       if (todayIn(timeZone).equals(state.today)) return false;
-      changeState();
+      changeState('today');
       return true;
     },
     viewModel() {
       if (model) return model;
-      const snap = store.snapshot;
-      if (view.family === 'timeGrid') {
-        model = { family: 'timeGrid', model: buildTimeGridModel(state.range, snap, { ...o.timeGrid, displayZone: timeZone }) };
-      } else if (view.family === 'dayGrid') {
-        model = { family: 'dayGrid', model: buildDayGridModel(state.range, snap, { ...o.dayGrid, displayZone: timeZone }) };
-      } else {
-        throw new Error(`the ${view.family} family is drawn from a later phase`);
-      }
+      const family = FAMILIES.get(view.family);
+      if (!family) throw new Error(`no model family registered for ${view.family}`);
+      model = { family: view.family, model: family.build(state.range, store.snapshot, { displayZone: timeZone, view, options }) };
       return model;
     },
     now,

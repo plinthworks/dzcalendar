@@ -1,0 +1,8 @@
+{
+  "_comment": "gzip bytes of a minified bundle per entry (ARCHITECTURE.md G.1). The Temporal polyfill is counted apart.",
+  "core (without polyfill)": 24000,
+  "dom (without core)": 30000,
+  "theme css": 8000,
+  "motion-gsap (without gsap)": 2000,
+  "temporal polyfill": 24000
+}

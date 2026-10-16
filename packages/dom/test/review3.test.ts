@@ -117,7 +117,7 @@ describe('options and update()', () => {
   it('a view this renderer cannot draw is refused before anything changes', () => {
     mount({});
     const before = cal!.kernel.getState();
-    expect(() => cal!.update({ view: 'dayGridMonth' })).toThrow(RangeError);
+    expect(() => cal!.update({ view: 'listWeek' })).toThrow(RangeError); // the list family has no renderer yet
     expect(() => cal!.update({ view: 'nope' })).toThrow(RangeError);
     expect(cal!.kernel.getState()).toBe(before);
   });

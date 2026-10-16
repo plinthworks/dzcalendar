@@ -201,8 +201,145 @@ export const DZ_CSS = `
   border-radius: 50%;
   background: var(--dz-now, var(--tz-danger, #b91c1c));
 }
+/* ── toolbar: view switcher ─────────────────────────────────────────────── */
+.dz-toolbar__views { display: inline-flex; }
+.dz-toolbar__view { border-radius: 0; margin-inline-start: -1px; }
+.dz-toolbar__view:first-child { border-start-start-radius: var(--dz-radius, var(--tz-radius, 0.375rem)); border-end-start-radius: var(--dz-radius, var(--tz-radius, 0.375rem)); }
+.dz-toolbar__view:last-child { border-start-end-radius: var(--dz-radius, var(--tz-radius, 0.375rem)); border-end-end-radius: var(--dz-radius, var(--tz-radius, 0.375rem)); }
+.dz-toolbar__view[aria-pressed='true'] { background: var(--dz-accent, var(--tz-accent, Highlight)); color: var(--dz-accent-fg, var(--tz-accent-fg, HighlightText)); border-color: var(--dz-accent, var(--tz-accent, Highlight)); }
+
+/* ── time grid: hours outside business hours ────────────────────────────── */
+.dz-off {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(var(--t) * var(--dz-minute, 0.8px));
+  height: calc(var(--h) * var(--dz-minute, 0.8px));
+  background: var(--dz-off-bg, color-mix(in srgb, var(--dz-fg-muted, var(--tz-fg-muted, GrayText)) 9%, transparent));
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── day grid ───────────────────────────────────────────────────────────── */
+.dz-dg { display: flex; flex-direction: column; flex: 1; min-height: 0; border: 1px solid var(--dz-border, var(--tz-border, GrayText)); border-radius: var(--dz-radius, var(--tz-radius, 0.375rem)); overflow: hidden; }
+.dz-dg__head { display: grid; grid-template-columns: repeat(var(--dz-cols, 7), minmax(0, 1fr)); border-bottom: 1px solid var(--dz-border, var(--tz-border, GrayText)); }
+.dz-dg__weekday { padding: 0.375rem 0.25rem; text-align: center; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText)); }
+.dz-dg__body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; }
+.dz-dg--month .dz-dg__week { flex: 1 1 0; min-height: var(--dz-week-min, 5.5rem); }
+.dz-dg__week {
+  display: grid;
+  position: relative;
+  grid-template-columns: repeat(var(--dz-cols, 7), minmax(0, 1fr));
+  grid-template-rows: var(--dz-day-head, 1.75rem) repeat(var(--lanes, 0), var(--dz-bar-height, 1.375rem)) 1fr;
+  row-gap: 2px;
+  border-bottom: 1px solid var(--dz-border, var(--tz-border, GrayText));
+}
+.dz-dg__week:last-child { border-bottom: 0; }
+.dz-dg__cell {
+  grid-row: 1 / -1;
+  grid-column: calc(var(--col) + 1);
+  border-inline-start: 1px solid var(--dz-border, var(--tz-border, GrayText));
+  padding: 0.125rem 0.25rem;
+  min-width: 0;
+  z-index: 0;
+}
+.dz-dg__cell:first-child { border-inline-start: 0; }
+.dz-dg__cell--outside { background: var(--dz-outside-bg, color-mix(in srgb, var(--dz-fg-muted, var(--tz-fg-muted, GrayText)) 6%, transparent)); }
+.dz-dg__cell--outside .dz-dg__num { opacity: 0.45; }
+.dz-dg__cell--closed { background-image: repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--dz-border, var(--tz-border, GrayText)) 45%, transparent) 7px 8px); }
+.dz-dg__cell--today { background-color: var(--dz-today-bg, color-mix(in srgb, var(--dz-accent, var(--tz-accent, Highlight)) 7%, transparent)); }
+.dz-dg__num {
+  display: inline-block;
+  min-width: 1.5rem;
+  padding: 0.0625rem 0.375rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: center;
+  cursor: pointer;
+}
+.dz-dg__cell--today .dz-dg__num { background: var(--dz-accent, var(--tz-accent, Highlight)); color: var(--dz-accent-fg, var(--tz-accent-fg, HighlightText)); font-weight: 600; }
+.dz-dg__week .dz-bar { grid-row: calc(var(--lane) + 2); z-index: 1; position: relative; }
+.dz-dg__week .dz-bar--bg { grid-row: 2 / -1; z-index: 0; }
+.dz-bar--timed { background: transparent; border-inline-start-width: 0; padding-inline-start: 0.25rem; }
+.dz-bar--timed::before {
+  content: '';
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-inline-end: 0.25rem;
+  border-radius: 50%;
+  background: var(--dz-event-accent, var(--dz-accent, var(--tz-accent, Highlight)));
+}
+.dz-bar__time { font-variant-numeric: tabular-nums; opacity: 0.85; }
+.dz-more {
+  grid-row: calc(var(--lane) + 2);
+  grid-column: calc(var(--col) + 1);
+  z-index: 1;
+  margin: 0 2px;
+  padding: 0 0.375rem;
+  border: 0;
+  border-radius: var(--dz-radius, var(--tz-radius, 0.375rem));
+  background: transparent;
+  color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText));
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dz-more:hover, .dz-more:focus-visible { background: var(--dz-bg-raised, var(--tz-bg-raised, ButtonFace)); outline-offset: 1px; }
+
+/* ── popover and context menu: inside .dz-cal, so they carry its theme ──── */
+.dz-pop, .dz-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  z-index: 50;
+  min-width: 12rem;
+  max-width: min(22rem, 90vw);
+  padding: 0.375rem;
+  border: 1px solid var(--dz-border, var(--tz-border, GrayText));
+  border-radius: calc(var(--dz-radius, var(--tz-radius, 0.375rem)) * 1.5);
+  background: var(--dz-bg, var(--tz-bg, Canvas));
+  color: var(--dz-fg, var(--tz-fg, CanvasText));
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.35);
+}
+.dz-pop[hidden], .dz-menu[hidden] { display: none; }
+.dz-pop__head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.125rem 0.25rem 0.375rem; }
+.dz-pop__title { margin: 0; font-size: 0.875rem; font-weight: 600; }
+.dz-pop__close { border: 0; background: transparent; color: inherit; font: inherit; font-size: 1.125rem; line-height: 1; cursor: pointer; padding: 0.125rem 0.375rem; border-radius: var(--dz-radius, var(--tz-radius, 0.375rem)); }
+.dz-pop__list { display: grid; gap: 2px; max-height: 18rem; overflow-y: auto; }
+.dz-bar--in-popover { margin: 0; }
+.dz-menu { display: grid; gap: 1px; }
+.dz-menu__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 0;
+  border-radius: var(--dz-radius, var(--tz-radius, 0.375rem));
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: start;
+  padding: 0.375rem 0.625rem;
+  cursor: pointer;
+}
+.dz-menu__item:hover, .dz-menu__item:focus-visible { background: var(--dz-bg-raised, var(--tz-bg-raised, ButtonFace)); outline: 2px solid transparent; }
+.dz-menu__item[aria-disabled='true'] { opacity: 0.55; cursor: not-allowed; }
+.dz-menu__reason { font-size: 0.75rem; color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText)); }
+.dz-menu__shortcut { margin-inline-start: auto; font-size: 0.75rem; color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText)); }
+
+/* Long press opens the context menu: no iOS callout or text selection in the way. */
+.dz-tg__body, .dz-dg__body { -webkit-touch-callout: none; user-select: none; }
+.dz-probe { position: absolute; visibility: hidden; pointer-events: none; inset-inline-start: -9999px; height: var(--dz-bar-height, 1.375rem); width: 1px; }
 .dz-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (forced-colors: active) {
+  .dz-menu__item:focus-visible, .dz-more:focus-visible, .dz-pop__close:focus-visible, .dz-dg__num:focus-visible { outline: 2px solid Highlight; }
   .dz-ev, .dz-bar { border: 1px solid CanvasText; }
   .dz-band--gap, .dz-band--repeat { border: 1px dashed CanvasText; }
 }

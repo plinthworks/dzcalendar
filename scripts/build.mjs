@@ -7,7 +7,7 @@
  * join the list as their phase arrives.
  */
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,7 +17,7 @@ const pkg = (name) => join(root, 'packages', name);
 const read = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const run = (cmd, args, cwd = root) => execFileSync(cmd, args, { cwd, stdio: 'inherit' });
 
-const PACKAGES = ['core'];
+const PACKAGES = ['core', 'dom', 'motion-gsap'];
 const TZSLOT_RANGE = '^2.1.0';
 
 const shared = (name) => ({
@@ -53,7 +53,8 @@ function typescript(name) {
     description: source.description,
     ...shared(name),
     type: 'module',
-    sideEffects: false,
+    // The DOM's built-in views register themselves on import: a bundler must keep those modules.
+    sideEffects: name === 'dom' ? ['./views/*.js', './calendar.js'] : false,
     main: './index.js',
     module: './index.js',
     types: './index.d.ts',
@@ -61,13 +62,28 @@ function typescript(name) {
       '.': { types: './index.d.ts', default: './index.js' },
       './package.json': './package.json',
     },
-    dependencies: internal(source.dependencies),
+    ...(source.dependencies && { dependencies: internal(source.dependencies) }),
+    ...(source.peerDependencies && { peerDependencies: source.peerDependencies }),
   };
   writeFileSync(join(dir, 'dist', 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
   extras(name);
 }
 
 for (const name of PACKAGES) typescript(name);
+theme();
+
+/** The theme ships its CSS and SCSS as they are, compiled first. */
+function theme() {
+  const dir = pkg('theme');
+  rmSync(join(dir, 'dist'), { recursive: true, force: true });
+  mkdirSync(join(dir, 'dist'));
+  run('npm', ['run', 'build:theme', '--silent']);
+  const source = read(join(dir, 'package.json'));
+  for (const file of source.files) cpSync(join(dir, file), join(dir, 'dist', file));
+  const { files: _files, ...manifest } = source;
+  writeFileSync(join(dir, 'dist', 'package.json'), JSON.stringify({ ...manifest, ...shared('theme') }, null, 2) + '\n');
+  extras('theme');
+}
 
 for (const name of PACKAGES) {
   const manifest = read(join(pkg(name), 'dist', 'package.json'));
@@ -80,9 +96,9 @@ for (const name of PACKAGES) {
   }
   // One Temporal for tzslot and DzCalendar: the range is a decision, not an accident.
   const tz = manifest.dependencies?.['@tzslot/core'];
-  if (tz !== TZSLOT_RANGE) {
+  if (name === 'core' && tz !== TZSLOT_RANGE) {
     console.error(`packages/${name} depends on @tzslot/core ${tz}, expected ${TZSLOT_RANGE}`);
     process.exit(1);
   }
 }
-console.log(`\nBuilt: packages/{${PACKAGES.join(',')}}/dist`);
+console.log(`\nBuilt: packages/{${[...PACKAGES, 'theme'].join(',')}}/dist`);

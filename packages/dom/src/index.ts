@@ -8,3 +8,5 @@ export type { DzMessages } from './messages.js';
 export { DZ_CSS, ensureStyles } from './styles.js';
 export { NO_MOTION } from './motion.js';
 export type { MotionAdapter } from './motion.js';
+export { registerView } from './host.js';
+export type { ViewController, ViewCtx, ViewFactory, CalendarHooks, EventHooks, EventContentCtx, ContextMenuCtx, MenuHook } from './host.js';

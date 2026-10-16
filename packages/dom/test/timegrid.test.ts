@@ -118,9 +118,11 @@ describe('time grid, read-only', () => {
     host.querySelector<HTMLButtonElement>('.dz-toolbar__next')!.click();
     // Intl puts narrow no-break spaces around the dash: compare on plain spaces.
     expect(host.querySelector('.dz-toolbar__title')!.textContent!.replace(/\s/g, ' ')).toBe('26 oct. – 1 nov. 2026');
-    host.querySelector<HTMLButtonElement>('.dz-toolbar__prev')!.click();
+    host.querySelector<HTMLButtonElement>('.dz-toolbar__next')!.click();
     host.querySelector<HTMLButtonElement>('.dz-toolbar__today')!.click();
-    expect(seen).toEqual(['next', 'prev', 'other']);
+    // Today from the current week would be a no-op: nothing moves, nothing animates.
+    host.querySelector<HTMLButtonElement>('.dz-toolbar__today')!.click();
+    expect(seen).toEqual(['next', 'next', 'other']);
   });
 
   it('update() changes only what it is asked: the scroll position survives a relabel', () => {
