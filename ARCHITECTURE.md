@@ -1,0 +1,1330 @@
+# DzCalendar : architecture complète
+
+> Livrable destiné à `/Users/nadou/Dev/dzcalendar/ARCHITECTURE.md`.
+> Rédigé après lecture intégrale de `DzCalendar face à FullCalendar.md` et de tzslot : `CLAUDE.md`, `ROADMAP.md`, `package.json`, `vitest.config.ts`, `scripts/build.mjs`, `core/src/{temporal,slots,grid,range,shift,interop,index}.ts`, `dom/src/time-slots.ts`, `angular/src/calendar.ts`, `theme/tzslot.scss`, `core/test/perf.test.ts`.
+> Aucune ligne de FullCalendar n'a été lue. Seule sa documentation publique (comportement observable) sert de référence.
+> Ce que je n'ai pas vérifié est marqué **[À VÉRIFIER]**. Ce sont soit des API du polyfill Temporal, soit des fichiers de tzslot non lus.
+
+## Décisions validées par le propriétaire (2026-10-16)
+
+Elles priment sur le reste du document quand il dit autre chose.
+
+| Sujet | Décision |
+|---|---|
+| Lien avec tzslot | `@tzslot/core ^2.1.0` en dépendance npm, pas de copie. |
+| Modèle d'événement | `ZonedDateTime` avec une zone par événement ; journées entières en `PlainDate` (fin exclusive). |
+| Périmètre | Tout ce que fait FullCalendar, Premium compris. |
+| Axe DST en timeGrid (K.1) | **Option C** : axe mural + transition visible ; `elapsed` en option ; `elapsed` seul en timeline. |
+| Gratuit / Pro (K.5, K.9) | **Tout en MIT pour l'instant.** Le paquet `@dzcalendar/pro` reste une frontière de code (plugins via `registerView`), sans licence FSL ni clé tant que le modèle économique n'est pas décidé. |
+| From scratch (K.11) | **`CLEANROOM.md` adopté** : seul le comportement observable / la doc publique de FullCalendar est consulté ; chaque comportement imité est décrit dans `docs/behaviors/*.md` avec nos mots. |
+| Polyfill (K.2) | **Import statique conservé**, comme dans tzslot. |
+
+Restent ouvertes : K.3, K.4, K.6–K.8, K.10, K.12–K.16.
+
+### Ajustements après la Phase 0 (spikes et revues, détail dans ROADMAP.md)
+
+Ils priment sur les sections citées.
+- **B.3** — `getTimeZoneTransition` existe (polyfill 1.0.6 et natif) : pas de repli par bisection. `DayKind` gagne `'skipped'` (jour de longueur 0, Apia 2011-12-30). Une transition appartient au seul jour dont `[start, end)` la contient (le jour qui *commence* dessus, São Paulo/Havane). `lengthMinutes` et `deltaMinutes` ne sont pas arrondis (offsets historiques à secondes). `ResolvedWall.offsetMatched`.
+- **B.4/B.5** — Modèle en calendrier ISO, toujours. `TimedEvent.zoneGuessed`. `revision` attribuée par le store (Phase 1), 0 à la normalisation. Id déterministe pour un événement de source sans id (Phase 1). Code `invalid-event` ; `null` = absent ; aucune exception sur données, exception sur `ctx` invalide.
+- **B.10–B.12, C.3** — En mode `wall`, un événement est coupé à chaque transition `repeat` ; un jour `skipped` donne une colonne repliée « ce jour n'existe pas », sans segment ; un jour qui commence à 01:00 montre une bande `gap` 00:00–01:00.
+- **B.17, K.4** — `Intl.DateTimeFormat#format` lève sur les objets Temporal sous le polyfill : formatage par `toLocaleString` ou `format(epochMs)` + `timeZone` ; calendrier d'affichage via l'extension de locale (`-u-ca-`). Formatage d'un `PlainDate` à vérifier en Phase 2.
+- **D.8** — `Intl.Locale#getTextInfo()` et le getter `textInfo` existent ; repli méthode-ou-getter conservé.
+- **I/J** — Theme, playground, `vite.config.ts`, `size-budget.json` passent en Phase 3.
+- **Dépendance** — `@tzslot/core` 2.1.0 publié importe le polyfill de base, pas `/full` : calendriers non ISO indisponibles jusqu'à une release de tzslot qui le corrige.
+
+---
+
+## 0. Ce que tzslot fait déjà, et que DzCalendar reprend à l'identique
+
+| Convention tzslot | Référence | Conséquence pour DzCalendar |
+|---|---|---|
+| Une seule porte d'entrée pour Temporal : `Temporal` natif sinon polyfill `/full`, jamais de fallback `Date`. | `core/src/temporal.ts:29-55` | Tout import Temporal passe par `@tzslot/core`, ré-exporté par `@dzcalendar/core/temporal.ts`. Un test de pureté interdit `Date` et le global `Temporal`. |
+| Le polyfill est un import statique (~19,7 ko gzip). | `temporal.ts:16-19`, `CLAUDE.md` | Il compte dans nos budgets. Voir G et K. |
+| `resolve` → `{exists, ambiguous, offsets, instants}`, calculé par deux lectures `earlier`/`later`. | `slots.ts:106-145` | Réutilisé tel quel (`resolveWallTime`). C'est la primitive de l'axe horaire et du drop sur l'heure répétée. |
+| `getDaySlots` marche la journée en heure murale, pas en `+24h`. 0,40 ms/jour. | `slots.ts:156-198`, `ROADMAP.md` | Génère les graduations de l'axe et les candidats du moteur de créneaux. |
+| `getMonthGrid` fait toujours 6×7 `PlainDate` ISO. `firstDayFor(locale)` interroge `Intl.Locale.getWeekInfo`. `getWeekdayOrder`. | `grid.ts:31,101,115` | Base de dayGrid mois et des en-têtes. |
+| `getRangeInfo` donne la durée écoulée contre la durée murale (`crossesTransition`). | `range.ts:54-87` | Badge « durée réelle » sur un événement qui traverse un changement d'heure. |
+| `shiftInstant` passe par la zone. `shiftDayRange` recalcule la fin d'un mois entier. | `shift.ts:76,104` | Navigation par mois et déplacements d'événements. |
+| `interop.ts` (`toInstant`, `toPlainDate`) accepte `Date`. | `interop.ts` | **Jamais dans l'API publique de DzCalendar.** Seulement dans `@dzcalendar/compat-fullcalendar` (migration). |
+| Widgets `create…(host, options)` renvoyant `{update, clear, destroy}`, boutons gardés dans une `Map` par clé (`time-slots.ts:124`), CSS injecté une fois et `injectStyles:false` pour la CSP. | `dom/src/*` | Même forme pour `createCalendar`. Rendu keyed, pas de VDOM. |
+| Wrapper Angular : le widget est créé à la construction, et `effect(() => { const s = this.settings(); untracked(() => widget.update(s)); })`. | `angular/src/calendar.ts:150-168` | Règle des appels widget en `untracked`, reprise partout. |
+| L'état d'interface doit survivre à `update({value})`. | `CLAUDE.md` | Contrat central de `update()` (D.7). |
+| `tsconfig` du core : `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, ES2022. | `core/tsconfig.json` | Identique, avec `lib` sans DOM pour les paquets purs. |
+| Build : `scripts/build.mjs` (tsc par paquet, ng-packagr pour Angular, manifeste de `dist/` réécrit, garde-fou « pas de `src/` dans le manifeste »). | `scripts/build.mjs` | Copié et étendu. |
+| Vitest + jsdom + plugin Angular, `test:ci` en 1 worker, `test:memory` avec `--expose-gc`. | `vitest.config.ts`, `package.json` | Même chose, avec des « projects » node/jsdom. |
+| Thème : SCSS source → CSS compilé, un test échoue si le CSS dérive, `light-dark()`, variantes `tailwind.css` et `tailwind3.css`. | `theme/*` | Même mécanique. |
+
+### Ce qui manque dans `@tzslot/core` : upstream ou local
+
+Règle de partage : **tout fait de fuseau horaire (temps pur) va upstream. Toute sémantique de calendrier (événement, série, layout) reste dans DzCalendar.** Pour ne pas dépendre du calendrier de release de tzslot, tout est d'abord écrit localement dans `@dzcalendar/core/zone.ts` avec la signature finale. On migre ensuite vers upstream sans casser l'API.
+
+| Manque | Décision | Détail |
+|---|---|---|
+| `dayInfo(date, zone)` : début et fin d'instant du jour, longueur (23h, 24h, 25h, 23h30, 24h30), liste des transitions du jour. | **Upstream** (tzslot 2.2), local d'abord | Utile aussi aux pickers : « ce jour dure 23 h ». |
+| `getTransitions(from, to, zone)` : transitions dans un intervalle. | **Upstream**, local d'abord | Marqueurs DST sur la timeline. |
+| `getWeekInfo(locale)` : `firstDay`, `weekend`, `minimalDays`. tzslot n'a que `firstDayFor`. | **Upstream** | Même source `Intl.Locale.getWeekInfo`, avec le même repli getter/méthode que `grid.ts:92-112`. |
+| Types `PlainYearMonth`, `PlainMonthDay`, `ZoneId`. | **Local** | `type PlainYearMonth = ReturnType<typeof Temporal.PlainYearMonth.from>`. Trivial. |
+| Résolution d'une heure murale avec politique : `compatible`/`earlier`/`later`/`reject`, y compris l'instant d'un trou. `resolve` renvoie `instants: []` dans un trou. | **Local** `zone.ts: resolveWall(date, time, zone, policy)`, construit sur `resolveWallTime` et `toZonedDateTime({disambiguation})` | Besoin propre aux séries et au drop. |
+| Grille à nombre de semaines variable (`fixedWeekCount:false`). | **Local** | Prendre `getMonthGrid` et retirer les dernières lignes sans jour du mois (`inMonth`). |
+| Numéro de semaine selon la locale (`minimalDays`, `firstDay`). | **Local** | `PlainDate.weekOfYear` ne couvre que l'ISO. |
+| Moteur d'intervalles libres/occupés. | **Local** (`@dzcalendar/slots`) | Pas du domaine « picker ». |
+
+---
+
+## A. Vue d'ensemble
+
+### A.1 Couches et paquets
+
+```
+                          ┌──────────────────────────────────────────────────────────┐
+  Apps / frameworks       │ Angular 18–21      Vanilla JS       (plus tard: React,    │
+                          │ @dzcalendar/angular                  Vue, Web Component)  │
+                          └───────────────┬──────────────────────────────────────────┘
+                                          │ wrappers fins, signals, untracked
+  Rendu            ┌──────────────────────▼───────────────────────┐  ┌───────────────┐
+  (DOM, light DOM) │ @dzcalendar/dom                              │  │ @dzcalendar/  │
+                   │  createCalendar · views (dayGrid,timeGrid,   │◄─┤ theme (CSS    │
+                   │  list,multiMonth) · interactions · a11y ·    │  │ vars, SCSS)   │
+                   │  popover · render hooks · motion adapter     │  └───────────────┘
+                   └───────┬───────────────────────┬──────────────┘
+          plugins de vues  │                       │ importe
+   ┌───────────────────────▼─────────┐             │            ┌───────────────────────┐
+   │ @dzcalendar/pro   (FSL)         │             │            │ @dzcalendar/motion-   │
+   │  timeline · resource views ·    │             │            │ gsap (adaptateur,     │
+   │  virtualisation 2D · print ·    │             │            │ optionnel)            │
+   │  export · éditeur · slots pro   │             │            └───────────────────────┘
+   └───────────────┬─────────────────┘             │
+                   │                               │
+  Modèle & moteurs ▼   (aucun DOM, aucun framework, aucun Date)
+   ┌─────────────────────────────────────────────────────────────────────────────────┐
+   │ @dzcalendar/core                                                                │
+   │  kernel · store persistant+index · sources · séries/édition · ressources ·      │
+   │  projection/segmentation · axe horaire · layout · virtualisation (maths) ·      │
+   │  règles (businessHours, contraintes) · commandes+historique · interaction pure  │
+   │  · navigation · formatage Intl                                                  │
+   └──────┬───────────────────────────┬───────────────────────────┬──────────────────┘
+          │                           │                           │
+   ┌──────▼──────────┐   ┌────────────▼────────┐   ┌──────────────▼───────────┐
+   │ @dzcalendar/    │   │ @dzcalendar/ical    │   │ @dzcalendar/slots        │
+   │ rrule           │   │ (parse/serialize)   │   │ (moteur de créneaux)     │
+   └──────┬──────────┘   └──────────┬──────────┘   └──────────────┬───────────┘
+          └──────────────────────────┴─────────────────────────────┘
+                                     │
+                         ┌───────────▼─────────────┐
+                         │ @tzslot/core ^2.1.0     │  Temporal (natif|polyfill),
+                         │ (npm, pas de copie)     │  resolveWallTime, getDaySlots,
+                         └─────────────────────────┘  getMonthGrid, firstDayFor…
+
+   Transverse : @dzcalendar/conformance (fixtures JSON + schémas + runner), lu par TS, Swift, Kotlin.
+```
+
+### A.2 Liste des paquets à terme
+
+| Paquet | Contenu | Licence | Phase |
+|---|---|---|---|
+| `@dzcalendar/core` | Tout le modèle et les moteurs purs | MIT | 0–… |
+| `@dzcalendar/rrule` | RRULE/EXDATE/RDATE sur Temporal, sans modèle d'événement | MIT | 5 |
+| `@dzcalendar/ical` | Parse/sérialise iCalendar, source iCal | MIT | 9 |
+| `@dzcalendar/slots` | Moteur de créneaux de base (fenêtre, durée, buffers, préavis, busy) | MIT | 14 |
+| `@dzcalendar/dom` | Vues dayGrid, timeGrid, list, multiMonth, vues custom, interactions, a11y | MIT | 3– |
+| `@dzcalendar/angular` | Composant, `CalendarController`, templates | MIT | 11 |
+| `@dzcalendar/theme` | SCSS → CSS, tokens, Tailwind 3 et 4, `contrast.css` | MIT | 0 (minimal) |
+| `@dzcalendar/motion-gsap` | Adaptateur GSAP optionnel (Flip, transitions de vues) | MIT, peer `gsap` | 17 |
+| `@dzcalendar/conformance` | `cases/**/*.json`, schémas JSON, runner TS | MIT | 1 |
+| `@dzcalendar/pro` | timeline ±ressources, vues ressource verticales, arbre/groupes de ressources (UI), virtualisation 2D étendue, impression paginée, export PDF/PNG/XLSX/ICS, éditeur d'événement et de récurrence, slots avancés | FSL (source-available, bascule MIT après 2 ans) | 15–16 |
+| `@dzcalendar/pro-angular` | Wrappers Angular du Pro | FSL | 16 |
+| `@dzcalendar/compat-fullcalendar` | Traducteur d'options FC → DzCalendar, codemod | MIT | 18 |
+| `@dzcalendar/element`, `react`, `vue` | Web Component, adaptateurs | MIT | 18 |
+| `DzCalendarKit` (Swift), `dz-calendar-kotlin` | Ports du core pilotés par la conformité, UI SwiftUI/Compose | à décider | 19+ |
+
+**Gratuit contre Pro.** Reste gratuit, tout ce que FullCalendar MIT fait, plus les failles comblées :
+- les vues dayGrid, timeGrid, list, multiMonth et custom ;
+- drag, resize, sélection, clavier, undo/redo, popover, business hours, now indicator ;
+- les sources (tableau, fonction, JSON, iCal) ;
+- la récurrence et l'édition « cette / suivantes / toutes » au niveau modèle ;
+- la virtualisation de toutes les vues non-ressource ;
+- le modèle de ressources (types, arbre, `resourceId` sur les événements), parce que les événements le portent ;
+- slots de base, Angular, a11y.
+
+Pro : timeline, vues ressource verticales, UI de colonnes/groupes de ressources, virtualisation 2D à grande échelle, impression paginée, export, éditeur prêt à l'emploi, slots avancés (capacité, rotas, contraintes).
+
+Rien ne dépend du Pro dans les paquets MIT. Le Pro s'enregistre comme plugin de vues via `registerView` (D.1). La clé de licence est vérifiée hors ligne (signature Ed25519), sans appel réseau (question K.9).
+
+### A.3 Flux de données de bout en bout
+
+```
+ EventSource (array|fn|json|ical)           commandes UI / API / clavier
+        │ fetch(window, signal)                          │
+        ▼                                                ▼
+ SourceManager ── ChunkCache ──► normalizeMany ──►  CommandExecutor ──► History (inverses)
+        │            (Problem[] jamais d'exception)      │ valide (constraints/overlap/allow)
+        └────────────────────────────┬───────────────────┘
+                                     ▼
+                      EventStore (snapshot persistant, index d'intervalles)
+                                     │ StoreChange {added,updated,removed,dirtySpans}
+        ┌────────────────────────────┴─────────────────────────────┐
+        │                                                          │
+   queryInstances(ViewWindow)                              subscribe() → DOM : invalide
+   événements + séries expansées (RRULE) + overrides      seulement les conteneurs dirty
+        ▼
+   Projection : instants → jours de la zone d'affichage (DayInfo 23h/24h/25h)
+        ▼  Segment[] (par jour, par colonne de ressource)
+   Layout pur : layoutColumn (timeGrid) | packLanes+overflow (dayGrid/timeline) | PrefixSums (virtual)
+        ▼  Placement[] en FRACTIONS/unités d'axe (aucun pixel mesuré)
+   ViewModel (sérialisable, testé par la conformité)
+        ▼
+ @dzcalendar/dom : FrameScheduler  [lecture] → [calcul] → [écriture]
+        Reconciler keyed (segmentKey) → ne touche que les nœuds dont (rect, revision) changent
+        ▼
+   Interaction : pointer events / clavier → Hit → DragSession (pur) → Proposal → preview
+        ▼ commit
+   Command (sérialisable) ──► CommandExecutor ──► store      (boucle fermée)
+```
+
+---
+
+## B. `@dzcalendar/core` module par module
+
+Contraintes de paquet :
+- `lib: ["ES2023"]`, sans DOM. Les types DOM sont donc une erreur de compilation. Le core déclare lui-même `interface AbortSignalLike { readonly aborted: boolean; addEventListener(...): void; … }`.
+- `types: []`, tsconfig strict comme tzslot.
+- Zéro `Date` : un test (`test/purity.test.ts`) fait un grep des sources et échoue sur `\bDate\b`, `Date.now`, `globalThis.Temporal`, `from 'temporal-polyfill`.
+- Les tests du core tournent en environnement `node`, pas jsdom, pour détecter toute fuite DOM.
+- Invariants numériques : les index internes utilisent `epochMilliseconds` (nombre). Les sous-millisecondes sont tronquées à l'indexation mais conservées dans les objets Temporal. Documenté.
+
+### B.1 `temporal.ts`
+
+```ts
+export { Temporal, usingPolyfill } from '@tzslot/core';
+export type { PlainDate, PlainTime, PlainDateTime, ZonedDateTime, Instant, Duration, DurationLike, Weekday } from '@tzslot/core';
+export type PlainYearMonth = ReturnType<typeof Temporal.PlainYearMonth.from>;
+export type ZoneId = string;            // identifiant IANA, jamais un offset
+export type EpochMs = number;
+```
+
+### B.2 `intervals.ts` : algèbre d'intervalles `[start, end)`
+
+```ts
+export interface Interval { readonly start: Instant; readonly end: Instant }
+export interface MsSpan { readonly s: EpochMs; readonly e: EpochMs }
+export function normalizeIntervals(xs: readonly MsSpan[]): MsSpan[];        // tri + fusion O(n log n)
+export function unionSpans(a: readonly MsSpan[], b: readonly MsSpan[]): MsSpan[];           // sweep O(a+b)
+export function intersectSpans(a: readonly MsSpan[], b: readonly MsSpan[]): MsSpan[];       // O(a+b)
+export function subtractSpans(a: readonly MsSpan[], b: readonly MsSpan[]): MsSpan[];        // O(a+b)
+export function spansToIntervals(xs: readonly MsSpan[]): Interval[];
+```
+Invariants : entrée triée disjointe → sortie triée disjointe. Un intervalle vide est supprimé. Sert aux business hours, aux contraintes et au moteur de créneaux.
+
+### B.3 `zone.ts` : faits de fuseau (candidats upstream)
+
+```ts
+export type DayKind = 'normal' | 'short' | 'long' | 'irregular';   // 23h, 25h, autre (Lord Howe 23h30/24h30, Apia: jour sauté)
+export interface Transition {
+  readonly at: Instant;
+  readonly offsetBefore: string; readonly offsetAfter: string;
+  readonly deltaMinutes: number;                 // +60 (avance), -60 (retour), +30 (Lord Howe)…
+  readonly wallBefore: PlainDateTime;            // l'heure murale juste avant
+  readonly wallAfter: PlainDateTime;             // juste après
+  readonly kind: 'gap' | 'repeat';               // delta>0 : heure inexistante ; delta<0 : heure répétée
+}
+export interface DayInfo {
+  readonly date: PlainDate; readonly zone: ZoneId;
+  readonly start: Instant;       // début du jour réel (gère « minuit n'existe pas » : São Paulo/Havane historiques)
+  readonly end: Instant;         // début du jour suivant
+  readonly lengthMinutes: number;
+  readonly kind: DayKind;
+  readonly transitions: readonly Transition[];
+}
+export function dayInfo(date: PlainDate, zone: ZoneId): DayInfo;
+export function dayInfos(from: PlainDate, count: number, zone: ZoneId): DayInfo[];    // O(count), réutilise end→start du suivant
+export function transitionsBetween(from: Instant, to: Instant, zone: ZoneId): Transition[];
+export function resolveWall(date: PlainDate, time: PlainTime, zone: ZoneId,
+  policy: 'compatible' | 'earlier' | 'later' | 'reject' | { preferOffset: string }): {
+    instant: Instant | null; exists: boolean; ambiguous: boolean; other: Instant | null };
+```
+Algorithme `dayInfo` : `start = date.toZonedDateTime({timeZone})` (début de jour au sens Temporal), `end = date.add({days:1})` idem. Les transitions sont énumérées par `ZonedDateTime.getTimeZoneTransition('next')` jusqu'à `end` **[À VÉRIFIER : présence dans `temporal-polyfill/full` 1.0.5]**. Repli : comparaison des offsets en `start`/`end`, puis bisection sur les instants (≈ 30 itérations de `offsetNanoseconds`, au plus 2 transitions par jour). Un test compare les deux méthodes.
+
+`resolveWall` s'appuie sur `resolveWallTime` (`exists`, `ambiguous`, `instants`) pour classer le cas. Dans un trou, `instant` = `toZonedDateTime({disambiguation:'compatible'})` (avance), `exists=false`.
+
+### B.4 `event/types.ts` : le modèle d'événement
+
+```ts
+export type EventId = string; export type SeriesId = string; export type ResourceId = string;
+export type RecurrenceKey = string;     // ZonedDateTime.toString() (offset + [zone]) ou PlainDate.toString()
+
+export type TemporalInput = ZonedDateTime | PlainDate | PlainDateTime | Instant | string;
+
+export interface EventInput {
+  id?: string; groupId?: string; title?: string;
+  start: TemporalInput; end?: TemporalInput; duration?: DurationLike; allDay?: boolean;
+  timeZone?: ZoneId;                       // zone de l'événement quand start n'en porte pas
+  resourceId?: ResourceId; resourceIds?: readonly ResourceId[];
+  rrule?: string | RRuleObject; exdate?: readonly TemporalInput[]; rdate?: readonly TemporalInput[];
+  display?: 'auto' | 'block' | 'list-item' | 'background' | 'inverse-background' | 'none';
+  status?: 'confirmed' | 'tentative' | 'cancelled'; busy?: boolean;   // busy : alimente le moteur de slots
+  editable?: boolean; startEditable?: boolean; durationEditable?: boolean; resourceEditable?: boolean;
+  constraint?: ConstraintSpec; overlap?: boolean | OverlapFn; allow?: AllowFn;
+  classNames?: readonly string[]; tone?: string;   // nom de token (--dz-tone-<tone>), pas une couleur codée en dur
+  url?: string; extendedProps?: Readonly<Record<string, unknown>>;
+}
+
+interface EventCommon {
+  readonly id: EventId; readonly groupId?: string; readonly title: string;
+  readonly resourceIds: readonly ResourceId[];
+  readonly display: NonNullable<EventInput['display']>;
+  readonly status: 'confirmed' | 'tentative' | 'cancelled'; readonly busy: boolean;
+  readonly perms: { start: boolean; duration: boolean; resource: boolean };
+  readonly constraint?: ConstraintSpec; readonly overlap?: boolean | OverlapFn; readonly allow?: AllowFn;
+  readonly classNames: readonly string[]; readonly tone?: string; readonly url?: string;
+  readonly props: Readonly<Record<string, unknown>>;
+  readonly sourceId?: string;
+  readonly ref?: { readonly seriesId: SeriesId; readonly key: RecurrenceKey };   // occurrence/override d'une série
+  readonly revision: number;              // +1 à chaque modification : invalide les render hooks
+}
+export interface TimedEvent extends EventCommon { readonly allDay: false; readonly start: ZonedDateTime; readonly end: ZonedDateTime }
+export interface AllDayEvent extends EventCommon { readonly allDay: true;  readonly start: PlainDate;     readonly end: PlainDate }  // fin EXCLUSIVE
+export type CalEvent = TimedEvent | AllDayEvent;
+```
+Invariants :
+- `start` et `end` d'un événement horaire sont des `ZonedDateTime` **qui peuvent avoir des zones différentes** (vol Paris→Tokyo). La « zone de l'événement » est celle de `start`. `end ≥ start` en instants.
+- Un événement journée entière n'a **aucune zone** : il est « flottant ». Il occupe les mêmes dates calendaires pour tous les observateurs. `end > start` (au moins 1 jour).
+- Un événement horaire de durée nulle est valide (jalon). Le layout lui donne une hauteur visuelle minimale.
+
+### B.5 `event/normalize.ts` : entrées → modèle, avec rapport
+
+```ts
+export type ProblemCode =
+  | 'missing-start' | 'invalid-start' | 'invalid-end' | 'invalid-duration' | 'end-before-start'
+  | 'unknown-zone' | 'zone-defaulted' | 'offset-only' | 'offset-mismatch'
+  | 'wall-time-skipped' | 'wall-time-ambiguous'
+  | 'date-object-rejected' | 'foreign-temporal'
+  | 'allday-with-time' | 'allday-zone-ignored'
+  | 'duplicate-id' | 'invalid-rrule' | 'invalid-exdate' | 'unknown-resource' | 'too-many-occurrences';
+export interface Problem {
+  readonly code: ProblemCode; readonly severity: 'error' | 'warning';
+  readonly path: string;                   // 'events[12].start'
+  readonly sourceId?: string; readonly detail?: string;   // code + détail brut ; les phrases viennent des messages du DOM (i18n)
+}
+export interface NormalizeContext {
+  readonly displayZone: ZoneId; readonly defaultEventZone?: ZoneId;
+  readonly defaultTimedDuration: Duration;        // défaut PT1H
+  readonly defaultAllDayDuration: Duration;       // défaut P1D
+  readonly strictZones: boolean;                  // true : un instant/heure murale sans zone = erreur
+  readonly newId: () => string;                   // injectable pour les tests
+  readonly knownResources?: ReadonlySet<ResourceId>;
+}
+export type Normalized = { kind: 'event'; event: CalEvent } | { kind: 'series'; series: Series };
+export type NormalizeResult =
+  | { ok: true; value: Normalized; problems: readonly Problem[] }
+  | { ok: false; problems: readonly Problem[] };
+export function normalizeEvent(input: EventInput, ctx: NormalizeContext, path?: string): NormalizeResult;
+export function normalizeMany(inputs: Iterable<EventInput>, ctx: NormalizeContext, sourceId?: string):
+  { items: Normalized[]; report: NormalizationReport };
+export interface NormalizationReport { readonly accepted: number; readonly rejected: number; readonly problems: readonly Problem[] }
+```
+Règles de lecture, décidées :
+
+| Entrée | Résultat |
+|---|---|
+| `ZonedDateTime` ou chaîne `2026-03-29T09:00[Europe/Paris]` (avec ou sans offset) | Horaire dans cette zone. Un offset incohérent avec les règles → recalculé depuis la zone, avec `offset-mismatch` (`offset:'prefer'`). |
+| `PlainDate` ou chaîne `2026-03-29` | Journée entière. Avec `allDay:false` et une zone connue : minuit de cette zone. |
+| Chaîne `…Z` / `…+02:00` sans crochet, ou `Instant` | Zone = `timeZone` ?? `defaultEventZone`, sinon zone d'affichage avec `offset-only` (warning). En `strictZones` : erreur. |
+| `PlainDateTime` ou chaîne sans offset | Heure murale dans `timeZone` ?? `defaultEventZone` ?? affichage (`zone-defaulted`). Heure inexistante → `compatible` + `wall-time-skipped`. Heure ambiguë → `earlier` + `wall-time-ambiguous`. |
+| Un `Date` | **Rejeté** : `date-object-rejected`, avec un `detail` indiquant `Temporal.Instant.fromEpochMilliseconds(d.getTime())` (conversion volontaire par l'appelant). |
+| Objet Temporal d'une autre copie du polyfill (`instanceof` faux, `Symbol.toStringTag` correct) | Ré-analysé via `.toString()`, avec `foreign-temporal` (warning). |
+| `end` absent | `start + duration` si fournie, sinon la durée par défaut. Une durée peut contenir des jours : elle est appliquée avec `ZonedDateTime.add` (jours en heure murale, heures en temps écoulé). |
+
+Le rapport s'expose via `onProblems(report)` et `calendar.getProblems()`. Rien n'est jeté en silence.
+
+### B.6 `store/` : store immuable indexé
+
+**Choix : arbre AVL persistant (copie de chemin), augmenté de `maxEnd`.** Une mise à jour coûte O(log n). Chaque snapshot est immuable et partage la structure avec le précédent. L'undo et l'optimistic revert sont gratuits, et les snapshots restent cohérents pendant qu'un rendu asynchrone les lit.
+
+```
+store/ordered-map.ts   PersistentOrderedMap<K, V>   get/set/delete O(log n), iteration ordonnée
+store/interval-tree.ts PersistentIntervalTree<K>    insert/remove O(log n)
+                       overlapping(s, e, visit)     O(log n + k)   (élague par maxEnd, arrête quand start ≥ e)
+store/store.ts         EventStore, StoreSnapshot
+store/changes.ts       StoreChange, Mutation, invert()
+store/query.ts         queryInstances
+```
+
+Index maintenus par snapshot :
+1. `events : PersistentOrderedMap<EventId, CalEvent>`.
+2. `timedIdx : IntervalTree` sur les spans horaires `[start.epochMs, end.epochMs]`. Une durée nulle est indexée comme `[t, t+1]`.
+3. `dayIdx : IntervalTree` pour les journées entières, en numéros de jour d'époque `[epochDay(start), epochDay(end))`. C'est indépendant de toute zone.
+4. `byResource : PersistentOrderedMap<ResourceId, {timed, day}>` : un arbre par ressource, pour qu'une ligne de timeline interroge seulement ses événements.
+5. `series : PersistentOrderedMap<SeriesId, Series>` et `seriesIdx : IntervalTree` sur `[dtstart, lastOccurrenceEnd | +∞]`.
+6. `bySource : Map<sourceId, Set<EventId>>` (pour remplacer un chunk de source).
+
+```ts
+export interface ViewWindow {
+  readonly start: Instant; readonly end: Instant;               // fenêtre en instants (zone d'affichage appliquée)
+  readonly startDate: PlainDate; readonly endDate: PlainDate;   // fenêtre en dates calendaires, fin exclusive
+  readonly displayZone: ZoneId;
+}
+export interface EventInstance {
+  readonly key: string;            // id, ou `${seriesId}@${recurrenceKey}`
+  readonly event: CalEvent;        // occurrence matérialisée (identité stable entre deux requêtes)
+  readonly origin: 'single' | 'occurrence' | 'override';
+}
+export interface StoreSnapshot {
+  readonly version: number;
+  getEvent(id: EventId): CalEvent | undefined;
+  getSeries(id: SeriesId): Series | undefined;
+  queryInstances(w: ViewWindow, opts?: { resourceId?: ResourceId; includeBackground?: boolean }): EventInstance[];
+  readonly counts: { events: number; series: number };
+}
+export interface EventStore {
+  readonly snapshot: StoreSnapshot;
+  apply(mutations: readonly Mutation[], cause: StoreChange['cause']): StoreChange;   // une transaction = une notification
+  replaceSourceChunk(sourceId: string, chunk: string, items: readonly Normalized[]): StoreChange;
+  subscribe(fn: (c: StoreChange) => void): () => void;
+}
+export interface StoreChange {
+  readonly version: number;
+  readonly added: readonly EventId[]; readonly updated: readonly EventId[]; readonly removed: readonly EventId[];
+  readonly seriesTouched: readonly SeriesId[];
+  readonly dirtySpans: readonly MsSpan[];          // ancienne ET nouvelle position de chaque événement touché
+  readonly dirtyDays: readonly { s: number; e: number }[];   // idem, jours flottants
+  readonly cause: 'command' | 'source' | 'undo' | 'redo' | 'api';
+}
+export type Mutation =
+  | { kind: 'event'; before?: CalEvent; after?: CalEvent }
+  | { kind: 'series'; before?: Series; after?: Series };
+export function invert(m: Mutation): Mutation;
+```
+`queryInstances` : (1) événements simples via `timedIdx`/`dayIdx` en O(log n + k) ; (2) séries candidates via `seriesIdx` puis `expandSeries` limité à la fenêtre ; (3) saute les clés d'occurrence qui ont un override ; (4) tri stable par `(start, -durée, titre, key)`. Les occurrences matérialisées sont cachées par `(seriesId, series.revision, key)` : même identité d'objet tant que la série ne change pas, donc pas de re-render inutile.
+
+### B.7 `source/` : sources d'événements
+
+```ts
+export interface FetchRequest {
+  readonly window: ViewWindow; readonly signal: AbortSignalLike; readonly sourceId: string;
+}
+export type SourceFetch = (req: FetchRequest) => Promise<readonly EventInput[]> | readonly EventInput[];
+export interface ChunkPolicy { readonly unit: 'none' | 'week' | 'month' | 'year'; readonly prefetch: number }  // prefetch en chunks de part et d'autre
+export interface EventSourceSpec {
+  readonly id: string; readonly fetch: SourceFetch; readonly chunk: ChunkPolicy;
+  readonly staleAfter?: Duration; readonly retry?: { attempts: number; backoffMs: number };
+  readonly defaults?: Partial<EventInput>;        // tone, classNames, editable… hérités par les événements de la source
+  readonly recurrence?: 'client' | 'server';      // 'server' : le serveur renvoie des occurrences, pas de RRULE à expandre
+}
+export const arraySource  = (id: string, events: readonly EventInput[]): EventSourceSpec;     // chunk 'none'
+export const fnSource     = (id: string, fn: SourceFetch, chunk?: ChunkPolicy): EventSourceSpec;
+export const jsonSource   = (id: string, o: { url: string; startParam?: string; endParam?: string; zoneParam?: string;
+                              method?: 'GET' | 'POST'; headers?: Record<string, string>;
+                              map?: (raw: unknown) => EventInput[]; fetchImpl?: typeof fetch }): EventSourceSpec;
+// ical : voir @dzcalendar/ical (icalSource)
+```
+`SourceManager` (`source/manager.ts`) :
+- **Découpe en chunks** alignés dans la zone d'affichage (mois civil, par exemple). `ChunkCache` : `Map<chunkKey, {status, fetchedAt, ids, abort}>`.
+- **Fusionne** les chunks manquants contigus en **une seule requête** (moins d'appels réseau).
+- **Annule** (via `AbortController`) les requêtes dont tous les chunks sont sortis de `fenêtre ∪ prefetch`.
+- **Déduplique** les requêtes en vol. Concurrence maximale 4.
+- **Génération** : `refetch(sourceId?)` incrémente une génération, et les réponses d'une génération périmée sont ignorées.
+- **Application atomique** par `store.replaceSourceChunk` : `refCount: Map<EventId, Set<chunkKey>>` gère l'événement qui chevauche deux chunks. Il appartient aux deux, et disparaît quand les deux l'ont retiré.
+- **Notifications** : `onLoading(boolean)`, `onSourceError({sourceId, chunk, error})`, avec retry exponentiel.
+
+### B.8 `recurrence/` : séries et édition (avec `@dzcalendar/rrule`)
+
+```ts
+export interface Series {
+  readonly id: SeriesId; readonly revision: number;
+  readonly template: SeriesTemplate;                 // tout ce qui n'est pas temporel
+  readonly allDay: boolean;
+  readonly dtstart: ZonedDateTime | PlainDate;
+  readonly duration: Duration;                       // durée « zonée » (P1DT2H) : jours en mural, heures en écoulé
+  readonly set: RRuleSet;                            // rules, rdates, exdates (voir paquet rrule)
+  readonly overrides: ReadonlyMap<RecurrenceKey, EventId>;   // événements détachés qui remplacent une occurrence
+  readonly splitFrom?: { readonly seriesId: SeriesId; readonly at: RecurrenceKey };
+}
+export interface Occurrence { readonly seriesId: SeriesId; readonly key: RecurrenceKey; readonly start: ZonedDateTime | PlainDate; readonly end: ZonedDateTime | PlainDate }
+export function expandSeries(s: Series, w: ViewWindow, o?: { limit?: number }): Occurrence[];
+export function materialize(s: Series, occ: Occurrence): CalEvent;
+```
+**Sémantique de l'heure** (corrige les bugs DST/RRULE de FullCalendar, cf. #6729) :
+- Un horaire quotidien ou plus lent (`DAILY`…`YEARLY`) est **mural** : le 9 h reste 9 h avant et après le changement d'heure.
+- Les fréquences sub-journalières (`HOURLY`, `MINUTELY`, `SECONDLY`) avancent en **temps écoulé**.
+- `dtstart` dans un trou donne l'heure suivante (`compatible`). Dans une heure répétée, c'est la première lecture (`earlier`), conformément à RFC 5545. Chaque occurrence ambiguë est signalée dans `Occurrence` (`ambiguous: true`).
+
+`RecurrenceKey` = `ZonedDateTime.toString()` de l'occurrence *originale*, offset compris. Les deux « 02:30 » d'un jour de retour d'heure ont donc deux clés distinctes.
+
+**Édition** (`recurrence/edit.ts`). Les fonctions sont pures : snapshot + intention → `Mutation[]`.
+
+```ts
+export type EditScope = 'this' | 'following' | 'all';
+export interface OccurrenceRef { readonly seriesId: SeriesId; readonly key: RecurrenceKey }
+export type EventPatch = Partial<Pick<CalEvent, 'title' | 'resourceIds' | 'status' | 'busy' | 'tone' | 'classNames'>> &
+  { start?: ZonedDateTime | PlainDate; end?: ZonedDateTime | PlainDate; props?: Record<string, unknown> };
+export function editOccurrence(snap: StoreSnapshot, ref: OccurrenceRef, patch: EventPatch, scope: EditScope,
+  opts?: { overrides?: 'keep' | 'drop'; newId?: () => string }): Result<Mutation[], Violation[]>;
+export function deleteOccurrence(snap: StoreSnapshot, ref: OccurrenceRef, scope: EditScope): Result<Mutation[], Violation[]>;
+export function rebaseRule(rule: RRule, oldStart: ZonedDateTime | PlainDate, newStart: ZonedDateTime | PlainDate): RRule;
+```
+Algorithmes :
+- **`this`** : crée un événement override `{ref:{seriesId,key}}` avec le patch, et l'enregistre dans `series.overrides`. L'expanseur saute cette clé. Comme l'override est un événement ordinaire de l'index, il est retrouvé à sa **nouvelle** position même s'il a été déplacé hors de la fenêtre d'origine. Une suppression de `this` ajoute un EXDATE (clé ISO complète).
+- **`all`** : applique le patch au `template`. Un changement d'heure ou de jour modifie `dtstart` **en heure murale**, et `rebaseRule` recale la règle : `BYDAY` d'une règle hebdomadaire décalé du même nombre de jours, `BYMONTHDAY` remplacé pour une règle mensuelle, `n-ième jour de semaine` recalculé. Les overrides sont gardés par défaut, sauf ceux dont le champ touché entre en conflit avec le patch (`overrides:'drop'` les supprime).
+- **`following`** : (a) si l'occurrence est la première, c'est `all`. (b) Sinon, la série d'origine est tronquée : `UNTIL` = début de l'occurrence **précédente** (inclusif), ou `COUNT` réduit au nombre d'occurrences déjà passées. (c) Une nouvelle série est créée avec `dtstart` = l'occurrence éditée (patch appliqué), `COUNT` restant ou `UNTIL` d'origine, et `splitFrom` renseigné. (d) EXDATE, RDATE et overrides postérieurs à la coupure migrent vers la nouvelle série. Choix d'export iCal : deux `UID` liés par `RELATED-TO;RELTYPE=PARENT`, sans `RANGE=THISANDFUTURE` (moins bien supporté).
+- Un `EditScope` demandé sur un drag est fourni par un callback `chooseScope(info): Promise<EditScope | null>`. Par défaut `'this'`, et `null` annule.
+
+### B.9 `resource/` : ressources (types et arbre, gratuits)
+
+```ts
+export interface ResourceInput {
+  id: ResourceId; title: string; parentId?: ResourceId; order?: number;
+  group?: string;                               // champ de groupement (resourceGroupField)
+  timeZone?: ZoneId;                            // pour businessHours et slots de cette ressource
+  businessHours?: BusinessHoursInput | boolean;
+  eventConstraint?: ConstraintSpec; eventOverlap?: boolean;
+  classNames?: readonly string[]; extendedProps?: Record<string, unknown>;
+}
+export interface ResourceNode { readonly resource: ResourceInput; readonly depth: number; readonly path: readonly ResourceId[];
+  readonly parent: ResourceNode | null; readonly children: readonly ResourceNode[] }
+export interface ResourceTree { readonly roots: readonly ResourceNode[]; readonly byId: ReadonlyMap<ResourceId, ResourceNode> }
+export function buildResourceTree(inputs: readonly ResourceInput[], o?: { orderBy?: (a: ResourceInput, b: ResourceInput) => number }):
+  { tree: ResourceTree; problems: Problem[] };    // cycles, orphelins, doublons → Problem, jamais d'exception
+export type ResourceRow =
+  | { kind: 'resource'; node: ResourceNode; depth: number; expanded: boolean | null; rowKey: string }
+  | { kind: 'group'; label: string; groupKey: string; count: number; rowKey: string };
+export function flattenRows(tree: ResourceTree, state: { expanded: ReadonlySet<ResourceId>; groups?: { field: string; collapsed: ReadonlySet<string> } },
+  filter?: (r: ResourceInput) => boolean): ResourceRow[];     // O(n)
+```
+Dans l'arbre, la zone de ressource sert aux business hours et aux slots. L'affichage reste dans la zone du calendrier (question K.6).
+
+### B.10 `project/` : projection événement → vue
+
+```ts
+export interface Segment {
+  readonly key: string;                 // `${instanceKey}|${dayIndex}|${part}` : clé du réconciliateur DOM
+  readonly instance: EventInstance;
+  readonly dayIndex: number;            // colonne/jour dans la vue (après hiddenDays)
+  readonly resourceId?: ResourceId;
+  readonly startsHere: boolean; readonly endsHere: boolean;       // coins arrondis, flèche de continuation
+  readonly from: Instant | PlainDate; readonly to: Instant | PlainDate;   // tranche de ce jour
+}
+export function segmentTimed(ev: TimedEvent, days: readonly DayInfo[]): Segment[];
+export function segmentAllDay(ev: AllDayEvent, view: DateIndex): Segment[];
+export interface DateIndex { readonly dates: readonly PlainDate[]; colOf(date: PlainDate): number /* -1 si masqué */ }
+export function splitByWeek(segs: readonly Segment[], weeks: readonly (readonly number[])[]): Segment[][];
+```
+`segmentTimed` : recherche binaire du premier `DayInfo` tel que `day.end > event.start`, puis itération tant que `day.start < event.end`. Complexité O(log D + jours couverts). Chaque tranche = `[max(start, day.start), min(end, day.end))`. Un événement qui finit **exactement** à `day.start` n'apparaît pas ce jour-là (fin exclusive). Un événement de durée nulle à `day.start` apparaît. Les `DayInfo` viennent de `dayInfos()` : la journée de 23 h, 25 h ou 23 h 30 est la vraie journée de la zone d'affichage.
+`segmentAllDay` : indices par arithmétique `startDate.since(viewStart).days`, découpé aux jours masqués.
+Un événement horaire multi-jours en dayGrid devient un segment par jour. Un événement journée entière en timeGrid va dans la rangée « all-day ». Option `multiDayTimed: 'split-columns' | 'all-day-row'`.
+
+### B.11 `project/time-axis.ts` : axe horaire d'une colonne (décision C)
+
+```ts
+export type AxisMode = 'wall' | 'elapsed';
+export interface AxisTick { readonly position: number; readonly label: PlainTime; readonly instant: Instant | null;
+  readonly note?: 'second-pass' | 'first-pass' | 'skipped'; readonly major: boolean }
+export interface AxisBand { readonly kind: 'gap' | 'repeat'; readonly from: number; readonly to: number; readonly transition: Transition }
+export interface ColumnAxis {
+  readonly mode: AxisMode; readonly day: DayInfo;
+  readonly length: number;                         // en minutes d'axe
+  readonly bands: readonly AxisBand[];             // à hachurer / marquer
+  toPosition(i: Instant): number;                  // clampé [0, length]
+  fromPosition(p: number, hint?: { prefer?: 'earlier' | 'later' | { offset: string } }):
+    { instant: Instant; exists: boolean; ambiguous: boolean; alternative: Instant | null };
+  ticks(stepMinutes: number): AxisTick[];
+}
+export function buildColumnAxis(date: PlainDate, zone: ZoneId,
+  o: { mode: AxisMode; slotMin?: DurationLike; slotMax?: DurationLike /* jusqu'à P2D : « 30:00 » */ }): ColumnAxis;
+```
+Détails d'implémentation :
+- Mode `wall` : `toPosition(i) = minutes murales depuis minuit` dans la zone. La graduation reprend `getDaySlots(date, zone, {stepMinutes, minTime, maxTime})` (`exists`, `ambiguous`). Cache LRU `(date, zone, step)`.
+- Mode `elapsed` : `toPosition(i) = (i − day.start)/60000`. Les graduations marchent les heures murales et portent `second-pass` sur la deuxième lecture d'une heure répétée. Les heures inexistantes sont absentes.
+- `slotMax` au-delà de 24 h est calculé en arithmétique murale sur `PlainDateTime`, puis résolu.
+
+### B.12 `layout/` : algorithmes de placement
+
+**`layout/column.ts` : chevauchements côte à côte (timeGrid)**
+
+```ts
+export interface ColItem { readonly key: string; readonly start: number; readonly end: number; readonly order: number }  // unités d'axe
+export interface ColPlacement { readonly key: string; readonly lane: number; readonly lanes: number;
+  readonly left: number; readonly width: number /* fractions 0..1 */; readonly z: number }
+export function layoutColumn(items: readonly ColItem[], o: { minVisual: number; mode: 'side-by-side' | 'cascade'; indent?: number; maxLanes?: number }): ColPlacement[];
+```
+Algorithme **sweep + coloration d'intervalles gloutonne** : étendre chaque `end` à `max(end, start + minVisual)` pour que le layout corresponde à ce qui est dessiné ; trier par `(start, -end, order)` ; ouvrir/fermer des clusters (composantes connexes de chevauchement) en balayant `maxEnd` ; dans un cluster, affecter chaque élément à la première voie libre (`laneEnd ≤ start`) ; cette coloration est optimale (nombre de voies = clique maximale). Ensuite **expansion à droite** : un élément de voie `l` s'étend sur les voies `l+1…` tant qu'aucun élément de ces voies ne le chevauche (recherche binaire dans la liste triée de chaque voie). `width = span/lanes`, `left = lane/lanes`. Mode `cascade` : `left = depth*indent`, `width = 1 − left`, `z = ordre`. Complexité O(n log n), O(n·voies) au pire.
+Important : en mode d'axe `wall`, le layout travaille sur les positions **murales**. Deux événements 02:30 de la première et de la seconde passe se chevauchent visuellement et se placent donc côte à côte. Voir C.
+
+**`layout/rows.ts` : empilement en rangées (dayGrid, timeline)**
+
+```ts
+export interface RowItem { readonly key: string; readonly start: number; readonly end: number; readonly rank: readonly number[] }  // colonnes ou px
+export function packLanes(items: readonly RowItem[], o?: { gap?: number }): { lanes: ReadonlyMap<string, number>; laneCount: number };
+export interface OverflowResult { readonly pieces: readonly { key: string; lane: number; from: number; to: number }[];
+  readonly hiddenPerDay: readonly number[]; readonly hiddenKeysPerDay: readonly (readonly string[])[] }
+export function computeOverflow(lanes: ReadonlyMap<string, number>, items: readonly RowItem[], dayCount: number, maxLanes: number): OverflowResult;
+```
+- `packLanes` : tri par `(start, durée décroissante, rank)`, tas min des occupants `(end, lane)`, tas min des voies libres ; complexité O(n log n). Les journées entières passent avant les événements horaires ; `rank` porte l'ordre `eventOrder`.
+- `computeOverflow` : pour chaque jour `d`, `hidden[d]` = éléments dont `lane ≥ maxLanes` qui couvrent `d`. Si `hidden[d] > 0`, la dernière voie visible est aussi masquée ce jour-là et sert au lien « +N ». Les barres sont ensuite découpées en `pieces` : plus grandes plages contiguës de jours où elles restent visibles. Complexité O(S·J), avec J ≤ 7 par semaine.
+
+**`layout/virtual.ts` : mathématiques de fenêtre**
+
+```ts
+export class PrefixSums { constructor(sizes: ArrayLike<number>); readonly total: number;
+  set(i: number, size: number): void; offsetOf(i: number): number; indexAt(offset: number): number }  // Fenwick : O(log n)
+export interface VRange { readonly first: number; readonly last: number }   // inclusif
+export function visibleRange(sums: PrefixSums | { uniform: number; count: number }, scroll: number, viewport: number, overscan: number): VRange;
+export function visible2D(rows: PrefixSums, cols: PrefixSums, scrollTop: number, scrollLeft: number, vw: number, vh: number, overscan: number): { rows: VRange; cols: VRange };
+```
+Les tailles uniformes prennent un chemin arithmétique O(1). Les tailles variables servent aux lignes de timeline (hauteur = voies×hauteur de voie) et aux colonnes de jours à longueur variable en mode `elapsed`.
+
+### B.13 `rules/` : business hours, contraintes, overlap
+
+```ts
+export interface BusinessHoursRule { daysOfWeek: readonly Weekday[]; start: PlainTime | string; end: PlainTime | string | '24:00'; timeZone?: ZoneId }
+export type BusinessHoursInput = boolean | BusinessHoursRule | readonly BusinessHoursRule[];
+export function businessIntervals(w: ViewWindow, input: BusinessHoursInput, zone: ZoneId): MsSpan[];
+export type ConstraintSpec = 'businessHours' | { groupId: string } | { start: TemporalInput; end: TemporalInput } | { span: MsSpan[] };
+export type OverlapFn = (still: CalEvent, moving: CalEvent) => boolean;
+export type AllowFn = (proposal: Proposal) => boolean;
+export interface Violation { readonly code: 'constraint' | 'overlap' | 'allow' | 'valid-range' | 'not-editable' | 'resource-locked'; readonly eventId: EventId; readonly detail?: string }
+export function validateProposal(snap: StoreSnapshot, p: Proposal, rules: RulesContext): Violation[];
+```
+- **`businessIntervals`** : pour chaque jour de la fenêtre dans la zone de la règle, les heures murales sont résolues par `resolveWall` (`compatible`). Un `24:00` ou un horaire de nuit (`22:00`→`06:00`) produit un intervalle qui chevauche le jour suivant. Le résultat est une liste normalisée d'intervalles, donc la nuit de 23 h/25 h donne des intervalles de vraie durée. Cache par `(fenêtre, règle)`.
+- **`validateProposal`** : contrainte = l'intervalle proposé ⊆ union de contrainte (`subtractSpans(proposal, constraint)` vide). Overlap = `snap.queryInstances` sur la fenêtre de la proposition (O(log n + k)), filtré par ressource, en excluant l'événement lui-même et les `display:'background'`. `allow` est appelée en dernier.
+
+### B.14 `commands/` : commandes sérialisables, historique
+
+```ts
+export type Command =
+  | { type: 'event.create'; event: EventInput }
+  | { type: 'event.update'; id: EventId; patch: EventPatch }
+  | { type: 'event.move'; id: EventId; start: TemporalInput; end?: TemporalInput; resourceIds?: readonly ResourceId[]; scope?: EditScope; key?: RecurrenceKey }
+  | { type: 'event.resize'; id: EventId; edge: 'start' | 'end'; to: TemporalInput; scope?: EditScope; key?: RecurrenceKey }
+  | { type: 'event.delete'; id: EventId; scope?: EditScope; key?: RecurrenceKey }
+  | { type: 'series.split'; id: SeriesId; at: RecurrenceKey; patch?: EventPatch }
+  | { type: 'resource.set'; resources: readonly ResourceInput[] }
+  | { type: 'batch'; label?: string; commands: readonly Command[] };
+export type CommandResult =
+  | { ok: true; mutations: readonly Mutation[]; change: StoreChange }
+  | { ok: false; violations: readonly Violation[]; problems: readonly Problem[] };
+export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandContext): { result: CommandResult; mutations: Mutation[] };
+export interface History {
+  readonly canUndo: boolean; readonly canRedo: boolean;
+  undo(): boolean; redo(): boolean;
+  transaction<T>(label: string, fn: () => T): T;       // regroupe en une entrée
+  clear(): void;
+}
+export function createHistory(store: EventStore, o?: { limit?: number /* 200 */; mergeKey?: (c: Command) => string | null }): History;
+```
+Propriétés :
+- **Les inverses sont des `Mutation`**, pas des commandes. L'undo ne dépend donc ni du serveur ni des règles de validation, et rejoue exactement l'état précédent (y compris la scission d'une série).
+- Un drag continu produit une seule entrée grâce à `mergeKey`.
+- Une action externe (source rafraîchie) ne passe pas par l'historique. Une entrée d'historique dont les événements ont disparu est ignorée, avec une alerte de cause `'undo'`.
+- `scripts/gen-schema.mjs` génère `commands.schema.json` (JSON Schema) à partir de ces types, pour qu'un LLM de l'application hôte puisse les émettre.
+- **Optimistic UI** : `eventChange` fournit `revert()`, qui applique les inverses de cette seule transaction si le serveur refuse.
+
+### B.15 `selection.ts`, `interaction/`
+
+```ts
+export interface Selection { readonly start: ZonedDateTime | PlainDate; readonly end: ZonedDateTime | PlainDate; readonly allDay: boolean; readonly resourceId?: ResourceId }
+export function normalizeSelection(a: Hit, b: Hit, o: { snap: Duration; allDayWhen: 'day-cell' | 'allday-row' }): Selection;
+
+export type Hit =
+  | { kind: 'slot'; dayIndex: number; date: PlainDate; position: number; resourceId?: ResourceId }   // timeGrid
+  | { kind: 'day';  date: PlainDate; resourceId?: ResourceId }                                       // dayGrid, allday row
+  | { kind: 'time'; instant: Instant; resourceId?: ResourceId };                                     // timeline
+export interface Proposal { readonly event: CalEvent; readonly start: ZonedDateTime | PlainDate; readonly end: ZonedDateTime | PlainDate;
+  readonly resourceIds: readonly ResourceId[]; readonly valid: boolean; readonly violations: readonly Violation[]; readonly ambiguity?: { chosen: Instant; alternative: Instant } }
+export function proposeMove(ctx: InteractionContext, ev: CalEvent, grab: Hit, over: Hit): Proposal;
+export function proposeResize(ctx: InteractionContext, ev: CalEvent, edge: 'start' | 'end', over: Hit): Proposal;
+export function intentFor(key: KeyLike, ctx: { rtl: boolean; mode: 'cursor' | 'event' | 'grab' }): Intent | null;
+```
+- Les propositions sont **pures** : souris, tactile et clavier fournissent un `Hit`, et le même code produit la `Proposal`. C'est ce qui garantit la parité clavier/souris.
+- **Déplacement** : le nouveau début est résolu avec `resolveWall` ; la **durée zonée** de l'événement est conservée (`add(duration)`). Pour une série, la durée est celle de la série. Une cible dans un trou donne l'instant suivant le trou (`exists:false` → avertissement visuel). Une cible dans une heure répétée garde la lecture d'origine si l'événement était déjà dans l'heure répétée, sinon `earlier` avec `ambiguity` renseigné (le DOM offre « 1ʳᵉ / 2ᵉ »).
+- **Snap** : `snapDuration` en minutes murales (mode `wall`) ou écoulées (`elapsed`).
+
+### B.16 `views/` : navigation et modèles de vue
+
+```ts
+export type ViewFamily = 'dayGrid' | 'timeGrid' | 'list' | 'multiMonth' | 'timeline' | 'custom';
+export interface ViewSpec {
+  readonly type: string; readonly family: ViewFamily;
+  readonly duration: DurationLike;                       // { months: 1 }, { weeks: 1 }, { days: 3 }, { years: 1 }…
+  readonly alignment: 'month' | 'week' | 'day' | 'year' | 'none';
+  readonly dayCount?: number; readonly fixedWeekCount: boolean; readonly hiddenDays: readonly Weekday[];
+  readonly dateIncrement?: DurationLike; readonly showNonCurrentDates: boolean; readonly validRange?: { start?: PlainDate; end?: PlainDate };
+}
+export interface ViewRange { readonly start: PlainDate; readonly end: PlainDate /* exclusive */;
+  readonly activeStart: PlainDate; readonly activeEnd: PlainDate; readonly dates: readonly PlainDate[]; readonly weeks: readonly (readonly PlainDate[])[] }
+export interface NavContext { readonly locale: string; readonly firstDay: Weekday; readonly today: PlainDate }
+export function computeViewRange(anchor: PlainDate, spec: ViewSpec, ctx: NavContext): ViewRange;
+export function navigate(anchor: PlainDate, spec: ViewSpec, dir: 'prev' | 'next' | 'today' | { to: PlainDate }, ctx: NavContext): PlainDate;
+export const BUILTIN_VIEWS: Readonly<Record<string, ViewSpec>>;
+```
+- Pour un mois, `computeViewRange` appelle `getMonthGrid(year, month, firstDay)`. Si `fixedWeekCount:false`, il retire les dernières lignes qui n'ont aucun jour du mois (`inMonth`).
+- Les en-têtes viennent de `getWeekdayOrder(firstDay)`. Le premier jour par défaut vient de `firstDayFor(locale)`.
+- `navigate` passe par `shiftDayRange` pour le mois entier, et saute les `hiddenDays` pour le pas d'un jour.
+- Vues intégrées : `dayGridMonth/Week/Day`, `timeGridWeek/Day`, `listDay/Week/Month/Year`, `multiMonthYear`. Vues personnalisées par composition : `{ type:'timeGridFourDay', family:'timeGrid', duration:{days:4} }`, ou famille `custom` avec un rendu fourni (D.1).
+- Un modèle de vue par famille, chacun pur et sérialisable : `buildDayGridModel`, `buildTimeGridModel`, `buildListModel`, `buildMultiMonthModel` (et `buildTimelineModel` dans le Pro). Chaque modèle reçoit la `ViewRange`, le snapshot, la zone d'affichage, les options, et renvoie les segments positionnés plus les bandes (business hours, DST, now).
+
+### B.17 `format/` : formatage et i18n via Intl, sans `Date`
+
+```ts
+export type Fmt = Intl.DateTimeFormatOptions;
+export function formatTemporal(v: ZonedDateTime | PlainDate | PlainDateTime | PlainTime | PlainYearMonth, f: Fmt, locale: string): string;
+export function formatToPartsTemporal(v: ..., f: Fmt, locale: string): Intl.DateTimeFormatPart[];
+export function formatRangeTitle(a: ZonedDateTime | PlainDate, b: ZonedDateTime | PlainDate, f: Fmt, locale: string, o?: { separator?: string }): string;
+export function weekNumber(d: PlainDate, o: { firstDay: Weekday; minimalDays: number }): number;
+export function weekdayNames(locale: string, width: 'narrow' | 'short' | 'long', firstDay: Weekday): string[];
+export function monthNames(locale: string, width: 'short' | 'long', calendar?: string): string[];
+```
+**Astuce sans `Date`** : `Intl.DateTimeFormat#formatToParts(number)` accepte un nombre (ms d'époque). Pour un `ZonedDateTime`, on crée un formateur `{timeZone: zdt.timeZoneId, calendar: zdt.calendarId}` et on passe `epochMilliseconds`. Pour un `PlainDate`, le formateur est en `UTC` et on passe `toZonedDateTime('UTC').epochMilliseconds`. **[À VÉRIFIER en spike de la phase 0 : comportement identique natif et polyfill, `timeZone` + `calendar` des formateurs]**.
+- `formatRangeTitle` fusionne les `parts` des deux bouts : préfixe/suffixe communs (même mois et année → « 15–21 mars 2026 »). Il n'utilise pas `formatRange`, qui exige des `Date` ou des Temporal selon l'environnement.
+- Les `Intl.DateTimeFormat` sont cachés dans une `Map` par `(locale, JSON(options))`.
+- Les 79 locales de FullCalendar sont couvertes par Intl, sans tableau à maintenir. Seuls les **messages** (« aujourd'hui », « +N autres ») sont des dictionnaires : EN et FR livrés, les autres par contribution. Les pluriels viennent de `Intl.PluralRules`.
+
+### B.18 `kernel.ts` : le noyau sans DOM
+
+```ts
+export interface KernelOptions { timeZone: ZoneId; locale: string; firstDay?: Weekday; initialDate?: PlainDate; initialView: string;
+  views: Record<string, ViewSpec>; sources: readonly EventSourceSpec[]; events?: readonly EventInput[]; resources?: readonly ResourceInput[];
+  businessHours?: BusinessHoursInput; rules?: RulesOptions; history?: { limit: number } | false; now?: () => Instant }  // 'now' injectable pour les tests
+export interface CalendarKernel {
+  readonly store: EventStore; readonly history: History; readonly sources: SourceManager;
+  getState(): KernelState;                                     // date, vue, plage, sélection, chargement, problèmes
+  dispatch(cmd: Command): CommandResult;
+  setView(type: string, date?: PlainDate): void; navigate(dir: 'prev' | 'next' | 'today' | { to: PlainDate }): void;
+  setTimeZone(zone: ZoneId): void; setSelection(s: Selection | null): void;
+  viewModel(): ViewModel;                                      // appelle buildXxxModel pour la vue courante
+  subscribe(fn: (e: KernelEvent) => void): () => void;
+  destroy(): void;
+}
+export function createKernel(o: KernelOptions): CalendarKernel;
+```
+Le kernel est l'orchestrateur partagé par `dom`, par Angular (via `CalendarController`) et par les ports natifs. Il n'a pas de timer propre : `now()` est injecté, et la ligne « maintenant » est rafraîchie par le DOM.
+
+---
+
+## C. Décision clé : l'axe horaire en timeGrid les jours de changement d'heure
+
+### C.1 Le problème
+
+Dimanche 29 mars 2026 à Paris : 02:00 → 03:00. La journée dure 23 h, et l'heure 02:xx n'existe pas.
+Dimanche 25 octobre 2026 : 03:00 → 02:00. La journée dure 25 h, et 02:xx arrive deux fois.
+Le timeGrid est une grille où toutes les colonnes partagent les lignes horizontales. Il faut décider ce que signifie une ligne.
+
+### C.2 Options
+
+| | **Option A : axe mural partagé** | **Option B : axe en temps écoulé par colonne** | **Option C (recommandée) : axe mural partagé + marquage explicite de la transition** |
+|---|---|---|---|
+| Principe | Ligne = heure d'horloge. Une position = heure murale. | Chaque colonne est une règle de 23 h/24 h/25 h à échelle constante. | Comme A, avec marquage visuel et sémantique de la transition, et mode B disponible. |
+| Alignement entre colonnes | Parfait | Rompu après la transition de la colonne concernée | Parfait |
+| Attentes de l'utilisateur (Google, Outlook, Apple) | Oui | Non | Oui |
+| Vérité des durées | Faux le jour de transition : un événement de 1 h dans un trou a l'air de durer 2 h, de 1 h dans une heure répétée a l'air de durer 2 h | Vrai | Faux visuellement, mais le **badge de durée réelle** (`getRangeInfo.crossesTransition`) et la bande hachurée l'expliquent |
+| Heure répétée : deux événements à « 02:30 » | Se superposent sans explication | Chacun à sa place | Disposés côte à côte, étiquetés avec leur offset |
+| Heure inexistante | Invisible | Absente | Bande hachurée « 02:00–03:00 n'existe pas » |
+| Coût d'implémentation | Faible | Moyen (graduations par colonne) | Moyen |
+
+### C.3 Recommandation : C par défaut, B sur demande, B seul pour la timeline
+
+`axis: 'wall' | 'elapsed'` (défaut `'wall'`).
+
+**Mode `wall` (par défaut), comportement exact :**
+1. Toutes les colonnes partagent la graduation de gauche (`getDaySlots`).
+2. **Trou (avance d'une heure)** : dans la colonne concernée, la bande 02:00–03:00 est dessinée hachurée et marquée `aria-label="02:00 à 03:00 n'existe pas ce jour"`. Une sélection ou un drop qui y tombe est repoussé à 03:00 (instant `compatible`), avec une annonce live. Un événement dont l'heure murale d'entrée est dans la bande est rendu à 03:00 avec le badge « décalé ».
+3. **Heure répétée (retour d'une heure)** : la bande 02:00–03:00 est marquée « répétée » dans la colonne. Le **layout travaille sur les positions murales** : les événements des deux passes se chevauchent visuellement et sont donc placés côte à côte par `layoutColumn`. Chacun porte son offset (`02:30 +02:00` et `02:30* +01:00`, avec la convention d'étoile de tzslot, `slots.ts` / `CLAUDE.md`). Un événement à cheval entre les passes affiche sa durée réelle (« 2 h ») dans un badge.
+4. **Drop dans l'heure répétée** : voir `Proposal.ambiguity` (B.15). Le DOM affiche un petit sélecteur « 1ʳᵉ fois / 2ᵉ fois ». Pour un événement déjà dans l'heure répétée, la lecture d'origine est conservée.
+5. **Jour de 23 h 30 / 24 h 30 (Lord Howe)** : la bande de transition fait 30 minutes. Même mécanisme.
+
+**Mode `elapsed` (option, pour rotas, paie, ops) :** chaque colonne est une règle de temps réel. La colonne de transition fait 23 h ou 25 h de haut à échelle constante. Les graduations de gauche sont celles de la première colonne normale. Les colonnes de transition (`day.kind !== 'normal'`) affichent leurs graduations *dans la colonne*, avec l'indicateur de seconde passe. Les lignes ne s'alignent plus après la transition. C'est assumé et documenté, car c'est le prix de la vérité des durées.
+
+**Timeline : toujours `elapsed`.** L'axe est continu sur plusieurs jours. L'abscisse est une fonction des instants, linéaire par morceaux : `x(i) = cumul(i)`, avec un `PrefixSums` sur les largeurs de créneaux. Les créneaux sont définis en heure murale (par heure, par jour) et peuvent avoir des largeurs inégales (jour de 23 h, 25 h). Le trou n'a pas de graduation, et l'heure répétée porte deux graduations « 02:00 » dont la seconde est annotée. Un événement pose son bord gauche par `x(start)` et son bord droit par `x(end)`, donc sa longueur est toujours vraie.
+
+### C.4 Pourquoi C par défaut
+- Il correspond à ce que l'utilisateur attend de tout autre calendrier (alignement des lignes d'une semaine).
+- Il rend **explicite** ce que FullCalendar cache : les durées affichées ne mentent plus sans que le calendrier le dise.
+- Le mode `elapsed` reste une ligne de configuration, parce que `ColumnAxis` expose la même interface pour les deux modes (B.11), et que le layout n'en dépend pas.
+
+À faire valider (K.1).
+
+---
+
+## D. `@dzcalendar/dom`
+
+### D.1 Rendu sans framework
+
+```
+createCalendar(host, options) ─► CalendarInstance
+   │
+   ├─ kernel (core)
+   ├─ ViewHost : monte / démonte un ViewController selon la vue courante
+   │     interface ViewController { mount(root, kernel): void; render(frame: Frame): void; unmount(): void;
+   │                                hitTest(x:number,y:number): Hit | null; focusFor(intent): void; scrollTo(…): void }
+   │     registerView(family, factory)         // plugins : built-ins ET Pro, ET vues custom
+   ├─ FrameScheduler : une boucle rAF avec 3 phases
+   │     1. lecture (mesures batchées) → 2. calcul (core) → 3. écriture (DOM)
+   ├─ Reconciler : keyed par segment.key
+   ├─ InteractionHost : pointer + clavier + autoscroll
+   ├─ A11y : ARIA, focus itinérant, région live
+   ├─ Popover, RenderHooks, MotionAdapter
+   └─ styles : injection unique (comme tzslot), `injectStyles:false` pour la CSP
+```
+
+**Pas de VDOM global.** Le modèle est le `ViewModel` du core (données pures). Le DOM est un cache : `Map<key, SegmentNode>`.
+
+**Réconciliation par id (`render/reconciler.ts`)**
+
+```ts
+export interface SegmentNode { el: HTMLElement; sig: string /* hash (event.revision, titre, classes, état) */; rect: string /* "top,height,left,width" */ }
+export function reconcile(parent: Element, prev: Map<string, SegmentNode>, next: readonly SegmentSpec[], hooks: RenderHooks): Map<string, SegmentNode>;
+```
+- Un segment est créé, retiré, ou mis à jour. Un nœud existant n'est jamais recréé : sinon le focus sous le pointeur serait perdu, comme tzslot l'a appris pour ses boutons (`time-slots.ts:123-124`).
+- **Deux niveaux de changement** : (1) la position (`rect`) ne modifie que des variables CSS (`--dz-top`, `--dz-height`, `--dz-left`, `--dz-width`, `--dz-lane`), jamais le contenu ; (2) le contenu n'est ré-exécuté (`onEventUpdate`) que si `event.revision` a changé. Déplacer un événement ne relance donc pas le contenu des autres, ce qui règle le défaut #5594 de FullCalendar.
+- **Mise à jour fine** : `StoreChange.dirtySpans` désigne les conteneurs touchés (semaines pour dayGrid, couples colonne-jour pour timeGrid, lignes pour timeline). Seuls ceux-là recalculent `layout*` et se réconcilient. Pour un événement modifié : au plus 2 conteneurs (ancien et nouveau emplacement).
+- **Ordre d'insertion** : on n'appelle `insertBefore` que si l'ordre a changé, les nœuds déjà bien placés ne sont jamais déplacés.
+
+**Layout par fractions** : les placements du core sont des fractions (`left`, `width` en %, `top`/`height` en unités d'axe × `--dz-slot-height`). Le rendu est donc `inset-inline-start: calc(var(--dz-left)*100%)`, `inset-block-start: calc(var(--dz-top) * var(--dz-minute-height))`. **Redimensionner le conteneur ne déclenche aucun recalcul de layout** pour timeGrid et la plupart du dayGrid. Seule la hauteur d'une cellule dayGrid avec `dayMaxEvents:'auto'` est mesurée, une fois par resize, via un `ResizeObserver` unique sur l'hôte, déclenché en rAF.
+
+**Mesures batchées (`render/measure.ts`)**
+
+```ts
+export interface MeasureRequest<T> { read(): T; apply(v: T): void }
+export class FrameScheduler { schedule<T>(r: MeasureRequest<T>): void; flush(): void }   // toutes les `read` d'abord, puis toutes les `apply`
+```
+Règle de code : **aucune lecture de géométrie dans un chemin d'écriture**. Une lecture ne se fait que dans `read()`. Le test de perf navigateur compte `LayoutCount` (G.3) et échoue au-delà d'1 layout par mise à jour. Le `ResizeObserver` n'observe que l'hôte ; nos écritures ne changent jamais sa taille (`contain: size layout` sur l'intérieur), d'où l'absence de boucle « ResizeObserver loop » (#8082).
+
+### D.2 Virtualisation, toutes vues
+
+Principe : **ne rendre que ce qui intersecte la fenêtre visible** (plus un overscan), sur les deux axes, avec les maths de `core/layout/virtual.ts`. Un pool de nœuds recyclés évite la création/destruction.
+
+| Vue | Axe virtualisé | Détail |
+|---|---|---|
+| list | lignes (jours + événements) | `PrefixSums` sur les hauteurs de ligne ; hauteurs estimées puis corrigées par mesure unique (`read`) à l'apparition. |
+| dayGrid mois | semaines si la vue est tall/scrollable ; sinon seulement les événements | Un mois a 6 lignes : le coût vient des événements. Un jour ne rend que `maxLanes` barres + « +N », donc le nombre de nœuds est borné par `cellules×voies`. |
+| multiMonth | mois (lignes de la pile ou de la grille) | Un mois hors fenêtre n'est qu'un conteneur vide à hauteur connue. |
+| timeGrid | colonnes de jours (si > N) et événements hors de la fenêtre verticale | La fenêtre verticale (heures) est petite (24 h) : on ne virtualise que si `slotMin..slotMax` est étendu. Les segments hors du viewport d'axe ne sont pas montés. |
+| custom | selon la famille | Contrat : un `ViewController` fournit `visibleWindow()`. |
+| timeline, vues ressource (Pro) | lignes ET colonnes (2D) | `visible2D`. L'en-tête de ressources et l'en-tête de temps restent synchronisés. |
+
+L'impression désactive la virtualisation (D.9).
+
+### D.3 Interactions
+
+**Pointer Events unifiés** (`interact/pointer.ts`) : `pointerdown/move/up/cancel` avec `setPointerCapture`. Un seul chemin pour souris, tactile et stylet.
+
+- **Seuil de démarrage** : souris 4 px, stylet 4 px, tactile 8 px (`dragMinDistance`).
+- **Pas d'appui long obligatoire** (faille de FullCalendar) :
+  - Souris et stylet : le drag démarre au seuil, immédiatement.
+  - Tactile : un tap **sélectionne** un événement (poignées de redimensionnement visibles, `aria-pressed`). Sur un événement sélectionné, le drag démarre immédiatement au doigt (`touch-action: none` posé *seulement* sur l'événement sélectionné et ses poignées). Un événement non sélectionné laisse défiler (`touch-action: pan-x pan-y`).
+  - Création d'une sélection de plage au tactile : un tap pose un créneau d'une unité, avec deux poignées ajustables. Option `selectLongPress` (défaut 0, désactivé) pour ceux qui préfèrent le geste de FullCalendar.
+- **Autoscroll** (`interact/autoscroll.ts`) : boucle rAF, vitesse proportionnelle à la proximité du bord (zone de 40 px), sur le conteneur vertical du timeGrid et horizontal de la timeline.
+- **Navigation par le bord** : tenir un événement près du bord gauche/droit d'un calendrier pendant 600 ms (`dragEdgeNavigate`) passe à la période suivante/précédente.
+- **Hit-testing** (`interact/hit-test.ts`) : à la première `pointermove`, une phase `read` met en cache les rectangles de colonnes/lignes visibles ; chaque `move` suivant résout un `Hit` par arithmétique (division/recherche binaire), sans `elementFromPoint` ni lecture de layout pendant le geste.
+- **Prévisualisation** : un événement « fantôme » (`ghost.ts`), positionné par variables CSS, et le surlignage de la cible. Les violations (`Proposal.valid:false`) donnent la classe `dz-event--invalid`.
+- **Clavier complet** (`interact/keyboard.ts`, produit par `intentFor`) :
+  - Dans la grille : flèches = déplacement du curseur (jour/créneau), `Home/End` = début/fin de semaine ou de journée, `PageUp/PageDown` = période précédente/suivante, `Shift+flèches` = étend la sélection, `Entrée/Espace` = dateClick ou valide la sélection.
+  - Sur un événement (mode « event ») : `Entrée` = ouvrir ; `M` ou `Alt+Entrée` = **mode saisie** (grab) ; en mode grab, flèches = déplace d'un jour (←/→) ou d'un créneau (↑/↓), `Shift+↑/↓` = redimensionne la fin, `Alt+Shift+↑/↓` = redimensionne le début, `PageUp/PageDown` = ±1 semaine, `Entrée` = valide, `Échap` = annule. Chaque pas est annoncé en région live. Même `Proposal`, mêmes contraintes que la souris.
+  - Suppression : `Suppr`. Annuler/rétablir : `Ctrl/Cmd+Z`, `Ctrl/Cmd+Maj+Z` (désactivable).
+  - RTL : les flèches gauche/droite sont inversées (`intentFor(..., {rtl})`).
+
+### D.4 Popover « +N »
+
+`popover/popover.ts` : le lien « +N autres » ouvre un popover listant les segments cachés du jour. Il utilise l'attribut `popover` HTML et le **CSS anchor positioning** quand il est disponible (Baseline janv. 2026 d'après le doc d'analyse), avec un repli JS minimal (~1 ko : placement sous/au-dessus, retournement) sinon. Focus piégé et restitué, `Échap` ferme, les événements du popover sont des segments normaux (focusables, déplaçables au clavier).
+
+### D.5 Hooks de contenu (render hooks)
+
+```ts
+export interface EventContentCtx { event: CalEvent; instance: EventInstance; segment: SegmentInfo; view: ViewInfo; isMirror: boolean; isDragging: boolean; isSelected: boolean; timeText: string; displayZone: ZoneId }
+export interface Hooks<Ctx> {
+  content?: (ctx: Ctx) => string | Node | { html: string } | null;     // le rendu par défaut est fourni
+  didMount?: (arg: { el: HTMLElement; ctx: Ctx }) => void | (() => void);   // le retour est le cleanup
+  didUpdate?: (arg: { el: HTMLElement; ctx: Ctx }) => void;
+  willUnmount?: (arg: { el: HTMLElement; ctx: Ctx }) => void;
+}
+export interface CalendarHooks { event?: Hooks<EventContentCtx>; day?: Hooks<DayCtx>; resource?: Hooks<ResourceCtx>; slotLabel?: Hooks<SlotCtx>; moreLink?: Hooks<MoreCtx>; nowIndicator?: Hooks<NowCtx>; dayHeader?: Hooks<HeaderCtx> }
+```
+`didUpdate` n'est appelé que si `event.revision` ou l'état (`isSelected`…) change, jamais pour un simple déplacement du voisin. Un hook peut être appelé *après* le montage d'un segment recyclé par la virtualisation : le contrat garantit `willUnmount` avant recyclage.
+
+### D.6 Accessibilité
+
+| Vue | Rôles ARIA |
+|---|---|
+| dayGrid | `role="grid"` ; rangées `role="row"`, cellules `role="gridcell"` avec `aria-label` complet (« lundi 16 mars 2026, 3 événements ») ; événements `role="button"` dans la cellule, ancrés par `aria-describedby`. **Focus itinérant à deux niveaux** : un seul stop de tabulation (la cellule courante) ; `Entrée` sur une cellule non vide passe aux événements de la cellule ; `Échap` revient. |
+| timeGrid | Corps focusable unique avec **curseur virtuel** (`aria-activedescendant` vers un élément « curseur » déplacé), parce que le nombre de créneaux (96×7) interdit un nœud par créneau. En-têtes de colonne `role="columnheader"`. Les événements sont de vrais boutons, atteignables au `Tab`. |
+| list | `role="list"` d'événements, groupes par jour avec `role="group"` + titre de niveau `aria-level`. |
+| timeline (Pro) | `role="treegrid"`, `aria-level/expanded` sur les lignes de ressources, `aria-rowindex/colindex` et `aria-rowcount/colcount` pour la virtualisation. |
+| Heure de transition | Annotations `aria-label` des bandes (C.3) ; annonce live « 02:30 existe deux fois ». |
+
+- **Région live** polie (`a11y/live-region.ts`) : `messages.announce.picked/moved/resized/invalid` avec les valeurs formatées par `Intl`.
+- **WCAG 2.2** : alternative au glisser (SC 2.5.7) = mode grab + éditeur (Pro) ; cibles ≥ 24×24 px (variable `--dz-target-min`) ; focus non masqué (2.4.11) ; contrastes dans les tokens ; `forced-colors` via `contrast.css`.
+- Chaque événement expose `aria-label` = `titre, heure début à heure fin (zone si différente), durée réelle si transition`.
+
+### D.7 API impérative et contrat `update()`
+
+```ts
+export interface CalendarSettings { /* options */ }
+export interface CalendarInstance {
+  readonly kernel: CalendarKernel;
+  update(patch: Partial<CalendarSettings>): void;
+  getState(): CalendarState;                               // date, vue, plage, titre, sélection, canUndo/Redo, loading, problems
+  dispatch(cmd: Command): CommandResult;
+  prev(): void; next(): void; today(): void; goTo(d: PlainDate): void; changeView(type: string, d?: PlainDate): void;
+  select(s: Selection | null): void; undo(): boolean; redo(): boolean;
+  refetch(sourceId?: string): void; scrollToTime(t: PlainTime | string): void;
+  preparePrint(): () => void; destroy(): void;
+}
+export function createCalendar(host: HTMLElement, options?: Partial<CalendarSettings> & { injectStyles?: boolean }): CalendarInstance;
+```
+**`update()` est conçu pour un framework qui rend la valeur à chaque changement** (leçon tzslot).
+1. Chaque clé du patch est comparée à sa valeur précédente (`Object.is` pour les références, comparaison structurelle courte pour les Temporal : `equals`). Une clé inchangée est un no-op complet.
+2. L'instance mémorise la **dernière valeur qu'elle a émise** pour `date`, `view` et `selection` (callbacks `onDateChange`, `onViewChange`, `onSelect`). Si `update({date})` reçoit exactement cette valeur, ce n'est pas une navigation : rien ne bouge. C'est la protection contre « le framework renvoie la valeur et réinitialise l'état entre deux clics ».
+3. **L'état d'interface n'est jamais dans les options** et survit à tout `update()` : focus et curseur de grille, décalage de défilement, popover ouvert, sélection armée, geste en cours, ressources dépliées, poignées d'un événement sélectionné.
+4. Un changement de `events` (référence) passe par `diffEvents(prev, next)` (O(n), identité puis égalité superficielle par `id`) et produit un `StoreChange` fin ; un changement de `timeZone` ou `locale` recalcule les projections sans perdre l'état ; un changement de `view` conserve la date.
+5. Les tests de `update()` (H) rejouent la séquence « interaction, `update` avec la valeur renvoyée, interaction » pour chaque état listé.
+
+### D.8 RTL
+
+Propriétés CSS logiques partout (`inset-inline-start`, `margin-inline`, `padding-block`). `dir` pris de la locale (`Intl.Locale#getTextInfo()/textInfo` **[À VÉRIFIER]**) ou de l'option `direction`. Le `hit-test` inverse l'abscisse en RTL, `intentFor` inverse les flèches, la timeline RTL place le temps de droite à gauche.
+
+### D.9 Impression
+
+Feuille d'impression dans le thème : `@media print` (cellules à bordures nettes, couleurs forcées via `print-color-adjust: exact`, `break-inside: avoid` sur les événements). `preparePrint()` désactive la virtualisation, rend la fenêtre entière de façon synchrone et renvoie une fonction de restauration ; `beforeprint`/`afterprint` l'appellent automatiquement quand `autoPrint:true`. Le Pro ajoute la pagination de la timeline (découpe en colonnes de pages, en-têtes répétés).
+
+### D.10 Animations : GSAP optionnel
+
+```ts
+export interface MotionAdapter {
+  captureState(els: readonly Element[]): MotionSnapshot;                    // avant une mise à jour du DOM
+  animateFrom(snap: MotionSnapshot, o: { duration: number; ease?: string }): void;   // après : FLIP
+  viewTransition(o: { from: Element; to: Element; direction: 'prev' | 'next' | 'none' }, swap: () => void): Promise<void>;
+  kill(): void;
+}
+```
+- **Défaut sans dépendance** : transitions CSS et Web Animations (WAAPI) pour le FLIP d'un événement déplacé ; `document.startViewTransition` (View Transitions, same-document) pour le changement de vue quand l'API existe.
+- **`@dzcalendar/motion-gsap`** : implémente `MotionAdapter` avec GSAP Flip (`Flip.getState` / `Flip.from`) et des timelines de transition de vue. Paquet MIT séparé, `gsap` en `peerDependency` optionnelle, **jamais importé par core ni par dom**. À vérifier : conditions de licence GSAP au moment de la publication (K.10).
+- **`prefers-reduced-motion: reduce`** : `MotionAdapter` par défaut devient no-op ; l'adaptateur GSAP doit lire `matchMedia` et ne rien jouer (testé).
+
+### D.11 Messages
+
+`messages.ts` (EN, FR) comme tzslot : libellés du bouton « aujourd'hui », « +N autres » (pluriels `Intl.PluralRules`), annonces a11y, libellés de bande de transition. Injectables via `messages` (option) ; le DOM est le seul endroit où naissent des phrases (le core ne renvoie que des codes).
+
+---
+
+## E. `@dzcalendar/angular`
+
+```
+packages/angular/src/
+  index.ts · calendar.ts · controller.ts · providers.ts · templates.ts · shapes.ts · defaults.ts · messages.ts
+```
+
+**Composant** (`<dz-calendar>`, standalone, `OnPush`), construit sur le même patron que `tz-calendar` (`angular/src/calendar.ts:150-168`) :
+
+```ts
+@Component({ selector: 'dz-calendar', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush, providers: [CalendarController], template: '' })
+export class DzCalendar implements OnDestroy {
+  // données
+  readonly events        = input<readonly EventInput[]>([]);                 // diff par id côté DOM, pas de deepChangeDetection
+  readonly eventSources  = input<readonly EventSourceSpec[]>([]);
+  readonly resources     = input<readonly ResourceInput[]>([]);
+  // état bidirectionnel
+  readonly view          = model<string>('dayGridMonth');
+  readonly date          = model<PlainDate | undefined>(undefined);
+  readonly selection     = model<Selection | null>(null);
+  // options
+  readonly timeZone      = input<ZoneId | undefined>(undefined);
+  readonly locale        = input<string | undefined>(undefined);
+  readonly axis          = input<AxisMode>('wall');
+  readonly editable      = input(false); readonly selectable = input(false);
+  readonly businessHours = input<BusinessHoursInput | undefined>(undefined);
+  readonly options       = input<Partial<CalendarSettings>>({});               // le reste
+  // sorties
+  readonly dateClick = output<DateClickInfo>(); readonly eventClick = output<EventClickInfo>();
+  readonly select = output<Selection>(); readonly eventChange = output<EventChangeInfo>();   // contient revert()
+  readonly rangeChange = output<ViewRange>(); readonly problems = output<NormalizationReport>();
+  readonly commandApplied = output<CommandApplied>();
+}
+```
+**Règles reprises de tzslot :**
+- L'instance DOM est créée **à la construction** (les cellules existent dès que le composant existe), avec `untracked(this.settings)`.
+- `effect(() => { const s = this.settings(); untracked(() => this.cal.update(s)); })`. L'appel au widget est toujours dans `untracked`, sinon un callback qui écrit un signal dans un effet provoque NG0600 en Angular 18 et crée une dépendance cachée.
+- Les callbacks du DOM (`onDateChange`, …) écrivent les `model()` (`this.view.set(v)`) hors effet.
+- `update()` protège contre le renvoi de la dernière valeur émise (D.7).
+- `ngOnDestroy → cal.destroy()`.
+
+**Zoneless et zone.js.** Aucun appel à `NgZone`. Le DOM tourne hors cycle de détection (rien n'y déclenche de rendu Angular). Sous zone.js, l'instance est créée via `NgZone.runOutsideAngular` (injection optionnelle) et seuls les `output` repassent par `run`. Sous zoneless, les écritures de signal (`model.set`, `signal.set` du contrôleur) planifient la détection.
+
+**`CalendarController`** (injectable, fourni au niveau du composant, ou via `provideDzCalendar`) :
+
+```ts
+@Injectable()
+export class CalendarController {
+  readonly state = signal<CalendarState>(...);                   // brut
+  readonly title = computed(() => this.state().title);
+  readonly range = computed(() => this.state().range);
+  readonly view = computed(() => this.state().view);
+  readonly canUndo = computed(...); readonly canRedo = computed(...);
+  readonly loading = computed(...); readonly problems = computed(...);
+  dispatch(cmd: Command): CommandResult; undo(): boolean; redo(): boolean;
+  prev(): void; next(): void; today(): void; goTo(d: PlainDate): void; changeView(v: string): void;
+  readonly instance: Signal<CalendarInstance | null>;           // accès impératif
+}
+```
+Il comble le manque FullCalendar (pas de CalendarController Angular). Un composant enfant ou un en-tête personnalisé fait `inject(CalendarController)` et lit `title()` en signal. Le contrôleur reçoit `onStateChange` du DOM et met à jour `state`.
+
+**Templates pour les render hooks.**
+
+```html
+<dz-calendar [events]="events()" [(view)]="view">
+  <ng-template dzEventContent let-event="event" let-ctx="ctx">
+    <strong>{{ event.title }}</strong> <small>{{ ctx.timeText }}</small>
+  </ng-template>
+  <ng-template dzDayHeader let-date="date">…</ng-template>
+  <ng-template dzResourceLabel let-res="resource">…</ng-template>
+</dz-calendar>
+```
+`templates.ts` définit les directives `DzEventContent`, `DzDayHeader`, `DzResourceLabel`, `DzMoreLink`, `DzSlotLabel`. Le composant les lit via `contentChild`. Les hooks DOM `content/didMount/didUpdate/willUnmount` sont branchés ainsi :
+- `didMount(el, ctx)` → `ViewContainerRef.createEmbeddedView(tpl, {$implicit: ctx, event, ctx})`, vue déplacée dans `el` ;
+- `didUpdate` → mise à jour du contexte puis `viewRef.detectChanges()` **seulement pour cette vue** ;
+- `willUnmount` → `viewRef.destroy()`.
+Pas de `ApplicationRef.tick()` global. Compatible zoneless : la détection est explicite sur la vue embarquée.
+
+**Fournisseurs** : `provideDzCalendar({ locale, timeZone, messages, defaults })`, calqué sur `provideTzslot` (`defaults.ts`, `messages.ts`). Peer dependencies : `@angular/core` `^18 || ^19 || ^20 || ^21 || ^22`. Pas de `@angular/forms` requis (le calendrier n'est pas un champ de formulaire). Seul un éventuel sélecteur de créneau (slots) en serait un.
+
+---
+
+## F. `@dzcalendar/theme`
+
+- `dzcalendar.scss` est la source ; `dzcalendar.css` est compilé (`npm run build:theme`) et un test échoue si les deux dérivent, exactement comme tzslot.
+- **Palette** : paires `(clair, sombre)` converties en `light-dark()`. Variables `$bg`, `$bg-raised`, `$fg`, `$fg-muted`, `$border`, `$accent`, `$accent-fg`, `$danger`, `$warning`, plus des tons d'événement `$tones: (blue, green, amber, red, violet, slate…)` : un événement porte `tone: 'green'`, rendu par `--dz-tone-green-bg/-fg/-border`. Il n'y a **jamais de couleur dans le modèle** (pas de `backgroundColor` libre par défaut ; option `rawColors` qui injecte `--dz-event-bg` en ligne si on y tient).
+- **Tokens** (préfixe `--dz-*`, publics et stables dès la v1) : `--dz-slot-height`, `--dz-minute-height`, `--dz-event-height`, `--dz-lane-height`, `--dz-day-min-height`, `--dz-gutter-width`, `--dz-radius`, `--dz-gap`, `--dz-font`, `--dz-target-min` (24 px), `--dz-now-color`, `--dz-gap-hatch` (hachures du trou DST), `--dz-repeat-tint`, etc.
+- **Mode sombre** : double définition comme tzslot, pour la préférence système et pour `[data-theme="dark"|"light"]`.
+- **Densité** : `[data-density="compact|comfortable|spacious"]` change `--dz-slot-height`, `--dz-lane-height`, `--dz-event-padding`. La virtualisation se recalcule via `--dz-lane-height` lu en `read`.
+- **Contrat de sélecteurs** : classes BEM stables `dz-calendar`, `dz-event`, `dz-event--selected`, `dz-event--invalid`, `dz-col--dst-gap`, `dz-col--dst-repeat`, etc., et attributs `data-*` (`data-view`, `data-event-id`, `data-resource`). Le CSS de layout injecté par `dom/styles.ts` utilise `:where()` (spécificité nulle) : toute règle chargée après gagne, comme chez tzslot. Les parties sont aussi marquées `part=""` pour le futur Web Component.
+- **Tailwind** : `tailwind.css` (v4, `@theme` qui projette les tokens `--dz-*` sur `--color-*`) et `tailwind3.css` (config v3), comme `packages/theme/tailwind.css` et `tailwind3.css`. Le playground inclut `tailwind.html`.
+- **Impression** : bloc `@media print` ; **forced-colors** : `contrast.css`.
+- Container queries : la bascule semaine → agenda se fait par `@container` sur l'hôte (`container-type: inline-size`), jamais par la largeur de fenêtre.
+
+---
+
+## G. Performance
+
+### G.1 Budgets de taille (gzip, hors Temporal)
+
+| Paquet | Budget | Remarque |
+|---|---|---|
+| `@dzcalendar/core` | ≤ 24 ko | `@tzslot/core` (≈ 20 ko, dont le polyfill statique ≈ 19,7 ko) s'ajoute |
+| `@dzcalendar/rrule` | ≤ 7 ko | |
+| `@dzcalendar/ical` | ≤ 6 ko | |
+| `@dzcalendar/slots` | ≤ 5 ko | |
+| `@dzcalendar/dom` (dayGrid + timeGrid + list + multiMonth + interactions + a11y) | ≤ 30 ko | |
+| `@dzcalendar/angular` | ≤ 6 ko | hors Angular |
+| `@dzcalendar/theme` (CSS) | ≤ 8 ko | |
+| `@dzcalendar/pro` (timeline + ressources) | ≤ 16 ko | export/éditeur/impression en sous-entrées chargées à la demande |
+| **Total gratuit utile** (core+rrule+dom+theme) | **≤ 66 ko + 20 ko tzslot = ≈ 86 ko** | À comparer à ~95 ko (FullCalendar « all ») rapportés dans le doc d'analyse |
+
+`scripts/size.mjs` calcule le gzip de chaque `dist/` et le compare à `size-budget.json` ; la CI échoue au-delà de +5 %. Chaque module exporte `sideEffects:false` (comme `build.mjs`).
+
+### G.2 Budgets temps (Chrome récent, machine de développement de milieu de gamme)
+
+Jeux de données : **U** = 10 000 événements répartis sur 12 mois (~830/mois, ~190/semaine) ; **W** (pire cas) = 10 000 dans une même semaine/mois.
+
+| Opération | Budget |
+|---|---|
+| Normaliser + indexer 10 000 événements | ≤ 70 ms |
+| Mémoire du store | ≤ 1,2 ko / événement (mesure à la tzslot : « 650 octets par créneau ») |
+| `queryInstances` sur une fenêtre d'un mois (U) | ≤ 2 ms |
+| Premier rendu mois (U) | ≤ 50 ms |
+| Premier rendu mois (W) | ≤ 120 ms ; nœuds DOM ≤ cellules × voies + « +N » |
+| Premier rendu semaine (U) | ≤ 25 ms |
+| Premier rendu semaine (W, virtualisé) | ≤ 150 ms |
+| Timeline (Pro) : 500 ressources × 10 000 événements, premier rendu | ≤ 80 ms ; défilement : script ≤ 8 ms/frame |
+| **Modifier un événement** (store → DOM) | calcul ≤ 2 ms, 1 frame, nœuds touchés = ceux des ≤ 2 conteneurs dirty, **0 appel de hook `content` sur les autres événements**, ≤ 1 layout forcé |
+| **Supprimer 2 238 événements** (cas #4906) | ≤ 50 ms (cible : 20× mieux que le ~1,1 s rapporté) |
+| `expandSeries` : quotidien sur 1 an | ≤ 5 ms ; hebdomadaire BYDAY sur 10 ans, avec COUNT | ≤ 15 ms (checkpoints) |
+| `layoutColumn` 1 000 événements chevauchants | ≤ 5 ms |
+| `dayInfos` 366 jours | ≤ 15 ms |
+
+### G.3 Stratégie de mesure
+
+- `test:perf` (vitest, node) : `packages/core/test/perf.test.ts` calqué sur `tzslot/core/test/perf.test.ts` (seuils larges pour éviter les faux positifs, imprime un rapport). Un test garantit que **le jour de changement d'heure ne coûte pas plus de 3× un jour ordinaire** (même garde que tzslot).
+- `test:memory` : `NODE_OPTIONS=--expose-gc vitest run packages/core/test/memory.test.ts` : 10 000 événements, puis retrait, puis `gc()` ; octets retenus, et fuite sur 5 000 requêtes jetées.
+- `test:browser` (`scripts/perf-browser.mjs`) : `playwright-core` avec `channel:'chrome'`, protocole CDP `Performance.getMetrics` : `LayoutCount`, `RecalcStyleCount`, `TaskDuration` ; `PerformanceObserver` sur `long-animation-frame`. Le test charge `playground/perf.html`, injecte U et W, et vérifie : durée de premier rendu, **`LayoutCount` ≤ 1 par mise à jour**, nombre de nœuds DOM, absence d'erreur « ResizeObserver loop ». Sortie JSON comparée à `perf/baseline.json` (tolérance +25 %).
+- `check:size` : budgets de G.1.
+- Tous ces scripts sont locaux et lancés par le propriétaire ; `test:ci` ne contient que les tests déterministes.
+
+---
+
+## H. Stratégie de test
+
+| Niveau | Outil | Contenu |
+|---|---|---|
+| Unitaires core | vitest, env **node** | Règles IANA réelles (matrice ci-dessous). Aucun mock de temps : `now()` injecté. |
+| Pureté | vitest | `purity.test.ts` : pas de `Date`, pas de global `Temporal`, pas d'import DOM ; compilation sans lib DOM. |
+| DOM | vitest + jsdom | Comportement, clavier, focus, ARIA, `update()` qui préserve l'état, réconciliation, hooks, nombre d'appels. **Jamais la mise en page** (règle tzslot). |
+| CSS | vitest (texte) | Là où jsdom ne voit pas une règle (wrap, min-width, hachures DST), on assert le **texte** de la CSS, comme tzslot. |
+| Layout réel | `playwright-core`, Chrome système (`channel:'chrome'`) | Captures par **clip d'une capture pleine page** (piège documenté dans le `CLAUDE.md` de tzslot : les captures d'élément se font par coordonnées après défilement et peuvent montrer une autre zone), alignement des colonnes, hachures, popover, tactile émulé. |
+| Angular | vitest + plugin Angular (templates compilés, pas simulés) | Signals, `model()`, zoneless (`provideZonelessChangeDetection`), templates. |
+| Conformité | `@dzcalendar/conformance` | Voir ci-dessous. |
+| Mutation légère | revue | Les cas FC issus des issues sont des tests nommés. |
+| CI | `test:ci --maxWorkers=1` | Détecte l'état partagé entre fichiers (leçon tzslot : 55 fichiers cassés en un worker alors que 60 passaient). |
+
+**Matrice de zones IANA** : `Europe/Paris` (29 mars et 25 oct. 2026), `America/Chicago` (8 mars et 1ᵉʳ nov. 2026), `Australia/Lord_Howe` (décalage de 30 min), `America/Sao_Paulo` et `America/Havana` (historique : minuit inexistant), `Pacific/Apia` (31 déc. 2011 : jour entier sauté), `Asia/Kolkata` (+5:30 sans DST), `Europe/Dublin` (DST « négatif » IANA), `Africa/Casablanca`, `Pacific/Kiritimati` (+14), `UTC`. Les expectations sont écrites **à la main depuis les règles publiques**, pas copiées de la sortie de l'implémentation ; les cas RRULE sont contre-vérifiés hors ligne contre un implémentation indépendante (python-dateutil) par `scripts/conformance-crosscheck.py` (outil de génération, non livré).
+
+**Suite de conformité indépendante du langage (`conformance/`)**
+
+```
+conformance/
+  README.md                      format et gouvernance
+  schema/*.schema.json           un schéma par suite
+  cases/
+    zone-dayinfo/*.json          entrée {date, zone} → sortie DayInfo (strings)
+    zone-resolve/*.json
+    rrule-expand/*.json          {dtstart, rrule, window} → [instants ISO]
+    series-edit/*.json           {series, ref, patch, scope} → {séries résultantes}
+    segment/*.json
+    layout-column/*.json         {items} → {placements}
+    layout-rows/*.json
+    time-axis/*.json
+    navigation/*.json
+    normalize/*.json             {input} → {event|problems}
+    slots/*.json
+    ical-parse/*.json
+  runner/runner.test.ts          itère cases/**, charge l'adaptateur du paquet concerné
+```
+Format d'un cas :
+```json
+{ "id": "rrule-dst-weekly-paris-0900", "suite": "rrule-expand",
+  "description": "Hebdomadaire 09:00 Paris reste à 09:00 mural à travers le passage à l'heure d'été",
+  "refs": ["FC#6729"],
+  "input":  { "dtstart": "2026-03-23T09:00:00+01:00[Europe/Paris]", "rrule": "FREQ=WEEKLY;COUNT=3",
+              "window": { "start": "2026-03-01T00:00:00Z", "end": "2026-05-01T00:00:00Z" } },
+  "expected": [ "2026-03-23T09:00:00+01:00[Europe/Paris]", "2026-03-30T09:00:00+02:00[Europe/Paris]", "2026-04-06T09:00:00+02:00[Europe/Paris]" ] }
+```
+Règles : toutes les valeurs sont des **chaînes ISO 8601 + IANA** (aucun format propre au langage) ; `tzdata` n'est exercé que sur des dates dont les règles sont figées (passé, ou règles politiquement stables) ; chaque cas cite l'issue FC qu'il couvre (`refs`) ; `scripts/conformance-gen.mjs` régénère les `expected` à partir de l'implémentation TS **uniquement après revue humaine** (diff obligatoire). Les ports Swift et Kotlin liront le même dossier.
+
+**Tests à ne pas oublier** (chacun porte un `refs` quand il vient d'une issue) : #3887 et #5973 (durées au DST), #6729 (RRULE à la mauvaise heure), #6815 et #7680 (jour décalé selon l'offset), #6105 (exdate date seule), #7456 (iCal TZID), #7903 (segmentation en mode local), #5594 (hooks relancés), #4906 (suppression de masse), #8082 (boucle ResizeObserver).
+
+---
+
+## I. Arborescence complète de départ
+
+```
+dzcalendar/
+├─ ARCHITECTURE.md · CLAUDE.md · ROADMAP.md · CHANGELOG.md · README.md · CLEANROOM.md · LICENSE
+├─ package.json                  workspaces: ["packages/*"], scripts (voir ci-dessous)
+├─ tsconfig.spec.json · vitest.config.ts · vite.config.ts
+├─ size-budget.json · perf/baseline.json
+├─ scripts/
+│  ├─ build.mjs                  clone de tzslot (tsc par paquet, ng-packagr, manifestes dist, garde « pas de src/ »)
+│  ├─ size.mjs · perf-browser.mjs · gen-schema.mjs · conformance-gen.mjs · api.mjs
+├─ conformance/                  (cf. H) ── publié comme @dzcalendar/conformance
+├─ packages/
+│  ├─ core/
+│  │  ├─ package.json · tsconfig.json (lib ES2023, sans DOM) · tsconfig.build.json
+│  │  ├─ src/
+│  │  │  ├─ index.ts · temporal.ts · ids.ts · intervals.ts · zone.ts · kernel.ts · selection.ts
+│  │  │  ├─ event/        types.ts · normalize.ts · problems.ts · parse-temporal.ts · defaults.ts
+│  │  │  ├─ store/        ordered-map.ts · interval-tree.ts · store.ts · changes.ts · query.ts · diff.ts
+│  │  │  ├─ source/       source.ts · manager.ts · chunk-cache.ts · array-source.ts · fn-source.ts · json-source.ts
+│  │  │  ├─ recurrence/   series.ts · expand.ts · edit.ts · rebase-rule.ts · keys.ts
+│  │  │  ├─ resource/     types.ts · tree.ts · rows.ts
+│  │  │  ├─ project/      segment.ts · day-axis.ts · time-axis.ts · date-index.ts
+│  │  │  ├─ layout/       column.ts · rows.ts · overflow.ts · prefix-sums.ts · virtual.ts
+│  │  │  ├─ rules/        business-hours.ts · constraints.ts · overlap.ts · validate.ts
+│  │  │  ├─ commands/     types.ts · apply.ts · history.ts · schema.ts
+│  │  │  ├─ interaction/  hit.ts · propose-move.ts · propose-resize.ts · propose-select.ts · keymap.ts
+│  │  │  ├─ views/        spec.ts · builtin.ts · range.ts · nav.ts · daygrid.ts · timegrid.ts · list.ts · multimonth.ts
+│  │  │  └─ format/       intl.ts · range-title.ts · week.ts · names.ts
+│  │  └─ test/            *.test.ts · purity.test.ts · perf.test.ts · memory.test.ts · fixtures/
+│  ├─ rrule/
+│  │  ├─ src/             index.ts · types.ts · parse.ts · serialize.ts · validate.ts · iterate.ts · expand-period.ts
+│  │  │                   · bysetpos.ts · wall.ts · between.ts · matcher.ts · checkpoints.ts
+│  │  └─ test/
+│  ├─ ical/
+│  │  ├─ src/             index.ts · lexer.ts · parse-vevent.ts · parse-vtimezone.ts · tzid-map.ts · serialize.ts · source.ts
+│  │  └─ test/            fixtures/*.ics
+│  ├─ slots/
+│  │  ├─ src/             index.ts · types.ts · availability.ts · busy.ts · candidates.ts · constraints.ts · convert-zone.ts
+│  │  └─ test/
+│  ├─ dom/
+│  │  ├─ package.json · tsconfig.json · tsconfig.build.json
+│  │  ├─ src/
+│  │  │  ├─ index.ts · calendar.ts · settings.ts · messages.ts · styles.ts · icons.ts · plugin.ts (registerView)
+│  │  │  ├─ render/       reconciler.ts · scheduler.ts · measure.ts · pool.ts · hooks.ts · classnames.ts
+│  │  │  ├─ views/        daygrid/{view.ts,week-row.ts,popover-link.ts} · timegrid/{view.ts,column.ts,gutter.ts,all-day.ts,now.ts,dst-bands.ts}
+│  │  │  │                · list/view.ts · multimonth/view.ts · custom.ts
+│  │  │  ├─ interact/     pointer.ts · hit-test.ts · drag.ts · resize.ts · select.ts · autoscroll.ts · edge-nav.ts · ghost.ts · touch.ts · keyboard.ts
+│  │  │  ├─ a11y/         aria.ts · roving.ts · live-region.ts · announce.ts
+│  │  │  ├─ popover/      popover.ts · anchor.ts
+│  │  │  └─ motion/       adapter.ts · css.ts · view-transition.ts
+│  │  └─ test/
+│  ├─ angular/
+│  │  ├─ package.json · ng-package.json · tsconfig.lib.json
+│  │  ├─ src/             index.ts · calendar.ts · controller.ts · providers.ts · templates.ts · shapes.ts · defaults.ts · messages.ts
+│  │  └─ test/            setup.ts · *.test.ts
+│  ├─ theme/
+│  │  ├─ package.json · dzcalendar.scss · dzcalendar.css (généré) · contrast.css · tailwind.css · tailwind3.css
+│  ├─ motion-gsap/          src/index.ts · flip.ts · view-transition.ts
+│  ├─ pro/                  (Phase 15+)  src/{index.ts, timeline/, resource-views/, resource-area/, virtual2d/, print/, export/, editor/, slots-pro/, license.ts}
+│  └─ pro-angular/          (Phase 16)
+├─ playground/
+│  ├─ index.html (Angular) · vanilla.html · tailwind.html · dst.html (4 zones côte à côte) · perf.html · a11y.html
+│  ├─ main.ts · vanilla.ts · tailwind.ts · demo.ts · dst.ts · perf.ts
+│  └─ test/
+└─ site/                    docs (vitepress), génération d'API (scripts/api.mjs), llms.txt, commands.schema.json
+```
+
+Scripts `package.json` (même forme que tzslot) : `test`, `test:ci`, `test:watch`, `test:memory`, `test:perf`, `test:browser`, `typecheck` (un `tsc` par paquet puis `tsconfig.spec.json`), `start` (vite, port **4600** pour ne pas entrer en conflit avec le 4500 de tzslot), `build`, `build:theme`, `check:size`, `pack:local`, `publish:dry`, `publish:next`, `docs:api`.
+Dépendances : `@tzslot/core: ^2.1.0` en `dependencies` de core/rrule/ical/slots ; `peerDependencies` Angular `^18 … ^22` ; dev : les mêmes outils que tzslot (vitest 4, jsdom, `@analogjs/vite-plugin-angular`, ng-packagr, sass, playwright-core).
+Un test de `build.mjs` vérifie qu'aucun `dist/package.json` ne pointe vers `src/`, et que `@tzslot/core` reste sur la plage `^2.1.0`.
+
+**Config vitest** : même config que tzslot (`vitest.config.ts`) mais en `projects` : `core|rrule|ical|slots|conformance` en `environment:'node'`, `dom|angular|playground` en `jsdom` (avec le plugin Angular et `setupFiles` pour Angular).
+
+---
+
+## J. Séquence de construction en phases
+
+Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord** (c'est là que le DST se voit) → dayGrid → récurrence → interactions → reste.
+
+### Phase 0 : scaffold, spikes, modèle
+- **Livrables / fichiers** : monorepo (workspaces, tsconfig, vitest, build, theme minimal, playground), `CLAUDE.md` et `ROADMAP.md` (style tzslot), `CLEANROOM.md`. `core/{temporal,ids,intervals,zone,event/*}`.
+- **Spikes obligatoires (1 jour chacun, résultats notés dans ROADMAP.md)** :
+  1. `getTimeZoneTransition` dans `temporal-polyfill/full` (sinon bisection).
+  2. `Intl.DateTimeFormat.formatToParts(number)` avec `timeZone` et `calendar`, natif contre polyfill.
+  3. `Intl.Locale#getTextInfo`.
+  4. Comportement du polyfill sur `PlainDate.toZonedDateTime({timeZone})` pour un minuit inexistant (São Paulo 2018, Havane).
+- **Acceptation** : `npm test` vert ; `normalizeEvent` : 40 cas (chaque `ProblemCode`) ; `dayInfo` correct sur Paris/Chicago/Lord Howe/Apia/São Paulo ; `purity.test.ts` vert ; `typecheck` vert ; `npm run build` produit `dist/` de core.
+- **Dépend de** : rien.
+
+### Phase 1 : store, index, conformité
+- **Livrables / fichiers** : `store/*`, `source/{source,array-source}`, `commands/{types,apply,history}` (create/update/delete), `conformance/` harnais + 20 premiers cas (`zone-dayinfo`, `zone-resolve`, `normalize`).
+- **Acceptation** : 10 000 événements indexés ≤ 70 ms ; `queryInstances` sur 1 mois ≤ 2 ms ; l'arbre persistant : une mise à jour ne modifie pas l'ancien snapshot (test) ; undo/redo de 100 commandes revient à l'état initial octet pour octet (`toEqual` sur snapshots) ; `test:memory` : ≤ 1,2 ko/événement.
+- **Dépend de** : P0.
+
+### Phase 2 : projection, axe, layout (pur)
+- **Livrables / fichiers** : `project/*`, `layout/{column,rows,overflow,prefix-sums,virtual}`, `views/{spec,range,nav,builtin,timegrid,daygrid}` (modèles), `format/*`.
+- **Acceptation** : segmentation correcte sur journées de 23 h / 25 h / 23 h 30 (cas de conformité ; fin exclusive ; durée nulle) ; `layoutColumn` : nombre de voies = clique maximale sur 1 000 jeux aléatoires (propriété testée) ; `packLanes` sans chevauchement de voie (propriété) ; `computeOverflow` : somme visibles + cachés = total ; `navigate` : mois, semaine, jour, `hiddenDays`, `fixedWeekCount`.
+- **Dépend de** : P1.
+
+### Phase 3 : **timeGrid semaine/jour** (lecture seule) : première preuve DST visible
+- **Livrables / fichiers** : `dom/{calendar,settings,styles,messages,render/*,views/timegrid/*}`, thème de base, `playground/dst.html` (Paris, Chicago, Lord Howe, Sydney côte à côte).
+- **Acceptation** : la semaine du 25 oct. 2026 à Paris affiche dans la colonne de dimanche la bande « répétée », deux « 02:30 » côte à côte avec offsets ; la semaine du 29 mars 2026 affiche la bande hachurée ; mode `elapsed` : colonne de 25 h ; mesure Chrome (`test:browser`) : alignement des lignes entre colonnes ≤ 1 px ; aucune lecture de layout dans le chemin d'écriture.
+- **Dépend de** : P2.
+
+### Phase 4 : dayGrid mois/semaine/jour + popover « +N »
+- **Livrables / fichiers** : `dom/views/daygrid/*`, `popover/*`, `now.ts` (indicateur « maintenant »), business hours en fond (timeGrid et dayGrid), `rules/business-hours`.
+- **Acceptation** : `computeOverflow` appliqué en navigateur (« +N » exact) ; popover ouvert au clavier, focus restitué ; business hours à travers un changement d'heure (intervalle de vraie durée) ; mise à jour fine : modifier un événement ne ré-exécute pas `content` des autres (test jsdom par compteur) ; `LayoutCount ≤ 1` par mise à jour (navigateur).
+- **Dépend de** : P3.
+
+### Phase 5 : récurrence (`@dzcalendar/rrule` puis séries dans core)
+- **Livrables / fichiers** : `rrule/*` ; `core/recurrence/{series,expand,keys}` ; branchement `queryInstances`.
+- **Acceptation** : 100 cas `rrule-expand` (tous les cas FC cités, FREQ/INTERVAL/BYDAY/BYMONTHDAY/BYSETPOS/BYWEEKNO/BYYEARDAY/WKST/COUNT/UNTIL, 29 févr., jours 31) contre dateutil ; DST : 09:00 mural conservé ; heure répétée = première lecture ; heure inexistante = `compatible` ; exdate date seule ; fréquences sub-journalières en temps écoulé ; 1 an quotidien ≤ 5 ms ; `expandSeries` avec `limit` signale `too-many-occurrences`.
+- **Dépend de** : P1 (modèle), P2 (fenêtre).
+
+### Phase 6 : commandes, undo/redo, édition de séries
+- **Livrables / fichiers** : `commands/apply` complet ; `recurrence/{edit,rebase-rule}` ; `validateProposal`.
+- **Acceptation** : `this` / `following` / `all` : 40 cas `series-edit` ; la scission respecte COUNT et UNTIL ; EXDATE/overrides migrent ; l'undo d'un `following` restaure les deux séries exactement ; override déplacé hors fenêtre toujours retrouvé.
+- **Dépend de** : P5.
+
+### Phase 7 : interactions souris/tactile/stylet
+- **Livrables / fichiers** : `interact/{pointer,hit-test,drag,resize,select,ghost,autoscroll,edge-nav,touch}`, `core/interaction/*`, dateClick, select, eventClick.
+- **Acceptation** : la même `Proposal` pour souris et pour le clavier simulé (test de parité) ; tactile : un tap sélectionne, un drag sur événement sélectionné démarre sans appui long (Playwright, tactile émulé) ; sur iOS, `touch-action` ne bloque pas le défilement d'une zone non sélectionnée (test manuel noté dans ROADMAP.md) ; drop dans une heure répétée → `ambiguity` + sélecteur ; drop dans un trou → 03:00 + annonce ; contraintes/overlap refusent avec `dz-event--invalid`.
+- **Dépend de** : P4, P6.
+
+### Phase 8 : clavier complet et accessibilité
+- **Livrables / fichiers** : `interact/keyboard`, `a11y/*`, `core/interaction/keymap`.
+- **Acceptation** : parcours clavier complet de chaque vue (test jsdom) ; mode grab : 100 % des opérations de drag faisables au clavier ; axe-core sans violation sur chaque vue (exécuté dans Chrome via playwright-core) ; ACR WCAG 2.2 AA rédigé en brouillon (`site/a11y-conformance.md`) ; RTL : flèches inversées (test).
+- **Dépend de** : P7.
+
+### Phase 9 : sources, iCal
+- **Livrables / fichiers** : `core/source/{manager,chunk-cache,json-source,fn-source}` ; `ical/*`.
+- **Acceptation** : chunking mensuel ; deux chunks contigus manquants → une seule requête ; annulation vérifiée (`AbortSignal` abort appelée) ; réponse d'une génération périmée ignorée ; événement chevauchant deux chunks refcounté ; iCal : `TZID` IANA correct (#7456), RRULE + EXDATE + RECURRENCE-ID, `VTIMEZONE` personnalisé → Problem ou règle fixe ; aller-retour parse → serialize → parse identique sur 30 fixtures.
+- **Dépend de** : P5, P1.
+
+### Phase 10 : list, multiMonth, vues custom
+- **Livrables / fichiers** : `dom/views/{list,multimonth,custom}`, `registerView`.
+- **Acceptation** : list jour→année ; multiMonth pile et grille ; `registerView('myView', …)` fonctionne avec une vue de test ; hiddenDays/weekends ; numéros de semaine selon la locale.
+- **Dépend de** : P4.
+
+### Phase 11 : Angular
+- **Livrables / fichiers** : `packages/angular/*`, `playground/index.html`.
+- **Acceptation** : composant sous `provideZonelessChangeDetection` ; `[(view)]`, `[(date)]` ; les `effect` utilisent `untracked` (test qui échoue sous Angular 18 si l'écriture de signal est dans un effet) ; `CalendarController` expose `title()`, `range()` en signaux ; templates `dzEventContent` : seul le gabarit du segment modifié exécute `detectChanges` (compteur) ; `update({date})` avec la dernière valeur émise est sans effet ; `ng build` sur une application Angular réelle installée depuis les tarballs de `pack:local` (règle tzslot).
+- **Dépend de** : P4 minimum (idéalement P8).
+
+### Phase 12 : virtualisation de toutes les vues
+- **Livrables / fichiers** : `dom/render/pool.ts`, virtualisation de list, multiMonth, timeGrid (colonnes), dayGrid (événements), `preparePrint`.
+- **Acceptation** : budgets G.2 pour W ; nœuds DOM ≤ borne annoncée ; défilement stable ; `preparePrint()` rend tout puis restaure.
+- **Dépend de** : P10.
+
+### Phase 13 : thème complet, i18n, densité
+- **Livrables / fichiers** : `theme/*` (tokens, tailwind, contrast, print), messages EN/FR, tests de dérive CSS.
+- **Acceptation** : le test de dérive SCSS/CSS passe ; capture Chrome en clair/sombre/densités ; `forced-colors` lisible.
+- **Dépend de** : P4 (peut commencer plus tôt).
+
+### Phase 14 : moteur de créneaux (`@dzcalendar/slots`)
+- **Livrables / fichiers** : `slots/*`, vue « disponibilités » (créneaux en fond cliquables) dans dom.
+- **Acceptation** : 40 cas `slots` ; cas Bubble reproduit en ≤ 10 lignes ; fuseau prestataire ≠ fuseau client, dont un créneau à cheval sur un changement d'heure ; buffer avant/après ; préavis ; plafond journalier ; `capacity` ; 30 jours à 15 min ≤ 25 ms.
+- **Dépend de** : P5 (disponibilités récurrentes), P2.
+
+### Phase 15 : Pro, ressources et timeline
+- **Livrables / fichiers** : `pro/{timeline,resource-views,resource-area,virtual2d,license}`, `core/resource/*` (déjà posé en P1, complété ici).
+- **Acceptation** : timeline avec et sans ressources ; arbre et groupes ; axe `elapsed` : colonnes de largeur 23/24/25 h exactes ; deux « 02:00 » étiquetés ; budget timeline G.2 (500×10 000) ; resource-timeGrid et resource-dayGrid ; accessibilité `treegrid`.
+- **Dépend de** : P12, P7.
+
+### Phase 16 : Pro, impression, export, éditeur
+- **Livrables / fichiers** : `pro/{print,export,editor,slots-pro}`, `pro-angular`.
+- **Acceptation** : l'éditeur propose « cette occurrence / suivantes / toutes » et appelle `editOccurrence` ; l'éditeur réutilise `@tzslot/dom` (`createDateTimeRange`) pour la saisie, avec l'heure répétée gérée ; export ICS = parse(serialize(x)) ; PDF/PNG sans bloquer l'UI > 100 ms.
+- **Dépend de** : P6, P15.
+
+### Phase 17 : animations
+- **Livrables / fichiers** : `dom/motion/*`, `motion-gsap`.
+- **Acceptation** : défaut CSS/WAAPI ; `prefers-reduced-motion` désactive tout ; l'adaptateur GSAP est exclu du bundle de `@dzcalendar/dom` (test de taille).
+- **Dépend de** : P7.
+
+### Phase 18 : écosystème
+- **Livrables / fichiers** : `compat-fullcalendar` (traducteur d'options, codemod), `element` (Web Component), React/Vue, `llms.txt`, `commands.schema.json`, benchmark public.
+- **Dépend de** : P11.
+
+### Phase 19+ : natif
+- Ports Swift et Kotlin de `core` et `rrule`, **pilotés par `@dzcalendar/conformance`**, puis UI SwiftUI / Compose.
+- **Acceptation** : 100 % des cas de conformité verts dans chaque langage.
+- **Dépend de** : P2 minimum pour la suite `layout`, P5 pour `rrule`. Peut démarrer dès que les suites sont stables.
+
+**Dépendances en un coup d'œil**
+`P0 → P1 → P2 → P3 → P4 → P7 → P8` ; `P1,P2 → P5 → P6 → P7` ; `P5 → P9` ; `P4 → P10 → P12 → P15 → P16` ; `P4 → P11` ; `P5 → P14` ; `P7 → P17`.
+
+---
+
+## K. Risques et questions ouvertes à valider avant de coder
+
+**K.1 Axe horaire par défaut (section C).** Valider : mode `wall` par défaut avec bandes et côte à côte des deux passes, `elapsed` en option, `elapsed` obligatoire en timeline. C'est la décision la plus visible du produit.
+
+**K.2 Polyfill statique.** tzslot a décidé de garder le polyfill en import statique (≈ 19,7 ko gzip pour `@tzslot/core`). Pour DzCalendar, avec un budget total à ≈ 86 ko, c'est ~23 %. Garder (cohérent avec tzslot) ou demander un chargement conditionnel upstream pour les navigateurs où Temporal est natif ? Le doc d'analyse chiffre la couverture native à ~70 % (Safari absent jusqu'à 27.2).
+
+**K.3 Périmètre upstream.** Valider l'envoi à `@tzslot/core` de `dayInfo`, `transitionsBetween`, `getWeekInfo`, et le calendrier : implémentation locale d'abord, migration en tzslot 2.2. Qui publie et quand ?
+
+**K.4 `Intl` et Temporal.** Si le spike P0 montre que `formatToParts(number)` avec `timeZone`/`calendar` diffère entre natif et polyfill, il faut un adaptateur de formatage dédié, ce qui augmente la taille de `format/`.
+
+**K.5 Pro : frontière.** Faut-il que la **virtualisation 2D** et les **colonnes de ressources** soient Pro (comme dans le doc d'analyse), alors que le modèle de ressources est gratuit ? Le marché (MUI X) garde les ressources en MIT. Ce plan garde les types/arbre gratuits et la UI timeline/ressources en Pro ; à confirmer.
+
+**K.6 Fuseau par ressource.** La zone d'une ressource sert aux business hours et aux slots, mais l'affichage reste dans la zone du calendrier. Voulez-vous une colonne ressource affichée dans sa propre zone (utile pour des agendas de praticiens répartis sur plusieurs pays) ? C'est faisable avec un `ColumnAxis` par colonne, mais le Pro devrait alors gérer des colonnes à axes différents.
+
+**K.7 Portée de RRULE.** `RSCALE` (autres calendriers), `BYEASTER`, `SKIP=…` : exclus de la v1 ? Hypothèse : oui. Les exceptions `EXRULE` (obsolète) : acceptées en lecture, jamais émises ?
+
+**K.8 iCal : `VTIMEZONE` personnalisés** (non IANA, Windows). Hypothèse : table de correspondance Windows → IANA livrée ; un `VTIMEZONE` sans équivalent donne un `Problem` et un repli sur offset fixe, plutôt qu'une émulation de ses règles. À confirmer.
+
+**K.9 Licence et clé Pro.** Vérification hors ligne par signature, sans appel réseau, filigrane non bloquant en l'absence de clé : à valider (le doc d'analyse propose la FSL pour le code Pro). Définir ce qui se passe pour les `SSR`/tests CI.
+
+**K.10 GSAP.** Vérifier les conditions de licence actuelles de GSAP (y compris les plugins comme Flip) et de redistribution d'un adaptateur avant publication. Aucune dépendance côté core/dom dans tous les cas.
+
+**K.11 Démarche « from scratch ».** Proposer un fichier `CLEANROOM.md` : seule la documentation publique de FullCalendar (comportement observable) est consultée ; le code source, les types internes et les tests de FullCalendar ne sont pas lus par les contributeurs ; chaque comportement imité est documenté dans une fiche `docs/behaviors/*.md` sans copie de texte. À valider avec le propriétaire (et à rendre obligatoire pour les contributeurs externes).
+
+**K.12 Précision temporelle.** Les index utilisent des millisecondes. Si un utilisateur stocke des instants avec nanosecondes, l'ordre de deux événements dans la même milliseconde est décidé par `id`. À accepter.
+
+**K.13 Éditeur de récurrence : `following` crée deux séries** (pas de `RANGE=THISANDFUTURE` à l'export). Compatibilité d'échange avec Google/Outlook à tester en phase 16.
+
+**K.14 Natif : voie pragmatique** (ports Swift/Kotlin + conformité) contre la voie Rust/UniFFI. Le plan prépare la première. Décision à reporter, mais **la suite de conformité doit être publiée dès la Phase 1**, sinon le portage dérivera.
+
+**K.15 Date-free et migration.** L'API refuse les `Date` (`date-object-rejected`). Les équipes qui migrent depuis FullCalendar ont des `Date` partout. Le paquet `compat-fullcalendar` (qui utilise `@tzslot/core/interop`) fait la conversion. Confirmer que c'est le bon compromis, et que `Date` n'apparaît **nulle part ailleurs**, y compris dans les types publics.
+
+**K.16 Risques techniques principaux.**
+- Charge : timeGrid en mode `wall` avec événements à cheval sur une transition demande un cas spécial dans `layoutColumn` (positions murales) à tester abondamment.
+- iOS : `touch-action` dynamique par événement sélectionné doit être validé sur appareil réel.
+- RRULE : la correction des combinaisons `BYSETPOS` × `BYWEEKNO` × `WKST` est coûteuse à valider, d'où le contre-contrôle par dateutil.
+- Périmètre : FullCalendar complet + Premium + 6 failles est un chantier de plusieurs produits ; l'ordre des phases est conçu pour qu'on puisse s'arrêter à P8 avec un produit cohérent (timeGrid/dayGrid + interactions + a11y).
+- `@tzslot/core` en `dependencies` : deux copies du polyfill dans une application casseraient `instanceof` ; `normalizeEvent` détecte et convertit les objets étrangers (`foreign-temporal`), et `build.mjs` vérifie la plage `^2.1.0`.

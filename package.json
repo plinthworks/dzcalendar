@@ -1,0 +1,22 @@
+{
+  "name": "dzcalendar-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:ci": "vitest run --maxWorkers=1",
+    "test:watch": "vitest",
+    "spike": "node scripts/spikes.mjs",
+    "typecheck": "tsc -p packages/core/tsconfig.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.8",
+    "temporal-polyfill": "^1.0.6"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}

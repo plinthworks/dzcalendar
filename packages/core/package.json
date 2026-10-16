@@ -1,0 +1,16 @@
+{
+  "name": "@dzcalendar/core",
+  "version": "0.0.0",
+  "description": "Calendar model on Temporal: events with their own time zone, DST-correct days. No DOM, no framework, no Date.",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@tzslot/core": "^2.1.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  }
+}
