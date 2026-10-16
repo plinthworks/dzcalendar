@@ -1,5 +1,7 @@
-import { formatTemporal, locateNow } from '@dzcalendar/core';
-import type { AllDayBar, AxisBand, PlacedTimed, Segment, TimeGridColumn, TimeGridModel } from '@dzcalendar/core';
+import { Temporal, formatTemporal, locateNow } from '@dzcalendar/core';
+import type { AllDayBar, AxisBand, PlacedTimed, PlainDate, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
+import type { Box, InteractionSurface } from '../interact/surface.js';
+import { handles } from '../interact/handles.js';
 import type { ViewController, ViewCtx } from '../host.js';
 import { registerView } from '../host.js';
 import { attachMenuTriggers } from '../menu.js';
@@ -114,6 +116,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       el.style.setProperty('--span', String(s.dayCount));
       if (!changed.content) return;
       applyEventLook(el, ev);
+      handles(el, s, it.bg);
       if (it.bg) {
         el.replaceChildren();
         el.setAttribute('aria-hidden', 'true');
@@ -227,6 +230,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     el.classList.toggle('dz-ev--cont-start', !seg.startsHere);
     el.classList.toggle('dz-ev--cont-end', !seg.endsHere);
     applyEventLook(el, ev);
+    handles(el, seg, bg);
     if (bg || ev.allDay) {
       el.replaceChildren();
       el.setAttribute('aria-hidden', 'true');
@@ -255,6 +259,98 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       }),
     );
   }
+
+  // ── gestures: geometry read once per gesture, then arithmetic ─────────────
+  interface ColGeo {
+    readonly left: number;
+    readonly right: number;
+    readonly top: number;
+    readonly height: number;
+    readonly column: TimeGridColumn;
+  }
+  interface Geo {
+    readonly cols: readonly ColGeo[];
+    readonly track: { readonly top: number; readonly bottom: number } | null;
+    readonly view: { readonly top: number; readonly bottom: number };
+    readonly origin: { readonly x: number; readonly y: number };
+  }
+  const surface: InteractionSurface<Geo> = {
+    root,
+    scroller: body,
+    family: 'timeGrid',
+    accepts: (target) => target.closest('.dz-tg__col, .dz-tg__allday-track') !== null,
+    measure(origin) {
+      const m = model;
+      const els = [...colsHost.querySelectorAll<HTMLElement>(':scope > .dz-tg__col')];
+      const cols: ColGeo[] = [];
+      for (const el of els) {
+        const column = m?.columns.find((c) => c.key === el.dataset['date']);
+        if (!column) continue;
+        const r = el.getBoundingClientRect();
+        cols.push({ left: r.left, right: r.right, top: r.top, height: r.height, column });
+      }
+      // In reading order on screen: right to left, the first column in the DOM is the rightmost.
+      cols.sort((a, b) => a.left - b.left);
+      const t = track.getBoundingClientRect();
+      const b = body.getBoundingClientRect();
+      return { cols, track: t.height > 0 ? { top: t.top, bottom: t.bottom } : null, view: { top: b.top, bottom: b.bottom }, origin };
+    },
+    hitAt(geo, x, y, scrollY) {
+      const { cols } = geo;
+      if (cols.length === 0) return null;
+      const cx = Math.max(cols[0]!.left, Math.min(cols[cols.length - 1]!.right - 1, x));
+      const c = cols.find((k) => cx >= k.left && cx < k.right) ?? cols[cols.length - 1]!;
+      if (geo.track && y >= geo.track.top && y < geo.track.bottom) return { kind: 'day', date: c.column.date, allDayRow: true };
+      if (c.column.folded || c.column.axis.length === 0) return null;
+      const axis = c.column.axis;
+      const cy = Math.max(geo.view.top, Math.min(geo.view.bottom - 1, y));
+      const px = c.height / axis.length;
+      const minutes = Math.max(0, Math.min(axis.length - 1e-6, (cy - (c.top - scrollY)) / px));
+      const at = axis.fromPosition(minutes);
+      if (at.exists) return { kind: 'slot', date: c.column.date, instant: at.instant };
+      // In a skipped hour: the first moment after it (03:00), flagged so the drop is announced.
+      const band = axis.bands.find((x) => x.kind === 'gap' && minutes >= x.from && minutes < x.to);
+      return { kind: 'slot', date: c.column.date, instant: band ? axis.fromPosition(band.to).instant : at.instant, gap: true };
+    },
+    boxesFor(geo, span, scrollY) {
+      const o = geo.origin;
+      const out: Box[] = [];
+      if (span.allDay) {
+        if (!geo.track) return out;
+        const first = span.start as PlainDate;
+        const last = (span.end as PlainDate).subtract({ days: 1 });
+        const inside = geo.cols.filter((k) => Temporal.PlainDate.compare(k.column.date, first) >= 0 && Temporal.PlainDate.compare(k.column.date, last) <= 0);
+        if (inside.length === 0) return out;
+        const h = Math.min(22, geo.track.bottom - geo.track.top - 4);
+        const left = Math.min(...inside.map((k) => k.left));
+        const right = Math.max(...inside.map((k) => k.right));
+        out.push({ x: left - o.x + 2, y: geo.track.top - o.y + 2, w: right - left - 4, h });
+        return out;
+      }
+      const s = (span.start as ZonedDateTime).epochMilliseconds;
+      const e = (span.end as ZonedDateTime).epochMilliseconds;
+      for (const k of geo.cols) {
+        const axis = k.column.axis;
+        if (k.column.folded || axis.length === 0) continue;
+        const a = Math.max(s, axis.start.epochMilliseconds);
+        const b = Math.min(e, axis.end.epochMilliseconds);
+        if (a >= b) continue;
+        const px = k.height / axis.length;
+        const top = axis.toPosition(Temporal.Instant.fromEpochMilliseconds(a)) * px + k.top - scrollY;
+        const bottom = axis.toEndPosition(Temporal.Instant.fromEpochMilliseconds(b)) * px + k.top - scrollY;
+        // Only inside the scrolling body: a ghost never covers the headers.
+        const y0 = Math.max(top, geo.view.top);
+        const y1 = Math.min(Math.max(bottom, top + 12), geo.view.bottom);
+        if (y1 <= y0) continue;
+        out.push({ x: k.left - o.x + 2, y: y0 - o.y, w: k.right - k.left - 6, h: y1 - y0 });
+      }
+      return out;
+    },
+    instanceOf(node) {
+      if (!model) return null;
+      return findSegment(model, node.dataset['key'] ?? '')?.instance ?? null;
+    },
+  };
 
   // ── context menu: an event, or the moment under the pointer in a column ────
   attachMenuTriggers(ctx, root, (target, point) => {
@@ -288,6 +384,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   return {
     element: root,
     body,
+    surface: surface as InteractionSurface,
 
     render(next, state) {
       const m = next as TimeGridModel;

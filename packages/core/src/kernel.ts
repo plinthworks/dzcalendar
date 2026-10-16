@@ -153,6 +153,8 @@ export interface CalendarKernel {
    * the application's own calls and server pushes are not refused by them.
    */
   run(cmd: Command, opts?: { readonly validate?: boolean }): CommandResult;
+  /** What gestures are checked against now: the zone, business hours, the rules given. */
+  rules(): RulesContext;
   readonly history: History;
   subscribe(fn: (e: KernelEvent) => void): () => void;
   destroy(): void;
@@ -198,13 +200,14 @@ export function createKernel(o: KernelOptions): CalendarKernel {
 
   const nav = (): NavContext => ({ firstDay, today: todayIn(timeZone) });
   let validating = false;
+  const rulesNow = (): RulesContext => ({ displayZone: timeZone, ...(options.businessHours !== undefined && { businessHours: options.businessHours }), ...o.rules });
   // Read at every command: the zone, the locale's first day and the rules may have changed since.
   const history = createHistory(
     store,
     (): CommandContext => ({
       normalize: { displayZone: timeZone, newId: idGen },
       weekStart: firstDay,
-      ...(validating && { rules: { displayZone: timeZone, ...(options.businessHours !== undefined && { businessHours: options.businessHours }), ...o.rules } }),
+      ...(validating && { rules: rulesNow() }),
     }),
     { limit: o.historyLimit ?? 200 },
   );
@@ -359,6 +362,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         validating = false;
       }
     },
+    rules: rulesNow,
     history,
     destroy() {
       unsubscribe();

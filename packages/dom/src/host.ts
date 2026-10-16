@@ -1,4 +1,13 @@
-import type { ActionItem, ActionTarget, CalendarKernel, EventInstance, Instant, KernelState, Segment, ZoneId } from '@dzcalendar/core';
+import type { ActionItem, ActionTarget, CalendarKernel, Command, CommandResult, EditScope, EventInstance, Instant, KernelState, Proposal, RulesContext, Segment, ZoneId } from '@dzcalendar/core';
+import type { InteractionSurface } from './interact/surface.js';
+import type { LiveSettings } from './settings.js';
+
+/** What `chooseScope` is told: which occurrence, where it would go, by which gesture. */
+export interface ScopeRequest {
+  readonly instance: EventInstance;
+  readonly proposal: Proposal;
+  readonly kind: 'move' | 'resize';
+}
 import type { DzMessages } from './messages.js';
 import type { MotionAdapter } from './motion.js';
 import type { FrameScheduler } from './render/frame.js';
@@ -57,6 +66,18 @@ export interface ViewCtx {
    * for the browser's own menu): the caller then leaves the event alone.
    */
   openMenu(target: ActionTarget, at: { x: number; y: number } | HTMLElement, returnFocus: HTMLElement | null): boolean;
+  /** The live options (callbacks, `editable`, `selectable`…), read when used. */
+  live(): LiveSettings;
+  /** The rules a gesture is checked against (null: none). */
+  rules(): RulesContext | null;
+  /** Said by screen readers (a polite live region). */
+  announce(text: string): void;
+  /** "This event / following / all" for a gesture on an occurrence: the application's `chooseScope`, or a menu at the drop point. */
+  chooseScope(info: ScopeRequest, at: { x: number; y: number }): Promise<EditScope | null>;
+  /** A drop in a repeated hour: which of the two readings (a menu at the drop point). */
+  chooseReading(p: Proposal, at: { x: number; y: number }): Promise<Proposal | null>;
+  /** A gesture's command was refused by the calendar. */
+  refused(result: CommandResult, command: Command): void;
   /** Lists a day's events (`nodes`, drawn by the view) in the panel behind a "+N" link; `onClose` runs when it closes. */
   openMore(anchor: HTMLElement, title: string, nodes: Node[], onClose?: () => void): void;
 }
@@ -66,6 +87,8 @@ export interface ViewController {
   readonly element: HTMLElement;
   /** What moves on navigation. */
   readonly body: HTMLElement;
+  /** Pointer gestures (drag, resize, select): attached by the calendar when present. */
+  readonly surface?: InteractionSurface;
   /** Draws the model; returns event nodes created, for an entrance animation. */
   render(model: unknown, state: KernelState): HTMLElement[];
   /** Once a minute: the now line, today's cell. */

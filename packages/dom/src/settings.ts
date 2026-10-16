@@ -1,5 +1,8 @@
-import type { Command, CommandResult, CreateRequest, EventInstance } from '@dzcalendar/core';
-import type { MenuHook } from './host.js';
+import type { Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection } from '@dzcalendar/core';
+import type { MenuHook, ScopeRequest } from './host.js';
+
+/** A click on an empty day or moment. */
+export type DateClick = { readonly allDay: true; readonly date: PlainDate } | { readonly allDay: false; readonly date: PlainDate; readonly instant: Instant };
 
 /**
  * The options read at the moment they are used — callbacks, the editing
@@ -8,12 +11,34 @@ import type { MenuHook } from './host.js';
  * what else must follow when it changes.
  */
 export interface LiveSettings {
+  /** "New event here" from the context menu: the application opens its own editor. */
   readonly onCreateRequest?: (request: CreateRequest) => void;
+  /** "Open" from the context menu. */
   readonly onEventOpen?: (instance: EventInstance) => void;
+  /** Events can be dragged and resized, and the context menu offers editing entries. Default false. */
   readonly editable?: boolean;
+  /** A command from the calendar's own UI was refused: why (problems, rule violations). */
   readonly onCommandRefused?: (result: CommandResult, command: Command) => void;
+  /** Keep, reorder, add to or replace the context menu's entries; null leaves the browser's menu. */
   readonly contextMenu?: MenuHook;
+  /** Minutes gestures and context-menu moments snap to in a time grid. Default 15. */
   readonly snapMinutes?: number;
+  /** Dragging across empty time selects it (`onSelect`). Default false. */
+  readonly selectable?: boolean;
+  readonly onSelect?: (selection: Selection) => void;
+  readonly onDateClick?: (click: DateClick) => void;
+  readonly onEventClick?: (instance: EventInstance) => void;
+  /**
+   * A gesture on an occurrence of a series: how far it reaches. Resolve
+   * null to cancel. Default: a "this / following / all" menu where it dropped.
+   */
+  readonly chooseScope?: (request: ScopeRequest) => EditScope | null | Promise<EditScope | null>;
+  /** Holding a dragged event at the side goes to the previous/next period. Default true. */
+  readonly dragEdgeNavigate?: boolean;
+  /** Timed events can be resized from their start too. Default false. */
+  readonly eventResizableFromStart?: boolean;
+  /** A gesture dropped where the rules refuse it (the proposal and its violations). */
+  readonly onProposalRefused?: (proposal: Proposal) => void;
 }
 
 type Handler<K extends keyof LiveSettings> = {
@@ -27,6 +52,14 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   editable: {},
   onCommandRefused: {},
   contextMenu: {},
+  selectable: {},
+  onSelect: {},
+  onDateClick: {},
+  onEventClick: {},
+  chooseScope: {},
+  dragEdgeNavigate: {},
+  eventResizableFromStart: {},
+  onProposalRefused: {},
   snapMinutes: {
     check: (v) => {
       if (!Number.isInteger(v) || v < 1 || v > 1440) throw new RangeError(`snapMinutes must be a whole number of minutes from 1 to 1440: ${v}`);

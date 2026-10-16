@@ -674,6 +674,87 @@ From the Phase 5 architect review, to do with the editing:
 
 - Not done: memoizing `seriesSpan`, a "leak over 5 000 queries" bench line.
 
-## Next — Phase 7: mouse, touch, pen
+## Phase 7 — mouse, touch, pen ✅ (2026-10-16)
 
-See `ARCHITECTURE.md` J. Phase 7.
+- Core `interaction/propose.ts`: `Hit` (slot with its instant, or day /
+  all-day row), `proposeMove`, `proposeResize`, `selectionBetween`,
+  `commandFor`, `isUnchanged`. Grab offset kept; start snapped on the wall
+  clock and read again in the zone (`preferOffset` of the pass under the
+  pointer): a gap → next existing moment + `skipped`; a repeat →
+  `ambiguity { chosen, alternative }`. Event zone and elapsed length kept;
+  timed ↔ all-day by dropping on the all-day row or the grid. Validated by
+  `validateProposal` (renamed input: `Placement`). Parity test: a hit from
+  an axis position equals a hit from a keyboard wall time.
+- DOM `interact/`: `surface.ts` (what a view gives: `measure`, `hitAt`,
+  `boxesFor`, `instanceOf`), `host.ts` (Pointer Events, 4/8 px threshold,
+  touch tap selects / drag on selected without long press, `touch-action`
+  only on the selected event, ghosts by CSS variables, autoscroll, edge
+  navigation at 600 ms, Escape cancels, `chooseScope` / reading chooser,
+  live announcements), `handles.ts`. Time grid and day grid implement the
+  surface; geometry is read once per gesture and the scroll followed by
+  events. Options (live): `selectable`, `onSelect`, `onDateClick`,
+  `onEventClick`, `chooseScope`, `dragEdgeNavigate`,
+  `eventResizableFromStart`. `kernel.rules()`.
+- GSAP adapter: `dragStart` (lift), `dropRejected` (shake, fly back),
+  `captureLayout` / `animateLayout` (Flip for the others), `dropSettle`
+  (land from the ghost), `overlayOpen` (menu, sub-menu, "+N").
+- Browser 39/39: mouse move and resize (snapped), Escape, Saturday refusal
+  (red ghost, unchanged, announced), series scope menu, selection, the
+  reading chooser in the repeated hour, month drag, touch (tap selects,
+  drag without long press, empty time scrolls). GSAP path checked with
+  motion on (transform cleared, no ghost left, no console error).
+- Size: core 28.6 kB (over 28 by 2 %, within the owner's tolerance), dom
+  22.3 kB, motion-gsap 0.9 kB.
+
+### Reviews (architect; code review in real Chrome), fixed
+- Only the calendar's time takes gestures (`surface.accepts`): a header,
+  the gutter or a scrollbar is no date click and starts no selection.
+- Off valid ground (a skipped day), the proposal is dropped: a drop there
+  does nothing. The final proposal is computed from the pointerup point,
+  without autoscroll or navigation side effects.
+- RTL: time-grid columns sorted by position; all-day ghost by min/max.
+- The repeated hour on a resize: `ambiguity.edge` — choosing the other
+  reading moves only that edge; a resize clamped to its minimum has none.
+- A drop in a skipped hour: the hit says `gap`, the event lands on the
+  first moment after it (03:00, not 03:30), and it is announced.
+- The drop is one pipeline, `interact/commit.ts` (`commitProposal`), for
+  the keyboard too: refusal (announced, `onProposalRefused`, flying back
+  only to a node still there), scope (only "this" when the kind changes),
+  reading, a check that the calendar still exists after each wait, run,
+  announcement (moved / resized), Flip and landing. It never throws; a busy
+  flag blocks a new gesture while a choice is open.
+- Series preview validated with `movingSeries` (a series moving as a whole
+  is not in its own way); the final run stays the authority.
+- Autoscroll: `scrollBy` (no layout read), only inside the scroller.
+  Edge navigation re-measures after the view has settled (and waits 900 ms
+  in a month). The page scrolling re-measures. `lostpointercapture` (on
+  the root only — a touch's implicit capture handed over is not a loss) and
+  window blur cancel.
+- GSAP: the landed node is made visible (an entrance tween killed by the
+  landing left it hidden) and cleaned of opacity/visibility.
+- Focus: a click on an editable event focuses it again (`preventDefault`
+  had cancelled that); the menu closes before running an entry again, so
+  an application's editor keeps the focus it takes.
+- Ghosts copy only the event's accent and the application's classes; a
+  long press is never a tap; the touch resize strip is 16 px; a touched
+  event stays selected where it lands; an unchanged hit recomputes nothing.
+- Selections end on the wall-clock slot (Lord Howe's half-hour changes).
+- "+N" panel: a click on an event there fires `onEventClick`.
+- Browser 45/45 (header click, focus, RTL drop, March gap drop, GSAP
+  visibility added); 620 tests.
+
+### Manual (not automatable here)
+- iOS Safari: a finger on an unselected event or empty time scrolls; a
+  selected event drags. To check on a device.
+
+### Not done in Phase 7, on purpose
+- Touch selection handles (a tap selects one slot; adjusting it: Phase 8).
+- Violation codes turned into words ("outside business hours"); a warning
+  when a day event becomes a one-hour timed one; conformance cases for the
+  proposals (Swift/Kotlin); a keyboard sequence parity test (with Phase 8).
+- Dragging between calendars / external drop; timeline (Phase 10+).
+- Keyboard grab mode: Phase 8 (the proposals are already shared).
+
+## Next — Phase 8: keyboard and accessibility
+
+See `ARCHITECTURE.md` J. Phase 8.

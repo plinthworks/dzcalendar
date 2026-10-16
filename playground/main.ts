@@ -25,6 +25,11 @@ function make(axis: 'wall' | 'elapsed') {
       say(r.allDay ? `Nouvel événement demandé le ${r.start.toString()} (journée)` : `Nouvel événement demandé à ${r.start.toZonedDateTimeISO(zoneSelect.value).toString({ smallestUnit: 'minute' })}`),
     onEventOpen: (inst) => say(`Ouvrir « ${inst.event.title} »`),
     editable: true,
+    selectable: true,
+    onSelect: (sel) => say(`Sélection : ${sel.start.toString()} → ${sel.end.toString()}`),
+    onDateClick: (c) => say(c.allDay ? `Clic sur le ${c.date.toString()}` : `Clic à ${c.instant.toZonedDateTimeISO(zoneSelect.value).toString({ smallestUnit: 'minute' })}`),
+    // A demo rule: nothing may land on a Saturday (the drop is refused, animated back).
+    rules: { allow: (p) => (p.start instanceof Temporal.PlainDate ? p.start : p.start.withTimeZone(zoneSelect.value).toPlainDate()).dayOfWeek !== 6 },
     onCommandRefused: (r) => say(`Refusé : ${[...r.problems.map((p) => p.code), ...('violations' in r && r.violations ? r.violations.map((v) => v.code) : [])].join(', ')}`),
     motion: (document.querySelector<HTMLInputElement>('#motion')!).checked ? createGsapMotion() : NO_MOTION,
   });

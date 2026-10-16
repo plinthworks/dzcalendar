@@ -24,6 +24,11 @@ export class Scope {
     else this.cleanups.push(cleanup);
   }
 
+  /** True once `dispose` ran: work that awaited something checks it before writing. */
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+
   dispose(): void {
     this.disposed = true;
     for (const fn of this.cleanups.splice(0).reverse()) {

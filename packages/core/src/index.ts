@@ -57,8 +57,10 @@ export type { RRule, RRuleSet, Frequency, Weekday as RRuleWeekday } from '@dzcal
 export { editOccurrence, deleteOccurrence, deleteSeries, isOccurrence, startOfKey } from './recurrence/edit.js';
 export type { EditScope, OccurrenceRef, EditOptions } from './recurrence/edit.js';
 export { validateProposal } from './rules/validate.js';
-export type { Proposal, Violation, ConstraintSpec, OverlapFn, RulesContext } from './rules/validate.js';
+export type { Placement, Violation, ConstraintSpec, OverlapFn, RulesContext } from './rules/validate.js';
 export { rebaseRule, splitRule, countBefore } from '@dzcalendar/rrule';
+export { proposeMove, proposeResize, isUnchanged, selectionBetween, commandFor } from './interaction/propose.js';
+export type { Hit, InteractionContext, Proposal, Selection } from './interaction/propose.js';
 export { applyCommand } from './commands/apply.js';
 export { createHistory } from './commands/history.js';
 export type { History, HistoryOptions } from './commands/history.js';

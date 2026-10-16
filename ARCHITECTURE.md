@@ -68,6 +68,13 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 7 (détail dans ROADMAP.md)
+
+- **B.15** — `Hit` = `{kind:'slot', date, instant}` (la vue lit l'axe) ou `{kind:'day', date, allDayRow?}` ; `Proposal` étend `Placement` (l'entrée de `validateProposal`) avec `allDay`, `valid`, `violations`, `ambiguity`, `skipped`. `commandFor(instance, proposal, scope)`. Le snap se fait sur l'horloge murale de la zone d'affichage ; la lecture d'une heure répétée suit le passage sous le pointeur.
+- **D.1 / D.3** — `ViewController.surface?: InteractionSurface { root, scroller, family, measure(origin), hitAt(geo, x, y, scrollY), boxesFor(geo, span, scrollY), instanceOf(node) }` au lieu de `hitTest` ; un seul hôte (`interact/host.ts`) pour souris, stylet et tactile. Poignées de redimensionnement dessinées en CSS (`data-resize-end/start`), trouvées par position au `pointerdown`.
+- **D.10** — `MotionAdapter` garde `viewChange`/`eventsEnter` et ajoute `dragStart`, `dropRejected`, `captureLayout`/`animateLayout` (Flip), `dropSettle`, `overlayOpen`.
+- **D.3** — `surface.accepts(target)` : seules les zones de temps prennent les gestes. Un `Hit` de créneau peut porter `gap` (pointeur dans une heure sautée → premier instant après). `Proposal.ambiguity.edge`. Le dépôt passe par `interact/commit.ts` (`commitProposal`), partagé avec le clavier (Phase 8).
+
 ### Ajustements après la Phase 6 (détail dans ROADMAP.md)
 
 - **B.8** — `Series` garde `base` (CalEvent de la première occurrence) au lieu de `template`/`dtstart`/`duration` ; `splitFrom` ajouté. Édition : `editOccurrence(snap, ref, patch, scope, ctx, path, problems, opts)` (problèmes en sortie, pas de `Result`). « all » et « following » éditent l'occurrence telle que la série la produit (pas son override). Les clés (overrides, EXDATE, UNTIL) suivent la **position** de l'occurrence dans la série (la 4ᵉ reste la 4ᵉ) ; la règle est recalée depuis l'occurrence éditée après avoir rendu explicite ce qu'elle tirait de DTSTART ; une coupe « following » qui casserait la phase d'un INTERVAL est refusée (`invalid-edit`). Les règles (`validateProposal`) ne s'appliquent qu'aux gestes : `kernel.run(cmd, { validate: true })`. Passage journée entière ↔ horaire d'une série entière : `invalid-edit`.

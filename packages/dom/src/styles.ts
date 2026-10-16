@@ -345,7 +345,45 @@ export const DZ_CSS = `
 .dz-tg__body, .dz-dg__body { -webkit-touch-callout: none; user-select: none; }
 .dz-probe { position: absolute; visibility: hidden; pointer-events: none; inset-inline-start: -9999px; height: var(--dz-bar-height, 1.375rem); width: 1px; }
 .dz-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* ── gestures: ghosts, handles, the selected event on touch ─────────────── */
+.dz-tg, .dz-dg { position: relative; }
+.dz-ghosts { position: absolute; inset: 0; pointer-events: none; z-index: 30; }
+.dz-ghost {
+  position: absolute;
+  left: var(--gx);
+  top: var(--gy);
+  width: var(--gw);
+  height: var(--gh);
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 2px 6px;
+  border-radius: var(--dz-radius, var(--tz-radius, 0.375rem));
+  border-inline-start: 3px solid var(--dz-event-accent, var(--dz-accent, var(--tz-accent, Highlight)));
+  background: color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--tz-accent, Highlight))) 24%, var(--dz-bg, var(--tz-bg, Canvas)));
+  color: var(--dz-fg, var(--tz-fg, CanvasText));
+  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.5);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+.dz-ghost[data-time]:not([data-time=''])::before { content: attr(data-time); display: block; font-weight: 600; }
+.dz-ghost__title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dz-ghost--select { border: 1px dashed var(--dz-accent, var(--tz-accent, Highlight)); background: color-mix(in srgb, var(--dz-accent, var(--tz-accent, Highlight)) 16%, transparent); box-shadow: none; }
+.dz-ghost.dz-event--invalid { border-color: var(--dz-danger, var(--tz-danger, #dc2626)); background: color-mix(in srgb, var(--dz-danger, var(--tz-danger, #dc2626)) 16%, var(--dz-bg, var(--tz-bg, Canvas))); }
+.dz-ev--source { opacity: 0.35; }
+.dz-dragging, .dz-dragging * { cursor: grabbing !important; }
+.dz-selecting { cursor: cell; }
+.dz-editable .dz-ev:not(.dz-ev--bg), .dz-editable .dz-bar:not(.dz-bar--bg) { cursor: grab; }
+/* Resize: a thin strip at the edge that can be pulled (drawn by CSS, found by position on press). */
+.dz-editable .dz-ev[data-resize-end]::after { content: ''; position: absolute; inset-inline: 0; bottom: 0; height: 6px; cursor: ns-resize; }
+.dz-editable .dz-bar[data-resize-end]::after { content: ''; position: absolute; inset-block: 0; inset-inline-end: 0; width: 6px; cursor: ew-resize; }
+.dz-tg__allday-track .dz-bar { position: relative; }
+/* Touch: a tapped event is selected — its handles grow, and it alone stops the page from scrolling under a finger. */
+.dz-ev, .dz-bar { touch-action: pan-x pan-y; }
+.dz-ev--selected { outline: 2px solid var(--dz-accent, var(--tz-accent, Highlight)); outline-offset: 1px; touch-action: none; z-index: 4; }
+.dz-ev--selected[data-resize-end]::after { height: 14px; background: linear-gradient(transparent 5px, var(--dz-accent, var(--tz-accent, Highlight)) 5px 8px, transparent 8px); }
+.dz-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (forced-colors: active) {
+  .dz-ghost { border: 2px solid Highlight; }
   .dz-menu__item:focus-visible, .dz-more:focus-visible, .dz-pop__close:focus-visible, .dz-dg__num:focus-visible { outline: 2px solid Highlight; }
   .dz-ev, .dz-bar { border: 1px solid CanvasText; }
   .dz-band--gap, .dz-band--repeat { border: 1px dashed CanvasText; }

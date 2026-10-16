@@ -1,5 +1,6 @@
 import { Temporal, formatTemporal } from '@dzcalendar/core';
-import type { DayGridBar, DayGridModel, DayGridWeek, KernelState, PlainDate, Segment } from '@dzcalendar/core';
+import type { DayGridBar, DayGridModel, DayGridWeek, KernelState, PlainDate, Segment, ZonedDateTime } from '@dzcalendar/core';
+import type { Box, InteractionSurface } from '../interact/surface.js';
 import type { ViewController, ViewCtx } from '../host.js';
 import { registerView } from '../host.js';
 import { attachMenuTriggers } from '../menu.js';
@@ -214,6 +215,12 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     el.classList.toggle('dz-bar--cont-end', !(s.endsHere && it.last));
     el.classList.toggle('dz-bar--timed', !ev.allDay);
     applyEventLook(el, ev);
+    // Days are pulled by their edges where the event really starts or ends in this row; timed events in a month only move.
+    const resizable = !it.bg && ev.allDay && ev.perms.duration;
+    if (resizable && s.endsHere && it.last) el.dataset['resizeEnd'] = '1';
+    else delete el.dataset['resizeEnd'];
+    if (resizable && s.startsHere && it.first) el.dataset['resizeStart'] = '1';
+    else delete el.dataset['resizeStart'];
     if (it.bg) {
       el.replaceChildren();
       el.setAttribute('aria-hidden', 'true');
@@ -270,11 +277,97 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     return undefined;
   };
   // The panel's events take the same context menu as the grid's.
+  // An event in the "+N" panel is clicked like one in the grid.
+  ctx.scope.on(ctx.popoverElement, 'click', (e) => {
+    const item = (e.target as Element | null)?.closest<HTMLElement>('.dz-bar');
+    const seg = item ? segmentByKey(item.dataset['segment'] ?? '') : undefined;
+    if (seg) ctx.live().onEventClick?.(seg.instance);
+  });
+
   attachMenuTriggers(ctx, ctx.popoverElement, (target) => {
     const item = target.closest<HTMLElement>('.dz-bar');
     const seg = item ? segmentByKey(item.dataset['segment'] ?? '') : undefined;
     return item && seg ? { target: { kind: 'event', instance: seg.instance }, anchor: item } : null;
   });
+
+  // ── gestures: geometry read once per gesture ─────────────────────────────
+  interface WeekGeo {
+    readonly top: number;
+    readonly bottom: number;
+    readonly cells: readonly { readonly left: number; readonly right: number; readonly date: PlainDate }[];
+  }
+  interface Geo {
+    readonly weeks: readonly WeekGeo[];
+    /** Where the first lane starts below a row's top (the day number's track and a gap). */
+    readonly laneTop: number;
+    readonly laneHeight: number;
+    readonly origin: { readonly x: number; readonly y: number };
+  }
+  const surface: InteractionSurface<Geo> = {
+    root,
+    scroller: null,
+    family: 'dayGrid',
+    accepts: (target) => target.closest('.dz-dg__week') !== null,
+    measure(origin) {
+      const weeksGeo: WeekGeo[] = [];
+      let laneTop = 24;
+      let laneHeight = 20;
+      const rows = [...body.querySelectorAll<HTMLElement>(':scope > .dz-dg__week')];
+      const first = rows[0];
+      if (first) {
+        const style = getComputedStyle(first);
+        const tracks = style.gridTemplateRows.split(' ').map((t) => parseFloat(t) || 0);
+        const gap = parseFloat(style.rowGap) || 0;
+        laneTop = (tracks[0] ?? 24) + gap;
+        laneHeight = tracks[1] ?? laneHeight;
+      }
+      for (const row of rows) {
+        const r = row.getBoundingClientRect();
+        const cells = [...row.querySelectorAll<HTMLElement>('.dz-dg__cell')].map((c) => {
+          const cr = c.getBoundingClientRect();
+          return { left: cr.left, right: cr.right, date: Temporal.PlainDate.from(c.dataset['date']!) };
+        });
+        // In reading order, so a right-to-left row still finds its cells by position.
+        cells.sort((a, b) => a.left - b.left);
+        weeksGeo.push({ top: r.top, bottom: r.bottom, cells });
+      }
+      return { weeks: weeksGeo, laneTop, laneHeight, origin };
+    },
+    hitAt(geo, x, y) {
+      const { weeks: ws } = geo;
+      if (ws.length === 0) return null;
+      const cy = Math.max(ws[0]!.top, Math.min(ws[ws.length - 1]!.bottom - 1, y));
+      const w = ws.find((k) => cy >= k.top && cy < k.bottom) ?? ws[ws.length - 1]!;
+      if (w.cells.length === 0) return null;
+      const cx = Math.max(w.cells[0]!.left, Math.min(w.cells[w.cells.length - 1]!.right - 1, x));
+      const c = w.cells.find((k) => cx >= k.left && cx < k.right) ?? w.cells[w.cells.length - 1]!;
+      return { kind: 'day', date: c.date };
+    },
+    boxesFor(geo, span) {
+      const zone = ctx.zone;
+      const first = span.allDay ? (span.start as PlainDate) : (span.start as ZonedDateTime).withTimeZone(zone).toPlainDate();
+      let last: PlainDate;
+      if (span.allDay) last = (span.end as PlainDate).subtract({ days: 1 });
+      else {
+        // A timed event shows on the days it touches: an end at midnight does not touch the next one.
+        const end = (span.end as ZonedDateTime).withTimeZone(zone);
+        last = end.toPlainTime().equals(Temporal.PlainTime.from('00:00')) && Temporal.PlainDate.compare(end.toPlainDate(), first) > 0 ? end.toPlainDate().subtract({ days: 1 }) : end.toPlainDate();
+      }
+      const o = geo.origin;
+      const out: Box[] = [];
+      for (const w of geo.weeks) {
+        const inside = w.cells.filter((c) => Temporal.PlainDate.compare(c.date, first) >= 0 && Temporal.PlainDate.compare(c.date, last) <= 0);
+        if (inside.length === 0) continue;
+        const left = Math.min(...inside.map((c) => c.left));
+        const right = Math.max(...inside.map((c) => c.right));
+        out.push({ x: left - o.x + 2, y: w.top + geo.laneTop - o.y, w: right - left - 4, h: geo.laneHeight });
+      }
+      return out;
+    },
+    instanceOf(node) {
+      return segmentByKey(node.dataset['segment'] ?? '')?.instance ?? null;
+    },
+  };
 
   attachMenuTriggers(ctx, root, (target) => {
     if (!model) return null;
@@ -291,6 +384,7 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
   return {
     element: root,
     body,
+    surface: surface as InteractionSurface,
     render(next, s) {
       const m = next as DayGridModel;
       // Set before drawing: the rows read the new model's lanes.

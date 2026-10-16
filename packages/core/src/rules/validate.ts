@@ -9,7 +9,7 @@ import { businessIntervals } from './business-hours.js';
 import type { BusinessHoursInput } from './business-hours.js';
 
 /** Where an event is proposed to go: a move, a resize, an edit — whoever asks. */
-export interface Proposal {
+export interface Placement {
   readonly event: CalEvent;
   readonly start: ZonedDateTime | PlainDate;
   readonly end: ZonedDateTime | PlainDate;
@@ -38,7 +38,7 @@ export interface RulesContext {
   /** False: no event may overlap another (backgrounds aside). A function decides pair by pair. Default true. */
   readonly overlap?: boolean | OverlapFn;
   /** The application's last word. */
-  readonly allow?: (p: Proposal) => boolean;
+  readonly allow?: (p: Placement) => boolean;
   /** Days outside it are not reachable (exclusive end). */
   readonly validRange?: { readonly start?: PlainDate; readonly end?: PlainDate };
 }
@@ -59,7 +59,7 @@ const dateOf = (x: ZonedDateTime | PlainDate, zone: ZoneId): PlainDate => (x ins
  */
 export function validateProposal(
   snap: StoreSnapshot,
-  p: Proposal,
+  p: Placement,
   rules: RulesContext,
   /** A series moving as a whole: its own occurrences move with it and are not in the way. */
   opts: { readonly movingSeries?: string } = {},

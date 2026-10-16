@@ -42,6 +42,17 @@ export interface DzMessages {
   readonly goToDay: string;
   readonly openEvent: string;
   readonly deleteEvent: string;
+  /** Said when a drop is refused (a constraint, an overlap, not editable). */
+  readonly dropRefused: string;
+  eventMoved(parts: { title: string; time: string }): string;
+  eventResized(parts: { title: string; time: string }): string;
+  /** A drop snapped into a skipped hour, moved on to the next that exists. */
+  movedIntoGap(parts: { time: string }): string;
+  /** The menu asking how far a change to an occurrence reaches. */
+  readonly changeWhich: string;
+  /** The menu asking which of the two readings of a repeated wall time. */
+  whichReading(parts: { time: string }): string;
+  reading(parts: { time: string; offset: string; first: boolean }): string;
   readonly scopeThis: string;
   readonly scopeFollowing: string;
   readonly scopeAll: string;
@@ -75,6 +86,13 @@ export const EN: DzMessages = {
   goToDay: 'Go to this day',
   openEvent: 'Open',
   deleteEvent: 'Delete',
+  dropRefused: 'Not allowed here',
+  eventMoved: ({ title, time }) => (time ? `${title} moved to ${time}` : `${title} moved`),
+  eventResized: ({ title, time }) => (time ? `${title} now ends at ${time}` : `${title} resized`),
+  movedIntoGap: ({ time }) => `That time does not exist today; moved to ${time}`,
+  changeWhich: 'Change which events?',
+  whichReading: ({ time }) => `Which ${time}?`,
+  reading: ({ time, offset, first }) => `${first ? 'First' : 'Second'} ${time} (${offset})`,
   scopeThis: 'This event',
   scopeFollowing: 'This and following events',
   scopeAll: 'All events',
@@ -106,6 +124,13 @@ export const FR: DzMessages = {
   goToDay: 'Aller à ce jour',
   openEvent: 'Ouvrir',
   deleteEvent: 'Supprimer',
+  dropRefused: 'Impossible ici',
+  eventMoved: ({ title, time }) => (time ? `« ${title} » déplacé à ${time}` : `« ${title} » déplacé`),
+  eventResized: ({ title, time }) => (time ? `« ${title} » finit maintenant à ${time}` : `« ${title} » redimensionné`),
+  movedIntoGap: ({ time }) => `Cette heure n’existe pas ce jour-là : déplacé à ${time}`,
+  changeWhich: 'Modifier quels événements ?',
+  whichReading: ({ time }) => `Quel ${time} ?`,
+  reading: ({ time, offset, first }) => `${first ? 'Premier' : 'Second'} ${time} (${offset})`,
   scopeThis: 'Cet événement',
   scopeFollowing: 'Cet événement et les suivants',
   scopeAll: 'Tous les événements',

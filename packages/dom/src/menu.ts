@@ -57,7 +57,8 @@ export function attachMenuTriggers(ctx: ViewCtx, root: HTMLElement, resolve: Res
 }
 
 export interface MenuHost {
-  open(items: readonly ActionItem[], at: { x: number; y: number } | HTMLElement, returnFocus: HTMLElement | null, label: string): void;
+  /** `onClose` runs once when the menu closes, whatever closed it (after an entry's `run`). */
+  open(items: readonly ActionItem[], at: { x: number; y: number } | HTMLElement, returnFocus: HTMLElement | null, label: string, onClose?: () => void): void;
   /** `focusBack: false` when the calendar changes or goes away: focus is not handed to a stale node. */
   close(focusBack?: boolean): void;
   readonly element: HTMLElement;
@@ -78,6 +79,7 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
   menu.hidden = true;
   container.append(menu);
   let returnTo: HTMLElement | null = null;
+  let closed: (() => void) | null = null;
   let typed = '';
   let typedAt = 0;
 
@@ -115,6 +117,9 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
     const back = returnTo;
     returnTo = null;
     if (focusBack && back?.isConnected) back.focus();
+    const done = closed;
+    closed = null;
+    done?.();
   };
   // A fixed menu would float away from what it was opened on.
   const onScroll = (e: Event) => {
@@ -167,8 +172,13 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
             openSub(b, children, item.label, true);
             return;
           }
+          // Closed first (focus goes back), then the entry runs — it may move focus on purpose (an editor) —
+          // then whoever waits on the menu hears it closed: a choice made in `run` resolves before "nothing chosen".
+          const after = closed;
+          closed = null;
           close();
           item.run?.();
+          after?.();
         });
         return b;
       }),
@@ -235,9 +245,10 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
 
   return {
     element: menu,
-    open(entries, at, focusBack, label) {
+    open(entries, at, focusBack, label, onClose) {
       close();
       returnTo = focusBack;
+      closed = onClose ?? null;
       menu.setAttribute('aria-label', label);
       build(menu, entries);
       menu.hidden = false;

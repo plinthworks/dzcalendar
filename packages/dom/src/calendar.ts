@@ -1,6 +1,7 @@
 import { actionsFor, assertBusinessHours, createKernel, formatTemporal, isValidZone, Temporal } from '@dzcalendar/core';
-import type { Command, CommandResult } from '@dzcalendar/core';
+import type { Command, CommandResult, EditScope, Instant, Proposal, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
+import { attachInteractions } from './interact/host.js';
 import type { LiveSettings } from './settings.js';
 import type { ActionItem, CalendarKernel, CreateRequest, DurationLike, EventInput, EventInstance, KernelOptions, NavDirection, PlainDate, ZoneId } from '@dzcalendar/core';
 import type { CalendarHooks, MenuHook, ViewController, ViewCtx } from './host.js';
@@ -20,7 +21,7 @@ import { createToolbar } from './toolbar.js';
 import './views/timegrid.js';
 import './views/daygrid.js';
 
-export interface CalendarOptions extends Partial<KernelOptions> {
+export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   /** A kernel built elsewhere (shared store, tests). Otherwise one is made from the options. */
   readonly kernel?: CalendarKernel;
   /** Default: FR for French locales, EN otherwise. */
@@ -38,21 +39,11 @@ export interface CalendarOptions extends Partial<KernelOptions> {
   /** Lanes a month day shows before "+N": a number, or 'auto' (measured). Default 'auto'. */
   readonly dayMaxLanes?: number | 'auto';
   readonly hooks?: CalendarHooks;
-  /** Keep, reorder, add to or replace the context menu's entries; null leaves the browser's menu. */
-  readonly contextMenu?: MenuHook;
   /**
    * "New event here" from the context menu: the application opens its own
    * editor. A moment in a time grid, a date in a month.
    */
   readonly onCreateRequest?: (request: CreateRequest) => void;
-  /** Minutes a context-menu moment snaps to in a time grid. Default 15. */
-  readonly snapMinutes?: number;
-  /** "Open" from the context menu. */
-  readonly onEventOpen?: (instance: EventInstance) => void;
-  /** Editing entries (delete, and the recurrence scope sub-menu) in the context menu. Default false. */
-  readonly editable?: boolean;
-  /** A command from the calendar's own UI was refused: why (problems, rule violations). */
-  readonly onCommandRefused?: (result: CommandResult, command: Command) => void;
 }
 
 export interface CalendarUpdate extends Partial<LiveSettings> {
@@ -158,6 +149,30 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   });
 
   const settings = createSettings(options);
+  // What a screen reader is told about gestures: moved, refused, moved past a skipped hour.
+  const liveRegion = h(doc, 'div', 'dz-live');
+  liveRegion.setAttribute('aria-live', 'polite');
+  liveRegion.setAttribute('role', 'status');
+  root.append(liveRegion);
+  /** A short menu at a point: resolves with the value chosen, or null when it closes without one. */
+  function choose<T>(label: string, choices: readonly { id: string; label: string; value: T }[], at: { x: number; y: number }): Promise<T | null> {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (v: T | null) => {
+        if (done) return;
+        done = true;
+        resolve(v);
+      };
+      menu.open(
+        choices.map((c) => ({ id: c.id, label: c.label, enabled: true, run: () => finish(c.value) })),
+        at,
+        doc.activeElement as HTMLElement | null,
+        label,
+        () => finish(null),
+      );
+      ctx.motion.overlayOpen?.(menu.element);
+    });
+  }
   const ctx: ViewCtx = {
     doc,
     kernel,
@@ -198,10 +213,49 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       const items: readonly ActionItem[] | null = live.contextMenu ? live.contextMenu({ target, state }, defaults) : defaults;
       if (!items || items.length === 0) return false;
       menu.open(items, at, returnFocus, ctx.messages.actions);
+      ctx.motion.overlayOpen?.(menu.element);
       return true;
+    },
+    live: () => settings.current,
+    rules: () => kernel.rules(),
+    announce(text) {
+      // Emptied first, so the same words twice are said twice.
+      liveRegion.textContent = '';
+      requestAnimationFrame(() => (liveRegion.textContent = text));
+    },
+    chooseScope(request, at) {
+      const own = settings.current.chooseScope;
+      if (own) return Promise.resolve(own(request));
+      return choose<EditScope>(ctx.messages.changeWhich, [
+        { id: 'this', label: ctx.messages.scopeThis, value: 'this' },
+        { id: 'following', label: ctx.messages.scopeFollowing, value: 'following' },
+        { id: 'all', label: ctx.messages.scopeAll, value: 'all' },
+      ], at);
+    },
+    chooseReading(p, at) {
+      if (!p.ambiguity) return Promise.resolve(p);
+      const zone = kernel.getState().timeZone;
+      const read = (i: Instant) => i.toZonedDateTimeISO(zone);
+      const hm = (z: ZonedDateTime) => formatTemporal(z.toPlainTime(), { hour: '2-digit', minute: '2-digit' }, ctx.locale);
+      const [a, b] = [p.ambiguity.chosen, p.ambiguity.alternative].sort((x, y) => x.epochMilliseconds - y.epochMilliseconds) as [Instant, Instant];
+      const option = (i: Instant, first: boolean) => {
+        const z = read(i);
+        // The event keeps its own zone; only the moment changes — of the edge that was ambiguous (a resize moves one).
+        const shift = i.epochMilliseconds - p.ambiguity!.chosen.epochMilliseconds;
+        const move = p.ambiguity!.edge === 'start';
+        const start = move ? (p.start as ZonedDateTime).add({ milliseconds: shift }) : p.start;
+        const end = (p.end as ZonedDateTime).add({ milliseconds: shift });
+        return { id: first ? 'first' : 'second', label: ctx.messages.reading({ time: hm(z), offset: z.offset, first }), value: { ...p, start, end } as Proposal };
+      };
+      return choose<Proposal>(ctx.messages.whichReading({ time: hm(read(a)) }), [option(a, true), option(b, false)], at);
+    },
+    refused(result, command) {
+      settings.current.onCommandRefused?.(result, command);
+      ctx.announce(ctx.messages.dropRefused);
     },
     openMore(anchor, title, nodes, onClose) {
       popover.open(anchor, title, nodes, ctx.messages.closePopover, onClose);
+      ctx.motion.overlayOpen?.(popover.element);
     },
   };
 
@@ -229,6 +283,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     viewScope = new Scope();
     const viewCtx = Object.assign(Object.create(ctx) as ViewCtx, { scope: viewScope });
     view = factory(viewCtx);
+    if (view.surface) attachInteractions(viewCtx, view.surface);
     mountedFamily = family;
     root.append(view.element);
     firstPaint = true;
@@ -246,6 +301,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     const vm = kernel.viewModel();
     const v = mount(vm.family);
     root.dataset['view'] = state.view.type;
+    root.classList.toggle('dz-editable', settings.current.editable === true);
     const created = v.render(vm.model, state);
     if (options.nowIndicator !== false) v.tick(kernel.now(), state);
     if (!firstPaint && pendingDir) ctx.motion.viewChange?.(v.body, pendingDir);
@@ -365,7 +421,10 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       if (changes.timeZone && changes.timeZone !== state.timeZone && !isZone(changes.timeZone)) throw new RangeError(`not a time zone: ${changes.timeZone}`);
       if ('businessHours' in changes && changes.businessHours !== undefined) assertBusinessHours(changes.businessHours);
       // Live settings check themselves and apply at once (nothing to redraw): a bad one throws here, before any change.
-      if (settings.apply(changes)) ctx.snapMinutes = settings.current.snapMinutes ?? 15;
+      if (settings.apply(changes)) {
+        ctx.snapMinutes = settings.current.snapMinutes ?? 15;
+        root.classList.toggle('dz-editable', settings.current.editable === true);
+      }
       holding = true;
       try {
         kernel.batch(() => {
