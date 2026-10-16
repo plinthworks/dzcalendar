@@ -200,7 +200,81 @@ Measured after the fixes: normalize+index 61–67 ms, replaceSourceChunk 10k
   `single`) — Phase 5. Move/resize commands — Phase 6–7. Source manager,
   chunk cache, json/fn sources — Phase 9. `commands.schema.json` — Phase 18.
 
-## Next — Phase 2: projection, axis, layout (pure)
+## Phase 2 — projection, axis, layout (pure) ✅ (2026-10-16)
 
-See `ARCHITECTURE.md` J. Phase 2. Carried items above still apply (cut timed
-events at `repeat` transitions in `wall` mode; `skipped` days).
+- `project/segment.ts`: `segmentTimed` (binary search into the display
+  zone's real days; 23/25/23.5-hour days; skipped days get nothing; optional
+  cut at each fall-back for the wall axis), `segmentAllDay` (bars over shown
+  columns, broken by hidden days), `splitByWeek`, `dateIndex`.
+- `project/time-axis.ts`: `buildColumnAxis` — option C validated by the
+  owner: `wall` (shared clock positions, gap/repeat bands, `fromPosition`
+  with a reading preference) and `elapsed` (true lengths, second-pass ticks);
+  `toEndPosition` places an end exactly at a fall-back on the first pass.
+  `slotMin`/`slotMax` up to 30:00.
+- `layout/column.ts` (greedy colouring = largest overlap, widening, cascade),
+  `layout/rows.ts` (`packLanes` with heaps, `computeOverflow` for "+N"),
+  `layout/virtual.ts` (Fenwick `PrefixSums`, `visibleRange`, `visible2D`).
+- `views/`: `ViewSpec`, `BUILTIN_VIEWS`, `computeViewRange` (month grid from
+  tzslot's `getMonthGrid`, `fixedWeekCount`, `hiddenDays`, `dayCount`),
+  `navigate`, and pure models `buildTimeGridModel` / `buildDayGridModel`.
+- `format/`: `formatTemporal` (epoch ms + zone, floating values in UTC),
+  `formatRangeTitle` (Intl `formatRange` — it takes numbers, so no `Date`),
+  weekday/month names, `weekNumber` with locale rules (`minimalDays` from a
+  CLDR region table: V8 omits it).
+- Conformance: +18 cases (`time-axis`, `segment`, `layout-column`, `navigation`).
+- Tests: properties on 1000 random columns (lanes = largest overlap, no
+  horizontal overlap of overlapping events) and 500 random weeks (every bar
+  drawn or counted in "+N", never both); week numbers equal Temporal's ISO
+  weeks for ten years.
+
+Measured (minified): layoutColumn 1000 overlapping ~0.4 ms (≤ 5),
+dayInfos 366 ~1.2 ms (≤ 15), time-grid week model over 10 000 events
+~1.5 ms, month model ~3.3 ms.
+
+Lessons:
+- `Intl.DateTimeFormat#formatRange` names one offset for a whole range:
+  01:30 (+02:00) – 02:30 (+01:00) prints "UTC+1" once. Titles only; an
+  event's hours across a clock change are formatted end by end.
+- An end at a fall-back instant reads as the *second* pass's clock time;
+  ends are placed with `toEndPosition` (one millisecond before, then back).
+- Positions are computed in integer milliseconds before dividing — floating
+  minutes gave 29.99999 for a 30-minute event.
+
+### Architect review, fixed before closing Phase 2
+
+- Events outside `[slotMin, slotMax)` were drawn as 15-minute slivers at
+  the edge; now dropped, and a piece cut by the axis loses that rounded end.
+- A one-day view with hidden days was stuck going back from Monday; it now
+  steps over hidden days in the direction of travel.
+- Elapsed axis starting after a fall-back showed a phantom band at the top.
+- `slotMax` beyond 24 h refused (segmentation cuts at the real midnight).
+- `computeOverflow` and `visibleRange` validate their sizes; `weekNumber`
+  reads ISO fields whatever the input calendar.
+- +4 conformance cases: the 23-hour Sunday, Lord Howe's 23 h 30, a one-day
+  view over a hidden weekend both ways. Unit tests for `toEndPosition`.
+- Carried to Phase 3 by decision: minimal kernel, stable keys by date,
+  column reuse and `updateTimeGridModel`, offset readings, gutter, now line.
+
+### Code review (verified by execution), fixed before closing Phase 2
+
+- **Background events took a lane** in the month grid and the all-day row,
+  and could push a real event behind "+N". They are now set apart
+  (`DayGridWeek.background`, `allDay.background`) and take no lane.
+- `ticks(0)` never returned (the tab froze): a step ≤ 0 is now a RangeError.
+- `formatRangeTitle` with reversed ends printed "21–15 mars": ends are ordered.
+- `PrefixSums.indexAt(0)` returned a leading zero-size item.
+- Confirmed by the reviewer's fuzzing: 3000 random columns, 2000 overflow
+  cases, Fenwick, week numbers over 49 rule combinations, segmentation with
+  non-contiguous hidden days, Havana and Lord Howe axes.
+- Open, for the owner: `slotMax` beyond 24 h is refused for now (the plan
+  said up to 30:00). Supporting it means segmenting by axis window rather
+  than by civil day.
+
+**Budget watch:** `normalize+index 10k` measures 62–72 ms against 70 depending
+on machine load (load average ~5 during this phase). Not reliably met;
+nothing in Phases 1–2 changed that path since it was measured at 61–67.
+
+## Next — Phase 3: time grid in the DOM (read-only)
+
+See `ARCHITECTURE.md` J. Phase 3, plus the theme, playground and `dst.html`
+moved here from Phase 0.

@@ -4,7 +4,19 @@
  * object it creates *unless minified*, so measuring the sources directly
  * would measure a cost no user pays.
  */
-import { Temporal, createEventStore, createIdGenerator, normalizeMany, viewWindow } from '../packages/core/src/index.js';
+import {
+  BUILTIN_VIEWS,
+  Temporal,
+  buildDayGridModel,
+  buildTimeGridModel,
+  computeViewRange,
+  createEventStore,
+  createIdGenerator,
+  dayInfos,
+  layoutColumn,
+  normalizeMany,
+  viewWindow,
+} from '../packages/core/src/index.js';
 import type { EventInput, Mutation } from '../packages/core/src/index.js';
 
 // Run by node with --expose-gc; `gc` is not in @types/node's globals.
@@ -51,7 +63,7 @@ load();
 load();
 
 const results: Record<string, number> = {};
-results['normalize+index 10k'] = time(5, load);
+results['normalize+index 10k'] = time(9, load);
 const { items } = normalizeMany(raw, ctx);
 const muts = items.map((x) => ({ kind: 'event', after: x.event }) as Mutation);
 results['index 10k'] = time(5, () => createEventStore().apply(muts, 'api'));
@@ -66,6 +78,16 @@ results['refetch 10k identical'] = time(5, () => refetched.replaceSourceChunk('a
 const store = load();
 const w = viewWindow(Temporal.PlainDate.from('2026-06-01'), Temporal.PlainDate.from('2026-07-06'), 'Europe/Paris');
 results['query 5 weeks of 10k'] = time(50, () => store.snapshot.queryInstances(w));
+
+// Phase 2: pure layout and view models.
+const overlapping = Array.from({ length: 1000 }, (_, i) => ({ key: `c${i}`, start: (i * 7) % 600, end: ((i * 7) % 600) + 60 + (i % 90), order: i }));
+results['layoutColumn 1000 overlapping'] = time(20, () => layoutColumn(overlapping, { minVisual: 15 }));
+results['dayInfos 366'] = time(10, () => dayInfos(Temporal.PlainDate.from('2026-01-01'), 366, 'Europe/Paris'));
+const nav = { firstDay: 1 as const, today: Temporal.PlainDate.from('2026-06-10') };
+const weekRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.timeGridWeek!, nav);
+results['timeGrid week model (10k)'] = time(20, () => buildTimeGridModel(weekRange, store.snapshot, { displayZone: 'Europe/Paris' }));
+const monthRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.dayGridMonth!, nav);
+results['dayGrid month model (10k)'] = time(20, () => buildDayGridModel(monthRange, store.snapshot, { displayZone: 'Europe/Paris', maxLanes: 4 }));
 
 let k = 0;
 results['apply one update'] = time(50, () => {

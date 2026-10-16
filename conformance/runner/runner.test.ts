@@ -2,7 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Temporal, createIdGenerator, dayInfo, normalizeEvent, resolveWall } from '../../packages/core/src/index.js';
+import {
+  BUILTIN_VIEWS,
+  Temporal,
+  buildColumnAxis,
+  computeViewRange,
+  createIdGenerator,
+  dayInfo,
+  dayInfos,
+  layoutColumn,
+  navigate,
+  normalizeEvent,
+  resolveWall,
+  segmentTimed,
+} from '../../packages/core/src/index.js';
 import type { EventInput, WallPolicy } from '../../packages/core/src/index.js';
 
 /**
@@ -44,6 +57,26 @@ const adapters: Record<string, (input: any) => unknown> = {
   'zone-resolve': ({ date, time, zone, policy }) => {
     const r = resolveWall(Temporal.PlainDate.from(date), Temporal.PlainTime.from(time), zone, policy as WallPolicy);
     return { instant: str(r.instant), other: str(r.other), exists: r.exists, ambiguous: r.ambiguous, offsetMatched: r.offsetMatched };
+  },
+  'time-axis': ({ date, zone, mode }) => {
+    const axis = buildColumnAxis(Temporal.PlainDate.from(date), zone, { mode });
+    return { length: axis.length, bands: axis.bands.map((b) => [b.kind, b.from, b.to]) };
+  },
+  segment: ({ event, zone, firstDate, days, cutAtRepeat }) => {
+    const r = normalizeEvent({ id: 'e', ...event }, { displayZone: zone, newId: createIdGenerator('k') });
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    const segs = segmentTimed({ key: 'e', event: r.value.event, origin: 'single' }, dayInfos(Temporal.PlainDate.from(firstDate), days, zone), { cutAtRepeat });
+    return segs.map((s) => [s.dayIndex, s.part, str(s.from), str(s.to)]);
+  },
+  'layout-column': ({ items, minVisual }) =>
+    layoutColumn(items, { minVisual }).map((p) => [p.key, p.lane, p.lanes, p.left, p.width]),
+  navigation: ({ anchor, view, firstDay, dir, today, overrides }) => {
+    const spec = { ...BUILTIN_VIEWS[view]!, ...(overrides ?? {}) };
+    const ctx = { firstDay, today: Temporal.PlainDate.from(today ?? '2026-01-01') };
+    const to = typeof dir === 'object' ? { to: Temporal.PlainDate.from(dir.to) } : dir;
+    const next = navigate(Temporal.PlainDate.from(anchor), spec, to, ctx);
+    const range = computeViewRange(next, spec, ctx);
+    return { anchor: str(next), start: str(range.start), end: str(range.end), dates: range.dates.length };
   },
   normalize: ({ event, context }) => {
     const r = normalizeEvent(event as EventInput, { ...context, newId: createIdGenerator('k') });

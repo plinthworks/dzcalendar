@@ -29,5 +29,9 @@ One case per file, `cases/<suite>/<id>.json`, validated by `schema/case.schema.j
 | `zone-dayinfo` | `{date, zone}` | `{start, end, lengthMinutes, kind, transitions[]}` |
 | `zone-resolve` | `{date, time, zone, policy}` | `{instant, other, exists, ambiguous, offsetMatched}` |
 | `normalize` | `{event, context}` | `{ok, allDay, start, end, zoneGuessed?, warnings[]}` or `{ok: false, errors[]}` |
+| `time-axis` | `{date, zone, mode}` | `{length, bands: [kind, from, to][]}` |
+| `segment` | `{event, zone, firstDate, days, cutAtRepeat}` | `[dayIndex, part, from, to][]` |
+| `layout-column` | `{items, minVisual}` | `[key, lane, lanes, left, width][]` |
+| `navigation` | `{anchor, view, firstDay, dir, today?, overrides?}` | `{anchor, start, end, dates}` |
 
-Later phases add `segment`, `layout-column`, `rrule-expand`, `series-edit`, …
+Later phases add `rrule-expand`, `series-edit`, `layout-rows`, `slots`, …

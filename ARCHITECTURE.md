@@ -42,6 +42,17 @@ Ils priment sur les sections citées.
 - **B.14** — `createHistory(store, ctx, opts)` avec `run` et `destroy`. `event.update` n'est pas un move : un nouveau `start` (ou `duration`) sans `end` garde la durée de l'événement (temps écoulé, ou jours) ; une heure sans zone est lue dans la zone de l'événement. La clé `mergeKey` doit identifier le geste ; une entrée fusionnée est compactée (un `before`, un `after` par id). L'historique écoute le store : un changement d'autrui purge aussitôt les entrées concernées et appelle `onDropped`.
 - **G.2/G.3** — le bench minifié (`npm run bench`) remplace `test:perf`/`test:memory`. Lignes ajoutées : `replaceSourceChunk 10k`, `refetch 10k identical`. Restent à ajouter : requête W (10 000 dans une semaine) avant la Phase 4, garde « jour DST ≤ 3× un jour ordinaire », fuite sur 5 000 requêtes.
 
+### Ajustements après la Phase 2 (revue d'architecte, détail dans ROADMAP.md)
+
+- **B.11 / C.3** — `ColumnAxis` expose `start`/`end` (le temps couvert) et `toEndPosition` : une fin posée sur l'instant d'un retour d'heure se place à 03:00 de la première passe, pas à 02:00 de la seconde ; une fin à minuit à 24:00. `fromPosition` dans un trou suit `compatible` (02:30 → 03:30) ; un *drop* dans un trou se calera sur `band.to` (03:00) — couche d'interaction, Phase 7. **`slotMax` ≤ 24 h** : au-delà, refusé (RangeError) tant que la segmentation coupe au minuit réel. Pas de cache LRU : le modèle réutilisera les colonnes inchangées (Phase 3). Ticks `elapsed` en minutes écoulées depuis l'origine (Lord Howe : graduations à :30) — à revoir avec le DOM.
+- **B.10** — `Segment` gagne `dayCount` et `part`, perd `resourceId` (porté par l'instance) ; un segment hors de `[axis.start, axis.end)` n'est pas dessiné, un segment tronqué par l'axe perd son arrondi de ce côté. `multiDayTimed` reporté (Phase 4).
+- **B.12** — `overflow` vit dans `rows.ts`, `PrefixSums` dans `virtual.ts`. `computeOverflow` exige `maxLanes` entier ≥ 1 (1 : un jour débordant ne montre que « +N »).
+- **B.16** — `NavContext` = `{firstDay, today}` ; une vue d'un jour saute les jours masqués dans le sens du déplacement. `validRange` et `showNonCurrentDates` : Phase 4. `duration` n'est lu qu'hors alignement `month`.
+- **B.17** — `formatRangeTitle` **utilise** `Intl.DateTimeFormat#formatRange` avec des millisecondes (pas de `Date`) ; titres seulement — Intl n'écrit qu'un offset pour la plage. `monthNames` sans `calendar` (le calendrier passe par la locale `-u-ca-`). `weekRulesFor` : `minimalDays` par table CLDR quand le moteur l'omet (V8).
+- **B.18 / J Phase 3** — **un kernel minimal entre en Phase 3** : état (date, vue, zone, règles de semaine), `navigate`, `setView`, `setTimeZone`, `viewModel()`, `title()`, `subscribe`, `now()` injectable, et `store` injectable (quatre kernels sur un même store pour `dst.html`). Pas de commandes, historique ni sources avant leur phase.
+- **Phase 3, modèle** — clé de segment par date ISO (`id|YYYY-MM-DD|part`), `TimeGridColumn.key`, colonnes inchangées réutilisées par identité, `updateTimeGridModel(prev, snap, change)` guidé par `dirtySpans`, lectures d'offset (`first`/`second` passe) et durée réelle sur `PlacedTimed` les jours de transition, gouttière de graduations, `locateNow(model, now)`.
+- **Processus** — fiches `docs/behaviors/*.md` (« +N », `dayCount`, `fixedWeekCount`, hauteur minimale, numéros de semaine) à écrire avant la Phase 4.
+
 ---
 
 ## 0. Ce que tzslot fait déjà, et que DzCalendar reprend à l'identique
