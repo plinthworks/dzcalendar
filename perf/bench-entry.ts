@@ -11,6 +11,7 @@ import {
   buildTimeGridModel,
   computeViewRange,
   createEventStore,
+  createHistory,
   createIdGenerator,
   dayInfos,
   layoutColumn,
@@ -115,6 +116,28 @@ const stores = Array.from({ length: 10 }, () => {
 });
 let si = 0;
 results['week of 200 series'] = time(10, () => stores[si++ % stores.length]!.snapshot.queryInstances(seriesWeek));
+
+// Phase 6: editing a series. A daily series with 100 renamed occurrences.
+{
+  const editCtx = { normalize: { displayZone: 'Europe/Paris', newId: createIdGenerator('x') } };
+  const setup = () => {
+    const st = createEventStore();
+    const h = createHistory(st, editCtx);
+    h.run({ type: 'event.create', event: { id: 'd', start: '2026-01-01T09:00[Europe/Paris]', duration: { minutes: 30 }, rrule: 'FREQ=DAILY' } });
+    let day = Temporal.PlainDate.from('2026-01-01');
+    for (let i = 0; i < 100; i++, day = day.add({ days: 3 })) {
+      const key = day.toZonedDateTime({ timeZone: 'Europe/Paris', plainTime: '09:00' }).toString();
+      h.run({ type: 'event.update', id: 'd', key, scope: 'this', patch: { title: `o${i}` } });
+    }
+    return { st, h };
+  };
+  const pool = Array.from({ length: 12 }, setup);
+  let pi = 0;
+  results['series edit this'] = time(10, () => pool[pi++ % pool.length]!.h.run({ type: 'event.update', id: 'd', key: '2026-06-02T09:00:00+02:00[Europe/Paris]', scope: 'this', patch: { title: `t${pi}` } }));
+  const pool2 = Array.from({ length: 12 }, setup);
+  let pj = 0;
+  results['series edit following (100 overrides)'] = time(10, () => pool2[pj++ % pool2.length]!.h.run({ type: 'event.move', id: 'd', key: '2026-04-01T09:00:00+02:00[Europe/Paris]', scope: 'following', start: '2026-04-01T10:00' }));
+}
 
 let k = 0;
 results['apply one update'] = time(50, () => {

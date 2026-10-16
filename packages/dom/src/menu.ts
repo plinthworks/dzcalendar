@@ -66,7 +66,10 @@ export interface MenuHost {
 /**
  * The menu itself: a native popover inside the calendar (so it carries the
  * theme, `color-scheme` and `dir`), `role="menu"` with arrow keys, Home/End,
- * type-ahead, Escape giving focus back. Disabled entries stay, with their reason.
+ * type-ahead, Escape giving focus back. Disabled entries stay, with their
+ * reason. An entry with `children` opens a sub-menu (the recurrence scope:
+ * this one / this and following / all): the arrow towards it opens it, the
+ * arrow back or Escape closes it and returns to its entry.
  */
 export function createMenu(doc: Document, container: HTMLElement): MenuHost {
   const menu = h(doc, 'div', 'dz-menu');
@@ -78,11 +81,22 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
   let typed = '';
   let typedAt = 0;
 
-  const items = () => [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')];
-  const focusAt = (i: number) => {
-    const all = items();
+  const rtl = () => container.closest('[dir]')?.getAttribute('dir') === 'rtl';
+  /** The entries of one level only: a sub-menu's are not its parent's. */
+  const itemsOf = (level: Element) => [...level.querySelectorAll<HTMLElement>(':scope > [role="menuitem"]')];
+  const levelOf = (el: Element | null): HTMLElement => (el?.closest('[role="menu"]') as HTMLElement | null) ?? menu;
+  const focusAt = (level: Element, i: number) => {
+    const all = itemsOf(level);
     if (all.length === 0) return;
     all[(i + all.length) % all.length]!.focus();
+  };
+
+  const closeSubs = (level: Element) => {
+    for (const sub of level.querySelectorAll<HTMLElement>(':scope > .dz-menu__sub')) {
+      closeSubs(sub);
+      sub.hidden = true;
+    }
+    for (const b of itemsOf(level)) if (b.hasAttribute('aria-haspopup')) b.setAttribute('aria-expanded', 'false');
   };
 
   const close = (focusBack = true) => {
@@ -93,6 +107,7 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
     } catch {
       /* not shown as a popover */
     }
+    closeSubs(menu);
     menu.hidden = true;
     doc.removeEventListener('pointerdown', outside, true);
     doc.defaultView?.removeEventListener('scroll', onScroll, true);
@@ -109,23 +124,93 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
     if (!(e.target instanceof Node) || !menu.contains(e.target)) close();
   };
 
+  /** Opens the sub-menu of `entry` (built on demand), its first entry focused when asked. */
+  function openSub(entry: HTMLElement, children: readonly ActionItem[], label: string, focus: boolean) {
+    const level = levelOf(entry);
+    closeSubs(level);
+    let sub = entry.nextElementSibling as HTMLElement | null;
+    if (!sub || !sub.classList.contains('dz-menu__sub')) {
+      sub = h(doc, 'div', 'dz-menu dz-menu__sub');
+      sub.setAttribute('role', 'menu');
+      sub.setAttribute('aria-label', label);
+      entry.after(sub);
+    }
+    build(sub, children);
+    sub.hidden = false;
+    entry.setAttribute('aria-expanded', 'true');
+    // Beside its entry, inside the menu's box: positioned against the level.
+    sub.style.top = `${entry.offsetTop}px`;
+    if (focus) focusAt(sub, 0);
+  }
+
+  function build(level: HTMLElement, entries: readonly ActionItem[]) {
+    level.replaceChildren(
+      ...entries.map((item) => {
+        const b = h(doc, 'button', 'dz-menu__item') as HTMLButtonElement;
+        b.type = 'button';
+        b.setAttribute('role', 'menuitem');
+        b.tabIndex = -1;
+        b.dataset['action'] = item.id;
+        b.append(h(doc, 'span', 'dz-menu__label', item.label));
+        if (item.reason) b.append(h(doc, 'span', 'dz-menu__reason', item.reason));
+        if (item.shortcut) b.append(h(doc, 'kbd', 'dz-menu__shortcut', item.shortcut));
+        if (!item.enabled) b.setAttribute('aria-disabled', 'true');
+        const children = item.children && item.children.length > 0 ? item.children : null;
+        if (children) {
+          b.setAttribute('aria-haspopup', 'menu');
+          b.setAttribute('aria-expanded', 'false');
+          b.append(h(doc, 'span', 'dz-menu__chevron', rtl() ? '‹' : '›'));
+        }
+        b.addEventListener('click', () => {
+          if (!item.enabled) return;
+          if (children) {
+            openSub(b, children, item.label, true);
+            return;
+          }
+          close();
+          item.run?.();
+        });
+        return b;
+      }),
+    );
+  }
+
   menu.addEventListener('keydown', (e) => {
-    const all = items();
-    const i = all.indexOf(doc.activeElement as HTMLElement);
+    const active = doc.activeElement as HTMLElement | null;
+    const level = levelOf(active);
+    const all = itemsOf(level);
+    const i = active ? all.indexOf(active) : -1;
+    const inward = rtl() ? 'ArrowLeft' : 'ArrowRight';
+    const outward = rtl() ? 'ArrowRight' : 'ArrowLeft';
     switch (e.key) {
       case 'ArrowDown':
-        focusAt(i + 1);
+        focusAt(level, i + 1);
         break;
       case 'ArrowUp':
-        focusAt(i - 1);
+        focusAt(level, i - 1);
         break;
       case 'Home':
-        focusAt(0);
+        focusAt(level, 0);
         break;
       case 'End':
-        focusAt(-1);
+        focusAt(level, -1);
         break;
-      case 'Escape':
+      case inward:
+        if (active?.getAttribute('aria-haspopup') === 'menu' && active.getAttribute('aria-disabled') !== 'true') active.click();
+        else return;
+        break;
+      case outward:
+      case 'Escape': {
+        if (level !== menu) {
+          // Back to the entry that opened this sub-menu.
+          const entry = level.previousElementSibling as HTMLElement | null;
+          level.hidden = true;
+          entry?.setAttribute('aria-expanded', 'false');
+          entry?.focus();
+        } else if (e.key === 'Escape') close();
+        else return;
+        break;
+      }
       case 'Tab':
         close();
         break;
@@ -138,7 +223,7 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
           const query = [...typed].every((c) => c === ch) ? ch : typed;
           const order = all.map((_, k) => (i + 1 + k) % all.length);
           const hit = order.find((k) => (all[k]!.textContent ?? '').toLowerCase().startsWith(query));
-          if (hit !== undefined) focusAt(hit);
+          if (hit !== undefined) focusAt(level, hit);
           else return;
         } else {
           return;
@@ -154,25 +239,7 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
       close();
       returnTo = focusBack;
       menu.setAttribute('aria-label', label);
-      menu.replaceChildren(
-        ...entries.map((item) => {
-          const b = h(doc, 'button', 'dz-menu__item') as HTMLButtonElement;
-          b.type = 'button';
-          b.setAttribute('role', 'menuitem');
-          b.tabIndex = -1;
-          b.dataset['action'] = item.id;
-          b.append(h(doc, 'span', 'dz-menu__label', item.label));
-          if (item.reason) b.append(h(doc, 'span', 'dz-menu__reason', item.reason));
-          if (item.shortcut) b.append(h(doc, 'kbd', 'dz-menu__shortcut', item.shortcut));
-          if (!item.enabled) b.setAttribute('aria-disabled', 'true');
-          b.addEventListener('click', () => {
-            if (!item.enabled) return;
-            close();
-            item.run?.();
-          });
-          return b;
-        }),
-      );
+      build(menu, entries);
       menu.hidden = false;
       const pop = menu as HTMLElement & { showPopover?: () => void };
       try {
@@ -186,16 +253,18 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
       const vw = view?.innerWidth ?? Infinity;
       const vh = view?.innerHeight ?? Infinity;
       const box = menu.getBoundingClientRect();
-      const rtl = container.closest('[dir]')?.getAttribute('dir') === 'rtl';
+      const isRtl = rtl();
       // Under an anchor — clamped to the viewport, since a column's bottom may be far below it.
-      const x = r ? (rtl ? r.right - box.width : r.left) : (at as { x: number }).x;
+      const x = r ? (isRtl ? r.right - box.width : r.left) : (at as { x: number }).x;
       const y = r ? Math.min(r.bottom, vh) : (at as { y: number }).y;
       menu.style.left = `${Math.max(0, Math.min(x, vw - box.width))}px`;
       menu.style.top = `${Math.max(0, Math.min(y + box.height > vh ? y - box.height : y, vh - box.height))}px`;
+      // Sub-menus open towards the side with room.
+      menu.dataset['subSide'] = (isRtl ? x - box.width < 0 : x + box.width * 2 > vw) ? 'start' : 'end';
       doc.addEventListener('pointerdown', outside, true);
       doc.defaultView?.addEventListener('scroll', onScroll, true);
       doc.defaultView?.addEventListener('resize', onScroll);
-      focusAt(0);
+      focusAt(menu, 0);
     },
     close,
   };

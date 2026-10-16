@@ -35,7 +35,9 @@ One case per file, `cases/<suite>/<id>.json`, validated by `schema/case.schema.j
 | `navigation` | `{anchor, view, firstDay, dir, today?, overrides?}` | `{anchor, start, end, dates}` |
 | `rrule-expand` | `{dtstart, rrule, window?, exdates?, rdates?, limit}` | starts as UTC instants (or dates), or `{problem}` |
 
-Later phases add `series-edit`, `layout-rows`, `slots`, …
+| `series-edit` | `{zone, event, ops: Command[] \| {type: 'undo' \| 'redo'}, window}` | `{shown: "origin\|title\|start\|end"[], series: "rules\|EXDATE=…"[]}` |
+
+Later phases add `layout-rows`, `slots`, …
 
 ### Where `rrule-expand` expectations come from
 

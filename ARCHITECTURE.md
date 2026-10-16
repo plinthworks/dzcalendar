@@ -18,6 +18,7 @@ Elles priment sur le reste du document quand il dit autre chose.
 | Gratuit / Pro (K.5, K.9) | **Tout en MIT pour l'instant.** Le paquet `@dzcalendar/pro` reste une frontière de code (plugins via `registerView`), sans licence FSL ni clé tant que le modèle économique n'est pas décidé. |
 | From scratch (K.11) | **`CLEANROOM.md` adopté** : seul le comportement observable / la doc publique de FullCalendar est consulté ; chaque comportement imité est décrit dans `docs/behaviors/*.md` avec nos mots. |
 | Polyfill (K.2) | **Import statique conservé**, comme dans tzslot. |
+| Premier jour de semaine des règles (2026-10-16) | Une règle **sans `WKST`** se lit avec le lundi (RFC 5545), partout, quelle que soit la locale : la même règle donne les mêmes dates que Google, Outlook ou le serveur. Une série **créée dans DzCalendar** (commandes, interface) reçoit `WKST` = premier jour de la locale, **écrit explicitement** dans la règle. L'affichage (grilles, numéros de semaine) suit la locale. |
 | Menu contextuel (2026-10-16) | **Toutes les actions accessibles par un menu contextuel** sur la cellule et sur l'événement (clic droit, appui long tactile, touche Menu / Maj+F10). Voir D.3 bis et `docs/behaviors/context-menu.md`. |
 
 Restent ouvertes : K.3, K.4, K.6–K.8, K.10, K.12–K.16.
@@ -66,6 +67,16 @@ Ils priment sur les sections citées.
 - **C.3** — lectures d'offset portées par l'événement (pas le morceau) ; une fin n'est « seconde passe » que *dans* la seconde passe ; graduations alignées sur l'horloge murale (gouttière et mode `elapsed`). Graduations propres à la colonne de transition en mode `elapsed` : à faire.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
+
+### Ajustements après la Phase 6 (détail dans ROADMAP.md)
+
+- **B.8** — `Series` garde `base` (CalEvent de la première occurrence) au lieu de `template`/`dtstart`/`duration` ; `splitFrom` ajouté. Édition : `editOccurrence(snap, ref, patch, scope, ctx, path, problems, opts)` (problèmes en sortie, pas de `Result`). « all » et « following » éditent l'occurrence telle que la série la produit (pas son override). Les clés (overrides, EXDATE, UNTIL) suivent la **position** de l'occurrence dans la série (la 4ᵉ reste la 4ᵉ) ; la règle est recalée depuis l'occurrence éditée après avoir rendu explicite ce qu'elle tirait de DTSTART ; une coupe « following » qui casserait la phase d'un INTERVAL est refusée (`invalid-edit`). Les règles (`validateProposal`) ne s'appliquent qu'aux gestes : `kernel.run(cmd, { validate: true })`. Passage journée entière ↔ horaire d'une série entière : `invalid-edit`.
+- **B.8** — une source qui redonne une série supprime les overrides et les parties scindées localement (la source fait autorité, comme pour les événements).
+- **B.6** — `StoreChange.seriesChanged` (toute série modifiée) et `seriesTouched` (seulement celles qui imposent de tout reconstruire) ; un changement d'overrides ou d'EXDATE ne marque que la plage de l'occurrence.
+- **B.13** — `validateProposal(snap, proposal, rules)` ; `ConstraintSpec` = `'businessHours' | {groupId} | {spans}` ; `RulesContext { displayZone, businessHours?, constraint?, overlap?, allow?, validRange? }` ; `Violation.code` sans `resource-locked` (Phase 10).
+- **B.14** — `Reach { scope?, key? }` sur update/move/resize/delete ; `id` peut être l'id de série, une clé d'instance d'occurrence ou l'id d'un override ; `series.delete` en plus de B.14 ; `resource.set` : Phase 10. `CommandResult` en échec porte `violations`. `CommandContext { normalize, weekStart?, rules? }`. `createHistory` accepte un contexte en fonction (relu à chaque commande).
+- **B.18** — `kernel.run(cmd)`, `kernel.history`, `KernelOptions.rules` et `historyLimit`.
+- **D.3 bis / D.7** — sous-menus rendus (clavier, ARIA) ; `settings.ts` pour les options vivantes ; `editable`, `onCommandRefused`, `run/undo/redo` sur l'instance DOM.
 
 ### Ajustements après la Phase 5 (détail dans ROADMAP.md)
 
@@ -1094,11 +1105,11 @@ Pas de `ApplicationRef.tick()` global. Compatible zoneless : la détection est e
 
 | Paquet | Budget | Remarque |
 |---|---|---|
-| `@dzcalendar/core` | ≤ 24 ko | `@tzslot/core` (≈ 20 ko, dont le polyfill statique ≈ 19,7 ko) s'ajoute |
+| `@dzcalendar/core` | ≤ 28 ko (24 avant la Phase 6) | `@tzslot/core` (≈ 20 ko, dont le polyfill statique ≈ 19,7 ko) s'ajoute. Rééquilibré avec dom le 2026-10-16 (décision du propriétaire) : l'édition de séries et la validation sont dans le core ; la somme des budgets ne change pas. |
 | `@dzcalendar/rrule` | ≤ 7 ko | |
 | `@dzcalendar/ical` | ≤ 6 ko | |
 | `@dzcalendar/slots` | ≤ 5 ko | |
-| `@dzcalendar/dom` (dayGrid + timeGrid + list + multiMonth + interactions + a11y) | ≤ 30 ko | |
+| `@dzcalendar/dom` (dayGrid + timeGrid + list + multiMonth + interactions + a11y) | ≤ 26 ko (30 avant la Phase 6) | |
 | `@dzcalendar/angular` | ≤ 6 ko | hors Angular |
 | `@dzcalendar/theme` (CSS) | ≤ 8 ko | |
 | `@dzcalendar/pro` (timeline + ressources) | ≤ 16 ko | export/éditeur/impression en sous-entrées chargées à la demande |

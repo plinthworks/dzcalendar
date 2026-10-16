@@ -2,97 +2,34 @@ import { normalizeEvent } from '../event/normalize.js';
 import { problem } from '../event/problems.js';
 import type { Problem } from '../event/problems.js';
 import type { CalEvent, EventInput } from '../event/types.js';
-import { eventEquals } from '../store/diff.js';
-import { parseInstanceKey } from '../recurrence/series.js';
-import { Temporal } from '../temporal.js';
-import type { Duration } from '../temporal.js';
+import { deleteOccurrence, deleteSeries, editOccurrence, editedOccurrence, firstKey, startOfKey } from '../recurrence/edit.js';
+import type { EditScope, OccurrenceRef } from '../recurrence/edit.js';
+import { materialize, parseInstanceKey } from '../recurrence/series.js';
+import { validateProposal } from '../rules/validate.js';
+import type { Violation } from '../rules/validate.js';
 import type { Mutation } from '../store/changes.js';
 import type { StoreSnapshot } from '../store/store.js';
-import type { Command, CommandContext, CommandResult, EventPatch } from './types.js';
+import type { Command, CommandContext, CommandResult, EventPatch, Reach } from './types.js';
+import { patchEvent } from './patch.js';
 
-/** How long an event lasts: real elapsed time if timed, calendar days if all-day. */
-function lengthOf(e: CalEvent): Duration {
-  return e.allDay
-    ? Temporal.Duration.from({ days: e.start.until(e.end, { largestUnit: 'days' }).days })
-    : Temporal.Duration.from({ milliseconds: e.end.epochMilliseconds - e.start.epochMilliseconds });
-}
+const WKST = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
 
-/** A stored event written back as input, so a patch can be laid over it and normalized again. */
-function toInput(e: CalEvent): EventInput {
-  // Every field of CalEvent that an input can express; diff.test.ts checks
-  // that a full round trip through here changes nothing.
-  return {
-    id: e.id,
-    ...(e.groupId !== undefined && { groupId: e.groupId }),
-    title: e.title,
-    start: e.start,
-    end: e.end,
-    allDay: e.allDay,
-    resourceIds: e.resourceIds,
-    display: e.display,
-    status: e.status,
-    busy: e.busy,
-    startEditable: e.perms.start,
-    durationEditable: e.perms.duration,
-    resourceEditable: e.perms.resource,
-    classNames: e.classNames,
-    ...(e.tone !== undefined && { tone: e.tone }),
-    ...(e.url !== undefined && { url: e.url }),
-    extendedProps: e.props,
+/** A rule created here without WKST gets the locale's first day, written out (owner's decision). */
+function withWeekStart(input: EventInput, ctx: CommandContext): EventInput {
+  if (ctx.weekStart === undefined || input.rrule === undefined) return input;
+  const add = (t: unknown) => {
+    if (typeof t !== 'string') return t;
+    // The rule's own parts, as the parser reads them: an optional RRULE: prefix, spaces, a trailing ';'.
+    const body = t.trim().replace(/^RRULE:/i, '').replace(/;\s*$/, '').trim();
+    if (body.split(';').some((part) => /^\s*WKST\s*=/i.test(part))) return t;
+    return `${body};WKST=${WKST[ctx.weekStart! - 1]}`;
   };
+  const rrule = typeof input.rrule === 'string' ? add(input.rrule) : Array.isArray(input.rrule) ? input.rrule.map(add) : input.rrule;
+  return { ...input, rrule } as EventInput;
 }
 
-/**
- * The stored event as input, made ready for `patch` to be laid over it: every
- * field the patch derives from (permissions from `editable`, `busy` from
- * `status`, the moments from `allDay` or `timeZone`) is cleared or converted,
- * so an update means what the same fields mean in a create.
- */
-function patchedBase(before: CalEvent, p: EventPatch): EventInput {
-  const base = toInput(before);
-  const has = (k: keyof EventPatch) => k in p;
-
-  if (has('editable')) {
-    delete base.startEditable;
-    delete base.durationEditable;
-    delete base.resourceEditable;
-  }
-  // `busy` follows `status` unless it was set against it on purpose.
-  if (has('status') && !has('busy') && before.busy === (before.status !== 'cancelled')) delete base.busy;
-  if (has('resourceId') || has('resourceIds')) delete base.resourceIds;
-
-  const toAllDay = p.allDay === true && !before.allDay;
-  const toTimed = p.allDay === false && before.allDay;
-  if (!before.allDay && p.allDay === true) {
-    // The days the event touches: an end at 01:00 still covers that day.
-    const startDate = before.start.toPlainDate();
-    const endWall = before.end.withTimeZone(before.start.timeZoneId);
-    let endDate = endWall.toPlainDate();
-    if (endWall.toPlainTime().toString() !== '00:00:00' || Temporal.PlainDate.compare(endDate, startDate) <= 0) endDate = endDate.add({ days: 1 });
-    base.start = startDate;
-    base.end = endDate;
-  } else if (toTimed) {
-    // Midnight of its first day, for the default timed length.
-    delete base.end;
-  } else if (has('timeZone') && !before.allDay && !has('start') && !has('end')) {
-    // Same clock times, another place.
-    base.start = before.start.toPlainDateTime();
-    base.end = before.end.withTimeZone(before.start.timeZoneId).toPlainDateTime();
-  }
-
-  // A new start (or a new duration) without a new end keeps the event's
-  // length rather than its old end — elapsed time for a timed event, whole
-  // days for an all-day one. This is not yet a "move" (Phase 6), but it never
-  // turns an edit into end-before-start.
-  if ((has('start') || has('duration')) && !has('end') && !toTimed && !toAllDay) {
-    delete base.end;
-    base.duration = p.duration ?? lengthOf(before);
-  }
-  // A wall time written without a zone is read in the event's own zone —
-  // unless that zone was itself a guess, which keeps following the calendar.
-  if (!before.allDay && !before.zoneGuessed && !has('timeZone') && !toAllDay) base.timeZone = before.start.timeZoneId;
-  return base;
-}
+/** What a command's id names: a plain event, or an occurrence of a series with how far the edit reaches. */
+type Target = { readonly kind: 'event'; readonly event: CalEvent } | { readonly kind: 'occurrence'; readonly ref: OccurrenceRef; readonly scope: EditScope };
 
 /**
  * Turns a command into the mutations that carry it out, against a snapshot.
@@ -102,13 +39,81 @@ function patchedBase(before: CalEvent, p: EventPatch): EventInput {
  */
 export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandContext): CommandResult {
   const problems: Problem[] = [];
+  const violations: Violation[] = [];
   const mutations: Mutation[] = [];
   let current = snap;
+
+  /** Resolves `id` (+ `key`, `scope`) against the current state; reports and returns null when it names nothing editable. */
+  function target(id: string, reach: Reach, path: string, deleting = false): Target | null {
+    const ev = current.getEvent(id);
+    if (ev) {
+      // An override stands for its occurrence: deleting it, or reaching past it, goes through the series.
+      if (ev.ref && (deleting || (reach.scope !== undefined && reach.scope !== 'this'))) return { kind: 'occurrence', ref: ev.ref, scope: reach.scope ?? 'this' };
+      return { kind: 'event', event: ev };
+    }
+    const sr = current.getSeries(id);
+    // No key: the series as a whole, anchored on its first start (even when DTSTART itself is excluded or off-rule).
+    if (sr) return { kind: 'occurrence', ref: { seriesId: id, key: reach.key ?? firstKey(sr) }, scope: reach.scope ?? (reach.key === undefined ? 'all' : 'this') };
+    const k = parseInstanceKey(id);
+    if ('seriesId' in k && current.getSeries(k.seriesId)) return { kind: 'occurrence', ref: { seriesId: k.seriesId, key: k.key }, scope: reach.scope ?? 'this' };
+    problems.push(problem('unknown-event', 'error', `${path}.id`, id));
+    return null;
+  }
+
+  /** The event a target shows now: for checks and for patches that need the current moments. */
+  function shown(t: Target): CalEvent | undefined {
+    if (t.kind === 'event') return t.event;
+    const sr = current.getSeries(t.ref.seriesId)!;
+    const own = sr.overrides.get(t.ref.key);
+    if (own !== undefined) return current.getEvent(own);
+    try {
+      return materialize(sr, startOfKey(sr, t.ref.key));
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Checks the edit against the calendar's rules before anything is written —
+   * on the very event the edit will write (for a series, the occurrence it
+   * produces, not its override). When the whole series moves, its other
+   * occurrences move too: they are not in the way.
+   */
+  function allowed(t: Target, patch: EventPatch, path: string): boolean {
+    if (!ctx.rules || !('start' in patch || 'end' in patch || 'duration' in patch || 'resourceIds' in patch || 'resourceId' in patch || 'allDay' in patch)) return true;
+    let pair: { before: CalEvent; after: CalEvent } | null;
+    if (t.kind === 'event') {
+      const after = patchEvent(t.event, patch, ctx.normalize, path, []);
+      pair = after ? { before: t.event, after } : null;
+    } else pair = editedOccurrence(current, t.ref, patch, t.scope, ctx.normalize);
+    if (!pair) return true; // the edit itself will report why
+    const found = validateProposal(
+      current,
+      { event: pair.before, start: pair.after.start, end: pair.after.end, resourceIds: pair.after.resourceIds },
+      ctx.rules,
+      t.kind === 'occurrence' && t.scope !== 'this' ? { movingSeries: t.ref.seriesId } : {},
+    );
+    violations.push(...found);
+    return found.length === 0;
+  }
+
+  function edit(id: string, patch: EventPatch, reach: Reach, path: string): boolean {
+    const t = target(id, reach, path);
+    if (!t) return false;
+    if (!allowed(t, patch, path)) return false;
+    if (t.kind === 'event') {
+      const next = patchEvent(t.event, patch, ctx.normalize, path, problems);
+      if (!next) return false;
+      return next === t.event || push({ kind: 'event', before: t.event, after: next });
+    }
+    const r = editOccurrence(current, t.ref, patch, t.scope, ctx.normalize, path, problems);
+    return r.ok && pushAll(r.mutations);
+  }
 
   const run = (c: Command, path: string): boolean => {
     switch (c.type) {
       case 'event.create': {
-        const r = normalizeEvent(c.event, ctx.normalize, path);
+        const r = normalizeEvent(withWeekStart(c.event, ctx), ctx.normalize, path);
         problems.push(...r.problems);
         if (!r.ok) return false;
         const item = r.value;
@@ -121,53 +126,48 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
         }
         return push(item.kind === 'event' ? { kind: 'event', after: item.event } : { kind: 'series', after: item.series });
       }
-      case 'event.update': {
-        const before = current.getEvent(c.id);
-        if (!before) return missing(c.id, path);
-        const p = c.patch;
-        const base = patchedBase(before, p);
-        const r = normalizeEvent({ ...base, ...p, id: c.id }, ctx.normalize, path);
-        problems.push(...r.problems);
-        if (!r.ok) return false;
-        if (r.value.kind !== 'event') {
-          // Turning an event into a series is a Phase 6 edit.
-          problems.push(problem('invalid-rrule', 'error', `${path}.patch`, 'an update cannot add a rule'));
-          return false;
-        }
-        let next = r.value.event;
-        // Written back as a ZonedDateTime, a guessed zone reads as a named one.
-        // Untouched moments keep the guess, so the event still follows the calendar.
-        const movesTime = 'start' in p || 'end' in p || 'timeZone' in p || 'allDay' in p;
-        if (!movesTime && !before.allDay && !next.allDay && before.zoneGuessed) next = { ...next, zoneGuessed: true };
-        if (before.sourceId !== undefined) next = { ...next, sourceId: before.sourceId };
-        if (eventEquals(before, next)) return true;
-        return push({ kind: 'event', before, after: Object.freeze(next) as CalEvent });
+      case 'event.update':
+        return edit(c.id, c.patch, c, path);
+      case 'event.move': {
+        const patch: EventPatch = { start: c.start, ...(c.end !== undefined && { end: c.end }), ...(c.resourceIds !== undefined && { resourceIds: c.resourceIds }) };
+        return edit(c.id, patch, c, path);
+      }
+      case 'event.resize': {
+        const t = target(c.id, c, path);
+        if (!t) return false;
+        const now = shown(t);
+        if (!now) return false;
+        // The other edge stays where it is.
+        const patch: EventPatch = c.edge === 'start' ? { start: c.to, end: now.end } : { end: c.to };
+        return edit(c.id, patch, c, path);
       }
       case 'event.delete': {
-        const before = current.getEvent(c.id);
-        if (!before) return missing(c.id, path);
-        return push({ kind: 'event', before });
+        const t = target(c.id, c, path, true);
+        if (!t) return false;
+        if (t.kind === 'event') return push({ kind: 'event', before: t.event });
+        const r = deleteOccurrence(current, t.ref, t.scope, path, problems);
+        return r.ok && pushAll(r.mutations);
       }
       case 'series.delete': {
-        const before = current.getSeries(c.id);
-        if (!before) {
+        const sr = current.getSeries(c.id);
+        if (!sr) {
           problems.push(problem('unknown-event', 'error', `${path}.id`, c.id));
           return false;
         }
-        return push({ kind: 'series', before });
+        return pushAll(deleteSeries(current, sr));
+      }
+      case 'series.split': {
+        if (!current.getSeries(c.id)) {
+          problems.push(problem('unknown-event', 'error', `${path}.id`, c.id));
+          return false;
+        }
+        const r = editOccurrence(current, { seriesId: c.id, key: c.at }, c.patch ?? {}, 'following', ctx.normalize, path, problems, {}, true);
+        return r.ok && pushAll(r.mutations);
       }
       case 'batch':
         return c.commands.every((sub, i) => run(sub, `${path}.commands[${i}]`));
     }
   };
-
-  /** Not an event: a series, an occurrence (edited through the series, Phase 6), or nothing. */
-  function missing(id: string, path: string): false {
-    const k = parseInstanceKey(id);
-    const code = current.getSeries(id) ? 'is-series' : 'seriesId' in k && current.getSeries(k.seriesId) ? 'is-occurrence' : 'unknown-event';
-    problems.push(problem(code, 'error', `${path}.id`, id));
-    return false;
-  }
 
   // Each step sees the state the previous ones made: create then update works.
   function push(m: Mutation): boolean {
@@ -175,6 +175,11 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
     current = current.withMutations([m]).next;
     return true;
   }
+  function pushAll(ms: readonly Mutation[]): boolean {
+    for (const m of ms) push(m);
+    return true;
+  }
 
-  return run(cmd, 'command') ? { ok: true, mutations, problems } : { ok: false, problems };
+  if (run(cmd, 'command')) return { ok: true, mutations, problems };
+  return violations.length > 0 ? { ok: false, problems, violations } : { ok: false, problems };
 }

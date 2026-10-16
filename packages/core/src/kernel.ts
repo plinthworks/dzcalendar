@@ -7,6 +7,10 @@ import { assertBusinessHours } from './rules/business-hours.js';
 import type { BusinessHoursInput } from './rules/business-hours.js';
 import { arraySource, loadStaticSource } from './source/array-source.js';
 import type { StoreChange } from './store/changes.js';
+import { createHistory } from './commands/history.js';
+import type { History } from './commands/history.js';
+import type { Command, CommandContext, CommandResult } from './commands/types.js';
+import type { RulesContext } from './rules/validate.js';
 import { createEventStore } from './store/store.js';
 import type { EventStore, StoreSnapshot } from './store/store.js';
 import { Temporal } from './temporal.js';
@@ -45,6 +49,10 @@ export interface KernelOptions extends ModelOptions {
   readonly events?: readonly EventInput[];
   /** Injectable for tests. Default: the system clock. */
   readonly now?: () => Instant;
+  /** What edits are checked against (business hours come from `businessHours`). */
+  readonly rules?: Omit<RulesContext, 'displayZone' | 'businessHours'>;
+  /** Undo entries kept. Default 200. */
+  readonly historyLimit?: number;
 }
 
 export interface KernelState {
@@ -138,6 +146,14 @@ export interface CalendarKernel {
   now(): Instant;
   /** What the last `events`/`setEvents` load reported. */
   getProblems(): NormalizationReport | null;
+  /**
+   * Runs a command through the history: undoable; series created here take
+   * the locale's first day as WKST. `validate` checks it against the rules
+   * (constraint, overlap, allow, editable) — what a person's gesture asks for;
+   * the application's own calls and server pushes are not refused by them.
+   */
+  run(cmd: Command, opts?: { readonly validate?: boolean }): CommandResult;
+  readonly history: History;
   subscribe(fn: (e: KernelEvent) => void): () => void;
   destroy(): void;
 }
@@ -181,6 +197,17 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   if (o.events) loadEvents(o.events);
 
   const nav = (): NavContext => ({ firstDay, today: todayIn(timeZone) });
+  let validating = false;
+  // Read at every command: the zone, the locale's first day and the rules may have changed since.
+  const history = createHistory(
+    store,
+    (): CommandContext => ({
+      normalize: { displayZone: timeZone, newId: idGen },
+      weekStart: firstDay,
+      ...(validating && { rules: { displayZone: timeZone, ...(options.businessHours !== undefined && { businessHours: options.businessHours }), ...o.rules } }),
+    }),
+    { limit: o.historyLimit ?? 200 },
+  );
   let state = computeState();
   let model: ViewModel | null = null;
   let held = 0;
@@ -324,8 +351,18 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       listeners.add(fn);
       return () => listeners.delete(fn);
     },
+    run(cmd, opts = {}) {
+      validating = opts.validate === true;
+      try {
+        return history.run(cmd);
+      } finally {
+        validating = false;
+      }
+    },
+    history,
     destroy() {
       unsubscribe();
+      history.destroy();
       listeners.clear();
     },
   };

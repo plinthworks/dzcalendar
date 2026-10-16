@@ -8,6 +8,10 @@ const labels = {
   goToDay: 'Go',
   openEvent: 'Open',
   skippedHour: 'skipped',
+  deleteEvent: 'Delete',
+  scopeThis: 'This',
+  scopeFollowing: 'Following',
+  scopeAll: 'All',
 };
 const ctx = (over: Partial<ActionContext> = {}): ActionContext => ({
   displayZone: 'Europe/Paris',
@@ -109,5 +113,33 @@ describe('kernel options, events, batches', () => {
     k.setEvents([{ id: 'a', start: '2026-10-21' }]);
     expect(changes).toBe(1);
     expect(k.store.snapshot.getEvent('b')).toBeUndefined();
+  });
+});
+
+describe('editing entries (Phase 6)', () => {
+  it('delete: at once for an event, a this/following/all sub-menu for an occurrence, each carrying its command', () => {
+    const ran: unknown[] = [];
+    const onCommand = (c: unknown) => ran.push(c);
+    const single = normalizeEvent({ id: 'a', start: '2026-10-21T09:00[Europe/Paris]' }, { displayZone: 'Europe/Paris', newId: createIdGenerator('t') });
+    if (!single.ok) throw new Error();
+    const del = (xs: ReturnType<typeof actionsFor>) => xs.filter((x) => x.id.startsWith('event.delete'));
+    const a = del(actionsFor({ kind: 'event', instance: { key: 'a', event: itemEvent(single.value), origin: 'single' } }, ctx({ onCommand })));
+    expect(a.map((x) => [x.id, x.children?.length ?? 0])).toEqual([['event.delete', 0]]);
+    a[0]!.run!();
+    const key = '2026-10-21T09:00:00+02:00[Europe/Paris]';
+    const occ = { ...itemEvent(single.value), id: `s@${key}`, ref: { seriesId: 's', key } };
+    const b = del(actionsFor({ kind: 'event', instance: { key: `s@${key}`, event: occ, origin: 'occurrence' } }, ctx({ onCommand })));
+    expect(b[0]!.children!.map((x) => x.id)).toEqual(['event.delete.this', 'event.delete.following', 'event.delete.all']);
+    b[0]!.children![1]!.run!();
+    expect(ran).toEqual([{ type: 'event.delete', id: 'a' }, { type: 'event.delete', id: 's', key, scope: 'following' }]);
+    expect(del(actionsFor({ kind: 'event', instance: { key: 'a', event: itemEvent(single.value), origin: 'single' } }, ctx()))).toEqual([]);
+  });
+
+  it('the kernel runs commands through its history; a series created there takes the locale’s first day', () => {
+    const k = createKernel({ timeZone: 'America/New_York', locale: 'en-US', initialDate: Temporal.PlainDate.from('2026-10-21') });
+    expect(k.run({ type: 'event.create', event: { id: 's', start: '2026-10-21T09:00', rrule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,SU' } }).ok).toBe(true);
+    expect(k.store.snapshot.getSeries('s')!.set.rules[0]!.wkst).toBe(7);
+    expect([k.history.canUndo, k.history.undo(), k.store.snapshot.counts.series]).toEqual([true, true, 0]);
+    k.destroy();
   });
 });

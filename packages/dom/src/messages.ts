@@ -41,6 +41,10 @@ export interface DzMessages {
   readonly viewSwitcher: string;
   readonly goToDay: string;
   readonly openEvent: string;
+  readonly deleteEvent: string;
+  readonly scopeThis: string;
+  readonly scopeFollowing: string;
+  readonly scopeAll: string;
   /** Under "New event at 03:00" when the click was in an hour that does not exist. */
   readonly skippedHour: string;
   /** The context menu's accessible name. */
@@ -70,6 +74,10 @@ export const EN: DzMessages = {
   viewSwitcher: 'View',
   goToDay: 'Go to this day',
   openEvent: 'Open',
+  deleteEvent: 'Delete',
+  scopeThis: 'This event',
+  scopeFollowing: 'This and following events',
+  scopeAll: 'All events',
   skippedHour: 'This hour does not exist today; the event starts when it ends',
   actions: 'Actions',
 };
@@ -97,6 +105,10 @@ export const FR: DzMessages = {
   viewSwitcher: 'Vue',
   goToDay: 'Aller à ce jour',
   openEvent: 'Ouvrir',
+  deleteEvent: 'Supprimer',
+  scopeThis: 'Cet événement',
+  scopeFollowing: 'Cet événement et les suivants',
+  scopeAll: 'Tous les événements',
   skippedHour: "Cette heure n'existe pas aujourd'hui ; l'événement commence à sa fin",
   actions: 'Actions',
 };

@@ -48,7 +48,7 @@ export interface ViewCtx {
   hooks: CalendarHooks;
   epoch: number;
   /** Minutes a context-menu moment snaps to in a time grid. */
-  readonly snapMinutes: number;
+  snapMinutes: number;
   /** The "+N" panel: views attach their menu triggers to it too. */
   readonly popoverElement: HTMLElement;
   /**

@@ -474,7 +474,7 @@ Found on the way:
 - Month ARIA structure (bars inside cells) and roving focus — Phase 8.
 - Per-instance registries alongside the global ones; extensible `ModelOptions`.
 
-## Phase 5 — recurrence ✅ (2026-10-16, before reviews)
+## Phase 5 — recurrence ✅ (2026-10-16)
 
 - `@dzcalendar/rrule` (4.4 kB gz, budget 7): `parseRRule` (never throws;
   UNTIL as a date or a UTC date-time; extensions such as RSCALE refused),
@@ -563,7 +563,95 @@ Found on the way:
   line has sat on its budget since Phase 4. To decide: optimize
   normalization or revise the budget.
 
-## Next — Phase 6: editing series and validation
+## Phase 6 — commands, undo/redo, editing series ✅ (2026-10-16)
+
+- `recurrence/edit.ts`: `editOccurrence` / `deleteOccurrence` / `deleteSeries`
+  with `this` / `following` / `all`. *This* = an override event (`ref`) in the
+  ordinary index, the series skips its key; delete *this* = EXDATE. *All* =
+  the base rebuilt from the edited occurrence (as the series produces it, not
+  its override), every start shifted by the same wall-clock difference;
+  rules rebased (`rebaseRule`: weekly days shift, monthly day / n-th weekday
+  / last day recounted, a single BYHOUR/BYMINUTE follows); overrides keys,
+  EXDATEs and RDATEs shifted with it. *Following* = `splitRule` (COUNT
+  shared, or UNTIL = last start before the cut), EXDATEs/RDATEs/overrides
+  after the cut migrate (keys remapped), `splitFrom`; on the first
+  occurrence it is *all*. Switching a whole series between all-day and
+  timed: `invalid-edit`.
+- rrule: `rebaseRule`, `splitRule`, `countBefore`.
+- Commands: `event.update` / `event.move` / `event.resize` / `event.delete`
+  take `scope` and `key` (or an occurrence instance key as `id`, or an
+  override's id); `series.delete` cascades to overrides; `series.split`.
+  `CommandContext.weekStart` (WKST written into rules created here — owner's
+  decision 2026-10-16) and `rules`.
+- `rules/validate.ts`: `validateProposal` — not-editable, valid range,
+  constraint (business hours, group, spans), overlap (one indexed query),
+  `allow`. Commands return `violations`.
+- Store: occurrence cache keyed by `series.base`, occurrences stamped with
+  `base.revision`, `base`/`set` keep their objects when unchanged; an
+  overrides/EXDATE-only change dirties that occurrence's span
+  (`StoreChange.seriesChanged`, not `seriesTouched`): one override redraws
+  one place. A source re-delivering a series drops local overrides and split
+  parts (the source is the authority, as for events). `ref` survives
+  `event.update` (`commands/patch.ts`).
+- Kernel: `run(cmd)` and `history` (context read at each command: zone,
+  first day, rules). DOM: `editable`, `onCommandRefused`, `run/undo/redo`;
+  "Delete" with a keyboard-accessible sub-menu (ArrowRight opens, ArrowLeft
+  / Escape returns; `aria-haspopup`/`aria-expanded`; the UA's
+  `overflow:auto` on `[popover]` made it scroll under itself — fixed);
+  `settings.ts`: live options (callbacks, `editable`, `contextMenu`,
+  `snapMinutes`) changed by `update()`, checked before anything applies.
+- Conformance: `series-edit`, 42 cases written by hand (a deliberately wrong
+  expectation fails). `docs/behaviors/recurrence-editing.md`.
+- Measured: 585 tests (`test:ci`); browser 21/21 (sub-menu beside the menu,
+  on screen, focus and undo checked in Chrome); bench: an override 0.09 ms,
+  "following" on a series with 100 overrides 1.4 ms; `normalize+index 10k`
+  65 ms on a quiet machine.
+
+### Reviews (architect; code review with 9 reproduced bugs), fixed
+- **Occurrences are identified by position.** "All" recounts the rules from
+  the edited occurrence (not the base), makes what a rule took from DTSTART
+  explicit first (`explicitRule` / `implicitRule`), finds the new first start
+  as the one that keeps the edited occurrence at its position, and carries
+  overrides, EXDATEs and UNTIL by position (`iterateUnion`, one walk each
+  way: "following" with 100 overrides 4.2 ms). Fixes: monthly/yearly/ordinal
+  rules recounted wrongly, UNTIL dropping the last occurrence, overrides
+  orphaned (a duplicate in the month), invalid BYMONTHDAY/BYYEARDAY values
+  (now kept in range, sign kept; last day + 1 = the 1st), several ordinals
+  merged, yearly ordinals counted in the month.
+- **"Following"** cuts into a tail with explicit rules, checked to repeat
+  the old tail exactly (64 starts); a cut that would break an INTERVAL
+  rule's phase is refused (`invalid-edit`) instead of moving its dates; a
+  cut on an RDATE keeps the rule on its own weekday.
+- A series id without `key` anchors on its first start (an excluded or
+  off-rule DTSTART no longer blocks editing or deleting it).
+- WKST is added after reading the rule (`RRULE:` prefix, spaces).
+- `validateProposal`: all-day lengths in days (the 25-hour day is one day);
+  a series moving as a whole does not collide with itself; validates the
+  event the edit will write; `businessHours` constraint without hours
+  constrains nothing. **Rules apply to gestures only**:
+  `kernel.run(cmd, { validate: true })` (the DOM menu); the application's
+  own calls are not refused.
+- Source cascade is transitive (a chain of splits goes with its source).
+- Size: owner's decision — core 28 kB / dom 26 kB (sum unchanged), and a
+  budget is a guide: `npm run size` warns over it, fails only beyond +5 %.
+  Measured: core 27.0, rrule 6.9, dom 15.8 kB gz.
+- Conformance `series-edit`: 47 cases by hand (non-first occurrences of
+  monthly / yearly series, a cut on an RDATE, a refused phase break).
+  605 tests, browser 21/21.
+
+### Not done in Phase 6, on purpose
+- Finding a cut walks from DTSTART: sub-daily series over years cost
+  millions of steps (bounded); arithmetic jump to the cut later.
+- Source re-delivery wipes local edits of its series (authority): write-back
+  (`revert()`, optimistic commit) is Phase 9, before this is user-facing.
+- Rename the validator's `Proposal` (B.13) when B.15's `Proposal` arrives
+  (Phase 7).
+- `chooseScope` on drop and keyboard moves — Phase 7/8 (the commands take
+  the scope already).
+- `overrides: 'drop'` for "all" is in `editOccurrence` but not in commands.
+- Turning an event into a series (or back) by an update.
+
+### Carried into Phase 6 from the Phase 5 review (done above unless noted)
 
 From the Phase 5 architect review, to do with the editing:
 - Granularity: keep `base`/`set` identity when equal, key the occurrence
@@ -584,4 +672,8 @@ From the Phase 5 architect review, to do with the editing:
   default `this`).
 - Memoize `seriesSpan` per series; a "leak over 5 000 queries" bench line.
 
-See `ARCHITECTURE.md` J. Phase 6.
+- Not done: memoizing `seriesSpan`, a "leak over 5 000 queries" bench line.
+
+## Next — Phase 7: mouse, touch, pen
+
+See `ARCHITECTURE.md` J. Phase 7.

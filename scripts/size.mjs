@@ -32,11 +32,15 @@ const results = {
   'temporal polyfill': (await bundle(src('core'), ['@dzcalendar/rrule'])) - (await bundle(src('core'), ['@dzcalendar/rrule', ...poly])),
 };
 const budgets = JSON.parse(readFileSync(join(root, 'size-budget.json'), 'utf8'));
+// A budget is a guide (owner, 2026-10-16: "a little over is fine"): over it
+// warns, only more than 5 % over fails — as ARCHITECTURE G.1 says.
 let over = 0;
 for (const [name, bytes] of Object.entries(results)) {
   const budget = budgets[name];
-  const ok = budget === undefined || bytes <= budget;
-  if (!ok) over++;
-  console.log(`${ok ? '✓' : '✗'} ${name.padEnd(28)} ${(bytes / 1000).toFixed(1).padStart(6)} kB   budget ${(budget / 1000).toFixed(1)} kB`);
+  const within = budget === undefined || bytes <= budget;
+  const tolerated = !within && bytes <= budget * 1.05;
+  if (!within && !tolerated) over++;
+  const mark = within ? '✓' : tolerated ? '!' : '✗';
+  console.log(`${mark} ${name.padEnd(28)} ${(bytes / 1000).toFixed(1).padStart(6)} kB   budget ${(budget / 1000).toFixed(1)} kB${tolerated ? '   (over, within 5 %)' : ''}`);
 }
 process.exit(over ? 1 : 0);

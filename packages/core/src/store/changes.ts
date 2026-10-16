@@ -47,6 +47,12 @@ export interface StoreChange {
    * reading spans.
    */
   readonly seriesTouched: readonly SeriesId[];
+  /**
+   * Every series whose object changed — those in `seriesTouched`, and those
+   * where only overrides or EXDATEs changed (their places are in the dirty
+   * spans). What history and other writers watch.
+   */
+  readonly seriesChanged: readonly SeriesId[];
   /** Items a source handed in but the store refused (an id already owned elsewhere). */
   readonly problems: readonly Problem[];
   /**
@@ -58,4 +64,4 @@ export interface StoreChange {
 }
 
 export const isEmptyChange = (c: StoreChange): boolean =>
-  c.added.length === 0 && c.updated.length === 0 && c.removed.length === 0 && c.seriesTouched.length === 0;
+  c.added.length === 0 && c.updated.length === 0 && c.removed.length === 0 && c.seriesChanged.length === 0;

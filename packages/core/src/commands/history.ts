@@ -106,7 +106,12 @@ function compact(mutations: readonly Mutation[]): Mutation[] {
 
 const touches = (e: Entry, keys: ReadonlySet<string>) => e.mutations.some((m) => keys.has(mutationKey(m)));
 
-export function createHistory(store: EventStore, ctx: CommandContext, options: HistoryOptions = {}): History {
+/**
+ * `ctx` may be a function: read at each command, so a calendar whose zone,
+ * locale or rules change keeps one history.
+ */
+export function createHistory(store: EventStore, ctx: CommandContext | (() => CommandContext), options: HistoryOptions = {}): History {
+  const context = typeof ctx === 'function' ? ctx : () => ctx;
   const limit = options.limit ?? 200;
   let done: Entry[] = [];
   let undone: Entry[] = [];
@@ -131,7 +136,7 @@ export function createHistory(store: EventStore, ctx: CommandContext, options: H
   // Anyone else's change to an event or a series invalidates every entry that touches it.
   const unsubscribe = store.subscribe((change) => {
     if (writing) return;
-    const ids = new Set([...[...change.added, ...change.updated, ...change.removed].map((id) => `event:${id}`), ...change.seriesTouched.map((id) => `series:${id}`)]);
+    const ids = new Set([...[...change.added, ...change.updated, ...change.removed].map((id) => `event:${id}`), ...change.seriesChanged.map((id) => `series:${id}`)]);
     const dropped = [...done, ...undone].filter((e) => touches(e, ids)).map((e) => e.label);
     if (dropped.length === 0) return;
     done = done.filter((e) => !touches(e, ids));
@@ -178,7 +183,7 @@ export function createHistory(store: EventStore, ctx: CommandContext, options: H
     },
 
     run(cmd) {
-      const result = applyCommand(store.snapshot, cmd, ctx);
+      const result = applyCommand(store.snapshot, cmd, context());
       if (!result.ok || result.mutations.length === 0) return result;
       const change = write(result.mutations, 'command');
       if (change.applied.length > 0) {

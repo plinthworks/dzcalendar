@@ -132,7 +132,7 @@ export function buildDayGridModel(range: ViewRange, snap: StoreSnapshot, o: DayG
  * skips it with `===`: its cells, links and focus stay as they were.
  */
 export function updateDayGridModel(prev: DayGridModel, snap: StoreSnapshot, change: StoreChange): DayGridModel {
-  if (change.added.length + change.updated.length + change.removed.length + change.seriesTouched.length === 0) return prev;
+  if (change.added.length + change.updated.length + change.removed.length + change.seriesChanged.length === 0) return prev;
   const next = buildDayGridModel(prev.range, snap, prev.options);
   // A series' occurrences may be in any week: no week can be kept on the strength of its spans.
   if (next.weeks.length !== prev.weeks.length || change.seriesTouched.length > 0) return next;

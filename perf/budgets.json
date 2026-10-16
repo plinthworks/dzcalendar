@@ -14,5 +14,7 @@
   "dayGrid month model (10k)": 50,
   "expand daily 1 year": 5,
   "week of 200 series": 30,
-  "normalize+index 200 series": 30
+  "normalize+index 200 series": 30,
+  "series edit this": 5,
+  "series edit following (100 overrides)": 20
 }

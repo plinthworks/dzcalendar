@@ -16,8 +16,11 @@ import {
   resolveWall,
   segmentTimed,
   itemEvent,
+  createEventStore,
+  createHistory,
+  viewWindow,
 } from '../../packages/core/src/index.js';
-import { expandZoned, expandDates, parseRRule } from '../../packages/rrule/src/index.js';
+import { expandZoned, expandDates, parseRRule, serializeRRule } from '../../packages/rrule/src/index.js';
 import type { EventInput, WallPolicy } from '../../packages/core/src/index.js';
 
 /**
@@ -103,6 +106,33 @@ const adapters: Record<string, (input: any) => unknown> = {
     const r = expandZoned(start, set, w, limit);
     const starts = r.starts.map((z) => z.toInstant().toString());
     return withProblems ? { starts, problems: r.problems.map((p) => p.code) } : starts;
+  },
+  // Commands against a series, then what a window shows and what the series became.
+  'series-edit': ({ zone, event, ops, window }) => {
+    const store = createEventStore();
+    const h = createHistory(store, { normalize: { displayZone: zone, newId: createIdGenerator('n') } });
+    const created = h.run({ type: 'event.create', event });
+    if (!created.ok) return { error: created.problems.map((p) => p.code) };
+    for (const op of ops) {
+      if (op.type === 'undo') h.undo();
+      else if (op.type === 'redo') h.redo();
+      else {
+        const r = h.run(op);
+        if (!r.ok) return { error: r.problems.map((p) => p.code) };
+      }
+    }
+    const shown = store.snapshot
+      .queryInstances(viewWindow(Temporal.PlainDate.from(window.from), Temporal.PlainDate.from(window.to), zone))
+      .map((i) => `${i.origin}|${i.event.title}|${i.event.start}|${i.event.end}`);
+    const at = (s: { base: { start: { toString(): string } } }) => s.base.start;
+    const series = [...store.snapshot.allSeries()]
+      .sort((a, b) => {
+        const x = at(a);
+        const y = at(b);
+        return x instanceof Temporal.PlainDate ? Temporal.PlainDate.compare(x, y as never) : Temporal.ZonedDateTime.compare(x as never, y as never);
+      })
+      .map((s) => s.set.rules.map(serializeRRule).join(',') + (s.set.exdates.length > 0 ? `|EXDATE=${s.set.exdates.join(',')}` : ''));
+    return { shown, series };
   },
   normalize: ({ event, context }) => {
     const r = normalizeEvent(event as EventInput, { ...context, newId: createIdGenerator('k') });

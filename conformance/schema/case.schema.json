@@ -26,7 +26,8 @@
         "segment",
         "layout-column",
         "navigation",
-        "rrule-expand"
+        "rrule-expand",
+        "series-edit"
       ]
     },
     "description": {

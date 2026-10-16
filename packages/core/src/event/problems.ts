@@ -27,8 +27,8 @@ export type ProblemCode =
   | 'invalid-exdate'
   | 'invalid-rdate'
   | 'too-many-occurrences'
-  | 'is-series'
-  | 'is-occurrence';
+  | 'unknown-occurrence'
+  | 'invalid-edit';
 
 export type Severity = 'error' | 'warning';
 

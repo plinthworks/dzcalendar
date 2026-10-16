@@ -245,7 +245,7 @@ const overlaps = (s: number, e: number, spans: readonly { s: number; e: number }
  * them with `===`. Returns `prev` itself when nothing it shows changed.
  */
 export function updateTimeGridModel(prev: TimeGridModel, snap: StoreSnapshot, change: StoreChange): TimeGridModel {
-  if (change.version === prev.version || change.added.length + change.updated.length + change.removed.length + change.seriesTouched.length === 0) return prev;
+  if (change.version === prev.version || change.added.length + change.updated.length + change.removed.length + change.seriesChanged.length === 0) return prev;
   const o = prev.options;
   // A series' occurrences may fall in any column: a touched series rebuilds them all.
   const everything = change.seriesTouched.length > 0;

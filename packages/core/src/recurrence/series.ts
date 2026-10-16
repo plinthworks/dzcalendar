@@ -19,6 +19,8 @@ export interface Series {
   readonly set: RRuleSet;
   readonly overrides: ReadonlyMap<RecurrenceKey, EventId>;
   readonly sourceId?: string;
+  /** Made by "this and following": the series it was cut from, and where. */
+  readonly splitFrom?: { readonly seriesId: SeriesId; readonly at: RecurrenceKey };
 }
 
 /**
@@ -45,7 +47,12 @@ export function parseInstanceKey(key: string): { readonly eventId: EventId } | {
   return at === -1 ? { eventId: unescapeId(key) } : { seriesId: unescapeId(key.slice(0, at)), key: key.slice(at + 1) };
 }
 
-const cache = new WeakMap<Series, Map<RecurrenceKey, CalEvent>>();
+/**
+ * Keyed by the base event, not the series: an override or an EXDATE makes a
+ * new series object around the same base, and its occurrences stay the same
+ * objects — nothing on screen redraws for them.
+ */
+const cache = new WeakMap<CalEvent, Map<RecurrenceKey, CalEvent>>();
 /** Occurrences kept per series: years of browsing an endless one must not grow memory without end. */
 const CACHE_CAP = 8000;
 
@@ -54,8 +61,8 @@ const CACHE_CAP = 8000;
  * same series object and key, so a view drawing it again sees nothing new.
  */
 export function materialize(series: Series, start: ZonedDateTime | PlainDate): CalEvent {
-  let byKey = cache.get(series);
-  if (!byKey) cache.set(series, (byKey = new Map()));
+  let byKey = cache.get(series.base);
+  if (!byKey) cache.set(series.base, (byKey = new Map()));
   const key = keyOf(start);
   let ev = byKey.get(key);
   if (!ev) {
@@ -72,7 +79,7 @@ export function materialize(series: Series, start: ZonedDateTime | PlainDate): C
       id: occurrenceKey(series.id, key),
       start,
       end,
-      revision: series.revision,
+      revision: series.base.revision,
       ref: { seriesId: series.id, key },
     }) as CalEvent;
     byKey.set(key, ev);
@@ -80,14 +87,21 @@ export function materialize(series: Series, start: ZonedDateTime | PlainDate): C
   return ev;
 }
 
+/** True when two series repeat their events with the same rules, exceptions and additions. */
+export function setEquals(a: RRuleSet, b: RRuleSet): boolean {
+  if (a === b) return true;
+  const rules = (s: RRuleSet) => s.rules.map(serializeRRule).join('\n');
+  const dates = (xs: readonly { toString(): string }[]) => xs.map(String).join(',');
+  return rules(a) === rules(b) && dates(a.exdates) === dates(b.exdates) && dates(a.rdates) === dates(b.rdates);
+}
+
 /** True when two series repeat the same event the same way (revision aside). */
 export function seriesEquals(a: Series, b: Series): boolean {
   if (a === b) return true;
   if (a.id !== b.id || a.sourceId !== b.sourceId) return false;
   if (!eventEquals(a.base, b.base)) return false;
-  const rules = (s: Series) => s.set.rules.map(serializeRRule).join('\n');
-  const dates = (xs: readonly { toString(): string }[]) => xs.map(String).join(',');
-  if (rules(a) !== rules(b) || dates(a.set.exdates) !== dates(b.set.exdates) || dates(a.set.rdates) !== dates(b.set.rdates)) return false;
+  if (!setEquals(a.set, b.set)) return false;
+  if (a.splitFrom?.seriesId !== b.splitFrom?.seriesId || a.splitFrom?.at !== b.splitFrom?.at) return false;
   if (a.overrides.size !== b.overrides.size) return false;
   for (const [k, v] of a.overrides) if (b.overrides.get(k) !== v) return false;
   return true;

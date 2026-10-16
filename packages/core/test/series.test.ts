@@ -212,16 +212,16 @@ describe('fixed after the architect review', () => {
     expect(performance.now() - t0).toBeLessThan(3000);
   });
 
-  it('update or delete of a series or an occurrence id says which it is', async () => {
+  it('delete by a series id takes the series, by an occurrence key that occurrence (Phase 6); keys round-trip', async () => {
     const { applyCommand, occurrenceKey, parseInstanceKey } = await import('../src/index.js');
     const store = storeWith({ id: 's|1', start: '2026-10-19T09:00[Europe/Paris]', rrule: 'FREQ=DAILY' });
     const occ = occurrenceKey('s|1', '2026-10-19T09:00:00+02:00[Europe/Paris]');
-    const code = (id: string) => {
-      const r = applyCommand(store.snapshot, { type: 'event.delete', id }, cctx());
-      return r.problems.map((p) => p.code);
-    };
-    expect([code('s|1'), code(occ), code('nope')]).toEqual([['is-series'], ['is-occurrence'], ['unknown-event']]);
-    expect(code(occ)).toContain('is-occurrence');
+    const del = (id: string) => applyCommand(store.snapshot, { type: 'event.delete', id }, cctx());
+    const whole = del('s|1');
+    expect(whole.ok && whole.mutations.map((m) => `${m.kind}:${m.after ? 'kept' : 'gone'}`)).toEqual(['series:gone']);
+    const one = del(occ);
+    expect(one.ok && one.mutations[0]!.kind === 'series' && one.mutations[0]!.after!.set.exdates.map(String)).toEqual(['2026-10-19T07:00:00Z']);
+    expect(del('nope').problems.map((p) => p.code)).toEqual(['unknown-event']);
     expect(parseInstanceKey(occ)).toEqual({ seriesId: 's|1', key: '2026-10-19T09:00:00+02:00[Europe/Paris]' });
     expect(parseInstanceKey('a%40b')).toEqual({ eventId: 'a@b' });
   });

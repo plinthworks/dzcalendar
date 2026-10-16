@@ -5,11 +5,11 @@ import { problem } from '../event/problems.js';
 import type { Problem } from '../event/problems.js';
 import type { Normalized } from '../event/normalize.js';
 import type { CalEvent, EventId, ResourceId, SeriesId } from '../event/types.js';
-import { occurrenceKey, escapeId, keyOf, seriesEquals } from '../recurrence/series.js';
-import { expandSeries, seriesSpan } from '../recurrence/expand.js';
+import { occurrenceKey, escapeId, keyOf, seriesEquals, setEquals } from '../recurrence/series.js';
+import { expandSeries, occurrenceSpan, seriesSpan } from '../recurrence/expand.js';
 import type { Series } from '../recurrence/series.js';
 import type { Instant, PlainDate, ZoneId } from '../temporal.js';
-import { stamp } from './diff.js';
+import { eventEquals, stamp } from './diff.js';
 import { isEmptyChange, mutationId } from './changes.js';
 import type { ChangeCause, Mutation, StoreChange } from './changes.js';
 import { PersistentIntervalTree } from './interval-tree.js';
@@ -71,6 +71,23 @@ function spanOf(e: CalEvent): MsSpan {
   if (e.allDay) return { s: epochDay(e.start), e: epochDay(e.end) };
   const s = e.start.epochMilliseconds;
   return { s, e: Math.max(e.end.epochMilliseconds, s + 1) };
+}
+
+function sameRulesAndAdditions(a: Series, b: Series): boolean {
+  return setEquals({ ...a.set, exdates: [] }, { ...b.set, exdates: [] });
+}
+
+/** The keys and EXDATEs present in one series and not the other. */
+function changedPlaces(a: Series, b: Series): (string | Instant | PlainDate)[] {
+  const out: (string | Instant | PlainDate)[] = [];
+  for (const [k, v] of a.overrides) if (b.overrides.get(k) !== v) out.push(k);
+  for (const [k, v] of b.overrides) if (a.overrides.get(k) !== v) out.push(k);
+  const ex = (s: Series) => new Map(s.set.exdates.map((x) => [x.toString(), x] as const));
+  const ea = ex(a);
+  const eb = ex(b);
+  for (const [k, x] of ea) if (!eb.has(k)) out.push(x);
+  for (const [k, x] of eb) if (!ea.has(k)) out.push(x);
+  return out;
 }
 
 const indexAdd = (ix: Indexes, id: string, allDay: boolean, sp: MsSpan): Indexes =>
@@ -273,7 +290,12 @@ export class StoreSnapshot {
 /** A series equal to the stored one keeps that object; a different one takes the revision. */
 function stampSeries(prev: Series | undefined, next: Series, revision: number): Series {
   if (prev && seriesEquals(prev, next)) return prev;
-  return next.revision === revision ? next : Object.freeze({ ...next, revision, base: Object.freeze({ ...next.base, revision }) as CalEvent });
+  if (next.revision === revision) return next;
+  // What did not change keeps its object (and its revision): an override
+  // leaves the base alone, so the occurrences built from it stay as drawn.
+  const base = prev && eventEquals(prev.base, next.base) ? prev.base : (Object.freeze({ ...next.base, revision }) as CalEvent);
+  const set = prev && setEquals(prev.set, next.set) ? prev.set : next.set;
+  return Object.freeze({ ...next, revision, base, set });
 }
 
 export interface EventStore {
@@ -320,14 +342,29 @@ function describe(
     if (before) mark(before);
     if (after) mark(after);
   }
-  const touchedSeries = [...seriesTouched].filter((id) => prev.getSeries(id) !== next.getSeries(id));
-  const changed = added.length + updated.length + removed.length + touchedSeries.length > 0;
+  const touchedSeries: SeriesId[] = [];
+  const seriesChanged: SeriesId[] = [];
+  for (const id of seriesTouched) {
+    const before = prev.getSeries(id);
+    const after = next.getSeries(id);
+    if (before === after) continue;
+    seriesChanged.push(id);
+    // Only overrides or EXDATEs changed: the occurrences they name are what
+    // changed, at known places. Anything else may move occurrences anywhere.
+    if (before && after && before.base === after.base && sameRulesAndAdditions(before, after)) {
+      for (const at of changedPlaces(before, after)) (after.base.allDay ? days : spans).push(occurrenceSpan(after, at));
+      continue;
+    }
+    touchedSeries.push(id);
+  }
+  const changed = added.length + updated.length + removed.length + seriesChanged.length > 0;
   return {
     version: changed ? next.version : prev.version,
     added,
     updated,
     removed,
     seriesTouched: touchedSeries,
+    seriesChanged,
     dirtySpans: normalizeIntervals(spans),
     dirtyDays: normalizeIntervals(days),
     cause,
@@ -422,6 +459,42 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
         } else {
           const current = series.get(id);
           if (current && current.sourceId === sourceId) mutations.push({ kind: 'series', before: current });
+        }
+      }
+
+      // The source is the authority on its series too: what was edited locally
+      // around one (overrides, a part cut off by "this and following") goes
+      // when the source says the series again, or stops saying it.
+      const localGone = new Set<string>();
+      for (const m of [...mutations]) {
+        if (m.kind !== 'series' || !m.before) continue;
+        const was = m.before;
+        if (m.after && seriesEquals(was, m.after)) continue;
+        const kept = new Set(m.after ? m.after.overrides.values() : []);
+        for (const id of was.overrides.values()) {
+          const ev = events.get(id);
+          if (ev && ev.sourceId === undefined && !kept.has(id) && !localGone.has(`event:${id}`)) {
+            localGone.add(`event:${id}`);
+            mutations.push({ kind: 'event', before: ev });
+          }
+        }
+        // Every local part cut from it, and the parts cut from those, to the end of the chain.
+        const cutFrom = [was.id];
+        while (cutFrom.length > 0) {
+          const parent = cutFrom.pop()!;
+          for (const other of series.values()) {
+            if (other.splitFrom?.seriesId !== parent || other.sourceId !== undefined || localGone.has(`series:${other.id}`)) continue;
+            localGone.add(`series:${other.id}`);
+            cutFrom.push(other.id);
+            for (const id of other.overrides.values()) {
+              const ev = events.get(id);
+              if (ev && !localGone.has(`event:${id}`)) {
+                localGone.add(`event:${id}`);
+                mutations.push({ kind: 'event', before: ev });
+              }
+            }
+            mutations.push({ kind: 'series', before: other });
+          }
         }
       }
 

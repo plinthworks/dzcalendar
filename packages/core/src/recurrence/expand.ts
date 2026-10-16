@@ -75,3 +75,25 @@ export function seriesSpan(sr: Series): MsSpan {
   const end = (last as ZonedDateTime).add(len).epochMilliseconds;
   return { s, e: Math.max(end, s + 1) };
 }
+
+/**
+ * Where the occurrence a key (or an EXDATE) names sits, in the units of the
+ * index: epoch ms for a timed series, epoch days for an all-day one. A date
+ * on a timed series covers that whole day in the series' zone.
+ */
+export function occurrenceSpan(sr: Series, at: string | Instant | PlainDate): MsSpan {
+  const base = sr.base;
+  const len = occurrenceLength(base);
+  if (base.allDay) {
+    const d = typeof at === 'string' ? Temporal.PlainDate.from(at) : at instanceof Temporal.PlainDate ? at : at.toZonedDateTimeISO('UTC').toPlainDate();
+    return { s: epochDay(d), e: epochDay(d) + Math.max(1, len.days) };
+  }
+  const zone = base.start.timeZoneId;
+  if (at instanceof Temporal.PlainDate) {
+    const s = at.toZonedDateTime({ timeZone: zone });
+    return { s: s.epochMilliseconds, e: s.add({ days: 1 }).add(len).epochMilliseconds };
+  }
+  const start = typeof at === 'string' ? Temporal.ZonedDateTime.from(at) : at.toZonedDateTimeISO(zone);
+  const s = start.epochMilliseconds;
+  return { s, e: Math.max(start.add(len).epochMilliseconds, s + 1) };
+}

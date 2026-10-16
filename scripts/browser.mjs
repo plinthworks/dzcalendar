@@ -144,6 +144,35 @@ try {
     const nextWeek = await standups();
     check('series: two occurrences this week (one excluded), three the next', thisWeek.length === 2 && nextWeek.length === 3, `${thisWeek.length}, ${nextWeek.length}`);
     check('series: 09:30 stays 09:30 across the clock change', new Set([...thisWeek, ...nextWeek]).size === 1, [...thisWeek, ...nextWeek].join(' '));
+
+    // ── editing a series from the context menu: "Supprimer" → sub-menu → "Cet événement"; undo brings it back ──
+    await p.click('.dz-ev[data-series-id="standup"]', { button: 'right' });
+    await p.waitForSelector('.dz-menu:not([hidden]) [data-action="event.delete"]');
+    await p.focus('.dz-menu [data-action="event.delete"]');
+    await p.keyboard.press('ArrowRight');
+    const sub = await p.evaluate(() => {
+      const s = document.querySelector('.dz-menu__sub');
+      const m = document.querySelector('.dz-menu').getBoundingClientRect();
+      const r = s.getBoundingClientRect();
+      return {
+        popup: document.querySelector('.dz-menu [data-action="event.delete"]').getAttribute('aria-haspopup'),
+        open: !s.hidden,
+        focused: document.activeElement?.dataset.action,
+        entries: [...s.querySelectorAll('[role="menuitem"]')].map((e) => e.textContent),
+        inViewport: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight,
+        beside: r.left >= m.right - 8 || r.right <= m.left + 8,
+      };
+    });
+    check('menu: "Supprimer" opens a this / following / all sub-menu, focused, beside the menu, on screen',
+      sub.popup === 'menu' && sub.open && sub.focused === 'event.delete.this' && sub.entries.length === 3 && sub.inViewport && sub.beside, JSON.stringify(sub));
+    await p.keyboard.press('ArrowLeft');
+    const back = await p.evaluate(() => document.activeElement?.dataset.action);
+    await p.keyboard.press('ArrowRight');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction(() => document.querySelectorAll('.dz-ev[data-series-id="standup"]').length === 2);
+    await p.evaluate(() => window.__dz().undo());
+    await p.waitForFunction(() => document.querySelectorAll('.dz-ev[data-series-id="standup"]').length === 3);
+    check('menu: ArrowLeft returns to "Supprimer"; "Cet événement" deletes one occurrence; undo restores it', back === 'event.delete', String(back));
     check('index: no console error', errors.length === 0, errors.join(' | '));
     await p.close();
   }

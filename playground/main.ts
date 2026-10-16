@@ -24,6 +24,8 @@ function make(axis: 'wall' | 'elapsed') {
     onCreateRequest: (r) =>
       say(r.allDay ? `Nouvel événement demandé le ${r.start.toString()} (journée)` : `Nouvel événement demandé à ${r.start.toZonedDateTimeISO(zoneSelect.value).toString({ smallestUnit: 'minute' })}`),
     onEventOpen: (inst) => say(`Ouvrir « ${inst.event.title} »`),
+    editable: true,
+    onCommandRefused: (r) => say(`Refusé : ${[...r.problems.map((p) => p.code), ...('violations' in r && r.violations ? r.violations.map((v) => v.code) : [])].join(', ')}`),
     motion: (document.querySelector<HTMLInputElement>('#motion')!).checked ? createGsapMotion() : NO_MOTION,
   });
 }

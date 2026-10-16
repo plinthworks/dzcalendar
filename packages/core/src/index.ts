@@ -53,11 +53,16 @@ export { expandSeries, seriesSpan, DEFAULT_OCCURRENCE_LIMIT } from './recurrence
 export type { SeriesWindow } from './recurrence/expand.js';
 export type { Series } from './recurrence/series.js';
 export { parseRRule, serializeRRule } from '@dzcalendar/rrule';
-export type { RRule, RRuleSet, Frequency } from '@dzcalendar/rrule';
+export type { RRule, RRuleSet, Frequency, Weekday as RRuleWeekday } from '@dzcalendar/rrule';
+export { editOccurrence, deleteOccurrence, deleteSeries, isOccurrence, startOfKey } from './recurrence/edit.js';
+export type { EditScope, OccurrenceRef, EditOptions } from './recurrence/edit.js';
+export { validateProposal } from './rules/validate.js';
+export type { Proposal, Violation, ConstraintSpec, OverlapFn, RulesContext } from './rules/validate.js';
+export { rebaseRule, splitRule, countBefore } from '@dzcalendar/rrule';
 export { applyCommand } from './commands/apply.js';
 export { createHistory } from './commands/history.js';
 export type { History, HistoryOptions } from './commands/history.js';
-export type { Command, CommandContext, CommandResult, EventPatch } from './commands/types.js';
+export type { Command, CommandContext, CommandResult, EventPatch, Reach } from './commands/types.js';
 export { arraySource, loadStaticSource } from './source/array-source.js';
 export type { AbortSignalLike, FetchRequest, SourceFetch, ChunkPolicy, EventSourceSpec } from './source/source.js';
 export { layoutColumn } from './layout/column.js';

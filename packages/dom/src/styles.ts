@@ -314,7 +314,8 @@ export const DZ_CSS = `
 .dz-pop__close { border: 0; background: transparent; color: inherit; font: inherit; font-size: 1.125rem; line-height: 1; cursor: pointer; padding: 0.125rem 0.375rem; border-radius: var(--dz-radius, var(--tz-radius, 0.375rem)); }
 .dz-pop__list { display: grid; gap: 2px; max-height: 18rem; overflow-y: auto; }
 .dz-bar--in-popover { margin: 0; }
-.dz-menu { display: grid; gap: 1px; }
+/* The UA gives [popover] overflow:auto: a sub-menu would make it scroll sideways under itself. */
+.dz-menu { display: grid; gap: 1px; overflow: visible; }
 .dz-menu__item {
   display: flex;
   flex-direction: column;
@@ -332,6 +333,12 @@ export const DZ_CSS = `
 .dz-menu__item:hover, .dz-menu__item:focus-visible { background: var(--dz-bg-raised, var(--tz-bg-raised, ButtonFace)); outline: 2px solid transparent; }
 .dz-menu__item[aria-disabled='true'] { opacity: 0.55; cursor: not-allowed; }
 .dz-menu__reason { font-size: 0.75rem; color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText)); }
+.dz-menu__item[aria-haspopup] { position: relative; padding-inline-end: 1.75rem; }
+.dz-menu__chevron { position: absolute; inset-inline-end: 0.5rem; top: 50%; transform: translateY(-50%); color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText)); }
+.dz-menu__item[aria-expanded='true'] { background: var(--dz-bg-raised, var(--tz-bg-raised, ButtonFace)); }
+/* A sub-menu sits beside its entry, inside the menu's box (the fixed menu is its containing block). */
+.dz-menu__sub { position: absolute; inset-inline-start: calc(100% - 0.25rem); }
+.dz-menu[data-sub-side='start'] .dz-menu__sub { inset-inline-start: auto; inset-inline-end: calc(100% - 0.25rem); }
 .dz-menu__shortcut { margin-inline-start: auto; font-size: 0.75rem; color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText)); }
 
 /* Long press opens the context menu: no iOS callout or text selection in the way. */

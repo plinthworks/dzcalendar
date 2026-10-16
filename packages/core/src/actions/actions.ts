@@ -1,4 +1,5 @@
 import type { Command } from '../commands/types.js';
+import type { EditScope } from '../recurrence/edit.js';
 import type { EventInstance } from '../store/store.js';
 import type { Instant, PlainDate, ZoneId } from '../temporal.js';
 
@@ -61,6 +62,11 @@ export interface ActionLabels {
   readonly goToDay: string;
   readonly openEvent: string;
   readonly skippedHour: string;
+  readonly deleteEvent: string;
+  /** The recurrence scope sub-menu. */
+  readonly scopeThis: string;
+  readonly scopeFollowing: string;
+  readonly scopeAll: string;
 }
 
 export interface ActionContext {
@@ -73,6 +79,8 @@ export interface ActionContext {
   readonly onCreateRequest?: (request: CreateRequest) => void;
   readonly onGoToDay?: (d: PlainDate) => void;
   readonly onOpen?: (instance: EventInstance) => void;
+  /** Runs an editing entry's command (through the calendar's history, so it can be undone). Without it, no editing entries. */
+  readonly onCommand?: (command: Command) => void;
 }
 
 /**
@@ -109,9 +117,32 @@ export function actionsFor(target: ActionTarget, ctx: ActionContext): ActionItem
       });
     }
     if (ctx.onGoToDay) out.push({ id: 'view.goToDay', label: ctx.labels.goToDay, enabled: true, run: () => ctx.onGoToDay!(target.date) });
-  } else if (ctx.onOpen) {
-    const open = ctx.onOpen;
-    out.push({ id: 'event.open', label: ctx.labels.openEvent, enabled: true, run: () => open(target.instance) });
+  } else {
+    if (ctx.onOpen) {
+      const open = ctx.onOpen;
+      out.push({ id: 'event.open', label: ctx.labels.openEvent, enabled: true, run: () => open(target.instance) });
+    }
+    if (ctx.onCommand) out.push(deleteEntry(target.instance, ctx.labels, ctx.onCommand));
   }
   return out;
+}
+
+/** "Delete": at once for an event; for an occurrence, a sub-menu says how far. */
+function deleteEntry(instance: EventInstance, labels: ActionLabels, onCommand: (c: Command) => void): ActionItem {
+  const ref = instance.event.ref;
+  if (!ref) {
+    const command: Command = { type: 'event.delete', id: instance.event.id };
+    return { id: 'event.delete', label: labels.deleteEvent, enabled: true, icon: 'delete', command, run: () => onCommand(command) };
+  }
+  const scoped = (scope: EditScope, label: string): ActionItem => {
+    const command: Command = { type: 'event.delete', id: ref.seriesId, key: ref.key, scope };
+    return { id: `event.delete.${scope}`, label, enabled: true, command, run: () => onCommand(command) };
+  };
+  return {
+    id: 'event.delete',
+    label: labels.deleteEvent,
+    enabled: true,
+    icon: 'delete',
+    children: [scoped('this', labels.scopeThis), scoped('following', labels.scopeFollowing), scoped('all', labels.scopeAll)],
+  };
 }

@@ -1,4 +1,7 @@
 import { actionsFor, assertBusinessHours, createKernel, formatTemporal, isValidZone, Temporal } from '@dzcalendar/core';
+import type { Command, CommandResult } from '@dzcalendar/core';
+import { createSettings } from './settings.js';
+import type { LiveSettings } from './settings.js';
 import type { ActionItem, CalendarKernel, CreateRequest, DurationLike, EventInput, EventInstance, KernelOptions, NavDirection, PlainDate, ZoneId } from '@dzcalendar/core';
 import type { CalendarHooks, MenuHook, ViewController, ViewCtx } from './host.js';
 import { viewFactory } from './host.js';
@@ -46,9 +49,13 @@ export interface CalendarOptions extends Partial<KernelOptions> {
   readonly snapMinutes?: number;
   /** "Open" from the context menu. */
   readonly onEventOpen?: (instance: EventInstance) => void;
+  /** Editing entries (delete, and the recurrence scope sub-menu) in the context menu. Default false. */
+  readonly editable?: boolean;
+  /** A command from the calendar's own UI was refused: why (problems, rule violations). */
+  readonly onCommandRefused?: (result: CommandResult, command: Command) => void;
 }
 
-export interface CalendarUpdate {
+export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly messages?: DzMessages;
   readonly locale?: string;
   readonly timeZone?: ZoneId;
@@ -71,6 +78,10 @@ export interface CalendarInstance {
    */
   update(changes: CalendarUpdate): void;
   navigate(dir: NavDirection): void;
+  /** Runs a command through the calendar's history (undoable); `validate` checks it against the rules as a gesture would be. */
+  run(cmd: Command, opts?: { readonly validate?: boolean }): CommandResult;
+  undo(): boolean;
+  redo(): boolean;
   destroy(): void;
 }
 
@@ -146,6 +157,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     popover.close(false);
   });
 
+  const settings = createSettings(options);
   const ctx: ViewCtx = {
     doc,
     kernel,
@@ -157,10 +169,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     motion: options.motion ?? NO_MOTION,
     hooks: options.hooks ?? {},
     epoch: 0,
-    snapMinutes: options.snapMinutes ?? 15,
+    snapMinutes: settings.current.snapMinutes ?? 15,
     popoverElement: popover.element,
     openMenu(target, at, returnFocus) {
       const state = kernel.getState();
+      const live = settings.current;
       const defaults = actionsFor(target, {
         displayZone: state.timeZone,
         labels: ctx.messages,
@@ -170,11 +183,19 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           const hm = formatTemporal(z.toPlainTime(), { hour: '2-digit', minute: '2-digit' }, ctx.locale);
           return withOffset ? `${hm} (${z.offset})` : hm;
         },
-        ...(options.onCreateRequest && { onCreateRequest: options.onCreateRequest }),
-        ...(options.onEventOpen && { onOpen: options.onEventOpen }),
+        ...(live.onCreateRequest && { onCreateRequest: live.onCreateRequest }),
+        ...(live.onEventOpen && { onOpen: live.onEventOpen }),
+        ...(live.editable && {
+          onCommand: (cmd: Command) => {
+            // A person's choice from the menu: checked against the rules.
+            const r = kernel.run(cmd, { validate: true });
+            // Read again: the callback may have been replaced since the menu opened.
+            if (!r.ok) settings.current.onCommandRefused?.(r, cmd);
+          },
+        }),
         ...(drawable('timeGridDay') && { onGoToDay: (d: PlainDate) => kernel.setView('timeGridDay', d) }),
       });
-      const items: readonly ActionItem[] | null = options.contextMenu ? options.contextMenu({ target, state }, defaults) : defaults;
+      const items: readonly ActionItem[] | null = live.contextMenu ? live.contextMenu({ target, state }, defaults) : defaults;
       if (!items || items.length === 0) return false;
       menu.open(items, at, returnFocus, ctx.messages.actions);
       return true;
@@ -343,6 +364,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       }
       if (changes.timeZone && changes.timeZone !== state.timeZone && !isZone(changes.timeZone)) throw new RangeError(`not a time zone: ${changes.timeZone}`);
       if ('businessHours' in changes && changes.businessHours !== undefined) assertBusinessHours(changes.businessHours);
+      // Live settings check themselves and apply at once (nothing to redraw): a bad one throws here, before any change.
+      if (settings.apply(changes)) ctx.snapMinutes = settings.current.snapMinutes ?? 15;
       holding = true;
       try {
         kernel.batch(() => {
@@ -381,6 +404,9 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       }
     },
     navigate: (dir) => kernel.navigate(dir),
+    run: (cmd, opts) => kernel.run(cmd, opts),
+    undo: () => kernel.history.undo(),
+    redo: () => kernel.history.redo(),
     destroy() {
       scope.dispose();
       viewScope?.dispose();
