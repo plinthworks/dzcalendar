@@ -96,11 +96,11 @@ try {
       const more = week.querySelector('.dz-more');
       return { drawn: drawn.length, more: more ? Number(more.textContent.replace(/\D/g, '')) : 0, inside };
     });
-    check('month: drawn + "+N" = the day’s six events', crowded.drawn + crowded.more === 6, JSON.stringify(crowded));
+    check('month: drawn + "+N" = the day’s seven events (six + a stand-up)', crowded.drawn + crowded.more === 7, JSON.stringify(crowded));
     check('month: every bar and link stays inside its row', crowded.inside);
     await p.click('.dz-more');
     const pop = await p.evaluate(() => ({ open: !document.querySelector('.dz-pop').hidden, items: document.querySelectorAll('.dz-pop__list .dz-bar').length }));
-    check('month: the "+N" panel opens with all six', pop.open && pop.items === 6, JSON.stringify(pop));
+    check('month: the "+N" panel opens with all seven', pop.open && pop.items === 7, JSON.stringify(pop));
     await p.keyboard.press('Escape');
 
     // Resize: lanes follow, and no ResizeObserver loop error.
@@ -135,6 +135,15 @@ try {
     });
     const used = (await layouts()) - before;
     check('week: changing one event costs at most one layout', used <= 1, `${used} layouts`);
+
+    // ── a series: Mon/Wed/Fri 09:30 Paris, the 23rd excluded; same place after the clock change ──
+    const standups = () => p.evaluate(() => [...document.querySelectorAll('.dz-ev[data-series-id="standup"]')].map((e) => e.style.getPropertyValue('--t')));
+    const thisWeek = await standups();
+    await p.click('.dz-toolbar__next');
+    await p.waitForFunction(() => document.querySelectorAll('.dz-ev[data-series-id="standup"]').length === 3);
+    const nextWeek = await standups();
+    check('series: two occurrences this week (one excluded), three the next', thisWeek.length === 2 && nextWeek.length === 3, `${thisWeek.length}, ${nextWeek.length}`);
+    check('series: 09:30 stays 09:30 across the clock change', new Set([...thisWeek, ...nextWeek]).size === 1, [...thisWeek, ...nextWeek].join(' '));
     check('index: no console error', errors.length === 0, errors.join(' | '));
     await p.close();
   }

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const src = (p) => join(root, 'packages', p, 'src', 'index.ts');
-const alias = { '@dzcalendar/core': src('core'), '@dzcalendar/dom': src('dom') };
+const alias = { '@dzcalendar/core': src('core'), '@dzcalendar/dom': src('dom'), '@dzcalendar/rrule': src('rrule') };
 
 async function bundle(entry, external) {
   // An alias would resolve a package before `external` sees its name and
@@ -23,11 +23,13 @@ async function bundle(entry, external) {
 
 const poly = ['temporal-polyfill', 'temporal-polyfill/full'];
 const results = {
-  'core (without polyfill)': await bundle(src('core'), poly),
+  // rrule is a dependency of core with its own line: each is counted once.
+  'core (without polyfill)': await bundle(src('core'), ['@dzcalendar/rrule', ...poly]),
+  'rrule (without polyfill)': await bundle(src('rrule'), ['@tzslot/core', ...poly]),
   'dom (without core)': await bundle(src('dom'), ['@dzcalendar/core', ...poly]),
   'theme css': gzipSync(readFileSync(join(root, 'packages/theme/dzcalendar.css')), { level: 9 }).length,
   'motion-gsap (without gsap)': await bundle(src('motion-gsap'), ['gsap', '@dzcalendar/dom']),
-  'temporal polyfill': (await bundle(src('core'), [])) - (await bundle(src('core'), poly)),
+  'temporal polyfill': (await bundle(src('core'), ['@dzcalendar/rrule'])) - (await bundle(src('core'), ['@dzcalendar/rrule', ...poly])),
 };
 const budgets = JSON.parse(readFileSync(join(root, 'size-budget.json'), 'utf8'));
 let over = 0;

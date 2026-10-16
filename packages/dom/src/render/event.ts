@@ -82,6 +82,9 @@ export function applyEventLook(el: HTMLElement, ev: CalEvent): void {
   if (ev.tone) el.style.setProperty('--dz-event-accent', `var(--dz-tone-${ev.tone})`);
   else el.style.removeProperty('--dz-event-accent');
   el.dataset['eventId'] = ev.id;
+  // An occurrence: its id is `series@start`; the series is what an application looks up.
+  if (ev.ref) el.dataset['seriesId'] = ev.ref.seriesId;
+  else delete el.dataset['seriesId'];
 }
 
 const mounted = new WeakMap<HTMLElement, { cleanup?: () => void; ctx: EventContentCtx }>();

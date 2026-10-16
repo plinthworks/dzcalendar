@@ -3,6 +3,7 @@ import { problem } from '../event/problems.js';
 import type { Problem } from '../event/problems.js';
 import type { CalEvent, EventInput } from '../event/types.js';
 import { eventEquals } from '../store/diff.js';
+import { parseInstanceKey } from '../recurrence/series.js';
 import { Temporal } from '../temporal.js';
 import type { Duration } from '../temporal.js';
 import type { Mutation } from '../store/changes.js';
@@ -110,23 +111,29 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
         const r = normalizeEvent(c.event, ctx.normalize, path);
         problems.push(...r.problems);
         if (!r.ok) return false;
-        if (current.getEvent(r.value.event.id)) {
-          problems.push(problem('duplicate-id', 'error', `${path}.id`, r.value.event.id));
+        const item = r.value;
+        const id = item.kind === 'event' ? item.event.id : item.series.id;
+        // The store keeps events and series apart, but a command refuses an id
+        // used by either: `event.update('x')` must never be ambiguous.
+        if (current.getEvent(id) || current.getSeries(id)) {
+          problems.push(problem('duplicate-id', 'error', `${path}.id`, id));
           return false;
         }
-        return push({ kind: 'event', after: r.value.event });
+        return push(item.kind === 'event' ? { kind: 'event', after: item.event } : { kind: 'series', after: item.series });
       }
       case 'event.update': {
         const before = current.getEvent(c.id);
-        if (!before) {
-          problems.push(problem('unknown-event', 'error', `${path}.id`, c.id));
-          return false;
-        }
+        if (!before) return missing(c.id, path);
         const p = c.patch;
         const base = patchedBase(before, p);
         const r = normalizeEvent({ ...base, ...p, id: c.id }, ctx.normalize, path);
         problems.push(...r.problems);
         if (!r.ok) return false;
+        if (r.value.kind !== 'event') {
+          // Turning an event into a series is a Phase 6 edit.
+          problems.push(problem('invalid-rrule', 'error', `${path}.patch`, 'an update cannot add a rule'));
+          return false;
+        }
         let next = r.value.event;
         // Written back as a ZonedDateTime, a guessed zone reads as a named one.
         // Untouched moments keep the guess, so the event still follows the calendar.
@@ -138,16 +145,29 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
       }
       case 'event.delete': {
         const before = current.getEvent(c.id);
+        if (!before) return missing(c.id, path);
+        return push({ kind: 'event', before });
+      }
+      case 'series.delete': {
+        const before = current.getSeries(c.id);
         if (!before) {
           problems.push(problem('unknown-event', 'error', `${path}.id`, c.id));
           return false;
         }
-        return push({ kind: 'event', before });
+        return push({ kind: 'series', before });
       }
       case 'batch':
         return c.commands.every((sub, i) => run(sub, `${path}.commands[${i}]`));
     }
   };
+
+  /** Not an event: a series, an occurrence (edited through the series, Phase 6), or nothing. */
+  function missing(id: string, path: string): false {
+    const k = parseInstanceKey(id);
+    const code = current.getSeries(id) ? 'is-series' : 'seriesId' in k && current.getSeries(k.seriesId) ? 'is-occurrence' : 'unknown-event';
+    problems.push(problem(code, 'error', `${path}.id`, id));
+    return false;
+  }
 
   // Each step sees the state the previous ones made: create then update works.
   function push(m: Mutation): boolean {

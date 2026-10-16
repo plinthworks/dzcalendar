@@ -15,7 +15,9 @@ import {
   normalizeEvent,
   resolveWall,
   segmentTimed,
+  itemEvent,
 } from '../../packages/core/src/index.js';
+import { expandZoned, expandDates, parseRRule } from '../../packages/rrule/src/index.js';
 import type { EventInput, WallPolicy } from '../../packages/core/src/index.js';
 
 /**
@@ -65,7 +67,7 @@ const adapters: Record<string, (input: any) => unknown> = {
   segment: ({ event, zone, firstDate, days, cutAtRepeat }) => {
     const r = normalizeEvent({ id: 'e', ...event }, { displayZone: zone, newId: createIdGenerator('k') });
     if (!r.ok) throw new Error(JSON.stringify(r.problems));
-    const segs = segmentTimed({ key: 'e', event: r.value.event, origin: 'single' }, dayInfos(Temporal.PlainDate.from(firstDate), days, zone), { cutAtRepeat });
+    const segs = segmentTimed({ key: 'e', event: itemEvent(r.value), origin: 'single' }, dayInfos(Temporal.PlainDate.from(firstDate), days, zone), { cutAtRepeat });
     return segs.map((s) => [s.dayIndex, s.part, str(s.from), str(s.to)]);
   },
   'layout-column': ({ items, minVisual }) =>
@@ -78,10 +80,34 @@ const adapters: Record<string, (input: any) => unknown> = {
     const range = computeViewRange(next, spec, ctx);
     return { anchor: str(next), start: str(range.start), end: str(range.end), dates: range.dates.length };
   },
+  // `withProblems`: the case also asserts what the expansion reported (the limit's `too-many-occurrences`).
+  'rrule-expand': ({ dtstart, rrule, window, limit, exdates, rdates, withProblems }) => {
+    const parsed = parseRRule(rrule);
+    if (!parsed.ok) return { problem: parsed.problem.code };
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dtstart)) {
+      const start = Temporal.PlainDate.from(dtstart);
+      const w = window ? { from: Temporal.PlainDate.from(window.from), to: Temporal.PlainDate.from(window.to) } : { from: start, to: start.add({ years: 200 }) };
+      const set = { rules: [parsed.rule], exdates: (exdates ?? []).map((x: string) => Temporal.PlainDate.from(x)), rdates: (rdates ?? []).map((x: string) => Temporal.PlainDate.from(x)) };
+      const r = expandDates(start, set, w, limit);
+      return withProblems ? { starts: r.starts.map(String), problems: r.problems.map((p) => p.code) } : r.starts.map(String);
+    }
+    const start = Temporal.ZonedDateTime.from(dtstart);
+    const w = window
+      ? { from: Temporal.Instant.from(window.from), to: Temporal.Instant.from(window.to) }
+      : { from: start.toInstant(), to: start.toInstant().add({ hours: 24 * 365 * 400 }) };
+    const set = {
+      rules: [parsed.rule],
+      exdates: (exdates ?? []).map((x: string) => (/T/.test(x) ? Temporal.Instant.from(x) : Temporal.PlainDate.from(x))),
+      rdates: (rdates ?? []).map((x: string) => Temporal.ZonedDateTime.from(x)),
+    };
+    const r = expandZoned(start, set, w, limit);
+    const starts = r.starts.map((z) => z.toInstant().toString());
+    return withProblems ? { starts, problems: r.problems.map((p) => p.code) } : starts;
+  },
   normalize: ({ event, context }) => {
     const r = normalizeEvent(event as EventInput, { ...context, newId: createIdGenerator('k') });
     if (!r.ok) return { ok: false, errors: r.problems.filter((p) => p.severity === 'error').map((p) => p.code) };
-    const e = r.value.event;
+    const e = itemEvent(r.value);
     return {
       ok: true,
       allDay: e.allDay,

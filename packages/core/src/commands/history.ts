@@ -1,5 +1,6 @@
-import type { CalEvent, EventId } from '../event/types.js';
-import { invert, mutationId } from '../store/changes.js';
+import type { CalEvent } from '../event/types.js';
+import type { Series } from '../recurrence/series.js';
+import { invert, mutationId, mutationKey } from '../store/changes.js';
 import type { Mutation, StoreChange } from '../store/changes.js';
 import type { EventStore } from '../store/store.js';
 import { applyCommand } from './apply.js';
@@ -46,16 +47,21 @@ interface Entry {
   readonly mergeKey: string | null;
 }
 
-/** What each id looks like after these mutations, in order. */
-function finalStates(mutations: readonly Mutation[]): Map<EventId, CalEvent | undefined> {
-  const out = new Map<EventId, CalEvent | undefined>();
-  for (const m of mutations) out.set(mutationId(m), m.after);
+type Item = CalEvent | Series | undefined;
+
+/** What each event or series (`kind:id`) looks like after these mutations, in order. */
+function finalStates(mutations: readonly Mutation[]): Map<string, Mutation> {
+  const out = new Map<string, Mutation>();
+  for (const m of mutations) out.set(mutationKey(m), m);
   return out;
 }
 
+const stored = (store: EventStore, m: Mutation): Item =>
+  m.kind === 'event' ? store.snapshot.getEvent(mutationId(m)) : store.snapshot.getSeries(mutationId(m));
+
 /** True when the store still shows exactly what these mutations left. Compared by identity. */
 function stillApplies(store: EventStore, mutations: readonly Mutation[]): boolean {
-  for (const [id, state] of finalStates(mutations)) if (store.snapshot.getEvent(id) !== state) return false;
+  for (const m of finalStates(mutations).values()) if (stored(store, m) !== m.after) return false;
   return true;
 }
 
@@ -64,7 +70,7 @@ function stillApplies(store: EventStore, mutations: readonly Mutation[]): boolea
  * Restored after the source withdrew it, nothing would ever remove it again.
  */
 function restoresOrphan(store: EventStore, steps: readonly Mutation[]): boolean {
-  return [...finalStates(steps)].some(([id, after]) => after?.sourceId !== undefined && !store.snapshot.isSourceOwned(id));
+  return [...finalStates(steps).values()].some((m) => m.after?.sourceId !== undefined && !store.snapshot.isSourceOwned(mutationId(m), m.kind));
 }
 
 /**
@@ -73,7 +79,7 @@ function restoresOrphan(store: EventStore, steps: readonly Mutation[]): boolean 
  */
 function continues(prev: readonly Mutation[], next: readonly Mutation[]): boolean {
   const left = finalStates(prev);
-  return next.every((m) => !left.has(mutationId(m)) || left.get(mutationId(m)) === m.before);
+  return next.every((m) => !left.has(mutationKey(m)) || left.get(mutationKey(m))!.after === m.before);
 }
 
 /**
@@ -81,23 +87,24 @@ function continues(prev: readonly Mutation[], next: readonly Mutation[]): boolea
  * drag is stored as one move; created-then-deleted is nothing at all.
  */
 function compact(mutations: readonly Mutation[]): Mutation[] {
-  const first = new Map<EventId, CalEvent | undefined>();
-  const last = new Map<EventId, CalEvent | undefined>();
+  const first = new Map<string, Mutation>();
+  const last = new Map<string, Mutation>();
   for (const m of mutations) {
-    const id = mutationId(m);
-    if (!first.has(id)) first.set(id, m.before);
-    last.set(id, m.after);
+    const key = mutationKey(m);
+    if (!first.has(key)) first.set(key, m);
+    last.set(key, m);
   }
   const out: Mutation[] = [];
-  for (const [id, before] of first) {
-    const after = last.get(id);
+  for (const [key, f] of first) {
+    const before = f.before;
+    const after = last.get(key)!.after;
     if (before === after) continue;
-    out.push({ kind: 'event', ...(before && { before }), ...(after && { after }) });
+    out.push({ kind: f.kind, ...(before && { before }), ...(after && { after }) } as Mutation);
   }
   return out;
 }
 
-const touches = (e: Entry, ids: ReadonlySet<EventId>) => e.mutations.some((m) => ids.has(mutationId(m)));
+const touches = (e: Entry, keys: ReadonlySet<string>) => e.mutations.some((m) => keys.has(mutationKey(m)));
 
 export function createHistory(store: EventStore, ctx: CommandContext, options: HistoryOptions = {}): History {
   const limit = options.limit ?? 200;
@@ -121,10 +128,10 @@ export function createHistory(store: EventStore, ctx: CommandContext, options: H
     }
   };
 
-  // Anyone else's change to an event invalidates every entry that touches it.
+  // Anyone else's change to an event or a series invalidates every entry that touches it.
   const unsubscribe = store.subscribe((change) => {
     if (writing) return;
-    const ids = new Set([...change.added, ...change.updated, ...change.removed]);
+    const ids = new Set([...[...change.added, ...change.updated, ...change.removed].map((id) => `event:${id}`), ...change.seriesTouched.map((id) => `series:${id}`)]);
     const dropped = [...done, ...undone].filter((e) => touches(e, ids)).map((e) => e.label);
     if (dropped.length === 0) return;
     done = done.filter((e) => !touches(e, ids));

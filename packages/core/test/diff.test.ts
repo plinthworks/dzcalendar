@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { createIdGenerator, eventEquals, normalizeEvent, sameValue, applyCommand, createEventStore, Temporal } from '../src/index.js';
+import { createIdGenerator, eventEquals, normalizeEvent, sameValue, applyCommand, createEventStore, Temporal, itemEvent } from '../src/index.js';
 import type { CalEvent, EventInput } from '../src/index.js';
 
 const ctx = () => ({ displayZone: 'Europe/Paris', newId: createIdGenerator('d') });
 const ev = (input: EventInput): CalEvent => {
   const r = normalizeEvent(input, ctx());
   if (!r.ok) throw new Error(JSON.stringify(r.problems));
-  return r.value.event;
+  return itemEvent(r.value);
 };
 
 const FULL: EventInput = {

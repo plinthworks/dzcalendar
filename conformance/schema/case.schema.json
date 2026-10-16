@@ -25,7 +25,8 @@
         "time-axis",
         "segment",
         "layout-column",
-        "navigation"
+        "navigation",
+        "rrule-expand"
       ]
     },
     "description": {
@@ -46,6 +47,10 @@
         "object",
         "array"
       ]
+    },
+    "source": {
+      "type": "string",
+      "description": "Where the expectation comes from when not written by hand: an independent implementation, never ours."
     }
   }
 }

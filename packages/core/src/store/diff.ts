@@ -57,6 +57,8 @@ export function eventEquals(a: CalEvent, b: CalEvent): boolean {
     a.tone === b.tone &&
     a.url === b.url &&
     a.sourceId === b.sourceId &&
+    a.ref?.seriesId === b.ref?.seriesId &&
+    a.ref?.key === b.ref?.key &&
     sameList(a.resourceIds, b.resourceIds) &&
     sameList(a.classNames, b.classNames) &&
     sameValue(a.props, b.props)

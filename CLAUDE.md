@@ -63,6 +63,8 @@ npm run test:browser   # layout checks in system Chrome on its own Vite server (
   polyfill adds a debug string to every object unless minified. Use `npm run bench`.
 - `toEqual` cannot compare Temporal objects (internal slots: different
   instants compare equal). Compare `.toString()`.
-- `conformance/cases` expectations are written by hand, never generated.
+- `conformance/cases` expectations are written by hand, never generated from
+  our code. One exception: `rrule-expand` cases come from python-dateutil, an
+  independent implementation (`scripts/conformance-crosscheck.py`).
 - `Intl.DateTimeFormat#format` does not accept Temporal objects under the
   polyfill (spike 2): format with `toLocaleString` or epoch ms + `timeZone`.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Temporal, actionsFor, createKernel, createIdGenerator, normalizeEvent } from '../src/index.js';
+import { Temporal, actionsFor, createKernel, createIdGenerator, normalizeEvent, itemEvent } from '../src/index.js';
 import type { ActionContext, DayGridModel, KernelEvent, TimeGridModel } from '../src/index.js';
 
 const labels = {
@@ -59,7 +59,7 @@ describe('actionsFor', () => {
   it('without callbacks there is nothing to offer', () => {
     const r = normalizeEvent({ id: 'a', start: '2026-10-21' }, { displayZone: 'UTC', newId: createIdGenerator('x') });
     if (!r.ok) throw new Error();
-    expect(actionsFor({ kind: 'event', instance: { key: 'a', event: r.value.event, origin: 'single' } }, { displayZone: 'UTC', labels, formatTime: () => '', formatDate: () => '' })).toEqual([]);
+    expect(actionsFor({ kind: 'event', instance: { key: 'a', event: itemEvent(r.value), origin: 'single' } }, { displayZone: 'UTC', labels, formatTime: () => '', formatDate: () => '' })).toEqual([]);
   });
 });
 

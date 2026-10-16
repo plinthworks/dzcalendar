@@ -9,6 +9,7 @@ import {
   segmentAllDay,
   segmentTimed,
   splitByWeek,
+  itemEvent,
 } from '../src/index.js';
 import type { EventInput, EventInstance } from '../src/index.js';
 
@@ -16,7 +17,7 @@ const d = (s: string) => Temporal.PlainDate.from(s);
 const inst = (input: EventInput): EventInstance => {
   const r = normalizeEvent({ id: 'e', ...input }, { displayZone: 'Europe/Paris', newId: createIdGenerator('p') });
   if (!r.ok) throw new Error(JSON.stringify(r.problems));
-  return { key: r.value.event.id, event: r.value.event, origin: 'single' };
+  return { key: itemEvent(r.value).id, event: itemEvent(r.value), origin: 'single' };
 };
 const iso = (x: { toString(): string }) => x.toString();
 

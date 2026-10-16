@@ -23,7 +23,12 @@ export type ProblemCode =
   | 'allday-with-time'
   | 'allday-zone-ignored'
   | 'unknown-resource'
-  | 'unsupported-recurrence';
+  | 'invalid-rrule'
+  | 'invalid-exdate'
+  | 'invalid-rdate'
+  | 'too-many-occurrences'
+  | 'is-series'
+  | 'is-occurrence';
 
 export type Severity = 'error' | 'warning';
 

@@ -8,6 +8,10 @@ import type { Parsed } from './parse-temporal.js';
 import { problem } from './problems.js';
 import type { Problem } from './problems.js';
 import type { AllDayEvent, CalEvent, EventInput, ResourceId, TimedEvent } from './types.js';
+import { parseRRule, serializeRRule } from '@dzcalendar/rrule';
+import type { RRule, RRuleSet } from '@dzcalendar/rrule';
+import type { Series } from '../recurrence/series.js';
+import type { Instant } from '../temporal.js';
 
 export interface NormalizeContext {
   /** Where the calendar is read. The last resort for an event that names no zone. */
@@ -23,8 +27,11 @@ export interface NormalizeContext {
   readonly knownResources?: ReadonlySet<ResourceId>;
 }
 
-/** Shaped as a union so Phase 5 can add `{ kind: 'series' }` without changing callers. */
-export type Normalized = { readonly kind: 'event'; readonly event: CalEvent };
+/** One event, or a series (an event with `rrule`). */
+export type Normalized = { readonly kind: 'event'; readonly event: CalEvent } | { readonly kind: 'series'; readonly series: Series };
+
+/** The event an item stands for: the event itself, or a series' first occurrence. */
+export const itemEvent = (n: Normalized): CalEvent => (n.kind === 'event' ? n.event : n.series.base);
 
 export type NormalizeResult =
   | { readonly ok: true; readonly value: Normalized; readonly problems: readonly Problem[] }
@@ -81,11 +88,6 @@ function normalizeObject(input: EventInput, ctx: NormalizeContext, path: string)
   const failed = (): NormalizeResult => ({ ok: false, problems });
   const isError = () => problems.some((p) => p.severity === 'error');
 
-  if (given(input.rrule) || given(input.exdate) || given(input.rdate)) {
-    problems.push(problem('unsupported-recurrence', 'error', path, 'recurrence arrives in Phase 5'));
-    return failed();
-  }
-
   if (given(input.id) && (typeof input.id !== 'string' || input.id === '')) {
     problems.push(problem('invalid-id', 'error', `${path}.id`, String(input.id)));
   }
@@ -131,7 +133,66 @@ function normalizeObject(input: EventInput, ctx: NormalizeContext, path: string)
 
   if (!span || isError()) return failed();
   const event = Object.freeze({ ...common, ...span }) as CalEvent;
-  return { ok: true, value: { kind: 'event', event }, problems };
+  if (!given(input.rrule)) return { ok: true, value: { kind: 'event', event }, problems };
+
+  // A series: the event is its first occurrence; the rules repeat it.
+  const set = recurrenceSet(input, ctx, path, event, problems);
+  if (!set || isError()) return failed();
+  const series: Series = { id: event.id, revision: 0, base: event, set, overrides: new Map() };
+  return { ok: true, value: { kind: 'series', series }, problems };
+}
+
+function recurrenceSet(input: EventInput, ctx: NormalizeContext, path: string, event: CalEvent, problems: Problem[]): RRuleSet | null {
+  const texts = typeof input.rrule === 'string' ? [input.rrule] : Array.isArray(input.rrule) ? input.rrule : null;
+  if (!texts || texts.length === 0) {
+    problems.push(problem('invalid-rrule', 'error', `${path}.rrule`, 'expected a rule string or a list of them'));
+    return null;
+  }
+  const rules: RRule[] = [];
+  texts.forEach((text, i) => {
+    const r = typeof text === 'string' ? parseRRule(text) : null;
+    if (!r || !r.ok) {
+      problems.push(problem('invalid-rrule', 'error', `${path}.rrule${texts.length > 1 ? `[${i}]` : ''}`, r && !r.ok ? r.problem.detail : 'not a string'));
+      return;
+    }
+    // Hours and minutes make no sense for an all-day series.
+    if (event.allDay && (r.rule.freq === 'HOURLY' || r.rule.freq === 'MINUTELY' || r.rule.freq === 'SECONDLY')) {
+      problems.push(problem('invalid-rrule', 'error', `${path}.rrule`, `FREQ=${r.rule.freq} on an all-day event`));
+      return;
+    }
+    rules.push(r.rule);
+  });
+  const zone = event.allDay ? ctx.displayZone : event.start.timeZoneId;
+  const exdates: (Instant | PlainDate)[] = [];
+  for (const [i, x] of (input.exdate ?? []).entries()) {
+    const p = parseTemporal(x, `${path}.exdate[${i}]`, 'start');
+    if (!p.ok) {
+      problems.push(problem('invalid-exdate', 'error', `${path}.exdate[${i}]`, String(x)));
+      continue;
+    }
+    const v = p.parsed;
+    // A date excludes that day; a moment excludes that moment (a wall time is read in the event's zone).
+    // An all-day series has days only: a moment names the day it falls on, in the calendar's zone.
+    if (event.allDay) {
+      exdates.push(v.kind === 'date' ? v.value : v.kind === 'zoned' || v.kind === 'wall' ? v.value.toPlainDate() : v.value.toZonedDateTimeISO(zone).toPlainDate());
+      continue;
+    }
+    exdates.push(
+      v.kind === 'date' ? v.value : v.kind === 'instant' ? v.value : v.kind === 'zoned' ? v.value.toInstant() : placeWall(v.value, zone, `${path}.exdate[${i}]`).value.toInstant(),
+    );
+  }
+  const rdates: (ZonedDateTime | PlainDate)[] = [];
+  for (const [i, x] of (input.rdate ?? []).entries()) {
+    const p = parseTemporal(x, `${path}.rdate[${i}]`, 'start');
+    if (!p.ok) {
+      problems.push(problem('invalid-rdate', 'error', `${path}.rdate[${i}]`, String(x)));
+      continue;
+    }
+    const v = p.parsed;
+    if (event.allDay) rdates.push(v.kind === 'date' ? v.value : v.kind === 'zoned' ? v.value.toPlainDate() : v.kind === 'wall' ? v.value.toPlainDate() : v.value.toZonedDateTimeISO(zone).toPlainDate());
+    else rdates.push(v.kind === 'zoned' ? v.value : v.kind === 'instant' ? v.value.toZonedDateTimeISO(zone) : v.kind === 'wall' ? placeWall(v.value, zone, `${path}.rdate[${i}]`).value : v.value.toZonedDateTime({ timeZone: zone, plainTime: (event.start as ZonedDateTime).toPlainTime() }));
+  }
+  return { rules, exdates, rdates };
 }
 
 // Shared, frozen, so ten thousand events without resources or classes do not
@@ -363,13 +424,16 @@ export function normalizeMany(
       rejected++;
       continue;
     }
-    let event = r.value.event;
+    const item = r.value;
+    let event = itemEvent(item);
     if (sourceId !== undefined) {
       let id = event.id;
       if (!given((input as EventInput).id)) {
         // Two 53-bit hashes of the same text under different seeds: ~106 bits,
         // so ids derived across chunks and refreshes do not meet by chance.
-        const text = `${event.start.toString()}|${event.end.toString()}|${event.title}`;
+        // A series' rules are part of what it is: the same start with another rule is another series.
+        const rules = item.kind === 'series' ? `|${item.series.set.rules.map(serializeRRule).join(';;')}` : '';
+        const text = `${event.start.toString()}|${event.end.toString()}|${event.title}${rules}`;
         const base = `${sourceId}:${hash53(text)}${hash53(text, 0x9e3779b9)}`;
         const rank = ranks.get(base) ?? 0;
         ranks.set(base, rank + 1);
@@ -383,7 +447,7 @@ export function normalizeMany(
       continue;
     }
     seen.add(event.id);
-    items.push({ kind: 'event', event });
+    items.push(item.kind === 'event' ? { kind: 'event', event } : { kind: 'series', series: { ...item.series, id: event.id, base: event, ...(sourceId !== undefined && { sourceId }) } });
   }
   return { items, report: { accepted: items.length, rejected, problems } };
 }

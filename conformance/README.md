@@ -33,5 +33,16 @@ One case per file, `cases/<suite>/<id>.json`, validated by `schema/case.schema.j
 | `segment` | `{event, zone, firstDate, days, cutAtRepeat}` | `[dayIndex, part, from, to][]` |
 | `layout-column` | `{items, minVisual}` | `[key, lane, lanes, left, width][]` |
 | `navigation` | `{anchor, view, firstDay, dir, today?, overrides?}` | `{anchor, start, end, dates}` |
+| `rrule-expand` | `{dtstart, rrule, window?, exdates?, rdates?, limit}` | starts as UTC instants (or dates), or `{problem}` |
 
-Later phases add `rrule-expand`, `series-edit`, `layout-rows`, `slots`, …
+Later phases add `series-edit`, `layout-rows`, `slots`, …
+
+### Where `rrule-expand` expectations come from
+
+Most `rrule-expand` cases (`"source"` field) are computed by
+**python-dateutil**, an implementation independent of ours, by
+`scripts/conformance-crosscheck.py` — never by our own code. dateutil walks
+wall times like we do for DAILY and slower, so it is a valid oracle there;
+for HOURLY and finer it steps in wall time where we step in elapsed time, so
+those cases use UTC, and the clock-change behaviour of sub-daily rules is
+covered by hand-written cases (`rrule-hand-*`).

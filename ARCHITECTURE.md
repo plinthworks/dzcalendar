@@ -67,6 +67,15 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 5 (détail dans ROADMAP.md)
+
+- **B.8** — `@dzcalendar/rrule` est une dépendance du core (compté à part dans les budgets). Itération en numéros de jour civils ; DAILY et plus lent en heure murale (`compatible`), sub-journalier en temps écoulé ; règle stérile arrêtée après un cycle grégorien de 400 ans ; saut jusqu'à la fenêtre (les occurrences antérieures sont comptées, pas construites).
+- **B.8** — `Series { id, revision, base, set, overrides, sourceId }` : `base` est la première occurrence (durée = `lengthOf(base)`, jours muraux + reste écoulé). `RecurrenceKey` = chaîne complète du début d'origine, décalage compris. Clé d'instance `escape(seriesId)@key` (ids échappés `%`, `|`, `@`).
+- **B.3/B.4** — store : `series`, `seriesIdx` (fin infinie = `MAX_SAFE_INTEGER`), `Mutation` `{ kind: 'series' }`, `StoreChange.seriesTouched` ; `queryInstances` expand dans la fenêtre élargie de la durée ; occurrences matérialisées une fois par objet série (WeakMap). Les modèles reconstruisent tout quand `seriesTouched` n'est pas vide.
+- **B.6** — `Normalized` = `{ kind: 'event' } | { kind: 'series' }`, accesseur `itemEvent`. Codes `invalid-rrule`, `invalid-exdate`, `invalid-rdate`.
+- **H** — suite `rrule-expand` : attentes calculées par python-dateutil (implémentation indépendante, script hors livraison), plus des cas écrits à la main.
+- **B.8** — WEEKLY + BYSETPOS suit la RFC 5545 (l'ensemble est toute la semaine WKST) ; rrule.js (plugin de FullCalendar) et dateutil commencent la première semaine à DTSTART. Écart assumé, épinglé par un cas écrit à la main.
+
 ### Ajustements après la Phase 4 (revues, détail dans ROADMAP.md)
 
 - **D.1** — contrat réel : `ViewController { element, body, render(model, state), tick, scrollTo?, destroy }`, enregistré par `registerView(family, factory)` ; chaque vue reçoit un `ViewCtx` dérivé avec son propre `Scope`. `KeyedList` (signatures position/contenu) remplace `reconcile()`. `FrameScheduler` (lecture puis écriture) sert à mesurer ; coalescence des dessins en Phase 7. À ajouter (optionnels) : `hitTest`, `focusFor`, `nodeFor`. Fichiers à plat : `host.ts`, `menu.ts`, `popover.ts`, `toolbar.ts`.

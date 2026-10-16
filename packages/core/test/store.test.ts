@@ -8,6 +8,7 @@ import {
   viewWindow,
   arraySource,
   loadStaticSource,
+  itemEvent,
 } from '../src/index.js';
 import type { CalEvent, EventInput, NormalizeContext, StoreChange, Normalized } from '../src/index.js';
 
@@ -15,7 +16,7 @@ const ctx = (): NormalizeContext => ({ displayZone: 'Europe/Paris', newId: creat
 const ev = (input: EventInput): CalEvent => {
   const r = normalizeEvent(input, ctx());
   if (!r.ok) throw new Error(JSON.stringify(r.problems));
-  return r.value.event;
+  return itemEvent(r.value);
 };
 const d = (s: string) => Temporal.PlainDate.from(s);
 const ids = (xs: { key: string }[]) => xs.map((x) => x.key);
@@ -239,6 +240,6 @@ describe('sources: chunks, revisions, stable ids', () => {
 it('normalizeMany ids: same input, same id, across calls', () => {
   const a = items([{ title: 'x', start: '2026-05-04T09:00[UTC]' }]) as Normalized[];
   const b = items([{ title: 'x', start: '2026-05-04T09:00[UTC]' }]) as Normalized[];
-  expect(a[0]!.event.id).toBe(b[0]!.event.id);
-  expect(items([{ title: 'y', start: '2026-05-04T09:00[UTC]' }])[0]!.event.id).not.toBe(a[0]!.event.id);
+  expect(itemEvent(a[0]!).id).toBe(itemEvent(b[0]!).id);
+  expect(itemEvent(items([{ title: 'y', start: '2026-05-04T09:00[UTC]' }])[0]!).id).not.toBe(itemEvent(a[0]!).id);
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createEventStore, createHistory, createIdGenerator, normalizeMany } from '../src/index.js';
+import { createEventStore, createHistory, createIdGenerator, normalizeMany, itemEvent } from '../src/index.js';
 import type { CommandContext, EventInput } from '../src/index.js';
 
 /** Scenarios from the Phase 1 code review, each reproduced before it was fixed. */
@@ -103,8 +103,8 @@ describe('event.update: each field does what a create would do', () => {
 
 it('derived ids of different events of one source do not collide across chunks', () => {
   // These two titles shared a 32-bit FNV id; the id is now ~106 bits.
-  const a = from([{ title: 'Meeting 571589', start: '2026-05-01T09:00[UTC]' }])[0]!.event.id;
-  const b = from([{ title: 'Meeting 1138190', start: '2026-05-01T09:00[UTC]' }])[0]!.event.id;
+  const a = itemEvent(from([{ title: 'Meeting 571589', start: '2026-05-01T09:00[UTC]' }])[0]!).id;
+  const b = itemEvent(from([{ title: 'Meeting 1138190', start: '2026-05-01T09:00[UTC]' }])[0]!).id;
   expect(a).not.toBe(b);
   expect(a.length).toBeGreaterThan(18);
 });

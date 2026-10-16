@@ -2,6 +2,14 @@ import type { DurationLike, Instant, PlainDate, PlainDateTime, ZonedDateTime, Zo
 
 export type EventId = string;
 export type ResourceId = string;
+export type SeriesId = string;
+/**
+ * An occurrence's identity within its series: its *original* start, written
+ * in full — `2026-10-25T02:30:00+02:00[Europe/Paris]`, or a date for an
+ * all-day series. The offset is part of it, so the two 02:30s of a fall-back
+ * night are two occurrences, never one.
+ */
+export type RecurrenceKey = string;
 
 /** What can be written where a moment is expected. Never a `Date` — see `date-object-rejected`. */
 export type TemporalInput = ZonedDateTime | PlainDate | PlainDateTime | Instant | string;
@@ -13,9 +21,8 @@ export type EventStatus = 'confirmed' | 'tentative' | 'cancelled';
  * An event as an application hands it in: loose, partly optional, strings
  * welcome. `normalizeEvent` turns it into a `CalEvent` or says why it cannot.
  *
- * Recurrence fields are accepted in the type so data is not silently
- * truncated, but until Phase 5 an event carrying them is rejected with
- * `unsupported-recurrence` — showing only its first occurrence would be a lie.
+ * With `rrule` (and optionally `exdate`, `rdate`) it becomes a series: its
+ * start is the first occurrence, its length every occurrence's length.
  */
 export interface EventInput {
   id?: string;
@@ -30,7 +37,8 @@ export interface EventInput {
   timeZone?: ZoneId;
   resourceId?: ResourceId;
   resourceIds?: readonly ResourceId[];
-  rrule?: unknown;
+  /** An RFC 5545 rule (`FREQ=WEEKLY;BYDAY=MO`), or several: the event becomes a series. */
+  rrule?: string | readonly string[];
   exdate?: readonly TemporalInput[];
   rdate?: readonly TemporalInput[];
   display?: EventDisplay;
@@ -62,6 +70,8 @@ interface EventCommon {
   readonly url?: string;
   readonly props: Readonly<Record<string, unknown>>;
   readonly sourceId?: string;
+  /** Present on an occurrence of a series (and, in Phase 6, on an override): which one it stands for. */
+  readonly ref?: { readonly seriesId: SeriesId; readonly key: RecurrenceKey };
   /**
    * +1 on every change: what a render hook keys on to know it must run again.
    * The store owns it (Phase 1): normalization always says 0, "not yet assigned".

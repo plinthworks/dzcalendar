@@ -17,7 +17,7 @@ const pkg = (name) => join(root, 'packages', name);
 const read = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const run = (cmd, args, cwd = root) => execFileSync(cmd, args, { cwd, stdio: 'inherit' });
 
-const PACKAGES = ['core', 'dom', 'motion-gsap'];
+const PACKAGES = ['rrule', 'core', 'dom', 'motion-gsap'];
 const TZSLOT_RANGE = '^2.1.0';
 
 const shared = (name) => ({
@@ -96,7 +96,7 @@ for (const name of PACKAGES) {
   }
   // One Temporal for tzslot and DzCalendar: the range is a decision, not an accident.
   const tz = manifest.dependencies?.['@tzslot/core'];
-  if (name === 'core' && tz !== TZSLOT_RANGE) {
+  if ((name === 'core' || name === 'rrule') && tz !== TZSLOT_RANGE) {
     console.error(`packages/${name} depends on @tzslot/core ${tz}, expected ${TZSLOT_RANGE}`);
     process.exit(1);
   }

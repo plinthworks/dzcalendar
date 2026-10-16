@@ -16,8 +16,10 @@ import {
   layoutColumn,
   normalizeMany,
   viewWindow,
+  itemEvent,
 } from '../packages/core/src/index.js';
 import type { EventInput, Mutation } from '../packages/core/src/index.js';
+import { expandZoned, parseRRule } from '../packages/rrule/src/index.js';
 
 // Run by node with --expose-gc; `gc` is not in @types/node's globals.
 const gc = (globalThis as { gc?: () => void }).gc;
@@ -56,7 +58,7 @@ const raw = inputs(10_000);
 const load = () => {
   const { items } = normalizeMany(raw, ctx);
   const store = createEventStore();
-  store.apply(items.map((x) => ({ kind: 'event', after: x.event }) as Mutation), 'api');
+  store.apply(items.map((x) => ({ kind: 'event', after: itemEvent(x) }) as Mutation), 'api');
   return store;
 };
 load();
@@ -65,7 +67,7 @@ load();
 const results: Record<string, number> = {};
 results['normalize+index 10k'] = time(9, load);
 const { items } = normalizeMany(raw, ctx);
-const muts = items.map((x) => ({ kind: 'event', after: x.event }) as Mutation);
+const muts = items.map((x) => ({ kind: 'event', after: itemEvent(x) }) as Mutation);
 results['index 10k'] = time(5, () => createEventStore().apply(muts, 'api'));
 
 // The real path of a source: one chunk of 10 000, then the same again (a refresh).
@@ -88,6 +90,31 @@ const weekRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTI
 results['timeGrid week model (10k)'] = time(20, () => buildTimeGridModel(weekRange, store.snapshot, { displayZone: 'Europe/Paris' }));
 const monthRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.dayGridMonth!, nav);
 results['dayGrid month model (10k)'] = time(20, () => buildDayGridModel(monthRange, store.snapshot, { displayZone: 'Europe/Paris', maxLanes: 4 }));
+
+// Phase 5: recurrence. The criterion: a year of a daily rule in ≤ 5 ms.
+const daily = parseRRule('FREQ=DAILY');
+if (!daily.ok) throw new Error('rule');
+const dstart = Temporal.ZonedDateTime.from('2026-01-01T09:00[Europe/Paris]');
+const year = { from: dstart.toInstant(), to: dstart.add({ years: 1 }).toInstant() };
+results['expand daily 1 year'] = time(20, () => expandZoned(dstart, { rules: [daily.rule], exdates: [], rdates: [] }, year));
+// What a view pays: 200 weekly series seen through one week, two years after they began (fresh objects, no cache).
+const seriesInputs: EventInput[] = Array.from({ length: 200 }, (_, i) => ({
+  id: `r${i}`,
+  start: `2024-06-${String(3 + (i % 5)).padStart(2, '0')}T${String(8 + (i % 9)).padStart(2, '0')}:00[Europe/Paris]`,
+  duration: { minutes: 30 },
+  rrule: 'FREQ=WEEKLY',
+}));
+const seriesMuts = () => normalizeMany(seriesInputs, ctx).items.map((x) => (x.kind === 'series' ? { kind: 'series', after: x.series } : { kind: 'event', after: x.event }) as Mutation);
+results['normalize+index 200 series'] = time(10, () => createEventStore().apply(seriesMuts(), 'api'));
+const seriesWeek = viewWindow(Temporal.PlainDate.from('2026-06-01'), Temporal.PlainDate.from('2026-06-08'), 'Europe/Paris');
+// Fresh series each run: the occurrence cache would otherwise answer.
+const stores = Array.from({ length: 10 }, () => {
+  const st = createEventStore();
+  st.apply(seriesMuts(), 'api');
+  return st;
+});
+let si = 0;
+results['week of 200 series'] = time(10, () => stores[si++ % stores.length]!.snapshot.queryInstances(seriesWeek));
 
 let k = 0;
 results['apply one update'] = time(50, () => {

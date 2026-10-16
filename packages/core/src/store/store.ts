@@ -4,7 +4,10 @@ import type { MsSpan } from '../intervals.js';
 import { problem } from '../event/problems.js';
 import type { Problem } from '../event/problems.js';
 import type { Normalized } from '../event/normalize.js';
-import type { CalEvent, EventId, ResourceId } from '../event/types.js';
+import type { CalEvent, EventId, ResourceId, SeriesId } from '../event/types.js';
+import { occurrenceKey, escapeId, keyOf, seriesEquals } from '../recurrence/series.js';
+import { expandSeries, seriesSpan } from '../recurrence/expand.js';
+import type { Series } from '../recurrence/series.js';
 import type { Instant, PlainDate, ZoneId } from '../temporal.js';
 import { stamp } from './diff.js';
 import { isEmptyChange, mutationId } from './changes.js';
@@ -41,10 +44,10 @@ export function viewWindow(startDate: PlainDate, endDate: PlainDate, displayZone
 }
 
 export interface EventInstance {
-  /** The event id; `${seriesId}${SEP}${recurrenceKey}` for occurrences (Phase 5). */
+  /** The event id (escaped), or `seriesId@recurrenceKey` for an occurrence. */
   readonly key: string;
   readonly event: CalEvent;
-  /** Only `single` until Phase 5; the union is here now so adding series breaks no one. */
+  /** `override` arrives with Phase 6 editing. */
   readonly origin: 'single' | 'occurrence' | 'override';
 }
 
@@ -52,6 +55,8 @@ export interface QueryOptions {
   readonly resourceId?: ResourceId;
   /** Default true. `display: 'none'` events are never returned. */
   readonly includeBackground?: boolean;
+  /** Receives what expansion had to say (`too-many-occurrences`): the occurrences shown were cut. */
+  readonly onProblem?: (p: Problem) => void;
 }
 
 interface Indexes {
@@ -68,15 +73,10 @@ function spanOf(e: CalEvent): MsSpan {
   return { s, e: Math.max(e.end.epochMilliseconds, s + 1) };
 }
 
-function unindex(ix: Indexes, e: CalEvent): Indexes {
-  const { s } = spanOf(e);
-  return e.allDay ? { ...ix, days: ix.days.remove(s, e.id) } : { ...ix, timed: ix.timed.remove(s, e.id) };
-}
-
-function index(ix: Indexes, e: CalEvent): Indexes {
-  const { s, e: end } = spanOf(e);
-  return e.allDay ? { ...ix, days: ix.days.insert(s, end, e.id) } : { ...ix, timed: ix.timed.insert(s, end, e.id) };
-}
+const indexAdd = (ix: Indexes, id: string, allDay: boolean, sp: MsSpan): Indexes =>
+  allDay ? { ...ix, days: ix.days.insert(sp.s, sp.e, id) } : { ...ix, timed: ix.timed.insert(sp.s, sp.e, id) };
+const indexRemove = (ix: Indexes, id: string, allDay: boolean, sp: MsSpan): Indexes =>
+  allDay ? { ...ix, days: ix.days.remove(sp.s, id) } : { ...ix, timed: ix.timed.remove(sp.s, id) };
 
 /** @internal Everything a snapshot holds, by name. */
 interface SnapshotState {
@@ -84,15 +84,18 @@ interface SnapshotState {
   readonly events: PersistentOrderedMap<EventId, CalEvent>;
   readonly all: Indexes;
   readonly byResource: PersistentOrderedMap<ResourceId, Indexes>;
-  /** Which source chunks hold each source event. */
-  readonly owners: PersistentOrderedMap<EventId, readonly string[]>;
-  /** The ids each source chunk delivered last time. */
-  readonly chunks: PersistentOrderedMap<string, readonly EventId[]>;
+  readonly series: PersistentOrderedMap<SeriesId, Series>;
+  /** Series by the span of their occurrences (timed in ms, all-day in days). */
+  readonly seriesIdx: Indexes;
+  /** Which source chunks hold each source item (`event:id` / `series:id`). */
+  readonly owners: PersistentOrderedMap<string, readonly string[]>;
+  /** The item keys each source chunk delivered last time. */
+  readonly chunks: PersistentOrderedMap<string, readonly string[]>;
 }
 
 export interface MutationOptions {
   /**
-   * Stamp each `after` with this revision (an equal event keeps the stored
+   * Stamp each `after` with this revision (an equal one keeps the stored
    * object instead). Omitted to restore objects exactly — undo, redo, and
    * previews where revisions do not matter.
    */
@@ -101,7 +104,7 @@ export interface MutationOptions {
 
 /**
  * One immutable state of the store. Every index is persistent, so producing
- * the next snapshot copies O(log n) nodes per touched event and leaves this
+ * the next snapshot copies O(log n) nodes per touched item and leaves this
  * one exactly as it was — anything holding it keeps a consistent picture.
  */
 export class StoreSnapshot {
@@ -119,82 +122,131 @@ export class StoreSnapshot {
     events: PersistentOrderedMap.emptyStrings(),
     all: EMPTY_INDEXES,
     byResource: PersistentOrderedMap.emptyStrings(),
+    series: PersistentOrderedMap.emptyStrings(),
+    seriesIdx: EMPTY_INDEXES,
     owners: PersistentOrderedMap.emptyStrings(),
     chunks: PersistentOrderedMap.emptyStrings(),
   });
 
-  get counts(): { readonly events: number } {
-    return { events: this.state.events.size };
+  get counts(): { readonly events: number; readonly series: number } {
+    return { events: this.state.events.size, series: this.state.series.size };
   }
 
   getEvent(id: EventId): CalEvent | undefined {
     return this.state.events.get(id);
   }
 
+  getSeries(id: SeriesId): Series | undefined {
+    return this.state.series.get(id);
+  }
+
   allEvents(): IterableIterator<CalEvent> {
     return this.state.events.values();
   }
 
+  allSeries(): IterableIterator<Series> {
+    return this.state.series.values();
+  }
+
+  /** True while some chunk of its source still delivers the event (or series). */
+  isSourceOwned(id: string, kind: 'event' | 'series' = 'event'): boolean {
+    return this.state.owners.has(`${kind}:${id}`);
+  }
+
   /**
-   * The events a window shows. O(log n + k) per index, then a stable sort:
-   * start, longer first, title, id — so two queries of the same state list
-   * the same events in the same order, and an overlap layout is repeatable.
-   * No cutting into days here: that is the view's projection (`segmentTimed`).
+   * The events a window shows: single events from the indexes, occurrences
+   * of the series whose span meets the window (expanded only there, an
+   * occurrence that began before the window and runs into it included). A
+   * stable sort: start, longer first, title, key.
    */
   queryInstances(w: ViewWindow, opts: QueryOptions = {}): EventInstance[] {
     const ix = opts.resourceId === undefined ? this.state.all : this.state.byResource.get(opts.resourceId);
-    if (!ix) return [];
-    const found: CalEvent[] = [];
-    const take = (id: string) => {
-      const e = this.state.events.get(id)!;
-      if (e.display === 'none') return;
-      if (opts.includeBackground === false && (e.display === 'background' || e.display === 'inverse-background')) return;
-      found.push(e);
+    const keep = (e: CalEvent) =>
+      e.display !== 'none' && !(opts.includeBackground === false && (e.display === 'background' || e.display === 'inverse-background'));
+    const found: EventInstance[] = [];
+    if (ix) {
+      const take = (id: string) => {
+        const e = this.state.events.get(id)!;
+        if (keep(e)) found.push({ key: escapeId(e.id), event: e, origin: e.ref ? 'override' : 'single' });
+      };
+      ix.days.overlapping(epochDay(w.startDate), epochDay(w.endDate), take);
+      ix.timed.overlapping(w.start.epochMilliseconds, w.end.epochMilliseconds, take);
+    }
+    const series = (id: string) => {
+      const sr = this.state.series.get(id)!;
+      if (opts.resourceId !== undefined && !sr.base.resourceIds.includes(opts.resourceId)) return;
+      if (!keep(sr.base)) return;
+      const { occurrences, problems } = expandSeries(sr, w);
+      if (opts.onProblem) for (const p of problems) opts.onProblem(p);
+      for (const ev of occurrences) {
+        if (sr.overrides.has(ev.ref!.key)) continue;
+        found.push({ key: occurrenceKey(sr.id, ev.ref!.key), event: ev, origin: 'occurrence' });
+      }
     };
-    ix.days.overlapping(epochDay(w.startDate), epochDay(w.endDate), take);
-    ix.timed.overlapping(w.start.epochMilliseconds, w.end.epochMilliseconds, take);
+    this.state.seriesIdx.days.overlapping(epochDay(w.startDate), epochDay(w.endDate), series);
+    this.state.seriesIdx.timed.overlapping(w.start.epochMilliseconds, w.end.epochMilliseconds, series);
 
-    const keyed = found.map((event) => {
+    const keyed = found.map((inst) => {
+      const event = inst.event;
       const s = event.allDay ? event.start.toZonedDateTime({ timeZone: w.displayZone }).epochMilliseconds : event.start.epochMilliseconds;
       const e = event.allDay ? event.end.toZonedDateTime({ timeZone: w.displayZone }).epochMilliseconds : event.end.epochMilliseconds;
-      return { event, s, d: e - s };
+      return { inst, s, d: e - s };
     });
     keyed.sort(
       (a, b) =>
         a.s - b.s ||
         b.d - a.d ||
-        (a.event.title < b.event.title ? -1 : a.event.title > b.event.title ? 1 : 0) ||
-        (a.event.id < b.event.id ? -1 : a.event.id > b.event.id ? 1 : 0),
+        (a.inst.event.title < b.inst.event.title ? -1 : a.inst.event.title > b.inst.event.title ? 1 : 0) ||
+        (a.inst.key < b.inst.key ? -1 : a.inst.key > b.inst.key ? 1 : 0),
     );
-    return keyed.map(({ event }) => ({ key: event.id, event, origin: 'single' }));
+    return keyed.map(({ inst }) => inst);
   }
 
   /**
    * @internal The next snapshot after these mutations. Pure. Returns what
-   * each touched id looked like before, and the mutations as carried out.
+   * each touched event looked like before, the series touched, and the
+   * mutations as carried out.
    */
   withMutations(
     mutations: readonly Mutation[],
     o: MutationOptions = {},
-  ): { next: StoreSnapshot; touched: Map<EventId, CalEvent | undefined>; applied: Mutation[] } {
-    let { events, all, byResource } = this.state;
+  ): { next: StoreSnapshot; touched: Map<EventId, CalEvent | undefined>; seriesTouched: Set<SeriesId>; applied: Mutation[] } {
+    let { events, all, byResource, series, seriesIdx } = this.state;
     const touched = new Map<EventId, CalEvent | undefined>();
+    const seriesTouched = new Set<SeriesId>();
     const applied: Mutation[] = [];
 
     const drop = (e: CalEvent) => {
-      all = unindex(all, e);
+      const sp = spanOf(e);
+      all = indexRemove(all, e.id, e.allDay, sp);
       for (const r of e.resourceIds) {
         const ix = byResource.get(r);
-        if (ix) byResource = byResource.set(r, unindex(ix, e));
+        if (ix) byResource = byResource.set(r, indexRemove(ix, e.id, e.allDay, sp));
       }
     };
     const add = (e: CalEvent) => {
-      all = index(all, e);
-      for (const r of e.resourceIds) byResource = byResource.set(r, index(byResource.get(r) ?? EMPTY_INDEXES, e));
+      const sp = spanOf(e);
+      all = indexAdd(all, e.id, e.allDay, sp);
+      for (const r of e.resourceIds) byResource = byResource.set(r, indexAdd(byResource.get(r) ?? EMPTY_INDEXES, e.id, e.allDay, sp));
     };
 
     for (const m of mutations) {
       const id = mutationId(m);
+      if (m.kind === 'series') {
+        const current = series.get(id);
+        const after = m.after && o.stampAt !== undefined ? stampSeries(current, m.after, o.stampAt) : m.after;
+        if (current === after) continue;
+        applied.push({ kind: 'series', ...(current && { before: current }), ...(after && { after }) });
+        seriesTouched.add(id);
+        if (current) seriesIdx = indexRemove(seriesIdx, id, current.base.allDay, seriesSpan(current));
+        if (after) {
+          seriesIdx = indexAdd(seriesIdx, id, after.base.allDay, seriesSpan(after));
+          series = series.set(id, after);
+        } else {
+          series = series.delete(id);
+        }
+        continue;
+      }
       const current = events.get(id);
       if (!touched.has(id)) touched.set(id, current);
       const after = m.after && o.stampAt !== undefined ? stamp(current, m.after, o.stampAt) : m.after;
@@ -208,19 +260,20 @@ export class StoreSnapshot {
         events = events.delete(id);
       }
     }
-    const next = new StoreSnapshot({ ...this.state, version: this.version + 1, events, all, byResource });
-    return { next, touched, applied };
-  }
-
-  /** True while some chunk of the event's source still delivers it. */
-  isSourceOwned(id: EventId): boolean {
-    return this.state.owners.has(id);
+    const next = new StoreSnapshot({ ...this.state, version: this.version + 1, events, all, byResource, series, seriesIdx });
+    return { next, touched, seriesTouched, applied };
   }
 
   /** @internal */
   withSourceBookkeeping(owners: SnapshotState['owners'], chunks: SnapshotState['chunks']): StoreSnapshot {
     return new StoreSnapshot({ ...this.state, owners, chunks });
   }
+}
+
+/** A series equal to the stored one keeps that object; a different one takes the revision. */
+function stampSeries(prev: Series | undefined, next: Series, revision: number): Series {
+  if (prev && seriesEquals(prev, next)) return prev;
+  return next.revision === revision ? next : Object.freeze({ ...next, revision, base: Object.freeze({ ...next.base, revision }) as CalEvent });
 }
 
 export interface EventStore {
@@ -233,11 +286,11 @@ export interface EventStore {
    */
   apply(mutations: readonly Mutation[], cause: ChangeCause): StoreChange;
   /**
-   * Replaces what one chunk of one source delivered. An event delivered by two
-   * chunks (it overlaps both) belongs to both, and goes only when both drop it.
-   * An event equal to the stored one keeps its object and revision. The source
-   * is the authority: an event edited or deleted locally comes back as the
-   * source says on the next delivery.
+   * Replaces what one chunk of one source delivered — events and series. An
+   * item delivered by two chunks belongs to both, and goes only when both
+   * drop it. An item equal to the stored one keeps its object and revision.
+   * The source is the authority: an item edited or deleted locally comes back
+   * as the source says on the next delivery.
    */
   replaceSourceChunk(sourceId: string, chunk: string, items: readonly Normalized[]): StoreChange;
   subscribe(fn: (change: StoreChange) => void): () => void;
@@ -247,6 +300,7 @@ function describe(
   prev: StoreSnapshot,
   next: StoreSnapshot,
   touched: Map<EventId, CalEvent | undefined>,
+  seriesTouched: Set<SeriesId>,
   applied: Mutation[],
   cause: ChangeCause,
   problems: readonly Problem[],
@@ -266,12 +320,14 @@ function describe(
     if (before) mark(before);
     if (after) mark(after);
   }
-  const changed = added.length + updated.length + removed.length > 0;
+  const touchedSeries = [...seriesTouched].filter((id) => prev.getSeries(id) !== next.getSeries(id));
+  const changed = added.length + updated.length + removed.length + touchedSeries.length > 0;
   return {
     version: changed ? next.version : prev.version,
     added,
     updated,
     removed,
+    seriesTouched: touchedSeries,
     dirtySpans: normalizeIntervals(spans),
     dirtyDays: normalizeIntervals(days),
     cause,
@@ -307,56 +363,72 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
 
     apply(mutations, cause) {
       const restoring = cause === 'undo' || cause === 'redo';
-      const { next, touched, applied } = snapshot.withMutations(mutations, restoring ? {} : { stampAt: snapshot.version + 1 });
-      const change = describe(snapshot, next, touched, applied, cause, []);
+      const { next, touched, seriesTouched, applied } = snapshot.withMutations(mutations, restoring ? {} : { stampAt: snapshot.version + 1 });
+      const change = describe(snapshot, next, touched, seriesTouched, applied, cause, []);
       return isEmptyChange(change) ? change : commit(next, change);
     },
 
     replaceSourceChunk(sourceId, chunk, items) {
       const chunkKey = `${sourceId}\u0000${chunk}`;
-      const { events } = snapshot.state;
+      const { events, series } = snapshot.state;
       let owners = snapshot.state.owners;
       const problems: Problem[] = [];
       const mutations: Mutation[] = [];
-      const delivered = new Set<EventId>();
+      const delivered = new Set<string>();
 
       for (const item of items) {
-        const event = item.event;
-        const current = events.get(event.id);
-        if (current && current.sourceId !== sourceId) {
-          // Someone else holds this id now (a user event, another source):
+        const kind = item.kind;
+        const id = kind === 'event' ? item.event.id : item.series.id;
+        const tag = `${kind}:${id}`;
+        const current = kind === 'event' ? events.get(id) : series.get(id);
+        // An id is one thing: an event and a series may not share it, whoever brought them.
+        const other = kind === 'event' ? series.get(id) : events.get(id);
+        if ((current && current.sourceId !== sourceId) || other) {
+          // Someone else holds this id now (a user's, another source's):
           // refuse, and stop counting this chunk among the id's owners.
-          problems.push(problem('duplicate-id', 'error', `${sourceId}/${chunk}`, event.id));
-          const rest = (owners.get(event.id) ?? []).filter((k) => k !== chunkKey);
-          owners = rest.length > 0 ? owners.set(event.id, rest) : owners.delete(event.id);
+          problems.push(problem('duplicate-id', 'error', `${sourceId}/${chunk}`, id));
+          const rest = (owners.get(tag) ?? []).filter((k) => k !== chunkKey);
+          owners = rest.length > 0 ? owners.set(tag, rest) : owners.delete(tag);
           continue;
         }
-        if (delivered.has(event.id)) continue;
-        delivered.add(event.id);
-        const own = owners.get(event.id);
-        if (!own) owners = owners.set(event.id, [chunkKey]);
-        else if (!own.includes(chunkKey)) owners = owners.set(event.id, [...own, chunkKey]);
-        const tagged = event.sourceId === sourceId ? event : ({ ...event, sourceId } as CalEvent);
-        mutations.push({ kind: 'event', ...(current && { before: current }), after: tagged });
+        if (delivered.has(tag)) continue;
+        delivered.add(tag);
+        const own = owners.get(tag);
+        if (!own) owners = owners.set(tag, [chunkKey]);
+        else if (!own.includes(chunkKey)) owners = owners.set(tag, [...own, chunkKey]);
+        if (kind === 'event') {
+          const tagged = item.event.sourceId === sourceId ? item.event : ({ ...item.event, sourceId } as CalEvent);
+          mutations.push({ kind: 'event', ...(current && { before: current as CalEvent }), after: tagged });
+        } else {
+          const tagged = item.series.sourceId === sourceId ? item.series : { ...item.series, sourceId };
+          mutations.push({ kind: 'series', ...(current && { before: current as Series }), after: tagged });
+        }
       }
 
-      for (const id of snapshot.state.chunks.get(chunkKey) ?? []) {
-        if (delivered.has(id)) continue;
-        const rest = (owners.get(id) ?? []).filter((k) => k !== chunkKey);
+      for (const tag of snapshot.state.chunks.get(chunkKey) ?? []) {
+        if (delivered.has(tag)) continue;
+        const rest = (owners.get(tag) ?? []).filter((k) => k !== chunkKey);
         if (rest.length > 0) {
-          owners = owners.set(id, rest);
+          owners = owners.set(tag, rest);
           continue;
         }
-        owners = owners.delete(id);
-        const current = events.get(id);
-        // Only what this source still owns: the id may now be a user's event.
-        if (current && current.sourceId === sourceId) mutations.push({ kind: 'event', before: current });
+        owners = owners.delete(tag);
+        const [kind, ...idParts] = tag.split(':');
+        const id = idParts.join(':');
+        // Only what this source still owns: the id may now be a user's.
+        if (kind === 'event') {
+          const current = events.get(id);
+          if (current && current.sourceId === sourceId) mutations.push({ kind: 'event', before: current });
+        } else {
+          const current = series.get(id);
+          if (current && current.sourceId === sourceId) mutations.push({ kind: 'series', before: current });
+        }
       }
 
       const chunks = delivered.size > 0 ? snapshot.state.chunks.set(chunkKey, [...delivered]) : snapshot.state.chunks.delete(chunkKey);
       const base = snapshot.withSourceBookkeeping(owners, chunks);
-      const { next, touched, applied } = base.withMutations(mutations, { stampAt: base.version + 1 });
-      const change = describe(base, next, touched, applied, 'source', problems);
+      const { next, touched, seriesTouched, applied } = base.withMutations(mutations, { stampAt: base.version + 1 });
+      const change = describe(base, next, touched, seriesTouched, applied, 'source', problems);
       return commit(isEmptyChange(change) ? base : next, change);
     },
 
@@ -366,3 +438,5 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
     },
   };
 }
+
+export { keyOf };

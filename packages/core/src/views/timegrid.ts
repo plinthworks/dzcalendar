@@ -245,11 +245,13 @@ const overlaps = (s: number, e: number, spans: readonly { s: number; e: number }
  * them with `===`. Returns `prev` itself when nothing it shows changed.
  */
 export function updateTimeGridModel(prev: TimeGridModel, snap: StoreSnapshot, change: StoreChange): TimeGridModel {
-  if (change.version === prev.version || change.added.length + change.updated.length + change.removed.length === 0) return prev;
+  if (change.version === prev.version || change.added.length + change.updated.length + change.removed.length + change.seriesTouched.length === 0) return prev;
   const o = prev.options;
+  // A series' occurrences may fall in any column: a touched series rebuilds them all.
+  const everything = change.seriesTouched.length > 0;
   let touched = false;
   const columns = prev.columns.map((col) => {
-    if (col.folded || !overlaps(col.axis.start.epochMilliseconds, col.axis.end.epochMilliseconds, change.dirtySpans)) return col;
+    if (col.folded || (!everything && !overlaps(col.axis.start.epochMilliseconds, col.axis.end.epochMilliseconds, change.dirtySpans))) return col;
     touched = true;
     return buildTimeGridColumn(col.date, snap, o, col.axis);
   });
@@ -257,7 +259,7 @@ export function updateTimeGridModel(prev: TimeGridModel, snap: StoreSnapshot, ch
   const last = prev.range.dates[prev.range.dates.length - 1];
   const dayLo = first ? epochDayOf(first) : 0;
   const dayHi = last ? epochDayOf(last) + 1 : 0;
-  const allDayDirty = overlaps(dayLo, dayHi, change.dirtyDays);
+  const allDayDirty = everything || overlaps(dayLo, dayHi, change.dirtyDays);
   const allDay = allDayDirty ? buildAllDay(prev.range, snap, o) : prev.allDay;
   // Nothing it shows changed: the same object, so nothing downstream redraws.
   if (!touched && !allDayDirty) return prev;

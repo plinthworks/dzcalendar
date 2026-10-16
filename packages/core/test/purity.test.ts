@@ -3,11 +3,13 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * The core's promise, enforced by reading its sources: no `Date`, no global
- * `Temporal`, no polyfill imported behind tzslot's back, no DOM.
+ * The core's promise — and rrule's, which it depends on — enforced by reading
+ * their sources: no `Date`, no global `Temporal`, no polyfill imported behind
+ * tzslot's back, no DOM.
  * Comments are stripped first — they are allowed to talk about `Date`.
  */
 const SRC = new URL('../src', import.meta.url).pathname;
+const RRULE = new URL('../../rrule/src', import.meta.url).pathname;
 
 const files = (dir: string): string[] =>
   readdirSync(dir).flatMap((f) => {
@@ -30,7 +32,7 @@ const FORBIDDEN: [string, RegExp][] = [
 ];
 
 describe('core purity', () => {
-  const all = files(SRC);
+  const all = [...files(SRC), ...files(RRULE)];
 
   it('finds the sources', () => {
     expect(all.length).toBeGreaterThan(5);
@@ -45,6 +47,6 @@ describe('core purity', () => {
 
   it('only temporal.ts imports @tzslot/core for Temporal itself', () => {
     const importers = all.filter((f) => /import\s*\{[^}]*\bTemporal\b[^}]*\}\s*from\s*['"]@tzslot\/core['"]/.test(readFileSync(f, 'utf8')));
-    expect(importers.map((f) => f.slice(SRC.length + 1))).toEqual(['temporal.ts']);
+    expect(importers.map((f) => f.replace(SRC, 'core').replace(RRULE, 'rrule'))).toEqual(['core/temporal.ts', 'rrule/temporal.ts']);
   });
 });

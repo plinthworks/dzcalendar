@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Temporal, createIdGenerator, normalizeEvent, normalizeMany } from '../src/index.js';
+import { Temporal, createIdGenerator, normalizeEvent, normalizeMany, itemEvent } from '../src/index.js';
 import type { EventInput, NormalizeContext, NormalizeResult, ProblemCode, TimedEvent, AllDayEvent } from '../src/index.js';
 
 const ctx = (over: Partial<NormalizeContext> = {}): NormalizeContext => ({
@@ -11,7 +11,7 @@ const ctx = (over: Partial<NormalizeContext> = {}): NormalizeContext => ({
 const accept = (input: EventInput, c = ctx()) => {
   const r = normalizeEvent(input, c);
   if (!r.ok) throw new Error(`rejected: ${JSON.stringify(r.problems)}`);
-  return { event: r.value.event, codes: r.problems.map((p) => p.code) };
+  return { event: itemEvent(r.value), codes: r.problems.map((p) => p.code) };
 };
 const timed = (input: EventInput, c?: NormalizeContext) => {
   const { event, codes } = accept(input, c);
@@ -317,8 +317,11 @@ describe('rejections', () => {
     expect(() => normalizeMany([], ctx({ defaultEventZone: 'Nowhere' }))).toThrow(RangeError);
   });
 
-  it('unsupported-recurrence until Phase 5, rather than a single wrong occurrence', () => {
-    expect(rejectedWith(normalizeEvent({ start: '2026-05-01', rrule: 'FREQ=DAILY' }, ctx()))).toEqual(['unsupported-recurrence']);
+  it('invalid-rrule, invalid-exdate, invalid-rdate: a series that cannot be read is refused whole', () => {
+    expect(rejectedWith(normalizeEvent({ start: '2026-05-01', rrule: 'FREQ=FORTNIGHTLY' }, ctx()))).toEqual(['invalid-rrule']);
+    expect(rejectedWith(normalizeEvent({ start: '2026-05-01', rrule: 'FREQ=HOURLY' }, ctx()))).toEqual(['invalid-rrule']);
+    expect(rejectedWith(normalizeEvent({ start: '2026-05-01', rrule: 'FREQ=DAILY', exdate: ['someday'] }, ctx()))).toEqual(['invalid-exdate']);
+    expect(rejectedWith(normalizeEvent({ start: '2026-05-01', rrule: 'FREQ=DAILY', rdate: ['never'] }, ctx()))).toEqual(['invalid-rdate']);
   });
 });
 
@@ -377,8 +380,8 @@ describe('normalizeMany', () => {
       ctx(),
       'api',
     );
-    expect(items.map((x) => x.event.id)).toEqual(['a', 'b']);
-    expect(items[0]!.event.sourceId).toBe('api');
+    expect(items.map((x) => itemEvent(x).id)).toEqual(['a', 'b']);
+    expect(itemEvent(items[0]!).sourceId).toBe('api');
     expect(report).toMatchObject({ accepted: 2, rejected: 3 });
     expect(report.problems.map((p) => [p.code, p.path])).toEqual([
       ['invalid-event', 'events[0]'],

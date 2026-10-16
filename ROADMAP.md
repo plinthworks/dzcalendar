@@ -474,11 +474,114 @@ Found on the way:
 - Month ARIA structure (bars inside cells) and roving focus — Phase 8.
 - Per-instance registries alongside the global ones; extensible `ModelOptions`.
 
-## Next — Phase 5: recurrence
+## Phase 5 — recurrence ✅ (2026-10-16, before reviews)
 
-Carried from the Phase 4 review: a structured or escaped instance key (an id
-may contain `|`), `seriesTouched` handled by the models' updates, one query
-per window cached per snapshot, `Mutation` beyond events, menu sub-menus for
-the recurrence scope.
+- `@dzcalendar/rrule` (4.4 kB gz, budget 7): `parseRRule` (never throws;
+  UNTIL as a date or a UTC date-time; extensions such as RSCALE refused),
+  `serializeRRule`, `iterateZoned` / `iterateDates`, `expandZoned` /
+  `expandDates` (RDATE added, EXDATE as an instant or as a date in the
+  series' zone), `lastStart` (null when endless). Days are civil day
+  numbers; DAILY and slower keep the wall time (`compatible`: a gap moves
+  forward, a repeated time takes its first reading); HOURLY and finer step
+  in elapsed time. A rule that can never happen ends after one 400-year
+  Gregorian cycle of empty periods (29 February waits 8 years, not 400).
+  Skip-ahead: occurrences before a window are counted, not built — COUNT
+  stays exact, a window two years after DTSTART costs arithmetic.
+- Core: `Series { id, revision, base, set, overrides, sourceId }`; an event
+  with `rrule` normalizes to `{ kind: 'series' }` (`invalid-rrule`,
+  `invalid-exdate`, `invalid-rdate` replace `unsupported-recurrence`;
+  sub-daily rules on all-day events refused). `RecurrenceKey` = the
+  original start's full string, offset included (the two 02:30s are two
+  occurrences). Instance key `escape(seriesId)@key`, ids escaped (`%`, `|`,
+  `@`). Store: `series` map, `seriesIdx` by occurrence span (endless =
+  MAX_SAFE_INTEGER), `Mutation` of kind `series`, `StoreChange.seriesTouched`,
+  sources deliver series (owners keyed `event:id` / `series:id`).
+  `queryInstances` expands the series whose span meets the window, widened
+  back by the length; occurrences are materialized once per series object
+  (WeakMap), so an unchanged series redraws nothing. History, `invert`,
+  `compact` and invalidation work per `kind:id`. Commands: `event.create`
+  with `rrule` creates a series; `series.delete`. Models rebuild every
+  column/week when `seriesTouched` is non-empty. DOM: `data-series-id`.
+- Conformance: `rrule-expand`, 100 cases — 80 expectations computed by
+  python-dateutil 2.9 (`scripts/conformance-crosscheck.py`, an independent
+  implementation, not shipped), 20 written by hand (sub-daily across clock
+  changes, EXDATE/RDATE, all-day, limits, refusals). A deliberately wrong
+  expectation fails the runner.
+- Bench (minified): a year of a daily rule 1.7 ms (budget 5); a week seen
+  through 200 weekly series started two years earlier 15 ms (83 ms before
+  skip-ahead; budget 30).
+- Browser: 19/19 (a demo series Mon/Wed/Fri 09:30 Paris with an EXDATE:
+  two then three occurrences, same position across the clock change).
 
-See `ARCHITECTURE.md` J. Phase 4.
+### Architect review, fixed before closing Phase 5
+- No input can stall: `lastStart` walks at most 50 000 (beyond, the series
+  is indexed as endless — a safe bound); plain sub-daily COUNT is arithmetic;
+  a sub-daily rule skips non-matching days in day arithmetic (a barren
+  `MINUTELY;BYMONTHDAY=30;BYMONTH=2` ends after one 400-year cycle of
+  integers), and every sub-daily generator stops at 2 000 000 steps.
+- DTSTART on the second reading of a repeated hour is yielded as itself.
+- All-day EXDATE given as a moment names its wall day (was read in UTC).
+- `limit`: detected by fetching one more (exactly `limit` is not too many),
+  RDATEs counted before the cut; `expandSeries` (`core/recurrence/expand.ts`)
+  returns `{ occurrences, problems }`, `queryInstances({ onProblem })`
+  receives `too-many-occurrences`; conformance asserts it (`withProblems`).
+- An occurrence keeps the base's end zone; the window is widened back by an
+  hour per wall day of the length (25-hour days); an RDATE before DTSTART
+  widens the index span (`firstStart`); the occurrence cache is capped at
+  2 000 per series.
+- `is-series` / `is-occurrence` instead of `unknown-event`;
+  `parseInstanceKey`; `occurrenceLength` (nominal, RFC DURATION) named apart
+  from a moved event's elapsed length; purity test covers `rrule`, which now
+  takes its Temporal types from `@tzslot/core`.
+
+### Code review (verified by execution: 16 000-rule skip-ahead fuzz, 1 500 rules against dateutil), fixed
+- Sub-daily rules with BY parts no longer hit the step budget: a non-matching
+  hour or minute jumps to the next one that can match (never across a zone
+  transition — wall time rewinds at a fall-back); a generator that still runs
+  out of steps reports `too-many-occurrences` and `lastStart` returns null.
+- Several rules: the limit is counted per rule, then the sorted union is cut.
+- The occurrence cache forgets its older half (cap 8 000), not everything.
+- A source may not bring a series with an event's id, or the reverse.
+- WEEKLY + BYSETPOS follows RFC 5545 (the set is the whole WKST week);
+  dateutil and rrule.js — FullCalendar's plugin — start the first week at
+  DTSTART. A hand-written case pins our reading. The other dateutil
+  differences found were dateutil's (mixed BYDAY, BYWEEKNO at year's end).
+
+### Not done in Phase 5, on purpose
+- A DTSTART typed in a gap (02:30 on spring-forward day) is normalized to
+  03:30 first, so the series repeats at 03:30: the event says when it starts.
+- `Occurrence.ambiguous` (B.8): not on the materialized event yet — the
+  DOM marks repeated hours from the axis; revisit with Phase 6 editing.
+- `too-many-occurrences` is not drawn by the DOM yet (Phase 8 messages).
+- Editing one occurrence / the following / all (overrides, split series),
+  the recurrence-scope sub-menu — Phase 6.
+- A query cache per (snapshot, window): occurrence objects are already
+  stable; measured need first.
+- **Budget watch:** `normalize+index 10k` measures 70–75 ms against 70 —
+  and so does the Phase 4 commit, A/B on the same machine at the same time
+  (HEAD 70.0–74.6, Phase 5 70.8–73.4): no regression from recurrence, the
+  line has sat on its budget since Phase 4. To decide: optimize
+  normalization or revise the budget.
+
+## Next — Phase 6: editing series and validation
+
+From the Phase 5 architect review, to do with the editing:
+- Granularity: keep `base`/`set` identity when equal, key the occurrence
+  cache by `series.base`, stamp occurrences with `base.revision` — one
+  override must not redraw every occurrence.
+- Dirty spans for series: an overrides/EXDATE-only change dirties that
+  occurrence's span, not every column.
+- `ref` survives `event.update` (`toInput`, round-trip test); a snapshot
+  invariant helper (overrides map ⇔ `event.ref`).
+- Cascades: `series.delete` deletes its overrides; a source replacing a
+  series drops overrides it no longer lists (the source is the authority);
+  overrides inherit `sourceId`.
+- "All" edits that change the time or zone remap every key (overrides,
+  EXDATE, `ref.key`) in one transaction.
+- rrule: `countBefore`, `truncate(rule, start, cut)` for "following";
+  `splitFrom?` on `Series`.
+- DOM: `data-recurrence-key`; the scope sub-menu (`ActionItem.children`,
+  default `this`).
+- Memoize `seriesSpan` per series; a "leak over 5 000 queries" bench line.
+
+See `ARCHITECTURE.md` J. Phase 6.

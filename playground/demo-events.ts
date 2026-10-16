@@ -5,7 +5,8 @@ import type { EventInput } from '@dzcalendar/core';
  * change in Paris, events in other zones, the two 02:30s, an all-day trip.
  */
 export const DEMO_EVENTS: EventInput[] = [
-  { id: 'standup-mon', title: 'Stand-up', start: '2026-10-19T09:30[Europe/Paris]', duration: { minutes: 15 }, tone: 'blue' },
+  // A series: Monday, Wednesday, Friday at 09:30 Paris, still 09:30 after the clocks change; not on the 23rd.
+  { id: 'standup', title: 'Stand-up', start: '2026-10-19T09:30[Europe/Paris]', duration: { minutes: 15 }, tone: 'blue', rrule: 'FREQ=WEEKLY;BYDAY=MO,WE,FR', exdate: ['2026-10-23'] },
   { id: 'design', title: 'Revue de design', start: '2026-10-19T10:00[Europe/Paris]', end: '2026-10-19T11:30[Europe/Paris]', tone: 'violet' },
   { id: 'lunch', title: 'Déjeuner', start: '2026-10-19T12:30[Europe/Paris]', duration: { hours: 1 }, tone: 'green' },
   { id: 'overlap-a', title: 'Point client', start: '2026-10-20T14:00[Europe/Paris]', end: '2026-10-20T15:30[Europe/Paris]', tone: 'amber' },
