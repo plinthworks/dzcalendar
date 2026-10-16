@@ -145,6 +145,16 @@ const perms = (start: boolean, duration: boolean, resource: boolean) =>
   PERMS[(start ? 1 : 0) | (duration ? 2 : 0) | (resource ? 4 : 0)]!;
 const list = (xs: readonly string[]): readonly string[] => (xs.length === 0 ? EMPTY_LIST : Object.freeze(xs));
 
+/**
+ * Class names as tokens: "a b" is two classes, "" none — so the DOM can add
+ * them one by one without `classList` throwing on a space or an empty string.
+ */
+function classList(xs: readonly string[] | undefined): readonly string[] {
+  if (!xs || xs.length === 0) return EMPTY_LIST;
+  const tokens = xs.flatMap((x) => String(x).split(/\s+/)).filter((x) => x.length > 0);
+  return list([...new Set(tokens)]);
+}
+
 function buildCommon(input: EventInput, ctx: NormalizeContext, path: string, problems: Problem[]) {
   const resourceIds =
     !given(input.resourceId) && !(input.resourceIds && input.resourceIds.length > 0)
@@ -170,8 +180,9 @@ function buildCommon(input: EventInput, ctx: NormalizeContext, path: string, pro
       input.durationEditable ?? editable,
       input.resourceEditable ?? editable,
     ),
-    classNames: input.classNames && input.classNames.length > 0 ? list([...input.classNames]) : EMPTY_LIST,
-    ...(given(input.tone) && { tone: input.tone }),
+    classNames: classList(input.classNames),
+    // A tone names a CSS token (`--dz-tone-<tone>`): anything else is ignored, never interpolated.
+    ...(given(input.tone) && /^[a-z0-9_-]+$/i.test(input.tone) && { tone: input.tone }),
     ...(given(input.url) && { url: input.url }),
     props: input.extendedProps && Object.keys(input.extendedProps).length > 0 ? Object.freeze({ ...input.extendedProps }) : EMPTY_PROPS,
     revision: 0,

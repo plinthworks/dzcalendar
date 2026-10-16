@@ -1,0 +1,16 @@
+{
+  "name": "@dzcalendar/theme",
+  "version": "0.0.0",
+  "description": "An optional stylesheet for DzCalendar, of one family with @tzslot/theme. Plain CSS, no framework.",
+  "license": "MIT",
+  "main": "./dzcalendar.css",
+  "exports": {
+    ".": "./dzcalendar.css",
+    "./dzcalendar.css": "./dzcalendar.css",
+    "./dzcalendar.scss": "./dzcalendar.scss",
+    "./dzcalendar": { "sass": "./dzcalendar.scss", "default": "./dzcalendar.css" }
+  },
+  "files": ["dzcalendar.css", "dzcalendar.scss"],
+  "sideEffects": ["*.css"],
+  "sass": "./dzcalendar.scss"
+}

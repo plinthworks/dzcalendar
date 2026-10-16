@@ -7,8 +7,9 @@ import type { DayInfo } from '../zone.js';
 /**
  * One event's piece on one day column — what the DOM draws and reconciles.
  *
- * `key` is stable across renders (`instance|day|part`), so the reconciler
- * moves or updates the same node rather than rebuilding it.
+ * `key` is stable across renders (`instance|YYYY-MM-DD|part`) — by date, not
+ * column, so hiding a weekend or moving the view keeps it — and the
+ * reconciler updates the same node rather than rebuilding it.
  */
 export interface Segment {
   readonly key: string;
@@ -85,7 +86,7 @@ export function segmentTimed(instance: EventInstance, days: readonly DayInfo[], 
     const bounds = [from, ...cuts, to];
     for (let p = 0; p < bounds.length - 1; p++) {
       out.push({
-        key: `${instance.key}|${d}|${p}`,
+        key: `${instance.key}|${day.date.toString()}|${p}`,
         instance,
         dayIndex: d,
         dayCount: 1,
@@ -137,7 +138,7 @@ export function segmentAllDay(instance: EventInstance, view: DateIndex): Segment
     const col = runStart;
     const count = view.colOf(dayFrom(lastDay)) - col + 1;
     out.push({
-      key: `${instance.key}|${col}|${part++}`,
+      key: `${instance.key}|${dayFrom(runFirstDay).toString()}|${part++}`,
       instance,
       dayIndex: col,
       dayCount: count,

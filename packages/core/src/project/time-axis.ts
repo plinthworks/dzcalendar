@@ -157,7 +157,9 @@ export function buildColumnAxis(date: PlainDate, zone: ZoneId, o: ColumnAxisOpti
       ticks(step) {
         assertStep(step);
         const out: AxisTick[] = [];
-        for (let p = 0; p <= length + 1e-9; p += step) {
+        // On the clock's multiples of `step`: a grid from 08:30 still labels 09:00.
+        const first = (step - (minM % step)) % step;
+        for (let p = first; p <= length + 1e-9; p += step) {
           const wall = wallAt(date, minM + p);
           const r = resolveWall(wall.toPlainDate(), wall.toPlainTime(), zone, 'earlier');
           out.push({
@@ -179,7 +181,6 @@ export function buildColumnAxis(date: PlainDate, zone: ZoneId, o: ColumnAxisOpti
   const clamp = (p: number) => Math.min(length, Math.max(0, p));
   const raw = (i: Instant) => (i.epochMilliseconds - origin.epochMilliseconds) / 60000;
   const toPosition = (i: Instant) => clamp(raw(i));
-  const repeats = day.transitions.filter((t) => t.kind === 'repeat');
   const bands: AxisBand[] = [];
   for (const t of day.transitions) {
     if (t.kind === 'repeat') {
@@ -209,26 +210,24 @@ export function buildColumnAxis(date: PlainDate, zone: ZoneId, o: ColumnAxisOpti
     },
     ticks(step) {
       assertStep(step);
+      // Walk the wall clock, not elapsed minutes: every wall multiple of
+      // `step` that happens gets a tick, twice when it happens twice. On Lord
+      // Howe's 23 h 30 day the hours after the jump still fall on :00.
       const out: AxisTick[] = [];
-      for (let p = 0; p <= length + 1e-9; p += step) {
-        const instant = origin.add({ milliseconds: Math.round(p * 60000) });
-        const zdt = instant.toZonedDateTimeISO(zone);
-        const second = repeats.some((t) => {
-          const at = t.at.epochMilliseconds;
-          return instant.epochMilliseconds >= at && instant.epochMilliseconds < at - t.deltaMinutes * 60000;
-        });
-        const first = repeats.some((t) => {
-          const at = t.at.epochMilliseconds;
-          return instant.epochMilliseconds < at && instant.epochMilliseconds >= at + t.deltaMinutes * 60000;
-        });
-        out.push({
-          position: p,
-          label: zdt.toPlainTime(),
-          instant,
-          ...(second ? { note: 'second-pass' as const } : first ? { note: 'first-pass' as const } : {}),
-          major: zdt.minute === 0,
-        });
+      for (let w = Math.ceil(minM / step) * step; w <= maxM + 1e-9; w += step) {
+        const wall = wallAt(date, w);
+        const r = resolveWall(wall.toPlainDate(), wall.toPlainTime(), zone, 'earlier');
+        if (!r.exists || !r.instant) continue;
+        const readings: [Instant, AxisTick['note']][] = r.ambiguous && r.other
+          ? [[r.instant, 'first-pass'], [r.other, 'second-pass']]
+          : [[r.instant, undefined]];
+        for (const [instant, note] of readings) {
+          const p = raw(instant);
+          if (p < -1e-9 || p > length + 1e-9) continue;
+          out.push({ position: p, label: wall.toPlainTime(), instant, ...(note ? { note } : {}), major: wall.minute === 0 });
+        }
       }
+      return out.sort((a, b) => a.position - b.position);
       return out;
     },
   };

@@ -274,7 +274,107 @@ Lessons:
 on machine load (load average ~5 during this phase). Not reliably met;
 nothing in Phases 1–2 changed that path since it was measured at 61–67.
 
-## Next — Phase 3: time grid in the DOM (read-only)
+## Phase 3 — time grid in the DOM (read-only) ✅ (2026-10-16)
 
-See `ARCHITECTURE.md` J. Phase 3, plus the theme, playground and `dst.html`
-moved here from Phase 0.
+Owner decisions (2026-10-16): **own CSS, of one family with tzslot** (same
+palette names and values); `slotMax` stays ≤ 24 h for now; GSAP as an
+optional adapter from this phase.
+
+- **core**: segment keys by ISO date; `buildTimeGridColumn`,
+  `updateTimeGridModel` (rebuilds only columns a change touches, others keep
+  their identity), `locateNow`, offset readings (`first`/`second` pass) and
+  real length on days with a clock change, gutter ticks, `visualHeight`.
+  **Minimal kernel** (`createKernel`): date, view, zone, locale week rules,
+  navigation, title, memoized view model, injectable `store` and `now`.
+- **@dzcalendar/dom**: `createCalendar(host, options)` → `{ kernel, element,
+  update, navigate, destroy }`. Toolbar, day headers (a day that is not 24 h
+  says so), all-day row, gutter, columns keyed by date, DST bands (hatched
+  gap, dashed repeat, both named), events placed by axis minutes ×
+  `--dz-minute` (no pixel measured), second-pass mark and offset badge,
+  "N h real" badge, folded skipped day, now line (minute-aligned timer).
+  Keyed reconciler: an unchanged column, event or header is not touched.
+  Messages EN/FR. Structural CSS injected, every colour
+  `var(--dz-x, var(--tz-x, system colour))`.
+- **@dzcalendar/theme**: SCSS → CSS (drift test), tzslot's nine palette
+  colours under `--tz-*`, named tones `--dz-tone-*`, sizes on `.dz-cal`.
+- **@dzcalendar/motion-gsap**: view slide and event entrance through the
+  DOM's motion hooks; `gsap.matchMedia` turns everything off under
+  `prefers-reduced-motion`; transforms and `autoAlpha` only, `clearProps`.
+  GSAP is a peer dependency, never bundled by `dom` (457 bytes gzip).
+- **Playground** (`npm start`, port 4600): `index.html` (zone, axis, theme,
+  GSAP toggles) and `dst.html` — one store, four kernels: Paris, Chicago,
+  Lord Howe, Sydney, with buttons for each clock change of 2026.
+
+Seen in real Chrome (playwright-core, system Chrome), not only jsdom:
+- Found there: the gutter rendered on the **right** with every column shifted
+  (the keyed list inserted before the grid's first child, the gutter) — fixed
+  with a dedicated host and a jsdom test of DOM order.
+- Found there: the DST band measured 54 px for an hour of 48 (padding and
+  border added to the height) — `box-sizing: border-box`; measured 48 after.
+- Found there: the theme was never loaded in the playground (a `<link>` to a
+  path outside Vite's root, 404) — imported from TS.
+- A tone set as `--dz-accent: var(--dz-tone-x, var(--dz-accent…))` on one
+  element is a cycle and invalid: events now use `--dz-event-accent`.
+- Measured in Chrome: all seven columns of the Paris week 1152 px tall
+  (1440 min × 0.8 px), the two 02:30s side by side at the same top.
+
+Sizes (minified, gzip): core + dom **20.2 kB without the polyfill**, 39.7 kB
+with it (tzslot 2.1.0 ships the basic polyfill).
+
+Known, for later: the 25-hour Sunday is cramped in a narrow week grid (an
+event across the fall-back is two parts in two lanes); the shortest events
+clip their time label; ticks in `elapsed` mode follow elapsed minutes.
+
+### Reviews (architect + code review in jsdom and real Chrome), fixed before closing Phase 3
+
+- **Readings were the piece's, not the event's**: a night across the
+  fall-back read "00:00 – 06:00*" (06:00 happens once). Readings are now the
+  event's own; an end is marked second-pass only when it lies *inside* that
+  pass; an end at the fall-back instant shows 03:00, not "02:00*".
+- **Today froze at midnight** while the now line moved on: `kernel.refreshToday()`
+  from the minute timer.
+- **Gutter lost its hours** with `slotMin: PT8H30M` (ticks at :30, unlabelled)
+  and on Lord Howe's elapsed axis: ticks walk the wall clock.
+- **The theme overrode sizes set by the page** (`--dz-height` declared on
+  `.dz-cal` itself): sizes now live on `:root` and are read with fallbacks.
+  The theme no longer redeclares a radius of its own (`--tz-radius` is shared).
+- `update({ locale })` did not retitle: `kernel.setLocale`.
+- `timeZone: undefined` or `locale: ''` threw: defaults now go after the spread.
+- Headers and all-day row drifted 13–15 px from the columns with classic
+  scrollbars: `scrollbar-gutter: stable` on all three rows.
+- A replaced motion adapter was never destroyed; the scroll on first paint
+  ignored a handed-in kernel's `slotMin`.
+- `update()` echoing current values rebuilt everything, re-animated and
+  re-announced the title: no-ops detected, one paint per update, the title
+  node only rewritten when it changes. A view the DOM cannot draw is refused
+  before the kernel moves (`kernel.getViewSpec`).
+- Class names are tokens (a space or an empty string no longer throws); a
+  tone must match `[a-z0-9_-]+`; an event's own classes are swapped as a set.
+- A11y: columns `group`, events and bars `button`; the spoken label gives the
+  offsets instead of "*", the real length, and the event's zone when it is
+  not the one on screen. `dir` follows the locale; times stay LTR.
+- A subscriber that throws no longer starves the others (nor other kernels
+  sharing a store). `updateTimeGridModel` returns the same object when
+  nothing it shows changed.
+- 20 regression tests (`packages/dom/test/review3.test.ts`), one per finding.
+
+### Step 4.0 — before drawing the day grid (from the architect's review)
+
+1. `ViewHost` / `registerView`: the DOM mounts a view per family; the kernel
+   asks a registry of model builders instead of `if family`.
+2. `settings.ts` (resolve + diff, a handler per key) and a mutable kernel:
+   `setOptions`, `setEvents` (via `replaceSourceChunk`), `batch`, `KernelEvent.cause`.
+3. A lifecycle `Scope` (listeners, timers, observers) and one `Ticker` per
+   kernel, paused when the tab is hidden or the host disconnected.
+4. `render/event.ts`: one event renderer for time grid, day grid and popover,
+   with two-level signatures (position vs content) and render hooks (D.5).
+5. `FrameScheduler` (read → compute → write, coalesced per frame).
+6. `toolbar.ts` with a view switcher.
+7. `build.mjs` for dom, theme, motion-gsap; a size script and `size-budget.json`;
+   `test:browser` (alignment, layout count) with playwright-core.
+8. `docs/behaviors/*` sheets: "+N", dayCount, fixedWeekCount, minimum
+   height, week numbers.
+
+## Next — Phase 4: day grid month/week/day and "+N"
+
+See `ARCHITECTURE.md` J. Phase 4.

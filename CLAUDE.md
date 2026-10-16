@@ -18,8 +18,12 @@ whose `@tzslot/core` we depend on and whose conventions we follow.
   Tests run in `node`, not jsdom. `test/purity.test.ts` enforces it.
 - Temporal comes **only** from `@tzslot/core` (re-exported by `core/src/temporal.ts`).
   One polyfill, one set of classes for apps using both libraries.
-- Later phases add `dom`, `angular`, `theme`, `rrule`, `ical`, `slots`,
-  `motion-gsap`, `pro` (everything MIT for now — owner's decision).
+- `packages/dom` — `createCalendar`; views render from the kernel's model,
+  keyed by date and segment key. `packages/theme` — one family with
+  `@tzslot/theme` (same `--tz-*` palette). `packages/motion-gsap` — optional.
+- `playground/` — `index.html`, `dst.html` (four zones, one store).
+- Later phases add `angular`, `rrule`, `ical`, `slots`, `pro` (everything MIT
+  for now — owner's decision).
 
 ## Commands
 
@@ -30,6 +34,8 @@ npm run typecheck      # core (lib ES2023, no DOM) then the tests
 npm run build          # packages/*/dist, refuses a manifest pointing at src/
 npm run spike          # Phase 0 polyfill questions, results in ROADMAP.md
 npm run bench          # budgets (perf/budgets.json) on a MINIFIED bundle — exits 1 over budget
+npm start              # playground on http://localhost:4600 (tzslot's is 4500) — often already running; don't kill it
+npm run build:theme    # after editing packages/theme/dzcalendar.scss (a test fails if the CSS drifts)
 ```
 
 ## Working rules
@@ -47,7 +53,10 @@ npm run bench          # budgets (perf/budgets.json) on a MINIFIED bundle — ex
 - Bad input never throws: it becomes a `Problem` (code + detail; sentences
   belong to the DOM layer's translated messages). Every guess is a warning.
 - Verify before saying done; measure sizes and timings rather than assert them.
-  jsdom checks behaviour, never layout.
+  jsdom checks behaviour, never layout: look at the playground in real Chrome
+  (`playwright-core`, `channel: 'chrome'`) — Phase 3's worst bug (the gutter
+  on the right) passed every jsdom test. Clip full-page screenshots rather
+  than taking element screenshots.
 - Never measure performance or memory on unminified code: the Temporal
   polyfill adds a debug string to every object unless minified. Use `npm run bench`.
 - `toEqual` cannot compare Temporal objects (internal slots: different

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — playground</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: var(--tz-bg); color: var(--tz-fg); color-scheme: var(--tz-color-scheme, light dark); }
+      header { display: flex; gap: 1rem; align-items: baseline; flex-wrap: wrap; margin-bottom: 1rem; }
+      h1 { font-size: 1.25rem; margin: 0; }
+      label { font-size: 0.875rem; }
+      #cal { --dz-height: calc(100vh - 7rem); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>DzCalendar</h1>
+      <a href="./dst.html">Changements d'heure, quatre fuseaux →</a>
+      <label>Fuseau <select id="zone"></select></label>
+      <label>Axe <select id="axis"><option value="wall">mural</option><option value="elapsed">temps écoulé</option></select></label>
+      <label>Thème <select id="theme"><option value="">système</option><option value="light">clair</option><option value="dark">sombre</option></select></label>
+      <label><input type="checkbox" id="motion" checked /> GSAP</label>
+    </header>
+    <div id="cal"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -286,7 +286,17 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
 
   const commit = (next: StoreSnapshot, change: StoreChange) => {
     snapshot = next;
-    if (!isEmptyChange(change)) for (const fn of [...listeners]) fn(change);
+    if (!isEmptyChange(change)) {
+      // One listener that throws must not keep the change from the others.
+      for (const fn of [...listeners]) {
+        try {
+          fn(change);
+        } catch (err) {
+          // Reported as an unhandled rejection: visible, and after the round.
+          void Promise.reject(err);
+        }
+      }
+    }
     return change;
   };
 

@@ -1,0 +1,74 @@
+@charset "UTF-8";
+/**
+ * @dzcalendar/theme — one import and the calendar is presentable.
+ * Generated from dzcalendar.scss — edit that file, then `npm run build:theme`.
+ *
+ * Optional: the calendar's injected CSS reads every colour as
+ * var(--dz-x, var(--tz-x, system colour)). This file only gives those
+ * variables values, plus the few rules variables cannot express.
+ * light-dark() needs Chrome 123, Safari 17.5 or Firefox 120.
+ */
+:root {
+  --tz-bg: light-dark(#ffffff, #18181b);
+  --tz-bg-raised: light-dark(#f4f4f5, #27272a);
+  --tz-fg: light-dark(#18181b, #f4f4f5);
+  --tz-fg-muted: light-dark(#52525b, #a1a1aa);
+  --tz-border: light-dark(#d4d4d8, #3f3f46);
+  --tz-accent: light-dark(#2563eb, #60a5fa);
+  --tz-accent-fg: light-dark(#ffffff, #0b1220);
+  --tz-danger: light-dark(#b91c1c, #f87171);
+  --tz-warning: light-dark(#b45309, #fbbf24);
+  --tz-font: inherit;
+  --tz-radius: 0.375rem;
+  /* On :root, not .dz-cal: a size set on the host or any ancestor must reach the calendar. */
+  --dz-minute: 0.8px;
+  --dz-gutter-width: 3.75rem;
+  --dz-bar-height: 1.375rem;
+  --dz-height: 40rem;
+  --dz-tone-blue: light-dark(#2563eb, #60a5fa);
+  --dz-tone-green: light-dark(#15803d, #4ade80);
+  --dz-tone-red: light-dark(#b91c1c, #f87171);
+  --dz-tone-amber: light-dark(#b45309, #fbbf24);
+  --dz-tone-violet: light-dark(#6d28d9, #a78bfa);
+  --dz-tone-slate: light-dark(#475569, #94a3b8);
+}
+
+[data-theme=light] {
+  --tz-color-scheme: light;
+}
+
+[data-theme=dark] {
+  --tz-color-scheme: dark;
+}
+
+.dz-toolbar__btn:hover:not(:disabled) {
+  background: var(--tz-bg-raised);
+}
+
+.dz-ev:hover {
+  filter: brightness(0.97);
+}
+
+.dz-tg__head,
+.dz-tg__allday {
+  background: var(--tz-bg);
+}
+
+@media (forced-colors: active) {
+  .dz-tg__dayhead--today .dz-tg__dayhead-date {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .dz-now {
+    border-top-color: CanvasText;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dz-toolbar__btn {
+    transition: background-color 120ms ease;
+  }
+  .dz-ev, .dz-bar {
+    transition: box-shadow 120ms ease, filter 120ms ease;
+  }
+}

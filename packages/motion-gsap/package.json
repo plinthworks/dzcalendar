@@ -1,0 +1,16 @@
+{
+  "name": "@dzcalendar/motion-gsap",
+  "version": "0.0.0",
+  "description": "Optional GSAP motion for DzCalendar: view transitions and event entrances, reduced-motion aware.",
+  "type": "module",
+  "license": "MIT",
+  "peerDependencies": {
+    "gsap": "^3.13.0"
+  },
+  "dependencies": {
+    "@dzcalendar/dom": "0.0.0"
+  },
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  }
+}

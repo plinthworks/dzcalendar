@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — changements d'heure</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: var(--tz-bg); color: var(--tz-fg); color-scheme: var(--tz-color-scheme, light dark); }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: var(--tz-fg-muted); max-width: 70ch; }
+      .controls { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1rem; }
+      figure { margin: 0; }
+      figcaption { font-weight: 600; margin-bottom: 0.25rem; }
+      .grid .dz-cal { --dz-height: 34rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Un seul jeu d'événements, quatre fuseaux</h1>
+    <p>
+      Les mêmes instants, affichés à Paris, Chicago, Lord Howe et Sydney. Les bandes hachurées marquent les heures qui
+      n'existent pas, les bandes orange celles qui ont lieu deux fois ; les deux « 02:30 » de Paris sont côte à côte, avec
+      leur offset.
+    </p>
+    <div class="controls" id="weeks"></div>
+    <div class="grid" id="grid"></div>
+    <script type="module" src="./dst.ts"></script>
+  </body>
+</html>

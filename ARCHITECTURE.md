@@ -53,6 +53,19 @@ Ils priment sur les sections citées.
 - **Phase 3, modèle** — clé de segment par date ISO (`id|YYYY-MM-DD|part`), `TimeGridColumn.key`, colonnes inchangées réutilisées par identité, `updateTimeGridModel(prev, snap, change)` guidé par `dirtySpans`, lectures d'offset (`first`/`second` passe) et durée réelle sur `PlacedTimed` les jours de transition, gouttière de graduations, `locateNow(model, now)`.
 - **Processus** — fiches `docs/behaviors/*.md` (« +N », `dayCount`, `fixedWeekCount`, hauteur minimale, numéros de semaine) à écrire avant la Phase 4.
 
+### Ajustements après la Phase 3 (revues, détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : CSS propre de la même famille que tzslot (palette `--tz-*` partagée, mêmes valeurs) ; `slotMax` ≤ 24 h ; GSAP en adaptateur optionnel dès la Phase 3.
+- **D.10** — interface livrée `MotionAdapter { viewChange, eventsEnter, destroy }` ; `captureState/animateFrom/viewTransition/kill` restent pour la Phase 17. Le calendrier possède l'adaptateur (détruit avec lui ou quand il est remplacé).
+- **B.18** — kernel réel : `store`/`now` injectables, `events`, `timeGrid`/`dayGrid`, `getViewSpec`, `setLocale`, `refreshToday` (pas de timer dans le core), abonnés isolés. À venir (étape 4.0) : `setOptions`, `setEvents`, `batch`, `cause`, registre de familles.
+- **D.1** — `KeyedList` (clé + signature) ; colonnes réutilisées par identité ; les tailles se lisent avec repli et ne sont jamais déclarées sur `.dz-cal` ; `scrollbar-gutter: stable`. Étape 4.0 : signatures à deux niveaux, `FrameScheduler`, `Scope`, `Ticker`, `ViewHost`.
+- **D.6** — colonne `group`, événement et barre `button` ; l'étiquette parlée dit les offsets (pas « * »), la durée réelle, le fuseau de l'événement s'il diffère. Curseur virtuel et région live : Phase 8.
+- **D.7** — `update()` : no-op sur valeurs identiques, un seul dessin, vue non dessinable refusée avant mutation. `update({events})` passera par `replaceSourceChunk` (étape 4.0).
+- **D.8** — `dir` déduit de la locale (méthode ou getter `textInfo`), heures en LTR.
+- **C.3** — lectures d'offset portées par l'événement (pas le morceau) ; une fin n'est « seconde passe » que *dans* la seconde passe ; graduations alignées sur l'horloge murale (gouttière et mode `elapsed`). Graduations propres à la colonne de transition en mode `elapsed` : à faire.
+- **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
+- **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
+
 ---
 
 ## 0. Ce que tzslot fait déjà, et que DzCalendar reprend à l'identique

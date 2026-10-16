@@ -14,7 +14,15 @@ export default defineConfig({
           name: 'core',
           globals: true,
           environment: 'node',
-          include: ['packages/core/test/**/*.test.ts'],
+          include: ['packages/core/test/**/*.test.ts', 'packages/theme/test/**/*.test.ts'],
+        },
+      },
+      {
+        test: {
+          name: 'dom',
+          globals: true,
+          environment: 'jsdom',
+          include: ['packages/dom/test/**/*.test.ts'],
         },
       },
       {

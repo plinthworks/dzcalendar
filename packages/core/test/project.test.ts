@@ -53,7 +53,7 @@ describe('segmentTimed on real days', () => {
     expect(segmentTimed(ev, days)).toHaveLength(1);
     const parts = segmentTimed(ev, days, { cutAtRepeat: true });
     expect(parts.map((p) => [p.part, p.startsHere, p.endsHere])).toEqual([[0, true, false], [1, false, true]]);
-    expect(parts.map((p) => p.key)).toEqual(['e|0|0', 'e|0|1']);
+    expect(parts.map((p) => p.key)).toEqual(['e|2026-10-25|0', 'e|2026-10-25|1']);
   });
 });
 
