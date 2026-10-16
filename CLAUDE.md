@@ -12,6 +12,9 @@ whose `@tzslot/core` we depend on and whose conventions we follow.
   The owner's validated decisions sit at its top and win over the rest.
 - `ROADMAP.md` — what is done, what is next, spike results. Keep it current.
 - `packages/core` — `@dzcalendar/core`: pure Temporal, no DOM, no `Date`.
+  Persistent store (`store/`), commands and undo (`commands/`), sources.
+- `conformance/` — language-independent JSON cases, run by vitest; the future
+  Swift/Kotlin ports read the same files.
   Tests run in `node`, not jsdom. `test/purity.test.ts` enforces it.
 - Temporal comes **only** from `@tzslot/core` (re-exported by `core/src/temporal.ts`).
   One polyfill, one set of classes for apps using both libraries.
@@ -26,6 +29,7 @@ npm run test:ci        # one worker — catches state shared between files
 npm run typecheck      # core (lib ES2023, no DOM) then the tests
 npm run build          # packages/*/dist, refuses a manifest pointing at src/
 npm run spike          # Phase 0 polyfill questions, results in ROADMAP.md
+npm run bench          # budgets (perf/budgets.json) on a MINIFIED bundle — exits 1 over budget
 ```
 
 ## Working rules
@@ -44,5 +48,10 @@ npm run spike          # Phase 0 polyfill questions, results in ROADMAP.md
   belong to the DOM layer's translated messages). Every guess is a warning.
 - Verify before saying done; measure sizes and timings rather than assert them.
   jsdom checks behaviour, never layout.
+- Never measure performance or memory on unminified code: the Temporal
+  polyfill adds a debug string to every object unless minified. Use `npm run bench`.
+- `toEqual` cannot compare Temporal objects (internal slots: different
+  instants compare equal). Compare `.toString()`.
+- `conformance/cases` expectations are written by hand, never generated.
 - `Intl.DateTimeFormat#format` does not accept Temporal objects under the
   polyfill (spike 2): format with `toLocaleString` or epoch ms + `timeZone`.

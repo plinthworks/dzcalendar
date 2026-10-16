@@ -111,6 +111,96 @@ Both reports were checked by running each scenario before fixing.
   (02:50 first pass → 02:10 second pass has wall end < wall start); a
   `skipped` day yields no segment and a folded column.
 
-## Next — Phase 1: store, index, conformance
+## Phase 1 — store, index, conformance ✅ (2026-10-16)
 
-See `ARCHITECTURE.md` J. Phase 1.
+- `store/avl.ts`: one persistent AVL (path copying) carrying each subtree's
+  largest end; `PersistentOrderedMap` and `PersistentIntervalTree` on top.
+  Property-tested against a plain Map and a linear scan.
+- `store/store.ts`: immutable `StoreSnapshot` (events, timed index on epoch
+  ms, all-day index on epoch days, one index pair per resource, source chunk
+  bookkeeping), `queryInstances` with a stable order, `createEventStore` with
+  `apply` (one transaction, one notification, no-op batches silent) and
+  `replaceSourceChunk` (an event in two chunks goes when both drop it; a
+  source cannot overwrite an event it does not own).
+- `store/diff.ts`: `eventEquals`, `stamp` — **the store owns `revision`**:
+  equal content keeps the same object, a change takes the next revision.
+- **Deterministic ids** for source events without one (`api:<fnv1a>`, rank
+  among identical events): a refetch is a no-op, not remove-all/add-all.
+- `commands/`: `event.create|update|delete|batch`, pure `applyCommand`
+  (all or nothing), `createHistory` (inverse mutations, `mergeKey`,
+  `transaction`, entries overtaken by a source refresh are dropped).
+- `source/`: `EventSourceSpec`, `arraySource`, `loadStaticSource`.
+- `conformance/`: 32 hand-written cases (`zone-dayinfo`, `zone-resolve`,
+  `normalize`), schema, runner.
+- `epochDay` / `fromEpochDay`; shared frozen empties and interned `perms`.
+
+### Measured (`npm run bench`: minified bundle, median, node 24, polyfill)
+
+| Budget (G.2) | Measured | Budget |
+|---|---|---|
+| normalize + index 10 000 | 61–67 ms | ≤ 70 ms — **thin margin** |
+| index 10 000 | ~15 ms | ≤ 70 ms |
+| query 5 weeks of 10 000 | ~0.6 ms | ≤ 2 ms |
+| apply one update | ~0.01 ms | ≤ 2 ms |
+| delete 2 238 (FC#4906: ~1.1 s) | ~3.9 ms | ≤ 50 ms |
+| bytes per stored event | ~893 | ≤ 1 200 |
+
+Lessons:
+- **The polyfill attaches a debug string to every Temporal object unless it
+  is minified** (`attachDebugString`, enabled while `noop.name === 'noop'`):
+  in an unminified build half the time and a third of the memory went there.
+  Budgets are therefore measured on a minified bundle (what ships); vitest
+  runs do not assert timings.
+- A wall time can only be skipped or repeated near a transition:
+  `isQuietDay` (cached per zone and day) lets ordinary days take one parse.
+- Normalization is now near Temporal's own floor (~3.8 µs of 4.5 µs per
+  event is parsing and arithmetic in the polyfill); native Temporal will move it.
+
+### Architect review, fixed before closing Phase 1
+
+- **Revisions are the snapshot version that wrote them** — a per-event
+  counter reused `(id, 2)` for two contents after an undo, and restarted at 1
+  after an eviction. The store stamps (not callers) and reports `applied`.
+- `eventEquals` compares nested `extendedProps` structurally: a refetch of
+  JSON-parsed props is now a no-op. A drift test fails if a `CalEvent` field
+  is left out. Times compared with `equals`, not strings (refetch 128 → 94 ms).
+- `replaceSourceChunk` used `Array#includes` per item (quadratic): a `Set`.
+- Deterministic ids: 53-bit hash (was 32).
+- `event.update`: a start without an end keeps the length; a zoneless time is
+  read in the event's zone.
+- History: purges entries as soon as another writer changes their events
+  (`onDropped`), compacts merged drags, checks before discarding.
+- `EventInstance.origin` widened now; `FetchRequest.window: null` for
+  unchunked sources instead of a lie in the types.
+
+### Code review (verified by execution), fixed before closing Phase 1
+
+- A source refresh **deleted a user event** that had taken over the id of a
+  deleted source event: a chunk now removes only what its source still owns,
+  and a refused id is no longer counted among the chunk's owners.
+- **Undo resurrected a source event** the source had since withdrawn, which
+  then no refresh would remove: such an entry is dropped (`onDropped`).
+- `event.update` now means what create means for each field: `editable`
+  resets the permissions, `resourceId` moves, `status` re-derives `busy`
+  (unless set on purpose), `timeZone` keeps the wall times in the new zone,
+  `allDay` converts both ways.
+- Derived ids: two 53-bit hashes (~106 bits) — two real titles shared a
+  32-bit id and merged across chunks.
+- `isQuietDay` keys its cache on the ISO date whatever the input calendar.
+- Confirmed sound by fuzzing: AVL balance/max/persistence, interval queries,
+  `isQuietDay` against every transition 1840–2040 in 15 zones.
+- Documented, not changed: a transaction that throws keeps what it applied.
+
+Measured after the fixes: normalize+index 61–67 ms, replaceSourceChunk 10k
+~30 ms, refetch 10k identical ~94 ms, ~890 bytes/event.
+
+### Not done in Phase 1, on purpose
+
+- Series (`seriesIdx`, `seriesTouched`, `EventInstance.origin` other than
+  `single`) — Phase 5. Move/resize commands — Phase 6–7. Source manager,
+  chunk cache, json/fn sources — Phase 9. `commands.schema.json` — Phase 18.
+
+## Next — Phase 2: projection, axis, layout (pure)
+
+See `ARCHITECTURE.md` J. Phase 2. Carried items above still apply (cut timed
+events at `repeat` transitions in `wall` mode; `skipped` days).

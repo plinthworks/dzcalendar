@@ -17,6 +17,14 @@ export default defineConfig({
           include: ['packages/core/test/**/*.test.ts'],
         },
       },
+      {
+        test: {
+          name: 'conformance',
+          globals: true,
+          environment: 'node',
+          include: ['conformance/runner/**/*.test.ts'],
+        },
+      },
     ],
   },
 });

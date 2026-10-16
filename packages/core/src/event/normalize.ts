@@ -134,8 +134,22 @@ function normalizeObject(input: EventInput, ctx: NormalizeContext, path: string)
   return { ok: true, value: { kind: 'event', event }, problems };
 }
 
+// Shared, frozen, so ten thousand events without resources or classes do not
+// carry ten thousand empty arrays, and every event has the same shape.
+const EMPTY_LIST: readonly string[] = Object.freeze([]);
+const EMPTY_PROPS: Readonly<Record<string, unknown>> = Object.freeze({});
+const PERMS = Array.from({ length: 8 }, (_, i) =>
+  Object.freeze({ start: (i & 1) !== 0, duration: (i & 2) !== 0, resource: (i & 4) !== 0 }),
+);
+const perms = (start: boolean, duration: boolean, resource: boolean) =>
+  PERMS[(start ? 1 : 0) | (duration ? 2 : 0) | (resource ? 4 : 0)]!;
+const list = (xs: readonly string[]): readonly string[] => (xs.length === 0 ? EMPTY_LIST : Object.freeze(xs));
+
 function buildCommon(input: EventInput, ctx: NormalizeContext, path: string, problems: Problem[]) {
-  const resourceIds = [...new Set([...(given(input.resourceId) ? [input.resourceId] : []), ...(input.resourceIds ?? [])])];
+  const resourceIds =
+    !given(input.resourceId) && !(input.resourceIds && input.resourceIds.length > 0)
+      ? EMPTY_LIST
+      : [...new Set([...(given(input.resourceId) ? [input.resourceId] : []), ...(input.resourceIds ?? [])])];
   if (ctx.knownResources) {
     for (const r of resourceIds) {
       if (!ctx.knownResources.has(r)) problems.push(problem('unknown-resource', 'warning', `${path}.resourceIds`, r));
@@ -147,19 +161,19 @@ function buildCommon(input: EventInput, ctx: NormalizeContext, path: string, pro
     id: given(input.id) ? input.id : ctx.newId(),
     ...(given(input.groupId) && { groupId: input.groupId }),
     title: input.title ?? '',
-    resourceIds: Object.freeze(resourceIds),
+    resourceIds: list(resourceIds),
     display: input.display ?? 'auto',
     status,
     busy: input.busy ?? status !== 'cancelled',
-    perms: Object.freeze({
-      start: input.startEditable ?? editable,
-      duration: input.durationEditable ?? editable,
-      resource: input.resourceEditable ?? editable,
-    }),
-    classNames: Object.freeze([...(input.classNames ?? [])]),
+    perms: perms(
+      input.startEditable ?? editable,
+      input.durationEditable ?? editable,
+      input.resourceEditable ?? editable,
+    ),
+    classNames: input.classNames && input.classNames.length > 0 ? list([...input.classNames]) : EMPTY_LIST,
     ...(given(input.tone) && { tone: input.tone }),
     ...(given(input.url) && { url: input.url }),
-    props: Object.freeze({ ...(input.extendedProps ?? {}) }),
+    props: input.extendedProps && Object.keys(input.extendedProps).length > 0 ? Object.freeze({ ...input.extendedProps }) : EMPTY_PROPS,
     revision: 0,
   };
 }
@@ -235,7 +249,8 @@ function timedSpan(
     }
   }
 
-  if (Temporal.Instant.compare(end.toInstant(), start.toInstant()) < 0) {
+  // ZonedDateTime.compare orders by instant, whatever the two zones.
+  if (Temporal.ZonedDateTime.compare(end, start) < 0) {
     problems.push(problem('end-before-start', 'error', `${path}.end`, `${start.toString()} > ${end.toString()}`));
     return null;
   }
@@ -290,8 +305,31 @@ function toDate(parsed: Parsed, input: EventInput, ctx: NormalizeContext, path: 
 }
 
 /**
+ * cyrb53: a fast 53-bit string hash. Used twice with two seeds for derived
+ * ids (a 32-bit hash made two real titles collide in review).
+ */
+function hash53(text: string, seed = 0): string {
+  let h1 = 0xdeadbeef ^ seed;
+  let h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/**
  * Many inputs, each judged alone. A rejected input never stops the others;
  * a repeated id rejects the later input and keeps the first.
+ *
+ * With a `sourceId`, an event the source sent without an id gets one derived
+ * from what it is — source, start, end, title — not from a counter. Fetched
+ * again (a refresh, or a neighbouring chunk it overlaps), it gets the same id,
+ * so the store sees the same event rather than one removed and one added.
+ * Identical events in one batch are told apart by their rank: `#1`, `#2`.
  */
 export function normalizeMany(
   inputs: Iterable<EventInput>,
@@ -302,6 +340,7 @@ export function normalizeMany(
   const items: Normalized[] = [];
   const problems: Problem[] = [];
   const seen = new Set<string>();
+  const ranks = new Map<string, number>();
   const tag = (p: Problem): Problem => (sourceId === undefined ? p : { ...p, sourceId });
   let rejected = 0;
   let i = 0;
@@ -313,13 +352,26 @@ export function normalizeMany(
       rejected++;
       continue;
     }
-    if (seen.has(r.value.event.id)) {
-      problems.push(tag(problem('duplicate-id', 'error', `${path}.id`, r.value.event.id)));
+    let event = r.value.event;
+    if (sourceId !== undefined) {
+      let id = event.id;
+      if (!given((input as EventInput).id)) {
+        // Two 53-bit hashes of the same text under different seeds: ~106 bits,
+        // so ids derived across chunks and refreshes do not meet by chance.
+        const text = `${event.start.toString()}|${event.end.toString()}|${event.title}`;
+        const base = `${sourceId}:${hash53(text)}${hash53(text, 0x9e3779b9)}`;
+        const rank = ranks.get(base) ?? 0;
+        ranks.set(base, rank + 1);
+        id = rank === 0 ? base : `${base}#${rank}`;
+      }
+      event = Object.freeze({ ...event, id, sourceId }) as CalEvent;
+    }
+    if (seen.has(event.id)) {
+      problems.push(tag(problem('duplicate-id', 'error', `${path}.id`, event.id)));
       rejected++;
       continue;
     }
-    seen.add(r.value.event.id);
-    const event = sourceId === undefined ? r.value.event : (Object.freeze({ ...r.value.event, sourceId }) as CalEvent);
+    seen.add(event.id);
     items.push({ kind: 'event', event });
   }
   return { items, report: { accepted: items.length, rejected, problems } };

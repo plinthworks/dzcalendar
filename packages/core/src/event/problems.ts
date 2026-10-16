@@ -11,6 +11,7 @@ export type ProblemCode =
   | 'end-before-start'
   | 'invalid-id'
   | 'duplicate-id'
+  | 'unknown-event'
   | 'unknown-zone'
   | 'zone-defaulted'
   | 'offset-only'

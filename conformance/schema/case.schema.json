@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dzcalendar.dev/conformance/case.schema.json",
+  "title": "DzCalendar conformance case",
+  "type": "object",
+  "required": ["id", "suite", "description", "refs", "input", "expected"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "suite": { "enum": ["zone-dayinfo", "zone-resolve", "normalize"] },
+    "description": { "type": "string", "minLength": 1 },
+    "refs": { "type": "array", "items": { "type": "string" } },
+    "input": { "type": "object" },
+    "expected": { "type": ["object", "array"] }
+  }
+}

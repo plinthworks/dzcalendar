@@ -24,7 +24,9 @@ const FORBIDDEN: [string, RegExp][] = [
   ['a Date type', /[:<|,]\s*Date\b/],
   ['global Temporal', /globalThis\.Temporal/],
   ['polyfill imported directly', /from\s+['"]temporal-polyfill/],
-  ['DOM globals', /\b(document|window|HTMLElement|navigator)\b/],
+  // Globals used, not words: a field may be called `window` (a ViewWindow).
+  // DOM *types* are already a compile error — the core builds with lib ES2023 only.
+  ['DOM globals', /(?<![.\w])(document|window|navigator)\s*\./],
 ];
 
 describe('core purity', () => {

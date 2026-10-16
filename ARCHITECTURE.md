@@ -32,6 +32,16 @@ Ils priment sur les sections citées.
 - **I/J** — Theme, playground, `vite.config.ts`, `size-budget.json` passent en Phase 3.
 - **Dépendance** — `@tzslot/core` 2.1.0 publié importe le polyfill de base, pas `/full` : calendriers non ISO indisponibles jusqu'à une release de tzslot qui le corrige.
 
+### Ajustements après la Phase 1 (revue d'architecte, détail dans ROADMAP.md)
+
+- **B.4/B.6 — `revision`** : attribuée par le store, égale à la version du snapshot qui écrit l'événement. Strictement croissante, donc un couple (id, revision) ne désigne jamais deux contenus (ni après un undo, ni après éviction puis re-livraison). Le store stampe lui-même dans `apply` et `replaceSourceChunk` (sauf causes `undo`/`redo`, qui restaurent les objets tels quels) et renvoie `StoreChange.applied` : les mutations effectives, que l'historique enregistre.
+- **B.6** — `StoreSnapshot` est une classe construite sur un état nommé ; `bySource` devient `owners` + `chunks`. `StoreChange` gagne `problems` et `applied` ; `seriesTouched` arrive en Phase 5. `EventInstance.origin` porte déjà l'union complète. `ViewWindow` n'est construit que par `viewWindow()` (type marqué). `queryInstances` ne segmente pas.
+- **B.6/D.7 — dirty** : `dirtySpans`/`dirtyDays` désignent des conteneurs ; la vue étend à la colonne (cluster de layout) en timeGrid et à la semaine en dayGrid. Un changement de zone d'affichage n'est pas un `StoreChange` : redessin complet. Une série (Phase 5) se signale par `seriesTouched`, jamais par un span infini.
+- **`eventEquals`** compare `props` structurellement (valeurs JSON), identité pour le reste ; un test de dérive échoue si un champ de `CalEvent` est oublié.
+- **B.7** — ids : espace global, `duplicate-id` entre sources ; id déterministe sur hash 53 bits (cyrb53) + rang dans le lot ; normaliser un lot avant de le partitionner en chunks (Phase 9). `FetchRequest.window` vaut `null` pour une source non découpée. Le serveur fait autorité : un refetch écrase une édition ou une suppression locale.
+- **B.14** — `createHistory(store, ctx, opts)` avec `run` et `destroy`. `event.update` n'est pas un move : un nouveau `start` (ou `duration`) sans `end` garde la durée de l'événement (temps écoulé, ou jours) ; une heure sans zone est lue dans la zone de l'événement. La clé `mergeKey` doit identifier le geste ; une entrée fusionnée est compactée (un `before`, un `after` par id). L'historique écoute le store : un changement d'autrui purge aussitôt les entrées concernées et appelle `onDropped`.
+- **G.2/G.3** — le bench minifié (`npm run bench`) remplace `test:perf`/`test:memory`. Lignes ajoutées : `replaceSourceChunk 10k`, `refetch 10k identical`. Restent à ajouter : requête W (10 000 dans une semaine) avant la Phase 4, garde « jour DST ≤ 3× un jour ordinaire », fuite sur 5 000 requêtes.
+
 ---
 
 ## 0. Ce que tzslot fait déjà, et que DzCalendar reprend à l'identique

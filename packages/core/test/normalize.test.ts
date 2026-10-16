@@ -389,12 +389,13 @@ describe('normalizeMany', () => {
     expect(report.problems.every((p) => p.sourceId === 'api')).toBe(true);
   });
 
-  it('every problem code is asserted somewhere in this file', async () => {
-    const { readFileSync } = await import('node:fs');
+  it('every problem code is asserted somewhere in the core tests', async () => {
+    const { readFileSync, readdirSync } = await import('node:fs');
     const types = readFileSync(new URL('../src/event/problems.ts', import.meta.url), 'utf8');
     const block = /export type ProblemCode =([\s\S]*?);/.exec(types)![1]!;
     const codes = [...block.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]!);
-    const self = readFileSync(new URL(import.meta.url), 'utf8');
+    const dir = new URL('.', import.meta.url);
+    const self = readdirSync(dir).filter((f) => f.endsWith('.test.ts')).map((f) => readFileSync(new URL(f, dir), 'utf8')).join('\n');
     expect(codes.length).toBeGreaterThan(15);
     // Asserted, not merely mentioned: the code must sit inside an expected array
     // or a toContain, so a comment or a stray string cannot satisfy this.

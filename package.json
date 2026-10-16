@@ -8,13 +8,15 @@
     "test:watch": "vitest",
     "spike": "node scripts/spikes.mjs",
     "typecheck": "tsc -p packages/core/tsconfig.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "bench": "node scripts/bench.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
+    "esbuild": "^0.25.10",
+    "temporal-polyfill": "^1.0.6",
     "typescript": "^5.9.0",
-    "vitest": "^4.0.8",
-    "temporal-polyfill": "^1.0.6"
+    "vitest": "^4.0.8"
   },
   "workspaces": [
     "packages/*"

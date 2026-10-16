@@ -1,6 +1,6 @@
 import { Temporal } from '../temporal.js';
 import type { Instant, PlainDate, PlainDateTime, ZonedDateTime } from '../temporal.js';
-import { isOffsetZone, isValidZone, resolveWall } from '../zone.js';
+import { isOffsetZone, isQuietDay, isValidZone } from '../zone.js';
 import { problem } from './problems.js';
 import type { Problem } from './problems.js';
 
@@ -36,7 +36,10 @@ const headOf = (s: string): string => s.split('[')[0] ?? '';
 /** A date followed by a time, joined by `T`, `t` or a space — Temporal accepts all three. */
 const TIME_PART = /^[+-]?\d{4,6}-?\d{2}-?\d{2}[Tt ]\d/;
 const hasTimePart = (s: string): boolean => TIME_PART.test(headOf(s));
-const hasOffset = (s: string): boolean => hasTimePart(s) && OFFSET_AT_END.test(headOf(s));
+const hasOffset = (s: string): boolean => {
+  const head = headOf(s);
+  return TIME_PART.test(head) && OFFSET_AT_END.test(head);
+};
 
 /** `kind` names the field for the error code: start errors are `invalid-start`, end errors `invalid-end`. */
 export function parseTemporal(input: unknown, path: string, field: 'start' | 'end'): ParseResult {
@@ -105,7 +108,15 @@ function parseZoned(text: string, zone: string, path: string, invalid: 'invalid-
     }
   }
 
-  // No offset: a wall time in a named zone. It may not happen, or happen twice.
+  // No offset: a wall time in a named zone. On an ordinary day it has exactly
+  // one reading, and one parse gives it.
+  try {
+    const direct = Temporal.ZonedDateTime.from(text);
+    if (isQuietDay(direct.toPlainDate(), zone)) return ok({ kind: 'zoned', value: direct }, problems);
+  } catch {
+    // Unparseable here is unparseable below too; the wall path reports it.
+  }
+  // Near a clock change it may not happen, or happen twice.
   let wall: PlainDateTime;
   try {
     wall = Temporal.PlainDateTime.from(text);
@@ -122,17 +133,21 @@ function parseZoned(text: string, zone: string, path: string, invalid: 'invalid-
  * its first occurrence (`earlier`). Both say so.
  */
 export function placeWall(wall: PlainDateTime, zone: string, path: string): { value: ZonedDateTime; problems: Problem[] } {
-  const r = resolveWall(wall.toPlainDate(), wall.toPlainTime(), zone, 'earlier');
-  const problems: Problem[] = [];
-  let value: ZonedDateTime;
-  if (!r.exists) {
-    value = wall.toZonedDateTime(zone, { disambiguation: 'compatible' });
-    problems.push(problem('wall-time-skipped', 'warning', path, `${wall.toString()} → ${value.toPlainDateTime().toString()}`));
-  } else {
-    value = wall.toZonedDateTime(zone, { disambiguation: 'earlier' });
-    if (r.ambiguous) problems.push(problem('wall-time-ambiguous', 'warning', path, `${wall.toString()} → ${value.offset}`));
+  // Two readings settle all three cases without the cost of a full resolve:
+  // equal instants mean an ordinary time; otherwise the earlier reading shows
+  // the same clock face when the time repeats, and a different one in a gap.
+  // 'later' in a gap is what 'compatible' does: forward by the gap's length.
+  if (isQuietDay(wall.toPlainDate(), zone)) return { value: wall.toZonedDateTime(zone), problems: [] };
+  const earlier = wall.toZonedDateTime(zone, { disambiguation: 'earlier' });
+  const later = wall.toZonedDateTime(zone, { disambiguation: 'later' });
+  if (earlier.epochNanoseconds === later.epochNanoseconds) return { value: earlier, problems: [] };
+  if (earlier.toPlainDateTime().equals(wall)) {
+    return { value: earlier, problems: [problem('wall-time-ambiguous', 'warning', path, `${wall.toString()} → ${earlier.offset}`)] };
   }
-  return { value, problems };
+  return {
+    value: later,
+    problems: [problem('wall-time-skipped', 'warning', path, `${wall.toString()} → ${later.toPlainDateTime().toString()}`)],
+  };
 }
 
 /**

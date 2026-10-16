@@ -23,7 +23,7 @@ export { createIdGenerator } from './ids.js';
 export type { IdGenerator } from './ids.js';
 export { normalizeIntervals, unionSpans, intersectSpans, subtractSpans, spansToIntervals } from './intervals.js';
 export type { Interval, MsSpan } from './intervals.js';
-export { dayInfo, dayInfos, transitionsBetween, resolveWall, isValidZone, isOffsetZone } from './zone.js';
+export { dayInfo, dayInfos, transitionsBetween, resolveWall, isValidZone, isOffsetZone, isQuietDay } from './zone.js';
 export type { DayInfo, DayKind, Transition, WallPolicy, ResolvedWall } from './zone.js';
 export { normalizeEvent, normalizeMany } from './event/normalize.js';
 export type { NormalizeContext, Normalized, NormalizeResult, NormalizationReport } from './event/normalize.js';
@@ -40,3 +40,17 @@ export type {
   EventDisplay,
   EventStatus,
 } from './event/types.js';
+export { epochDay, fromEpochDay } from './days.js';
+export { PersistentOrderedMap } from './store/ordered-map.js';
+export { PersistentIntervalTree } from './store/interval-tree.js';
+export { eventEquals, sameValue, stamp } from './store/diff.js';
+export { invert, isEmptyChange } from './store/changes.js';
+export type { Mutation, StoreChange, ChangeCause } from './store/changes.js';
+export { createEventStore, viewWindow, StoreSnapshot } from './store/store.js';
+export type { EventStore, ViewWindow, EventInstance, QueryOptions } from './store/store.js';
+export { applyCommand } from './commands/apply.js';
+export { createHistory } from './commands/history.js';
+export type { History, HistoryOptions } from './commands/history.js';
+export type { Command, CommandContext, CommandResult, EventPatch } from './commands/types.js';
+export { arraySource, loadStaticSource } from './source/array-source.js';
+export type { AbortSignalLike, FetchRequest, SourceFetch, ChunkPolicy, EventSourceSpec } from './source/source.js';

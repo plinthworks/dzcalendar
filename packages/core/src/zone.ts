@@ -1,4 +1,5 @@
 import { resolveWallTime } from '@tzslot/core';
+import { epochDay } from './days.js';
 import { Temporal } from './temporal.js';
 import type { Instant, PlainDate, PlainDateTime, PlainTime, ZoneId } from './temporal.js';
 
@@ -241,3 +242,30 @@ export function isValidZone(zone: string): boolean {
 
 /** "+02:00" is a valid Temporal zone but not a place: it has no daylight saving to follow. */
 export const isOffsetZone = (zone: string): boolean => /^[+-]\d{2}(:?\d{2})?$/.test(zone);
+
+const quietCache = new Map<ZoneId, Map<number, boolean>>();
+let quietEntries = 0;
+
+/**
+ * True when no clock change can touch a wall time on `date`: no transition
+ * from the start of the day before to the end of the day after. A change can
+ * move wall times across midnight (Apia skipped a whole date), hence the
+ * margin. Cached per zone and day number — events cluster on few dates, and
+ * this is what lets an ordinary day skip the two-reading check.
+ */
+export function isQuietDay(date: PlainDate, zone: ZoneId): boolean {
+  let days = quietCache.get(zone);
+  if (!days) quietCache.set(zone, (days = new Map()));
+  const n = epochDay(date.calendarId === 'iso8601' ? date : date.withCalendar('iso8601'));
+  let quiet = days.get(n);
+  if (quiet === undefined) {
+    if (++quietEntries > 20_000) {
+      quietCache.clear();
+      quietEntries = 0;
+      quietCache.set(zone, (days = new Map()));
+    }
+    quiet = transitionsBetween(startOf(date.subtract({ days: 1 }), zone), startOf(date.add({ days: 2 }), zone), zone).length === 0;
+    days.set(n, quiet);
+  }
+  return quiet;
+}

@@ -1,0 +1,11 @@
+{
+  "_comment": "ARCHITECTURE.md G.2, measured on a minified bundle (what ships), median of runs. ms unless named otherwise.",
+  "normalize+index 10k": 70,
+  "index 10k": 70,
+  "query 5 weeks of 10k": 2,
+  "apply one update": 2,
+  "delete 2238": 50,
+  "bytes per stored event": 1200,
+  "replaceSourceChunk 10k": 70,
+  "refetch 10k identical": 150
+}
