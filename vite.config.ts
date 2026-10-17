@@ -1,9 +1,23 @@
 import { defineConfig } from 'vite';
+import angular from '@analogjs/vite-plugin-angular';
 import { fileURLToPath } from 'node:url';
+
+/** Compiled by Angular; everything else by Vite. */
+const ANGULAR = /[\\/]packages[\\/]angular[\\/]src[\\/]|[\\/]playground[\\/]angular\.ts/;
 
 /** The playground: http://localhost:4600 (tzslot's runs on 4500). */
 export default defineConfig({
   root: 'playground',
+  // Only the Angular page and package are compiled by Angular (playground/tsconfig.angular.json).
+  // Everything else is left to Vite's own TypeScript transform.
+  plugins: [
+    angular({
+      tsconfig: fileURLToPath(new URL('./playground/tsconfig.angular.json', import.meta.url)),
+      transformFilter: (_code: string, id: string) => ANGULAR.test(id),
+    }),
+    // The Angular plugin turns Vite's own TypeScript transform off for every file: back on for the rest.
+    { name: 'dz-esbuild-back', enforce: 'post', config: () => ({ esbuild: { include: /\.ts$/, exclude: ANGULAR } }) },
+  ],
   server: { port: 4600, strictPort: true },
   resolve: {
     alias: {
@@ -13,6 +27,7 @@ export default defineConfig({
       '@dzcalendar/dom/toolkit': fileURLToPath(new URL('./packages/dom/src/toolkit.ts', import.meta.url)),
       '@dzcalendar/dom/custom': fileURLToPath(new URL('./packages/dom/src/custom.ts', import.meta.url)),
       '@dzcalendar/core/views': fileURLToPath(new URL('./packages/core/src/views.ts', import.meta.url)),
+      '@dzcalendar/angular': fileURLToPath(new URL('./packages/angular/src/index.ts', import.meta.url)),
       '@dzcalendar/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
       '@dzcalendar/dom': fileURLToPath(new URL('./packages/dom/src/index.ts', import.meta.url)),
       '@dzcalendar/ical': fileURLToPath(new URL('./packages/ical/src/index.ts', import.meta.url)),
@@ -25,6 +40,7 @@ export default defineConfig({
         index: fileURLToPath(new URL('./playground/index.html', import.meta.url)),
         dst: fileURLToPath(new URL('./playground/dst.html', import.meta.url)),
         sources: fileURLToPath(new URL('./playground/sources.html', import.meta.url)),
+        angular: fileURLToPath(new URL('./playground/angular.html', import.meta.url)),
       },
     },
   },

@@ -66,9 +66,13 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly hooks?: CalendarHooks;
   readonly businessHours?: KernelOptions['businessHours'];
   readonly hiddenDays?: KernelOptions['hiddenDays'];
+  /** Merged key by key over the current ones (`axis`, `slotMinutes`, `slotMin`…); equal values change nothing. */
+  readonly timeGrid?: KernelOptions['timeGrid'];
   readonly weekends?: boolean;
   readonly weekNumbers?: boolean;
   readonly multiMonthMaxColumns?: number;
+  /** The view switcher's buttons; equal lists change nothing. */
+  readonly headerViews?: readonly string[];
 }
 
 export interface CalendarInstance {
@@ -320,11 +324,14 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   };
 
   // A tab for a view whose family was not imported would do nothing: left out, and said once.
-  const headerViews = (options.headerViews ?? ['dayGridMonth', 'timeGridWeek', 'timeGridDay']).filter((v) => {
-    if (drawable(v)) return true;
-    if (options.headerViews) console.warn(`dzcalendar: no renderer for the view ${v}${entryHint(kernel.getViewSpec(v)?.family ?? '')}`);
-    return false;
-  });
+  const tabsOf = (asked: readonly string[] | undefined) =>
+    (asked ?? ['dayGridMonth', 'timeGridWeek', 'timeGridDay']).filter((v) => {
+      if (drawable(v)) return true;
+      if (asked) console.warn(`dzcalendar: no renderer for the view ${v}${entryHint(kernel.getViewSpec(v)?.family ?? '')}`);
+      return false;
+    });
+  let headerAsked = options.headerViews;
+  const headerViews = tabsOf(headerAsked);
   const toolbar = createToolbar(doc, scope, kernel, headerViews, (dir) => kernel.navigate(dir), (v) => kernel.setView(v));
   root.append(toolbar.element);
 
@@ -549,6 +556,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           }
           if (changes.timeZone && changes.timeZone !== state.timeZone) kernel.setTimeZone(changes.timeZone);
           if ('businessHours' in changes && changes.businessHours !== undefined) kernel.setOptions({ businessHours: changes.businessHours });
+          if (changes.timeGrid) kernel.setOptions({ timeGrid: changes.timeGrid });
           if ('hiddenDays' in changes || 'weekends' in changes) {
             hidden = { days: 'hiddenDays' in changes ? changes.hiddenDays : hidden.days, weekends: 'weekends' in changes ? changes.weekends : hidden.weekends };
             kernel.setOptions({ hiddenDays: hiddenOf(hidden.days, hidden.weekends) });
@@ -559,6 +567,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             dirty = true;
           }
           if (changes.multiMonthMaxColumns !== undefined) columns(changes.multiMonthMaxColumns);
+          if (changes.headerViews && changes.headerViews.join() !== (headerAsked ?? []).join()) {
+            headerAsked = changes.headerViews;
+            toolbar.setViews(tabsOf(headerAsked));
+            dirty = true;
+          }
           if (changes.events) kernel.setEvents(changes.events);
           if (changes.sources) {
             const keep = new Set(changes.sources.map((x) => x.id));

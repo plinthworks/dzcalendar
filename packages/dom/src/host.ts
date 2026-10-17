@@ -21,8 +21,12 @@ export interface EventContentCtx {
 }
 
 export interface EventHooks {
-  /** Replace the default content. Null keeps it. Runs only when the event's content changed. */
-  content?: (ctx: EventContentCtx) => string | Node | null;
+  /**
+   * Replace the default content. Null keeps it. Runs only when the event's
+   * content changed; `el` is the event's node (the same one across reruns),
+   * so a framework can keep and update what it rendered there.
+   */
+  content?: (ctx: EventContentCtx, el: HTMLElement) => string | Node | null;
   /** After the node is created; a returned function runs before it is removed. */
   didMount?: (arg: { el: HTMLElement; ctx: EventContentCtx }) => void | (() => void);
   willUnmount?: (arg: { el: HTMLElement; ctx: EventContentCtx }) => void;

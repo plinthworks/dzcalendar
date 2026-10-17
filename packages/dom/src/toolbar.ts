@@ -7,6 +7,8 @@ export interface Toolbar {
   readonly element: HTMLElement;
   /** Words, direction, the view switcher's pressed button. */
   draw(state: KernelState, messages: DzMessages, rtl: boolean): void;
+  /** Another set of view buttons (drawn at the next `draw`). */
+  setViews(views: readonly string[]): void;
 }
 
 /**
@@ -36,17 +38,26 @@ export function createToolbar(
   title.setAttribute('aria-live', 'polite');
   const switcher = h(doc, 'div', 'dz-toolbar__views');
   switcher.setAttribute('role', 'group');
-  const viewButtons = views.map((v) => {
-    const b = btn('dz-toolbar__view', () => switchTo(v));
-    b.dataset['view'] = v;
-    switcher.append(b);
-    return b;
-  });
+  let viewButtons: HTMLButtonElement[] = [];
+  const setViews = (list: readonly string[]) => {
+    viewButtons = list.map((v) => {
+      const b = h(doc, 'button', 'dz-toolbar__btn dz-toolbar__view') as HTMLButtonElement;
+      b.type = 'button';
+      // On the button itself: it goes with its node when the set changes.
+      b.addEventListener('click', () => switchTo(v));
+      b.dataset['view'] = v;
+      return b;
+    });
+    switcher.replaceChildren(...viewButtons);
+    if (viewButtons.length > 1) bar.append(switcher);
+    else switcher.remove();
+  };
   bar.append(prev, today, next, title);
-  if (viewButtons.length > 1) bar.append(switcher);
+  setViews(views);
 
   return {
     element: bar,
+    setViews,
     draw(state, messages, rtl) {
       // Rewriting an aria-live title, even with the same words, announces it again.
       if (title.textContent !== state.title) title.textContent = state.title;

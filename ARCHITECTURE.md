@@ -68,6 +68,13 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 11 (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : Angular **100 % signaux, 19 et plus** (`peerDependencies` `^19 || ^20 || ^21 || ^22`, chaque version vérifiée par `npm run test:package`) ; composants simples à brancher (`imports: [DZ_CALENDAR]`, aucun fournisseur requis).
+- **E** — entrées `sources` (pas `eventSources`) et sortie `selected` (pas `select` : un `select` natif remonterait) ; pas de `resources` ni d'`eventChange` (le `save` des sources, Phase 9) ; `[options]` = clés d'`update()` moins les rappels que le composant transforme en sorties ; options de création par `provideDzCalendar` (jetons `DZ_CALENDAR_DEFAULTS`). Seul `dzEventContent` existe ; ses vues sont dans le conteneur du composant (une vue par nœud d'événement, nœuds déplacés comme un portail). `NgZone` injecté (Noop en zoneless) : tout appel au calendrier hors zone, les sorties dedans. Une valeur refusée par `update()` est signalée à l'`ErrorHandler` sans bloquer les autres. `messages.ts`, `shapes.ts`, `defaults.ts` séparés : non nécessaires.
+- **D.7** — `update()` accepte `timeGrid` et `headerViews` ; `LiveSettings.onUnselect` ; le hook `content(ctx, el)` reçoit le nœud.
+- **I/J** — playground : `angular.html` à côté de `index.html` (qui reste en JavaScript pur pour les vérifications Chrome) ; `pack:local`, `test:package`.
+
 ### Ajustements après la Phase 10 (détail dans ROADMAP.md)
 
 - **Décisions du propriétaire** : vues payées à l'import — `@dzcalendar/dom/list`, `@dzcalendar/dom/multimonth`, `@dzcalendar/dom/custom` (`defineView`), modèles dans `@dzcalendar/core/views`, boîte à outils des familles de vues dans `@dzcalendar/dom/toolkit` (API de plugin : `registerView`, `KeyedList`, `h`, `fillEvent`, `timeLabels`, `attachMenuTriggers`, `createDayGridView`…) ; multi-mois « comme le mois » ; les jours masqués propres à une vue l'emportent sur ceux du calendrier ; six semaines par mois en multi-mois ; budgets dom/list 3,5 ko, core/views 1,5 ko, dom/multimonth 3 ko, dom/custom 1,5 ko.
@@ -1118,7 +1125,7 @@ Il comble le manque FullCalendar (pas de CalendarController Angular). Un composa
 - `willUnmount` → `viewRef.destroy()`.
 Pas de `ApplicationRef.tick()` global. Compatible zoneless : la détection est explicite sur la vue embarquée.
 
-**Fournisseurs** : `provideDzCalendar({ locale, timeZone, messages, defaults })`, calqué sur `provideTzslot` (`defaults.ts`, `messages.ts`). Peer dependencies : `@angular/core` `^18 || ^19 || ^20 || ^21 || ^22`. Pas de `@angular/forms` requis (le calendrier n'est pas un champ de formulaire). Seul un éventuel sélecteur de créneau (slots) en serait un.
+**Fournisseurs** : `provideDzCalendar({ locale, timeZone, messages, defaults })`, calqué sur `provideTzslot` (`defaults.ts`, `messages.ts`). Peer dependencies : `@angular/core` `^19 || ^20 || ^21 || ^22` (Phase 11 : signaux seulement). Pas de `@angular/forms` requis (le calendrier n'est pas un champ de formulaire). Seul un éventuel sélecteur de créneau (slots) en serait un.
 
 ---
 
@@ -1378,7 +1385,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 - **Dépend de** : P4.
 
 ### Phase 11 : Angular
-- **Livrables / fichiers** : `packages/angular/*`, `playground/index.html`.
+- **Livrables / fichiers** : `packages/angular/*`, `playground/angular.html` (livré, voir « Ajustements après la Phase 11 »).
 - **Acceptation** : composant sous `provideZonelessChangeDetection` ; `[(view)]`, `[(date)]` ; les `effect` utilisent `untracked` (test qui échoue sous Angular 18 si l'écriture de signal est dans un effet) ; `CalendarController` expose `title()`, `range()` en signaux ; templates `dzEventContent` : seul le gabarit du segment modifié exécute `detectChanges` (compteur) ; `update({date})` avec la dernière valeur émise est sans effet ; `ng build` sur une application Angular réelle installée depuis les tarballs de `pack:local` (règle tzslot).
 - **Dépend de** : P4 minimum (idéalement P8).
 

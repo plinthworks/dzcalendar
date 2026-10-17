@@ -990,6 +990,61 @@ view; budgets dom/list 3.5 kB.
 - `hiddenDays: []` on a view cannot force every day to show (a view naming
   none takes the calendar's).
 
-## Next — Phase 11: Angular
+## Phase 11 — Angular ✅ (2026-10-17)
 
-See `ARCHITECTURE.md` J. Phase 11.
+Owner's decisions: signals only, Angular 19 and later (`^19 || ^20 || ^21
+|| ^22`); components simple to plug.
+
+- `@dzcalendar/angular` (ng-packagr, partial compilation): `<dz-calendar>`
+  (standalone, OnPush) with signal inputs (`events`, `sources`, `timeZone`,
+  `locale`, `axis`, `editable`, `selectable`, `businessHours`, `weekends`,
+  `weekNumbers`, `hiddenDays`, `messages`, `options`), `model()` `view`,
+  `date`, `selection`, outputs `dateClick`, `eventClick`, `eventOpen`,
+  `createRequest`, `selected`, `sourceNotice`, `problems`;
+  `CalendarController` (`title`, `range`, `view`, `date`, `canUndo`,
+  `canRedo`, `loading`, `problems`; `prev/next/today/goTo/changeView/
+  dispatch/undo/redo/refetch`); `dzEventContent`; `provideDzCalendar`;
+  `DZ_CALENDAR` (one import). Created at construction (tzslot's rule), the
+  widget call in `untracked`, only changed keys sent, echoes of `view` /
+  `date` / `selection` no-ops, everything outside the zone under zone.js.
+- DOM for it: the `content` hook gets the event's node; `update()` takes
+  `timeGrid` and `headerViews` (the toolbar's buttons change live);
+  `onUnselect` when a shown selection goes away.
+- Tooling: Angular 21 dev dependencies, Analog's Vite plugin (vitest
+  project `angular`, compiled templates; `angular-zone` with zone.js in its
+  own processes; the playground's Vite limited to Angular files, Vite's own
+  TypeScript transform put back for the rest), `npm run pack:local`,
+  `npm run test:package` (a fresh application from the tarballs, `ng build`
+  with strict templates and library types on Angular 19, 20, 21, 22; 19 and
+  22 also run in Chrome), `playground/angular.html`.
+- Tests: 883; browser 92/92 (Angular page: controller, `[(date)]`,
+  `headerViews` after creation, axe). Size: angular 3.5 kB (≤ 6).
+
+### Reviews (architect; code review by execution, scratch apps), fixed
+- `[(selection)]` stale when the calendar cleared it (no DOM callback;
+  `onUnselect` added, a view family change included); `[(date)]` bound to
+  `undefined` never written; embedded views leaked or reused across a
+  template change; under zone.js `update` and the controller ran in the zone
+  (pointer moves would run change detection); `canUndo()` stale right after
+  `dispatch()`; the controller kept a destroyed calendar; `axis` replaced
+  `options.timeGrid`.
+- One bad input (an unknown view, seven hidden days) threw at every later
+  change and blocked them all; `[options]` callbacks silenced the outputs;
+  a template did not follow the application's signals (views are now in the
+  component's container); every change re-sent all events.
+- The Vite plugin had turned TypeScript off for the whole playground (the
+  main page broke for a few minutes on the owner's server; fixed, checked).
+
+### Not done in Phase 11, on purpose
+- `DzDayHeader`, `DzResourceLabel`, `DzMoreLink`, `DzSlotLabel`: the DOM has
+  no such hooks yet; `resources` input with resources (Pro phases).
+- `rangeChange` / `commandApplied` outputs: `controller.range()` and the
+  store; an `eventChange` with `revert()` is Phase 9's per-source `save`.
+- Creation-time options per instance (`views`, `rules`…) go through
+  `provideDzCalendar` (component-level providers); no `[config]` input.
+- `pack:local` keeps version 0.0.0: a consumer's lockfile may keep an older
+  tarball (`test:package` installs fresh each time).
+
+## Next — Phase 12: virtualisation of every view, print
+
+See `ARCHITECTURE.md` J. Phase 12.

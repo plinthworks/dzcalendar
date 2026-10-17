@@ -83,6 +83,27 @@ for (const name of PACKAGES) typescript(name);
 const styles = join(pkg('dom'), 'dist', 'styles.js');
 writeFileSync(styles, await minifyCssLiteral(readFileSync(styles, 'utf8')));
 theme();
+angular();
+
+/**
+ * ng-packagr compiles the Angular package against core's and dom's built
+ * declarations (`tsconfig.lib.json` paths), so it comes after them.
+ */
+function angular() {
+  const dir = pkg('angular');
+  rmSync(join(dir, 'dist'), { recursive: true, force: true });
+  run('npx', ['ng-packagr', '-p', 'ng-package.json', '-c', 'tsconfig.lib.json'], dir);
+  // ng-packagr writes its own manifest from the source one: take out what only
+  // makes sense in the repository, and pin the internal dependencies.
+  const file = join(dir, 'dist', 'package.json');
+  const manifest = read(file);
+  delete manifest.main;
+  delete manifest.types;
+  Object.assign(manifest, shared('angular'));
+  manifest.dependencies = internal(manifest.dependencies);
+  writeFileSync(file, JSON.stringify(manifest, null, 2) + '\n');
+  extras('angular');
+}
 
 /** The theme ships its CSS and SCSS as they are, compiled first. */
 function theme() {
@@ -97,7 +118,7 @@ function theme() {
   extras('theme');
 }
 
-for (const name of PACKAGES) {
+for (const name of [...PACKAGES, 'angular']) {
   const manifest = read(join(pkg(name), 'dist', 'package.json'));
   // A published manifest that points at src/ points at a file npm never received.
   // Only the entry points are checked: a description may well say "src/".
@@ -113,4 +134,4 @@ for (const name of PACKAGES) {
     process.exit(1);
   }
 }
-console.log(`\nBuilt: packages/{${[...PACKAGES, 'theme'].join(',')}}/dist`);
+console.log(`\nBuilt: packages/{${[...PACKAGES, 'theme', 'angular'].join(',')}}/dist`);

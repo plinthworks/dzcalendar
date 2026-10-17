@@ -105,7 +105,7 @@ function guard<T>(fn: () => T, fallback: T): T {
 }
 
 export function fillEvent(ctx: ViewCtx, el: HTMLElement, content: EventContentCtx, fallback: () => Node[], created: boolean): void {
-  const custom = guard(() => ctx.hooks.event?.content?.(content), null);
+  const custom = guard(() => ctx.hooks.event?.content?.(content, el), null);
   if (custom === null || custom === undefined) el.replaceChildren(...fallback());
   else el.replaceChildren(typeof custom === 'string' ? ctx.doc.createTextNode(custom) : custom);
   const prev = mounted.get(el);

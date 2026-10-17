@@ -75,7 +75,8 @@ export interface InteractionShared<G = unknown> {
   layerOrigin(): { x: number; y: number };
   /** The selection on screen, until it is cleared — a pointer's, a finger's (with handles) or the keyboard's. */
   readonly selection: Selection | null;
-  showSelection(sel: Selection | null, o?: { readonly handles?: boolean }): void;
+  /** `silent`: the application asked (`instance.select`) — it is not told back. */
+  showSelection(sel: Selection | null, o?: { readonly handles?: boolean; readonly silent?: boolean }): void;
 }
 
 /** What the calendar holds of a view's interactions. */
@@ -156,12 +157,15 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       return selection;
     },
     showSelection(sel, o = {}) {
+      // A shown selection going away (a click elsewhere, Escape, another period): said, so a binding can follow.
+      const cleared = selection !== null && sel === null && o.silent !== true;
       selection = sel;
       selectionHandles = o.handles === true;
       rangeKey = rangeNow();
       if (selectionFrame) win.cancelAnimationFrame(selectionFrame);
       selectionFrame = 0;
       drawSelection();
+      if (cleared) ctx.live().onUnselect?.();
     },
   };
   const interaction = shared.interaction;
@@ -312,6 +316,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     if (gesture) cancel();
     if (selectionFrame) win.cancelAnimationFrame(selectionFrame);
     layer.remove();
+    // Another view family: the selection shown goes with this one — said, as when it is cleared.
+    if (shared.selection) ctx.live().onUnselect?.();
   });
 
   function click(p: Press, pe: PointerEvent): void {
@@ -561,7 +567,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       queueSelection();
     },
     grab: (instance, kind) => keyboard.grab(instance, kind),
-    select: (sel) => shared.showSelection(sel),
+    select: (sel) => shared.showSelection(sel, { silent: true }),
     refocus: (id) => keyboard.refocus(id),
   };
 }

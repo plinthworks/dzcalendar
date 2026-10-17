@@ -1,0 +1,16 @@
+{
+  "name": "@dzcalendar/angular",
+  "version": "0.0.0",
+  "description": "DzCalendar for Angular 19+: signals only — signal inputs, model(), output(), a CalendarController of signals, templates for events. Zoneless or zone.js.",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@dzcalendar/core": "0.0.0",
+    "@dzcalendar/dom": "0.0.0"
+  },
+  "peerDependencies": {
+    "@angular/core": "^19.0.0 || ^20.0.0 || ^21.0.0 || ^22.0.0"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts"
+}

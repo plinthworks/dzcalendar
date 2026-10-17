@@ -26,6 +26,8 @@ export interface LiveSettings {
   /** Dragging across empty time selects it (`onSelect`). Default false. */
   readonly selectable?: boolean;
   readonly onSelect?: (selection: Selection) => void;
+  /** The selection shown went away (a click elsewhere, Escape, another period) — not when the application cleared it. */
+  readonly onUnselect?: () => void;
   readonly onDateClick?: (click: DateClick) => void;
   readonly onEventClick?: (instance: EventInstance) => void;
   /**
@@ -56,6 +58,7 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   contextMenu: {},
   selectable: {},
   onSelect: {},
+  onUnselect: {},
   onDateClick: {},
   onEventClick: {},
   chooseScope: {},

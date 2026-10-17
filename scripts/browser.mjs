@@ -751,6 +751,23 @@ try {
     await p.close();
   }
 
+  // ── Angular (zoneless): a header of one's own on the controller's signals, two-way date, templates ──
+  {
+    const { p, errors } = await page('/angular.html');
+    await p.waitForSelector('.dz-ev .dz-ev__content b');
+    const before = await p.textContent('.bar strong');
+    await p.click('.bar button >> nth=1');
+    await p.waitForFunction((t) => document.querySelector('.bar strong').textContent !== t, before);
+    const after = await p.evaluate(() => ({ title: document.querySelector('.bar strong').textContent, state: document.querySelector('.bar span').textContent, cal: document.querySelector('.dz-toolbar__title').textContent }));
+    check('angular: the controller moves the calendar; title() and [(date)] follow', after.title === after.cal && after.state.includes('2026-10-28'), JSON.stringify({ before, ...after }));
+    const tabs = await p.evaluate(() => [...document.querySelectorAll('.dz-toolbar__view')].map((x) => x.dataset.view).join(','));
+    check('angular: [options] reaches the toolbar after creation (headerViews)', tabs === 'dayGridMonth,timeGridWeek,timeGridDay,listWeek', tabs);
+    const found = await axeViolations(p, 'main');
+    check('axe: the Angular page has no violation', found.length === 0, found.join(' | '));
+    check('angular: no console error', errors.length === 0, errors.join(' | '));
+    await p.close();
+  }
+
   // ── dark and forced colours render without errors ──
   for (const media of [{ colorScheme: 'dark' }, { forcedColors: 'active' }]) {
     const { p, errors } = await page('/', media);

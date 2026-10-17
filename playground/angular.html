@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — Angular</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: var(--tz-bg); color: var(--tz-fg); color-scheme: var(--tz-color-scheme, light dark); }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: var(--tz-fg-muted); max-width: 75ch; }
+      .bar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; }
+      .bar strong { min-width: 14rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>&lt;dz-calendar&gt; en Angular (zoneless)</h1>
+      <p>
+        Un en-tête à soi lit le <code>CalendarController</code> en signaux ; la vue et la date sont liées dans les deux
+        sens ; les événements passent par un gabarit <code>dzEventContent</code>.
+      </p>
+      <app-root></app-root>
+    </main>
+    <script type="module" src="./angular.ts"></script>
+  </body>
+</html>

@@ -38,6 +38,8 @@ npm start              # playground on http://localhost:4600 (tzslot's is 4500) 
 npm run build:theme    # after editing packages/theme/dzcalendar.scss (a test fails if the CSS drifts)
 npm run size           # gzip per package against size-budget.json
 npm run test:browser   # layout checks in system Chrome on its own Vite server (port 4611)
+npm run pack:local     # tarballs into packed/
+npm run test:package   # a fresh Angular app from the tarballs, ng build on 19, 20, 21, 22 (network)
 ```
 
 ## Working rules

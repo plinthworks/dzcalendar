@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import angular from '@analogjs/vite-plugin-angular';
 
 /**
  * The core runs in `node`, not jsdom: a DOM global reached by accident would
@@ -23,6 +24,31 @@ export default defineConfig({
           globals: true,
           environment: 'jsdom',
           include: ['packages/dom/test/**/*.test.ts'],
+        },
+      },
+      {
+        // Components compiled for the tests, not stubbed: a template that fails to
+        // bind still compiles under tsc, and only rendering it catches that.
+        plugins: [angular({ tsconfig: 'packages/angular/tsconfig.spec.json' })],
+        test: {
+          name: 'angular',
+          globals: true,
+          environment: 'jsdom',
+          setupFiles: ['packages/angular/test/setup.ts'],
+          include: ['packages/angular/test/**/*.test.ts'],
+        },
+      },
+      {
+        // zone.js patches globals (Promise, timers, events): its own project, a process per file.
+        plugins: [angular({ tsconfig: 'packages/angular/tsconfig.spec.json' })],
+        test: {
+          name: 'angular-zone',
+          globals: true,
+          environment: 'jsdom',
+          pool: 'forks',
+          isolate: true,
+          setupFiles: ['packages/angular/test-zone/setup.ts'],
+          include: ['packages/angular/test-zone/**/*.test.ts'],
         },
       },
       {
