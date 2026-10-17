@@ -931,6 +931,65 @@ IANA rules, then fixed offsets; budgets core 33 kB, ical 7.5 kB.
 - A later edit queued after a failed save is sent relative to the failed
   state; the refetch after settle repairs it.
 
-## Next — Phase 10: list, multiMonth, custom views
+## Phase 10 — list, multi-month, custom views ✅ (2026-10-17)
 
-See `ARCHITECTURE.md` J. Phase 10.
+Owner's decisions: views paid for when imported (`@dzcalendar/dom/list`,
+`/multimonth`, `/custom`; models in `@dzcalendar/core/views`; the plugin
+toolkit in `@dzcalendar/dom/toolkit`); multi-month "like the month";
+custom views at two levels (`defineView` + `registerView`); a view's own
+hidden days win over the calendar's; six weeks per month in a multi-month
+view; budgets dom/list 3.5 kB.
+
+- Core: `buildListModel` (days in the display zone with their real length,
+  parts of multi-day events, all-day first, background left out;
+  `includeEmpty` for custom views), `buildMultiMonthModel` /
+  `updateMultiMonthModel` (a month grid per month, padding days empty, months
+  kept by identity), `ViewRange.months`, a month alignment runs for its
+  `duration` outside the month grid, titles of several months; kernel
+  `hiddenDays` (an effective spec cached by identity; ISO 1–7 validated).
+- DOM: list view (sections and `h3` per day, real lengths and offsets on
+  clock-change days, one tab stop, Enter/Delete/menu, hooks, focus kept);
+  the month view draws month sections (`createDayGridView(ctx, { months })`)
+  — one tab stop for a year, arrows across months and years, drags in each
+  month, a padding day never a way into the next month; week numbers
+  (`weekNumbers`, the locale's rules, a button to the week; the time grid's
+  corner); `weekends` / `hiddenDays` (the keyboard steps over them in every
+  view); `multiMonthMaxColumns`; `defineView`; errors naming the entry to
+  import; `injectStyles: false` honoured, `LIST_CSS` / `MULTIMONTH_CSS`
+  exported.
+- Fixed on the way (a Phase 8 carry-over): a week without events wrote
+  `repeat(0, …)` — invalid CSS — and the lane measurement read "room for one
+  lane"; months showed "+N" alone. `--lanes` is at least 1; the measurement
+  is decided on the view mounted at read time (multi-month included).
+- Tests: 859; browser 88/88 (months side by side then stacked, a drag in
+  October, a padding cell, five aligned columns, week numbers S40–S45, axe on
+  list week/month, multi-month and a weekend-less month); bench list year
+  model (10k) ~57 ms, multiMonth model (10k) ~50 ms (≤ 150).
+- Sizes: core 34.5, dom 31.1 (both over, < 5 %), core/views 0.8, dom/list
+  3.3, dom/multimonth 0.8, dom/custom 0.8 kB.
+
+### Reviews (architect; code review by execution, dist imported), fixed
+- Multi-month offered "Change duration…" on a timed event; `injectStyles:
+  false` ignored by the new views; `defineView` could replace a built-in
+  family, a second definition went half-applied, a throwing `render` blanked
+  the view; errors did not say which entry to import; one title for a span of
+  months; `hiddenDays` duplicates and values outside 1–7.
+- Day views without the weekend: Friday → Monday changed the period but left
+  the cursor ("no further"); a list on a 25-hour day hid real lengths (and
+  their contrast failed axe once shown); a multi-month padding cell took a
+  drag into the next month; focus lost when the focused day was hidden, when
+  a listed event moved or the list emptied.
+
+### Not done in Phase 10, on purpose
+- `visibleWindow()` on `ViewController` (D.1/D.2): with virtualisation,
+  Phase 12; list year and multi-month render everything until then.
+- The list's keyboard is a line, not a grid (documented); a day heading's
+  context menu is the pointer's.
+- The week-number button is a pointer shortcut (the keyboard has the view
+  switcher and PageUp/PageDown); the time grid's corner number is not read.
+- `hiddenDays: []` on a view cannot force every day to show (a view naming
+  none takes the calendar's).
+
+## Next — Phase 11: Angular
+
+See `ARCHITECTURE.md` J. Phase 11.

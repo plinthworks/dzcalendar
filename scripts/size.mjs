@@ -20,12 +20,14 @@ const shippedCss = {
   },
 };
 
+/** `entry` is a file, or `{ code }`: a module written here (resolved from the repository's root). */
 async function bundle(entry, external) {
   // An alias would resolve a package before `external` sees its name and
   // bundle it anyway (it once counted all of core inside dom): alias only
   // what is not meant to stay out.
   const kept = Object.fromEntries(Object.entries(alias).filter(([name]) => !external.includes(name)));
-  const r = await build({ entryPoints: [entry], bundle: true, minify: true, format: 'esm', platform: 'neutral', mainFields: ['module', 'main'], write: false, external, alias: kept, plugins: [shippedCss], logLevel: 'error' });
+  const input = typeof entry === 'string' ? { entryPoints: [entry] } : { stdin: { contents: entry.code, resolveDir: root, loader: 'ts' } };
+  const r = await build({ ...input, bundle: true, minify: true, format: 'esm', platform: 'neutral', mainFields: ['module', 'main'], write: false, external, alias: kept, plugins: [shippedCss], logLevel: 'error' });
   return gzipSync(r.outputFiles[0].contents, { level: 9 }).length;
 }
 
@@ -36,6 +38,13 @@ const results = {
   'rrule (without polyfill)': await bundle(src('rrule'), ['@tzslot/core', ...poly]),
   'ical (without core)': await bundle(src('ical'), ['@dzcalendar/core', '@dzcalendar/rrule', ...poly]),
   'dom (without core)': await bundle(src('dom'), ['@dzcalendar/core', ...poly]),
+  // The view models share core's modules: what they add beyond it.
+  'core/views (beyond core)':
+    (await bundle({ code: `export * from './packages/core/src/index.ts'; export * from './packages/core/src/views.ts';` }, ['@dzcalendar/rrule', ...poly])) -
+    (await bundle(src('core'), ['@dzcalendar/rrule', ...poly])),
+  'dom/list (without dom)': await bundle(join(root, 'packages/dom/src/list.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
+  'dom/multimonth (without dom)': await bundle(join(root, 'packages/dom/src/multimonth.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
+  'dom/custom (without dom)': await bundle(join(root, 'packages/dom/src/custom.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
   'theme css': gzipSync(readFileSync(join(root, 'packages/theme/dzcalendar.css')), { level: 9 }).length,
   'motion-gsap (without gsap)': await bundle(src('motion-gsap'), ['gsap', '@dzcalendar/dom']),
   'temporal polyfill': (await bundle(src('core'), ['@dzcalendar/rrule'])) - (await bundle(src('core'), ['@dzcalendar/rrule', ...poly])),

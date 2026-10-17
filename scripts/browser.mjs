@@ -598,6 +598,107 @@ try {
     await p.close();
   }
 
+  // ── list views: chronological rows, axe on a week and a month ──
+  {
+    const { p, errors } = await page('/');
+    await p.waitForSelector('.dz-ev');
+    await p.evaluate(() => window.__dz().update({ view: 'listWeek' }));
+    await p.waitForSelector('.dz-list__ev');
+    const order = await p.evaluate(() =>
+      [...document.querySelectorAll('.dz-list__ev')].slice(0, 6).map((el) => `${el.closest('.dz-list__day').dataset.date} ${el.querySelector('.dz-list__time')?.textContent ?? ''}`),
+    );
+    const keys = await p.evaluate(() => {
+      const model = window.__dz().kernel.viewModel().model;
+      return model.days.flatMap((d) => d.entries.map((e) => [String(d.date), e.allDay ? 0 : e.start.epochMilliseconds]));
+    });
+    const sorted = keys.every((k, i) => i === 0 || keys[i - 1][0] < k[0] || (keys[i - 1][0] === k[0] && keys[i - 1][1] <= k[1]));
+    const drawn = await p.locator('.dz-list__ev').count();
+    check('list: rows in chronological order, one per event-day', sorted && drawn === keys.length && keys.length > 0, JSON.stringify({ drawn, keys: keys.length, order }));
+    const week = await axeViolations(p, '.dz-cal');
+    check('axe: listWeek has no violation', week.length === 0, week.join(' | '));
+    await p.evaluate(() => window.__dz().update({ view: 'listMonth' }));
+    await p.waitForFunction(() => document.querySelectorAll('.dz-list__day').length > 3);
+    const month = await axeViolations(p, '.dz-cal');
+    check('axe: listMonth has no violation', month.length === 0, month.join(' | '));
+    check('list: no console error', errors.length === 0, errors.join(' | '));
+    await p.close();
+  }
+
+  // ── multi-month: months side by side (or stacked), the month's gestures; week numbers; no weekend ──
+  {
+    const { p, errors } = await page('/');
+    await p.waitForSelector('.dz-ev');
+    await p.evaluate(() => window.__dz().update({ view: 'multiMonthYear', weekNumbers: true }));
+    await p.waitForSelector('.dz-mm__grid');
+    const tops = await p.evaluate(() => [...document.querySelectorAll('.dz-mm__month')].slice(0, 4).map((m) => Math.round(m.getBoundingClientRect().top)));
+    check('multi-month: three months side by side, the fourth below', tops[0] === tops[1] && tops[1] === tops[2] && tops[3] > tops[0], JSON.stringify(tops));
+    const mm = await axeViolations(p, '.dz-cal');
+    check('axe: multiMonthYear (week numbers on) has no violation', mm.length === 0, mm.join(' | '));
+    // Drag the all-day "Mise en production" (Friday 23 October) one row down, in October's grid.
+    const oct = '.dz-mm__grid[aria-label="octobre 2026"]';
+    await p.locator(`${oct} .dz-dg__cell[data-date="2026-10-23"]`).scrollIntoViewIfNeeded();
+    const from = await p.evaluate((g) => {
+      const bar = [...document.querySelectorAll(`${g} .dz-bar`)].find((b) => b.dataset.segment?.startsWith('release'));
+      const r = bar.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }, oct);
+    const to = await p.evaluate((g) => {
+      const r = document.querySelector(`${g} .dz-dg__cell[data-date="2026-10-30"]`).getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }, oct);
+    await p.mouse.move(from.x, from.y);
+    await p.mouse.down();
+    await p.mouse.move(from.x, from.y + 10, { steps: 3 });
+    await p.mouse.move(to.x, to.y, { steps: 8 });
+    await p.mouse.up();
+    await p.waitForTimeout(150);
+    const release = await p.evaluate(() => String(window.__dz().kernel.store.snapshot.getEvent('release').start));
+    check('multi-month: an all-day event dragged a week later in its month', release === '2026-10-30', release);
+    // Over October's padding cell for Tuesday 29 September: the drop stays in October (the row's first day, Thursday 1st), not September.
+    const from2 = await p.evaluate((g) => {
+      const bar = [...document.querySelectorAll(`${g} .dz-bar`)].find((b) => b.dataset.segment?.startsWith('release'));
+      const r = bar.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }, oct);
+    const pad = await p.evaluate((g) => {
+      const r = document.querySelector(`${g} .dz-dg__cell[data-date="2026-09-29"]`).getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }, oct);
+    await p.mouse.move(from2.x, from2.y);
+    await p.mouse.down();
+    await p.mouse.move(from2.x, from2.y - 10, { steps: 3 });
+    await p.mouse.move(pad.x, pad.y, { steps: 8 });
+    await p.mouse.up();
+    await p.waitForTimeout(150);
+    const padded = await p.evaluate(() => String(window.__dz().kernel.store.snapshot.getEvent('release').start));
+    check('multi-month: a padding cell is not a way into the neighbouring month', padded === '2026-10-01', padded);
+    await p.evaluate(() => window.__dz().update({ multiMonthMaxColumns: 1 }));
+    const stacked = await p.evaluate(() => [...document.querySelectorAll('.dz-mm__month')].slice(0, 2).map((m) => Math.round(m.getBoundingClientRect().left)));
+    check('multi-month: multiMonthMaxColumns 1 stacks the months', stacked[0] === stacked[1], JSON.stringify(stacked));
+    // The month without its weekend: five columns, every cell under its weekday.
+    await p.evaluate(() => window.__dz().update({ view: 'dayGridMonth', weekends: false }));
+    await p.waitForFunction(() => document.querySelectorAll('.dz-dg__weekday').length === 5);
+    const off = await p.evaluate(() => {
+      const heads = [...document.querySelectorAll('.dz-dg__weekday')].map((x) => x.getBoundingClientRect());
+      const row = [...document.querySelectorAll('.dz-dg__week')][2];
+      const cells = [...row.querySelectorAll('.dz-dg__cell')].map((x) => x.getBoundingClientRect());
+      return Math.max(...cells.map((c, i) => Math.abs(c.left - heads[i].left)));
+    });
+    check('weekends off: five columns, cells within 1 px of their weekdays', off <= 1, `${off}px`);
+    const wk = await p.evaluate(() => [...document.querySelectorAll('.dz-dg__wk')].map((w) => w.textContent).join(' '));
+    check('week numbers: S40 to S45 on October 2026 (France)', wk === 'S40 S41 S42 S43 S44 S45', wk);
+    // Measured at the next frame, after the month is drawn.
+    const lanes = await p
+      .waitForFunction(() => window.__dz().kernel.viewModel().model.maxLanes >= 3, null, { timeout: 2000 })
+      .then(() => p.evaluate(() => window.__dz().kernel.viewModel().model.maxLanes))
+      .catch(() => p.evaluate(() => window.__dz().kernel.viewModel().model.maxLanes));
+    check('month: lanes measured after a change of options (no week of one lane)', lanes >= 3, String(lanes));
+    const noWeekend = await axeViolations(p, '.dz-cal');
+    check('axe: a month without weekends, week numbers on — no violation', noWeekend.length === 0, noWeekend.join(' | '));
+    check('multi-month: no console error', errors.length === 0, errors.join(' | '));
+    await p.close();
+  }
+
   // ── sources: one request for contiguous months, busy while loading, a refused save put back ──
   {
     const { p, errors } = await page('/sources.html');

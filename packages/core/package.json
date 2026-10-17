@@ -12,6 +12,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./views": {
+      "types": "./src/views.ts",
+      "default": "./src/views.ts"
     }
   }
 }

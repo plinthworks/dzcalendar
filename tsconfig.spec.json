@@ -18,6 +18,21 @@
       "@dzcalendar/core": [
         "./packages/core/src/index.ts"
       ],
+      "@dzcalendar/dom/toolkit": [
+        "./packages/dom/src/toolkit.ts"
+      ],
+      "@dzcalendar/dom/custom": [
+        "./packages/dom/src/custom.ts"
+      ],
+      "@dzcalendar/core/views": [
+        "./packages/core/src/views.ts"
+      ],
+      "@dzcalendar/dom/list": [
+        "./packages/dom/src/list.ts"
+      ],
+      "@dzcalendar/dom/multimonth": [
+        "./packages/dom/src/multimonth.ts"
+      ],
       "@dzcalendar/dom": [
         "./packages/dom/src/index.ts"
       ],

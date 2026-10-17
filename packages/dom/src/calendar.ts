@@ -4,7 +4,7 @@ import { createSettings } from './settings.js';
 import { attachInteractions } from './interact/host.js';
 import type { Interactions } from './interact/host.js';
 import type { LiveSettings } from './settings.js';
-import type { ActionItem, CalendarKernel, CreateRequest, DurationLike, EventInput, EventSourceSpec, SourceNotice, EventInstance, KernelOptions, NavDirection, PlainDate, ZoneId } from '@dzcalendar/core';
+import type { Weekday, ActionItem, CalendarKernel, CreateRequest, DurationLike, EventInput, EventSourceSpec, SourceNotice, EventInstance, KernelOptions, NavDirection, PlainDate, ZoneId } from '@dzcalendar/core';
 import type { CalendarHooks, MenuHook, ViewController, ViewCtx } from './host.js';
 import { viewFactory } from './host.js';
 import { createMenu } from './menu.js';
@@ -45,6 +45,12 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
    * editor. A moment in a time grid, a date in a month.
    */
   readonly onCreateRequest?: (request: CreateRequest) => void;
+  /** False hides Saturday and Sunday (added to `hiddenDays`). Default true. */
+  readonly weekends?: boolean;
+  /** A number per week: on the month's rows, in the week's corner. Default false. */
+  readonly weekNumbers?: boolean;
+  /** Months side by side at most in a multi-month view (1: a stack). Default 3. */
+  readonly multiMonthMaxColumns?: number;
 }
 
 export interface CalendarUpdate extends Partial<LiveSettings> {
@@ -59,6 +65,10 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly sources?: readonly EventSourceSpec[];
   readonly hooks?: CalendarHooks;
   readonly businessHours?: KernelOptions['businessHours'];
+  readonly hiddenDays?: KernelOptions['hiddenDays'];
+  readonly weekends?: boolean;
+  readonly weekNumbers?: boolean;
+  readonly multiMonthMaxColumns?: number;
 }
 
 export interface CalendarInstance {
@@ -99,6 +109,14 @@ function sameHooks(a: CalendarHooks, b: CalendarHooks): boolean {
   return shallowSame(ea, eb) && Object.keys(a).length === Object.keys(b).length;
 }
 
+/** Where a built-in family's renderer is imported from, for an error that says what to do. */
+const entryHint = (family: string): string =>
+  family === 'list' ? ` (import '@dzcalendar/dom/list')` : family === 'multiMonth' ? ` (import '@dzcalendar/dom/multimonth')` : '';
+
+/** `hiddenDays`, plus the weekend when `weekends` is false. */
+const hiddenOf = (hidden: readonly Weekday[] | undefined, weekends: boolean | undefined): Weekday[] =>
+  [...new Set([...(hidden ?? []), ...(weekends === false ? ([6, 7] as const) : [])])].sort() as Weekday[];
+
 const messagesFor = (locale: string) => (locale.toLowerCase().startsWith('fr') ? FR : EN);
 /** An application's messages over the locale's: a set written before a version added keys still works. */
 const withDefaults = (given: DzMessages | undefined, locale: string): DzMessages => (given ? { ...messagesFor(locale), ...given } : messagesFor(locale));
@@ -132,6 +150,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     createKernel({
       ...options,
       timeZone: options.timeZone || Temporal.Now.timeZoneId(),
+      hiddenDays: hiddenOf(options.hiddenDays, options.weekends),
       locale: options.locale || doc.documentElement.lang || 'en',
     } as KernelOptions);
 
@@ -140,7 +159,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     return spec !== undefined && viewFactory(spec.family) !== undefined;
   };
   const initial = kernel.getState().view;
-  if (!viewFactory(initial.family)) throw new RangeError(`the ${initial.family} family has no renderer`);
+  if (!viewFactory(initial.family)) throw new RangeError(`the ${initial.family} family has no renderer${entryHint(initial.family)}`);
 
   const scope = new Scope();
   const scheduler = new FrameScheduler(win);
@@ -150,6 +169,12 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   let givenMessages: DzMessages | undefined = options.messages;
   const root = h(doc, 'div', 'dz-cal');
   root.dir = directionOf(kernel.getState().locale);
+  let hidden: { days: readonly Weekday[] | undefined; weekends: boolean | undefined } = { days: options.hiddenDays, weekends: options.weekends };
+  const columns = (n: number) => {
+    if (!Number.isInteger(n) || n < 1) throw new RangeError(`multiMonthMaxColumns must be a whole number ≥ 1: ${n}`);
+    root.style.setProperty('--dz-mm-cols', String(n));
+  };
+  columns(options.multiMonthMaxColumns ?? 3);
 
   const menu = createMenu(doc, root);
   const popover = createPopover(doc, root);
@@ -212,6 +237,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     hooks: options.hooks ?? {},
     epoch: 0,
     snapMinutes: settings.current.snapMinutes ?? 15,
+    weekNumbers: options.weekNumbers === true,
+    injectStyles: options.injectStyles !== false,
     popoverElement: popover.element,
     openMenu(target, at, returnFocus) {
       const state = kernel.getState();
@@ -238,7 +265,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
         ...(live.editable && interactions && {
           onGrab: (inst: EventInstance, kind: 'move' | 'resize') => interactions?.grab(inst, kind),
           // A month draws a timed event's day, not its hours: it only moves there, as under the pointer.
-          canResize: (inst: EventInstance) => mountedFamily !== 'dayGrid' || inst.event.allDay,
+          canResize: (inst: EventInstance) => (mountedFamily !== 'dayGrid' && mountedFamily !== 'multiMonth') || inst.event.allDay,
         }),
         ...(drawable('timeGridDay') && { onGoToDay: (d: PlainDate) => kernel.setView('timeGridDay', d) }),
       });
@@ -292,7 +319,12 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     },
   };
 
-  const headerViews = (options.headerViews ?? ['dayGridMonth', 'timeGridWeek', 'timeGridDay']).filter(drawable);
+  // A tab for a view whose family was not imported would do nothing: left out, and said once.
+  const headerViews = (options.headerViews ?? ['dayGridMonth', 'timeGridWeek', 'timeGridDay']).filter((v) => {
+    if (drawable(v)) return true;
+    if (options.headerViews) console.warn(`dzcalendar: no renderer for the view ${v}${entryHint(kernel.getViewSpec(v)?.family ?? '')}`);
+    return false;
+  });
   const toolbar = createToolbar(doc, scope, kernel, headerViews, (dir) => kernel.navigate(dir), (v) => kernel.setView(v));
   root.append(toolbar.element);
 
@@ -350,7 +382,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
         const min = slotMin ? Temporal.Duration.from(slotMin).total({ unit: 'minutes' }) : 0;
         v.scrollTo(Math.max(0, scroll - min));
       }
-      if (vm.family === 'dayGrid') measureLanes();
+      if (vm.family === 'dayGrid' || vm.family === 'multiMonth') measureLanes();
     }
   }
 
@@ -366,14 +398,20 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   probe.setAttribute('aria-hidden', 'true');
   root.append(probe);
   function measureLanes(): void {
-    if (!autoLanes || mountedFamily !== 'dayGrid') return;
-    // Only a month is squeezed into rows of fixed height; a week or a day of
-    // the day grid grows to show everything.
-    if (kernel.getState().view.alignment !== 'month') return kernel.setOptions({ dayGrid: { maxLanes: null } });
+    if (!autoLanes) return;
+    // A week or a day of the day grid grows to show everything: uncapped at once, from the state (not the mounted view).
+    const view = kernel.getState().view;
+    if (view.family === 'dayGrid' && view.alignment !== 'month') return kernel.setOptions({ dayGrid: { maxLanes: null } });
     scheduler.schedule({
-      read: () => {
+      // Decided at read time, on the view then mounted: a view change paints after the event that asked.
+      read: (): number | null | undefined => {
+        const family = mountedFamily;
+        if (family !== 'dayGrid' && family !== 'multiMonth') return undefined;
+        // Only a month is squeezed into rows of fixed height; a week or a day of
+        // the day grid grows to show everything. A multi-month row has its own fixed height.
+        if (family === 'dayGrid' && kernel.getState().view.alignment !== 'month') return null;
         const week = root.querySelector<HTMLElement>('.dz-dg__week');
-        if (!week) return null;
+        if (!week) return undefined;
         // The row's own tracks: the day-number track, one per lane, a gap
         // between every two — what the grid really reserves, not the button.
         const style = getComputedStyle(week);
@@ -381,10 +419,10 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
         const gap = parseFloat(style.rowGap) || 0;
         const bar = probe.getBoundingClientRect().height;
         const weekH = week.getBoundingClientRect().height;
-        return weekH > 0 && bar > 0 ? Math.max(1, Math.floor((weekH - head - gap) / (bar + gap))) : null;
+        return weekH > 0 && bar > 0 ? Math.max(1, Math.floor((weekH - head - gap) / (bar + gap))) : undefined;
       },
       write: (lanes) => {
-        if (lanes !== null) kernel.setOptions({ dayGrid: { maxLanes: lanes } });
+        if (lanes !== undefined) kernel.setOptions({ dayGrid: { maxLanes: lanes } });
       },
     });
   }
@@ -466,10 +504,17 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       const viewChanges = viewType !== state.view.type || !sameDate;
       if (viewChanges) {
         if (!kernel.getViewSpec(viewType)) throw new RangeError(`unknown view: ${viewType}`);
-        if (!drawable(viewType)) throw new RangeError(`no renderer for the view ${viewType}`);
+        if (!drawable(viewType)) throw new RangeError(`no renderer for the view ${viewType}${entryHint(kernel.getViewSpec(viewType)!.family)}`);
       }
       if (changes.timeZone && changes.timeZone !== state.timeZone && !isZone(changes.timeZone)) throw new RangeError(`not a time zone: ${changes.timeZone}`);
       if ('businessHours' in changes && changes.businessHours !== undefined) assertBusinessHours(changes.businessHours);
+      if (changes.multiMonthMaxColumns !== undefined && !(Number.isInteger(changes.multiMonthMaxColumns) && changes.multiMonthMaxColumns >= 1)) {
+        throw new RangeError(`multiMonthMaxColumns must be a whole number ≥ 1: ${changes.multiMonthMaxColumns}`);
+      }
+      if (changes.hiddenDays?.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw new RangeError(`hiddenDays are ISO weekdays, 1 (Monday) to 7 (Sunday): ${changes.hiddenDays.join(', ')}`);
+      if (('hiddenDays' in changes || 'weekends' in changes) && hiddenOf('hiddenDays' in changes ? changes.hiddenDays : hidden.days, 'weekends' in changes ? changes.weekends : hidden.weekends).length >= 7) {
+        throw new RangeError('every day of the week is hidden');
+      }
       // Live settings check themselves and apply at once (nothing to redraw): a bad one throws here, before any change.
       if (settings.apply(changes)) {
         ctx.snapMinutes = settings.current.snapMinutes ?? 15;
@@ -504,6 +549,16 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           }
           if (changes.timeZone && changes.timeZone !== state.timeZone) kernel.setTimeZone(changes.timeZone);
           if ('businessHours' in changes && changes.businessHours !== undefined) kernel.setOptions({ businessHours: changes.businessHours });
+          if ('hiddenDays' in changes || 'weekends' in changes) {
+            hidden = { days: 'hiddenDays' in changes ? changes.hiddenDays : hidden.days, weekends: 'weekends' in changes ? changes.weekends : hidden.weekends };
+            kernel.setOptions({ hiddenDays: hiddenOf(hidden.days, hidden.weekends) });
+          }
+          if (changes.weekNumbers !== undefined && changes.weekNumbers !== ctx.weekNumbers) {
+            ctx.weekNumbers = changes.weekNumbers;
+            ctx.epoch++;
+            dirty = true;
+          }
+          if (changes.multiMonthMaxColumns !== undefined) columns(changes.multiMonthMaxColumns);
           if (changes.events) kernel.setEvents(changes.events);
           if (changes.sources) {
             const keep = new Set(changes.sources.map((x) => x.id));

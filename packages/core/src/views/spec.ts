@@ -1,6 +1,7 @@
 import type { DurationLike, PlainDate, Weekday } from '../temporal.js';
 
-export type ViewFamily = 'dayGrid' | 'timeGrid' | 'list' | 'multiMonth' | 'timeline' | 'custom';
+/** A built-in family, or one an application or plugin registers (`defineView` uses the view's type). */
+export type ViewFamily = 'dayGrid' | 'timeGrid' | 'list' | 'multiMonth' | 'timeline' | 'custom' | (string & {});
 
 /**
  * What a view shows, as data: a family (how it is drawn) and a stretch of
@@ -34,6 +35,8 @@ export interface ViewRange {
   readonly dates: readonly PlainDate[];
   /** `dates` in rows of one week each (a month grid), or a single row. */
   readonly weeks: readonly (readonly PlainDate[])[];
+  /** A multi-month view: each month's own grid (padding days included), in order. */
+  readonly months?: readonly ViewRange[];
 }
 
 export interface NavContext {

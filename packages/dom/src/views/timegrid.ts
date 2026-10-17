@@ -1,4 +1,4 @@
-import { Temporal, formatTemporal, locateNow } from '@dzcalendar/core';
+import { Temporal, formatTemporal, locateNow, weekNumber, weekRulesFor } from '@dzcalendar/core';
 import type { AllDayBar, AxisBand, Hit, PlacedTimed, PlainDate, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
 import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
 import { handles } from '../interact/handles.js';
@@ -50,7 +50,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   const { doc } = ctx;
   const root = h(doc, 'div', 'dz-tg');
   const head = h(doc, 'div', 'dz-tg__row dz-tg__head');
-  head.append(h(doc, 'div', 'dz-tg__corner'));
+  const corner = h(doc, 'div', 'dz-tg__corner');
+  head.append(corner);
   const headsHost = contentsHost(doc, 'dz-tg__heads');
   head.append(headsHost);
   const allday = h(doc, 'div', 'dz-tg__row dz-tg__allday');
@@ -313,7 +314,15 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const cols = model?.columns ?? [];
       if (cols.length === 0) return null;
       const col = columnOf(hit.date);
-      if (!col) return Temporal.PlainDate.compare(hit.date, cols[0]!.date) < 0 ? 'prev' : 'next';
+      if (!col) {
+        const st = ctx.kernel.getState();
+        // A hidden weekday, wherever it is: null, and the keyboard steps on past it (a day view: Friday → Monday).
+        if (st.view.hiddenDays.includes(hit.date.dayOfWeek as never)) return null;
+        const r = st.range;
+        if (Temporal.PlainDate.compare(hit.date, r.start) < 0) return 'prev';
+        // A hidden day inside the period: null, and the keyboard steps on past it.
+        return Temporal.PlainDate.compare(hit.date, r.end) >= 0 ? 'next' : null;
+      }
       if (hit.kind === 'day') return hit.allDayRow ? hit : { kind: 'day', date: hit.date, allDayRow: true };
       if (!usable(col)) return null;
       const s = col.axis.start.epochMilliseconds;
@@ -546,6 +555,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const cols = m.columns.map((column): ColumnItem => ({ key: column.key, sig: `${idOf(column)}|${epoch}`, column, today: column.date.equals(state.today) }));
       root.style.setProperty('--dz-cols', String(m.columns.length));
       alldayLabel.textContent = ctx.messages.allDay;
+      // The week's number in the corner (the head is drawn, not read: the columns say their dates).
+      const first = m.columns[0]?.date;
+      corner.textContent = ctx.weekNumbers && first ? ctx.messages.weekShort({ week: weekNumber(first, { ...weekRulesFor(ctx.locale), firstDay: state.firstDay }) }) : '';
       if (!cursorHits.has(cursorNode)) cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
       heads.sync(cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${c.today}|${epoch}` })));
       bars.sync([

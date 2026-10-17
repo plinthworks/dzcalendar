@@ -92,6 +92,13 @@ export interface DzMessages {
   saveFailed(parts: { title: string; reverted: boolean }): string;
   /** A source could not be fetched (after its retries). */
   readonly loadFailed: string;
+  /** A list view with nothing in its period. */
+  readonly noEvents: string;
+  /** A week number, short (in a cell) and spoken. */
+  weekShort(parts: { week: number }): string;
+  weekLabel(parts: { week: number }): string;
+  /** A month of a multi-month view: its title is a button to that month. */
+  readonly goToMonth: string;
   /** Grab mode: a timed event put on the all-day row, a day event put in the hours (with the length it gets). */
   readonly becomesAllDay: string;
   becomesTimed(parts: { length: string }): string;
@@ -120,7 +127,7 @@ export const EN: DzMessages = {
   moreLink: ({ count }) => `+${count} more`,
   moreLabel: ({ count, date }) => `${count} more ${count === 1 ? 'event' : 'events'}, ${date}`,
   closePopover: 'Close',
-  views: { dayGridMonth: 'Month', dayGridWeek: 'Week', dayGridDay: 'Day', timeGridWeek: 'Week', timeGridDay: 'Day' },
+  views: { dayGridMonth: 'Month', dayGridWeek: 'Week', dayGridDay: 'Day', timeGridWeek: 'Week', timeGridDay: 'Day', listDay: 'List', listWeek: 'List', listMonth: 'List', listYear: 'List', multiMonthYear: 'Year' },
   newEventAt: ({ time }) => `New event at ${time}`,
   newEventOn: ({ date }) => `New all-day event on ${date}`,
   dayLabel: ({ date, count }) => (count === 0 ? date : `${date}, ${count} ${count === 1 ? 'event' : 'events'}`),
@@ -160,6 +167,10 @@ export const EN: DzMessages = {
   eventDeleted: ({ title, undo }) => (undo ? `${title} deleted. ${undo} to undo.` : `${title} deleted.`),
   saveFailed: ({ title, reverted }) => `${title} could not be saved. ${reverted ? 'It is back as it was.' : 'Reloading.'}`,
   loadFailed: 'Some events could not be loaded.',
+  noEvents: 'No events to show',
+  weekShort: ({ week }) => `W${week}`,
+  weekLabel: ({ week }) => `Week ${week}`,
+  goToMonth: 'Go to this month',
   becomesAllDay: 'It becomes an all-day event',
   becomesTimed: ({ length }) => `It becomes a timed event of ${length}`,
   deleteWhich: 'Delete which events?',
@@ -185,7 +196,7 @@ export const FR: DzMessages = {
   moreLink: ({ count }) => `+${count} autre${count > 1 ? 's' : ''}`,
   moreLabel: ({ count, date }) => `${count} autre${count > 1 ? 's' : ''} événement${count > 1 ? 's' : ''}, ${date}`,
   closePopover: 'Fermer',
-  views: { dayGridMonth: 'Mois', dayGridWeek: 'Semaine', dayGridDay: 'Jour', timeGridWeek: 'Semaine', timeGridDay: 'Jour' },
+  views: { dayGridMonth: 'Mois', dayGridWeek: 'Semaine', dayGridDay: 'Jour', timeGridWeek: 'Semaine', timeGridDay: 'Jour', listDay: 'Liste', listWeek: 'Liste', listMonth: 'Liste', listYear: 'Liste', multiMonthYear: 'Année' },
   newEventAt: ({ time }) => `Nouvel événement à ${time}`,
   newEventOn: ({ date }) => `Nouvel événement le ${date}`,
   dayLabel: ({ date, count }) => (count === 0 ? date : `${date}, ${count} événement${count > 1 ? 's' : ''}`),
@@ -225,6 +236,10 @@ export const FR: DzMessages = {
   eventDeleted: ({ title, undo }) => (undo ? `« ${title} » supprimé. ${undo} pour annuler.` : `« ${title} » supprimé.`),
   saveFailed: ({ title, reverted }) => `« ${title} » n’a pas pu être enregistré. ${reverted ? 'Il est revenu comme avant.' : 'Rechargement.'}`,
   loadFailed: 'Des événements n’ont pas pu être chargés.',
+  noEvents: 'Aucun événement à afficher',
+  weekShort: ({ week }) => `S${week}`,
+  weekLabel: ({ week }) => `Semaine ${week}`,
+  goToMonth: 'Aller à ce mois',
   becomesAllDay: 'Il devient un événement sur la journée',
   becomesTimed: ({ length }) => `Il devient un événement horaire de ${length}`,
   deleteWhich: 'Supprimer quels événements ?',

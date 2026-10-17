@@ -68,6 +68,14 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 10 (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : vues payées à l'import — `@dzcalendar/dom/list`, `@dzcalendar/dom/multimonth`, `@dzcalendar/dom/custom` (`defineView`), modèles dans `@dzcalendar/core/views`, boîte à outils des familles de vues dans `@dzcalendar/dom/toolkit` (API de plugin : `registerView`, `KeyedList`, `h`, `fillEvent`, `timeLabels`, `attachMenuTriggers`, `createDayGridView`…) ; multi-mois « comme le mois » ; les jours masqués propres à une vue l'emportent sur ceux du calendrier ; six semaines par mois en multi-mois ; budgets dom/list 3,5 ko, core/views 1,5 ko, dom/multimonth 3 ko, dom/custom 1,5 ko.
+- **B.16** — `ViewFamily` accepte toute chaîne (une vue `defineView` a pour famille son type ; noms des familles intégrées refusés). `ViewRange.months` (multi-mois : une grille par mois ; la plage va du début de la première grille à la fin de la dernière, ce que les sources chargent). Un alignement `month` hors grille de mois dure `duration`. `hiddenDays` du calendrier (`ModelOptions.hiddenDays`, `weekends: false` côté DOM) : spec effective mise en cache par identité ; jours ISO 1–7 validés. `registerModelFamily` / `ModelFamily` publics.
+- **D.1** — `createDayGridView(ctx, { months: true })` dessine des sections de mois (un seul arrêt de tabulation, une seule surface) ; `ViewCtx.weekNumbers`, `ViewCtx.injectStyles`. `visibleWindow()` reporté à la Phase 12 (virtualisation), en membre optionnel.
+- **D.6** — numéros de semaine : bouton dans la première cellule de chaque ligne (nommé « Semaine N »), coin de la grille horaire ; liste : une `section` + `h3` par jour, `ul`/`li`, un seul arrêt de tabulation (clavier linéaire, différent des grilles à dessein).
+- **G.1** — `--lanes` au moins 1 (`repeat(0, …)` est du CSS invalide : la mesure lisait une seule ligne) ; la mesure des lignes se décide sur la vue montée au moment de la lecture.
+
 ### Ajustements après la Phase 9 (détail dans ROADMAP.md)
 
 - **Décisions du propriétaire** : écriture vers le serveur par un `save` optionnel par source (optimiste, retour en arrière annoncé en cas de refus, modification protégée d'un rechargement tant que l'envoi est en cours ; sans `save`, le serveur fait autorité) ; K.8 tranché : table Windows → IANA (CLDR), puis le fuseau IANA dont les règles concordent (avertissement `zone-guessed`), sinon le décalage que donnent les règles du VTIMEZONE à chaque heure (`zone-fixed-offset`) ; budgets core 33 ko, ical 7,5 ko.
@@ -1365,7 +1373,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 - **Dépend de** : P5, P1.
 
 ### Phase 10 : list, multiMonth, vues custom
-- **Livrables / fichiers** : `dom/views/{list,multimonth,custom}`, `registerView`.
+- **Livrables / fichiers** : `dom/views/{list,multimonth,custom}`, `registerView` (livré, voir « Ajustements après la Phase 10 »).
 - **Acceptation** : list jour→année ; multiMonth pile et grille ; `registerView('myView', …)` fonctionne avec une vue de test ; hiddenDays/weekends ; numéros de semaine selon la locale.
 - **Dépend de** : P4.
 

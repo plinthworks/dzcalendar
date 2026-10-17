@@ -34,6 +34,8 @@ export interface ModelOptions {
   readonly timeGrid?: Omit<TimeGridOptions, 'displayZone' | 'businessHours'>;
   readonly dayGrid?: Omit<DayGridOptions, 'displayZone' | 'businessHours' | 'showNonCurrentDates'>;
   readonly businessHours?: BusinessHoursInput;
+  /** Weekdays no view shows (ISO: 6 and 7 for the weekend), unless a view names its own. */
+  readonly hiddenDays?: readonly Weekday[];
 }
 
 export interface KernelOptions extends ModelOptions {
@@ -195,6 +197,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     ...(o.timeGrid && { timeGrid: o.timeGrid }),
     ...(o.dayGrid && { dayGrid: o.dayGrid }),
     ...(o.businessHours !== undefined && { businessHours: o.businessHours }),
+    ...(o.hiddenDays && { hiddenDays: o.hiddenDays }),
   };
   const todayIn = (zone: ZoneId) => now().toZonedDateTimeISO(zone).toPlainDate();
   let date = o.initialDate ?? todayIn(timeZone);
@@ -203,7 +206,20 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     if (!spec) throw new RangeError(`unknown view: ${type}`);
     return spec;
   };
-  let view = viewOf(o.initialView ?? 'timeGridWeek');
+  let raw = viewOf(o.initialView ?? 'timeGridWeek');
+  // The spec in force: the calendar's hidden days laid on a view that names none. Cached, so its identity holds.
+  const effective = new WeakMap<ViewSpec, { key: string; spec: ViewSpec }>();
+  const effectiveOf = (spec: ViewSpec): ViewSpec => {
+    const hidden = spec.hiddenDays.length > 0 ? null : (options.hiddenDays ?? null);
+    if (!hidden || hidden.length === 0) return spec;
+    const key = [...hidden].sort().join(',');
+    const hit = effective.get(spec);
+    if (hit?.key === key) return hit.spec;
+    const made = { ...spec, hiddenDays: [...hidden].sort() as Weekday[] };
+    effective.set(spec, { key, spec: made });
+    return made;
+  };
+  let view = effectiveOf(raw);
 
   let problems: NormalizationReport | null = null;
   const idGen = createIdGenerator('ev');
@@ -245,8 +261,13 @@ export function createKernel(o: KernelOptions): CalendarKernel {
 
   function titleFor(range: ViewRange, spec: ViewSpec): string {
     switch (spec.alignment) {
-      case 'month':
-        return formatTemporal(range.activeStart, { month: 'long', year: 'numeric' }, locale);
+      case 'month': {
+        // Several months (a list or a multi-month view of `duration: { months: 3 }`): the stretch.
+        const last = range.activeEnd.subtract({ days: 1 });
+        return last.month === range.activeStart.month && last.year === range.activeStart.year
+          ? formatTemporal(range.activeStart, { month: 'long', year: 'numeric' }, locale)
+          : formatRangeTitle(range.activeStart, last, { month: 'short', year: 'numeric' }, locale);
+      }
       case 'year':
         return formatTemporal(range.activeStart, { year: 'numeric' }, locale);
       default: {
@@ -307,8 +328,9 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     getViewSpec: (type) => views[type],
     setView(type, at) {
       const spec = viewOf(type);
-      if (spec === view && (!at || at.equals(date))) return;
-      view = spec;
+      if (spec === raw && (!at || at.equals(date))) return;
+      raw = spec;
+      view = effectiveOf(spec);
       if (at) date = at;
       direction ??= 'other';
       changeState('view');
@@ -341,16 +363,20 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       if (
         (!next.timeGrid || same(options.timeGrid, next.timeGrid)) &&
         (!next.dayGrid || same(options.dayGrid, next.dayGrid)) &&
-        (!('businessHours' in next) || next.businessHours === options.businessHours)
+        (!('businessHours' in next) || next.businessHours === options.businessHours) &&
+        (!('hiddenDays' in next) || [...(next.hiddenDays ?? [])].sort().join() === [...(options.hiddenDays ?? [])].sort().join())
       ) {
         return;
       }
+      if (next.hiddenDays && new Set(next.hiddenDays).size >= 7) throw new RangeError('hiddenDays: every day of the week is hidden');
       options = {
         ...options,
         ...(next.timeGrid && { timeGrid: { ...options.timeGrid, ...next.timeGrid } }),
         ...(next.dayGrid && { dayGrid: { ...options.dayGrid, ...next.dayGrid } }),
         ...('businessHours' in next && { businessHours: next.businessHours }),
+        ...('hiddenDays' in next && { hiddenDays: next.hiddenDays }),
       } as ModelOptions;
+      view = effectiveOf(raw);
       changeState('options');
     },
     setEvents(events) {

@@ -103,7 +103,8 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
   function land(from: Hit, to: Hit, step: Step): Hit | null {
     if (grid === 'time' && step.slots !== 0 && from.kind === 'day') return step.slots > 0 ? (keys!.firstSlot?.(from.date) ?? null) : null;
     let target = to;
-    for (let tries = 0; tries < 3; tries++) {
+    // Up to six more days: past a skipped day, or the hidden days of a week.
+    for (let tries = 0; tries < 7; tries++) {
       let f = keys!.fit(target);
       if (f === 'prev' || f === 'next') {
         ctx.kernel.navigate(f);
@@ -116,7 +117,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
         }
         return f;
       }
-      // A day its zone skipped (Apia, 30 December 2011): one more day the same way.
+      // A day its zone skipped (Apia, 30 December 2011), or a hidden day: one more day the same way.
       if (f !== null || step.days === 0) return null;
       // From where it started, one day further each time: the wall time is kept from there.
       target = stepHit(shared.interaction(null), from, { days: step.days + Math.sign(step.days) * (tries + 1), slots: step.slots });

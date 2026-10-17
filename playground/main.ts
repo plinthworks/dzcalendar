@@ -1,6 +1,8 @@
 import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import { createCalendar, NO_MOTION } from '@dzcalendar/dom';
+import '@dzcalendar/dom/list';
+import '@dzcalendar/dom/multimonth';
 import { createGsapMotion } from '@dzcalendar/motion-gsap';
 import { DEMO_EVENTS } from './demo-events';
 
@@ -19,6 +21,8 @@ function make(axis: 'wall' | 'elapsed') {
     locale: 'fr-FR',
     initialDate: Temporal.PlainDate.from('2026-10-21'),
     events: DEMO_EVENTS,
+    headerViews: ['multiMonthYear', 'dayGridMonth', 'timeGridWeek', 'timeGridDay', 'listWeek'],
+    weekNumbers: (document.querySelector<HTMLInputElement>('#weeknums')?.checked) ?? false,
     timeGrid: { axis, slotMinutes: 60 },
     businessHours: { daysOfWeek: [1, 2, 3, 4, 5], start: '09:00', end: '18:00' },
     onCreateRequest: (r) =>
@@ -53,3 +57,5 @@ document.querySelector<HTMLSelectElement>('#theme')!.addEventListener('change', 
 document.querySelector<HTMLInputElement>('#motion')!.addEventListener('change', (e) => {
   cal.update({ motion: (e.target as HTMLInputElement).checked ? createGsapMotion() : NO_MOTION });
 });
+document.querySelector<HTMLInputElement>('#weeknums')?.addEventListener('change', (e) => cal.update({ weekNumbers: (e.target as HTMLInputElement).checked }));
+document.querySelector<HTMLInputElement>('#weekends')?.addEventListener('change', (e) => cal.update({ weekends: (e.target as HTMLInputElement).checked }));

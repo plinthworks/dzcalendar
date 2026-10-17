@@ -55,12 +55,20 @@ function typescript(name) {
     ...shared(name),
     type: 'module',
     // The DOM's built-in views register themselves on import: a bundler must keep those modules.
-    sideEffects: name === 'dom' ? ['./views/*.js', './calendar.js'] : false,
+    sideEffects: name === 'dom' ? ['./views/*.js', './calendar.js', './list.js', './multimonth.js', './custom.js'] : false,
     main: './index.js',
     module: './index.js',
     types: './index.d.ts',
     exports: {
       '.': { types: './index.d.ts', default: './index.js' },
+      // Views paid for only when imported: `import '@dzcalendar/dom/list'` registers the family.
+      ...(name === 'dom' && {
+        './list': { types: './list.d.ts', default: './list.js' },
+        './multimonth': { types: './multimonth.d.ts', default: './multimonth.js' },
+        './custom': { types: './custom.d.ts', default: './custom.js' },
+        './toolkit': { types: './toolkit.d.ts', default: './toolkit.js' },
+      }),
+      ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' } }),
       './package.json': './package.json',
     },
     ...(source.dependencies && { dependencies: internal(source.dependencies) }),

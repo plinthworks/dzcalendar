@@ -56,6 +56,10 @@ export interface ViewCtx {
   epoch: number;
   /** Minutes a context-menu moment snaps to in a time grid. */
   snapMinutes: number;
+  /** False under a CSP without inline styles: a view family's own CSS is the application's to include. */
+  readonly injectStyles: boolean;
+  /** Week numbers on the month's rows and the week's corner. */
+  weekNumbers: boolean;
   /** The "+N" panel: views attach their menu triggers to it too. */
   readonly popoverElement: HTMLElement;
   /**

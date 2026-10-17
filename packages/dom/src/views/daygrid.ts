@@ -1,5 +1,11 @@
 import { Temporal, formatTemporal } from '@dzcalendar/core';
+import { weekNumber, weekRulesFor } from '@dzcalendar/core';
 import type { DayGridBar, DayGridModel, DayGridWeek, Hit, KernelState, PlainDate, Segment, ZonedDateTime } from '@dzcalendar/core';
+
+/** The shape of `@dzcalendar/core/views`' multi-month model, named here so the month view does not import that entry. */
+interface MonthsModel {
+  readonly months: readonly { readonly month: PlainDate; readonly model: DayGridModel }[];
+}
 import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
 import type { ViewController, ViewCtx } from '../host.js';
 import { registerView } from '../host.js';
@@ -11,6 +17,21 @@ interface WeekItem {
   readonly key: string;
   readonly sig: string;
   readonly week: DayGridWeek;
+  readonly maxLanes: number | null;
+}
+
+/** One month grid: the whole view, or one month of a multi-month view. */
+interface Section {
+  readonly key: string;
+  readonly model: DayGridModel;
+  /** The month's first day, in a multi-month view. */
+  readonly month: PlainDate | null;
+}
+
+interface MonthItem {
+  readonly key: string;
+  readonly sig: string;
+  readonly section: Section;
 }
 
 interface BarItem {
@@ -38,6 +59,8 @@ interface CellItem {
   readonly count: number;
   /** Every event on this day, hidden by "+N" or not: the cell lists them for the keyboard and screen readers. */
   readonly segs: readonly Segment[];
+  /** The row's week number, on its first cell when week numbers are on. */
+  readonly week: number | null;
 }
 
 interface ItemOfDay {
@@ -77,15 +100,21 @@ const idOf = (o: object) => {
  * cells behind, bars on lanes (`--lane`), and on a day that overflows, the
  * "+N" link in place of the last lane — never a half-covered bar.
  */
-export function createDayGridView(ctx: ViewCtx): ViewController {
+export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolean } = {}): ViewController {
   const { doc } = ctx;
-  const root = h(doc, 'div', 'dz-dg');
-  root.setAttribute('role', 'grid');
+  /** A multi-month view: a grid per month, each date's events in its own month only. */
+  const multi = opts.months === true;
+  const root = h(doc, 'div', multi ? 'dz-dg dz-mm' : 'dz-dg');
   const head = h(doc, 'div', 'dz-dg__head');
   head.setAttribute('role', 'row');
   const body = h(doc, 'div', 'dz-dg__body');
-  root.append(head, body);
-  let model: DayGridModel | null = null;
+  if (multi) root.append(body);
+  else {
+    root.setAttribute('role', 'grid');
+    root.append(head, body);
+  }
+  let sections: Section[] = [];
+  const allWeeks = () => sections.flatMap((x) => x.model.weeks);
   let state: KernelState | null = null;
   const parts = new Map<string, WeekParts>();
   let created: HTMLElement[] = [];
@@ -93,8 +122,8 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
   let cursorDate: PlainDate | null = null;
   const itemLists = new WeakMap<HTMLElement, { readonly host: HTMLElement; readonly list: KeyedList<ItemOfDay> }>();
 
-  const weeks = new KeyedList<WeekItem>(
-    body,
+  const weekList = (host: HTMLElement) => new KeyedList<WeekItem>(
+    host,
     (it) => {
       const el = h(doc, 'div', 'dz-dg__week');
       el.setAttribute('role', 'row');
@@ -133,16 +162,77 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
       p?.bars.clear();
     },
   );
+  /** The single grid's rows, or each month's. */
+  const weeks = weekList(body);
+  const monthWeeks = new Map<string, KeyedList<WeekItem>>();
+  const months = new KeyedList<MonthItem>(
+    body,
+    (it) => {
+      const el = h(doc, 'section', 'dz-mm__month');
+      const title = h(doc, 'h3', 'dz-mm__title');
+      const grid = h(doc, 'div', 'dz-mm__grid');
+      grid.setAttribute('role', 'grid');
+      const mhead = h(doc, 'div', 'dz-dg__head');
+      mhead.setAttribute('role', 'row');
+      const rows = contentsHost(doc, 'dz-mm__rows');
+      grid.append(mhead, rows);
+      el.append(title, grid);
+      monthWeeks.set(it.key, weekList(rows));
+      return el;
+    },
+    (el, it) => drawMonth(el, it.section),
+    (el) => {
+      monthWeeks.get(el.dataset['key'] ?? '')?.clear();
+      monthWeeks.delete(el.dataset['key'] ?? '');
+    },
+  );
+
+  function weekdayHead(host: HTMLElement, m: DayGridModel): void {
+    host.replaceChildren(
+      ...(m.weeks[0]?.dates ?? []).map((d) => {
+        const c = h(doc, 'div', 'dz-dg__weekday', formatTemporal(d, { weekday: 'short' }, ctx.locale));
+        c.setAttribute('role', 'columnheader');
+        return c;
+      }),
+    );
+  }
+
+  function weekItems(x: Section): WeekItem[] {
+    const s = state!;
+    return x.model.weeks.map((week) => ({
+      key: x.key ? `${x.key}|${week.dates[0]?.toString() ?? ''}` : (week.dates[0]?.toString() ?? ''),
+      sig: `${idOf(week)}|${s.today.toString()}|${x.model.maxLanes}|${ctx.epoch}`,
+      week,
+      maxLanes: x.model.maxLanes,
+    }));
+  }
+
+  function drawMonth(el: HTMLElement, x: Section): void {
+    const name = formatTemporal(x.month!, { month: 'long', year: 'numeric' }, ctx.locale);
+    const title = el.querySelector<HTMLElement>('.dz-mm__title')!;
+    const go = h(doc, 'button', 'dz-mm__go', name) as HTMLButtonElement;
+    go.type = 'button';
+    go.setAttribute('aria-label', `${ctx.messages.goToMonth}, ${name}`);
+    go.addEventListener('click', () => ctx.kernel.getViewSpec('dayGridMonth') && ctx.kernel.setView('dayGridMonth', x.month!));
+    title.replaceChildren(go);
+    const grid = el.querySelector<HTMLElement>('.dz-mm__grid')!;
+    grid.setAttribute('aria-label', name);
+    grid.style.setProperty('--dz-cols', String(x.model.weeks[0]?.dates.length ?? 7));
+    weekdayHead(grid.querySelector<HTMLElement>('.dz-dg__head')!, x.model);
+    created.push(...monthWeeks.get(x.key)!.sync(weekItems(x)));
+  }
 
   function drawWeek(el: HTMLElement, it: WeekItem): void {
     const { week } = it;
     const p = parts.get(it.key)!;
     const s = state!;
     p.week = week;
-    const max = model?.maxLanes ?? null;
+    const max = it.maxLanes;
     const shown = max !== null ? Math.min(week.laneCount, max) : week.laneCount;
     el.style.setProperty('--dz-cols', String(week.dates.length));
-    el.style.setProperty('--lanes', String(shown));
+    // At least one: `repeat(0, …)` is invalid CSS, and the whole row template would be dropped
+    // (one track as tall as the row — which the lane measurement then read as "room for one lane").
+    el.style.setProperty('--lanes', String(Math.max(1, shown)));
     p.cells.sync(
       week.dates.map((date, i): CellItem => {
         const segs = week.segments.filter((sg) => sg.dayIndex - week.firstColumn <= i && i < sg.dayIndex - week.firstColumn + sg.dayCount);
@@ -151,7 +241,8 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
         const outside = week.outside[i] ?? false;
         const closed = week.closed[i] ?? false;
         const items = segs.map((sg) => `${sg.key}:${sg.instance.event.revision}`).join(',');
-        return { key: date.toString(), sig: `${i}|${today}|${outside}|${closed}|${items}|${ctx.epoch}`, date, col: i, today, outside, closed, count, segs };
+        const wk = i === 0 && ctx.weekNumbers ? weekNumber(date, { ...weekRulesFor(ctx.locale), firstDay: s.firstDay }) : null;
+        return { key: date.toString(), sig: `${i}|${today}|${outside}|${closed}|${items}|${wk}|${ctx.epoch}`, date, col: i, today, outside, closed, count, segs, week: wk };
       }),
     );
     const items: BarItem[] = [];
@@ -227,6 +318,19 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     const old = cell.querySelector(':scope > .dz-dg__num');
     if (old) old.replaceWith(num);
     else cell.prepend(num);
+    cell.querySelector(':scope > .dz-dg__wk')?.remove();
+    if (c.week !== null) {
+      // The week's number, leading to that week where a week view exists.
+      const weekView = ctx.kernel.getViewSpec('timeGridWeek') ? 'timeGridWeek' : ctx.kernel.getViewSpec('dayGridWeek') ? 'dayGridWeek' : null;
+      const wk = h(doc, weekView ? 'button' : 'span', 'dz-dg__wk', ctx.messages.weekShort({ week: c.week }));
+      wk.setAttribute('aria-label', ctx.messages.weekLabel({ week: c.week }));
+      if (weekView) {
+        (wk as HTMLButtonElement).type = 'button';
+        wk.tabIndex = -1;
+        wk.addEventListener('click', () => ctx.kernel.setView(weekView, c.date));
+      }
+      cell.prepend(wk);
+    }
     items.list.sync(c.segs.map((seg) => ({ key: `item:${seg.key}`, sig: `${seg.instance.event.revision}|${ctx.epoch}`, seg })));
   }
 
@@ -310,7 +414,7 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
   }
 
   const segmentByKey = (key: string): Segment | undefined => {
-    for (const w of model?.weeks ?? []) {
+    for (const w of allWeeks()) {
       const seg = w.segments.find((sg) => sg.key === key);
       if (seg) return seg;
     }
@@ -341,8 +445,11 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
   });
 
   // ── keyboard: the cells are the cursor, their items the events ─────────
-  const cellOf = (date: PlainDate) => body.querySelector<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"]`);
-  const shownDates = () => (model?.weeks ?? []).flatMap((w) => w.dates);
+  // A date may be drawn twice in a multi-month view (a padding day of the next month): its own month's cell wins.
+  const cellOf = (date: PlainDate) =>
+    body.querySelector<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"]:not(.dz-dg__cell--outside)`) ??
+    body.querySelector<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"]`);
+  const shownDates = () => allWeeks().flatMap((w) => (multi ? w.dates.filter((_, i) => !w.outside[i]) : w.dates));
   const homeDate = (): PlainDate | null => {
     const dates = shownDates();
     const st = state ?? ctx.kernel.getState();
@@ -351,9 +458,10 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
   /** One tab stop: the cursor's cell. */
   function rove(date: PlainDate | null): void {
     cursorDate = date;
-    for (const c of body.querySelectorAll<HTMLElement>('.dz-dg__cell')) c.tabIndex = date && c.dataset['date'] === date.toString() ? 0 : -1;
+    const stop = date ? cellOf(date) : null;
+    for (const c of body.querySelectorAll<HTMLElement>('.dz-dg__cell')) c.tabIndex = c === stop ? 0 : -1;
   }
-  const weekOf = (date: PlainDate) => model?.weeks.find((w) => w.dates.some((d) => d.equals(date)));
+  const weekOf = (date: PlainDate) => allWeeks().find((w) => w.dates.some((d, i) => d.equals(date) && !(multi && w.outside[i])));
   /** The bars (or the "+N" link) that show an event on one day: where its focus ring is drawn. */
   function visualsOf(item: HTMLElement): HTMLElement[] {
     const cell = item.closest<HTMLElement>('.dz-dg__cell');
@@ -389,7 +497,14 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
       const dates = shownDates();
       if (dates.length === 0) return null;
       if (dates.some((d) => d.equals(hit.date))) return hit.kind === 'day' && !hit.allDayRow ? hit : { kind: 'day', date: hit.date };
-      return Temporal.PlainDate.compare(hit.date, dates[0]!) < 0 ? 'prev' : 'next';
+      // A hidden weekday, wherever it is: null, and the keyboard steps on past it (a day view: Friday → Monday).
+      if ((state ?? ctx.kernel.getState()).view.hiddenDays.includes(hit.date.dayOfWeek as never)) return null;
+      // The period's bounds (a month grid's padding included; a multi-month view's months only).
+      const r = (state ?? ctx.kernel.getState()).range;
+      if (Temporal.PlainDate.compare(hit.date, multi ? r.activeStart : r.start) < 0) return 'prev';
+      if (Temporal.PlainDate.compare(hit.date, multi ? r.activeEnd : r.end) >= 0) return 'next';
+      // A hidden day inside the period: null, and the keyboard steps on past it.
+      return null;
     },
     showCursor(hit) {
       rove(hit.date);
@@ -399,7 +514,8 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     cursorAt: (el) => (el.matches('.dz-dg__cell') && el instanceof HTMLElement && el.dataset['date'] ? { kind: 'day', date: Temporal.PlainDate.from(el.dataset['date']) } : null),
     lineEdge(hit, edge) {
       const w = weekOf(hit.date);
-      const d = w ? (edge === 'start' ? w.dates[0] : w.dates[w.dates.length - 1]) : undefined;
+      const inRow = w ? w.dates.filter((_, i) => !(multi && w.outside[i])) : [];
+      const d = edge === 'start' ? inRow[0] : inRow[inRow.length - 1];
       return d ? { kind: 'day', date: d } : hit;
     },
     itemsAt: (hit) => [...(cellOf(hit.date)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])],
@@ -430,7 +546,9 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
   interface WeekGeo {
     readonly top: number;
     readonly bottom: number;
-    readonly cells: readonly { readonly left: number; readonly right: number; readonly date: PlainDate }[];
+    readonly left: number;
+    readonly right: number;
+    readonly cells: readonly { readonly left: number; readonly right: number; readonly date: PlainDate; readonly outside: boolean }[];
   }
   interface Geo {
     readonly weeks: readonly WeekGeo[];
@@ -450,7 +568,7 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
       const weeksGeo: WeekGeo[] = [];
       let laneTop = 24;
       let laneHeight = 20;
-      const rows = [...body.querySelectorAll<HTMLElement>(':scope > .dz-dg__week')];
+      const rows = [...body.querySelectorAll<HTMLElement>('.dz-dg__week')];
       const first = rows[0];
       if (first) {
         const style = getComputedStyle(first);
@@ -463,22 +581,25 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
         const r = row.getBoundingClientRect();
         const cells = [...row.querySelectorAll<HTMLElement>('.dz-dg__cell')].map((c) => {
           const cr = c.getBoundingClientRect();
-          return { left: cr.left, right: cr.right, date: Temporal.PlainDate.from(c.dataset['date']!) };
+          return { left: cr.left, right: cr.right, date: Temporal.PlainDate.from(c.dataset['date']!), outside: c.classList.contains('dz-dg__cell--outside') };
         });
         // In reading order, so a right-to-left row still finds its cells by position.
         cells.sort((a, b) => a.left - b.left);
-        weeksGeo.push({ top: r.top, bottom: r.bottom, cells });
+        weeksGeo.push({ top: r.top, bottom: r.bottom, left: r.left, right: r.right, cells });
       }
       return { weeks: weeksGeo, laneTop, laneHeight, origin };
     },
     hitAt(geo, x, y) {
       const { weeks: ws } = geo;
       if (ws.length === 0) return null;
-      const cy = Math.max(ws[0]!.top, Math.min(ws[ws.length - 1]!.bottom - 1, y));
-      const w = ws.find((k) => cy >= k.top && cy < k.bottom) ?? ws[ws.length - 1]!;
-      if (w.cells.length === 0) return null;
-      const cx = Math.max(w.cells[0]!.left, Math.min(w.cells[w.cells.length - 1]!.right - 1, x));
-      const c = w.cells.find((k) => cx >= k.left && cx < k.right) ?? w.cells[w.cells.length - 1]!;
+      // The row under the point, or the nearest (months side by side: rows share their heights).
+      const dist = (k: WeekGeo) => Math.max(k.top - y, 0, y - k.bottom + 1) + Math.max(k.left - x, 0, x - k.right + 1);
+      const w = ws.reduce((best, k) => (dist(k) < dist(best) ? k : best));
+      // In a multi-month view a padding day belongs to the next month's grid: the row's own days only.
+      const cells = multi ? w.cells.filter((k) => !k.outside) : w.cells;
+      if (cells.length === 0) return null;
+      const cx = Math.max(cells[0]!.left, Math.min(cells[cells.length - 1]!.right - 1, x));
+      const c = cells.find((k) => cx >= k.left && cx < k.right) ?? cells[cells.length - 1]!;
       return { kind: 'day', date: c.date };
     },
     boxesFor(geo, span) {
@@ -494,7 +615,7 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
       const o = geo.origin;
       const out: Box[] = [];
       for (const w of geo.weeks) {
-        const inside = w.cells.filter((c) => Temporal.PlainDate.compare(c.date, first) >= 0 && Temporal.PlainDate.compare(c.date, last) <= 0);
+        const inside = w.cells.filter((c) => !(multi && c.outside) && Temporal.PlainDate.compare(c.date, first) >= 0 && Temporal.PlainDate.compare(c.date, last) <= 0);
         if (inside.length === 0) continue;
         const left = Math.min(...inside.map((c) => c.left));
         const right = Math.max(...inside.map((c) => c.right));
@@ -508,7 +629,7 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
   };
 
   attachMenuTriggers(ctx, root, (target) => {
-    if (!model) return null;
+    if (sections.length === 0) return null;
     const barEl = target.closest<HTMLElement>('.dz-bar:not(.dz-bar--bg), .dz-dg__item');
     if (barEl) {
       const seg = segmentByKey(barEl.dataset['segment'] ?? '');
@@ -526,28 +647,30 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     body,
     surface: surface as InteractionSurface,
     render(next, s) {
-      const m = next as DayGridModel;
       // Set before drawing: the rows read the new model's lanes.
-      model = m;
+      sections = multi
+        ? (next as MonthsModel).months.map((x) => ({ key: x.month.toString().slice(0, 7), model: x.model, month: x.month }))
+        : [{ key: '', model: next as DayGridModel, month: null }];
       state = s;
       created = [];
-      const first = m.weeks[0];
-      head.replaceChildren(
-        ...(first?.dates ?? []).map((d) => {
-          const c = h(doc, 'div', 'dz-dg__weekday', formatTemporal(d, { weekday: 'short' }, ctx.locale));
-          c.setAttribute('role', 'columnheader');
-          return c;
-        }),
-      );
-      root.style.setProperty('--dz-cols', String(first?.dates.length ?? 7));
+      const focused = root.contains(doc.activeElement);
       root.setAttribute('aria-label', s.title);
       // The cursor stays on its day while it is shown; otherwise today, or the period's first day.
-      if (!cursorDate || !m.weeks.some((w) => w.dates.some((d) => d.equals(cursorDate!)))) cursorDate = homeDate();
-      root.classList.toggle('dz-dg--month', s.view.alignment === 'month');
-      weeks.sync(m.weeks.map((week) => ({ key: week.dates[0]?.toString() ?? '', sig: `${idOf(week)}|${s.today.toString()}|${m.maxLanes}|${ctx.epoch}`, week })));
-      for (const key of parts.keys()) if (!m.weeks.some((w) => w.dates[0]?.toString() === key)) parts.delete(key);
+      if (!cursorDate || !shownDates().some((d) => d.equals(cursorDate!))) cursorDate = homeDate();
+      root.classList.toggle('dz-dg--month', s.view.alignment === 'month' || multi);
+      if (multi) months.sync(sections.map((x) => ({ key: x.key, sig: `${idOf(x.model)}|${s.today.toString()}|${ctx.epoch}`, section: x })));
+      else {
+        const m = sections[0]!.model;
+        weekdayHead(head, m);
+        root.style.setProperty('--dz-cols', String(m.weeks[0]?.dates.length ?? 7));
+        created.push(...weeks.sync(weekItems(sections[0]!)));
+      }
+      const live = new Set(sections.flatMap((x) => weekItems(x).map((w) => w.key)));
+      for (const key of parts.keys()) if (!live.has(key)) parts.delete(key);
       // A cell whose content did not change was not redrawn: the tab stop is set on all of them.
       rove(cursorDate);
+      // The focused day went away (hidden days changed): the focus goes to the cursor's day, not to the page.
+      if (focused && !root.contains(doc.activeElement) && cursorDate) cellOf(cursorDate)?.focus();
       return created;
     },
     tick() {
@@ -556,6 +679,7 @@ export function createDayGridView(ctx: ViewCtx): ViewController {
     destroy() {
       for (const p of parts.values()) p.bars.clear();
       weeks.clear();
+      months.clear();
       parts.clear();
       root.remove();
     },

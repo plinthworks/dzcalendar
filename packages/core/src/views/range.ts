@@ -22,12 +22,15 @@ function datesBetween(start: PlainDate, end: PlainDate, spec: ViewSpec): PlainDa
  * with `dayCount` counts shown days, stepping over hidden ones.
  */
 export function computeViewRange(anchor: PlainDate, spec: ViewSpec, ctx: NavContext): ViewRange {
-  if (spec.hiddenDays.length >= 7) throw new RangeError(`${spec.type}: every day of the week is hidden`);
+  if (spec.hiddenDays.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw new RangeError(`${spec.type}: hiddenDays are ISO weekdays, 1 to 7`);
+  if (new Set(spec.hiddenDays).size >= 7) throw new RangeError(`${spec.type}: every day of the week is hidden`);
+  if (spec.family === 'multiMonth') return multiMonthRange(anchor, spec, ctx);
 
   switch (spec.alignment) {
     case 'month': {
       const first = anchor.with({ day: 1 });
-      const activeEnd = first.add({ months: 1 });
+      // A month grid is one month; a list or several months run for the duration.
+      const activeEnd = spec.family === 'dayGrid' ? first.add({ months: 1 }) : first.add(spec.duration);
       if (spec.family === 'dayGrid') {
         let grid = getMonthGrid(first.year, first.month, ctx.firstDay);
         if (!spec.fixedWeekCount) grid = grid.filter((week) => week.some((d) => d.month === first.month && d.year === first.year));
@@ -87,4 +90,19 @@ function chunkWeeks(dates: readonly PlainDate[], firstDay: number): PlainDate[][
     rows[rows.length - 1]!.push(d);
   }
   return rows;
+}
+
+/**
+ * Several month grids, one per month of the period (a year from January, or
+ * `duration` months from the anchor's month). The range runs from the first
+ * grid's first day to the last grid's last, so sources fetch what is drawn.
+ */
+function multiMonthRange(anchor: PlainDate, spec: ViewSpec, ctx: NavContext): ViewRange {
+  const first = spec.alignment === 'year' ? anchor.with({ month: 1, day: 1 }) : anchor.with({ day: 1 });
+  const activeEnd = first.add(spec.duration);
+  const monthSpec: ViewSpec = { ...spec, family: 'dayGrid', alignment: 'month', duration: { months: 1 } };
+  const months: ViewRange[] = [];
+  for (let m = first; Temporal.PlainDate.compare(m, activeEnd) < 0; m = m.add({ months: 1 })) months.push(computeViewRange(m, monthSpec, ctx));
+  const dates = datesBetween(first, activeEnd, spec);
+  return { start: months[0]!.start, end: months[months.length - 1]!.end, activeStart: first, activeEnd, dates, weeks: [dates], months };
 }

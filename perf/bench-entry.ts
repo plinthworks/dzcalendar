@@ -23,6 +23,7 @@ import {
 } from '../packages/core/src/index.js';
 import type { EventInput, Mutation } from '../packages/core/src/index.js';
 import { expandZoned, parseRRule } from '../packages/rrule/src/index.js';
+import { buildListModel, buildMultiMonthModel } from '../packages/core/src/views.js';
 
 // Run by node with --expose-gc; `gc` is not in @types/node's globals.
 const gc = (globalThis as { gc?: () => void }).gc;
@@ -102,6 +103,11 @@ const weekRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTI
 results['timeGrid week model (10k)'] = time(20, () => buildTimeGridModel(weekRange, store.snapshot, { displayZone: 'Europe/Paris' }));
 const monthRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.dayGridMonth!, nav);
 results['dayGrid month model (10k)'] = time(20, () => buildDayGridModel(monthRange, store.snapshot, { displayZone: 'Europe/Paris', maxLanes: 4 }));
+// Phase 10: a year at once (nothing virtualized yet — Phase 12).
+const yearList = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.listYear!, nav);
+results['list year model (10k)'] = time(10, () => buildListModel(yearList, store.snapshot, { displayZone: 'Europe/Paris' }));
+const yearGrid = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.multiMonthYear!, nav);
+results['multiMonth model (10k)'] = time(10, () => buildMultiMonthModel(yearGrid, store.snapshot, { displayZone: 'Europe/Paris', maxLanes: 2 }));
 
 // Phase 5: recurrence. The criterion: a year of a daily rule in ≤ 5 ms.
 const daily = parseRRule('FREQ=DAILY');

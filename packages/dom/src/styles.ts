@@ -229,7 +229,7 @@ export const DZ_CSS = `
   display: grid;
   position: relative;
   grid-template-columns: repeat(var(--dz-cols, 7), minmax(0, 1fr));
-  grid-template-rows: var(--dz-day-head, 1.75rem) repeat(var(--lanes, 0), var(--dz-bar-height, 1.375rem)) 1fr;
+  grid-template-rows: var(--dz-day-head, 1.75rem) repeat(var(--lanes, 1), var(--dz-bar-height, 1.375rem)) 1fr;
   row-gap: 2px;
   border-bottom: 1px solid var(--dz-border, var(--tz-border, GrayText));
 }
@@ -260,6 +260,8 @@ export const DZ_CSS = `
   text-align: center;
   cursor: pointer;
 }
+.dz-dg__wk { border: 0; padding: 0 0.25rem; background: transparent; color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText)); font: inherit; font-size: 0.6875rem; cursor: pointer; }
+.dz-tg__corner { font-size: 0.6875rem; color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText)); text-align: center; align-self: end; }
 .dz-dg__cell--today .dz-dg__num { background: var(--dz-accent, var(--tz-accent, Highlight)); color: var(--dz-accent-fg, var(--tz-accent-fg, HighlightText)); font-weight: 600; }
 .dz-dg__week .dz-bar { grid-row: calc(var(--lane) + 2); z-index: 1; position: relative; }
 .dz-dg__week .dz-bar--bg { grid-row: 2 / -1; z-index: 0; }

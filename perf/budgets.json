@@ -13,6 +13,8 @@
   "dayInfos 366": 15,
   "timeGrid week model (10k)": 25,
   "dayGrid month model (10k)": 50,
+  "list year model (10k)": 150,
+  "multiMonth model (10k)": 150,
   "expand daily 1 year": 5,
   "week of 200 series": 30,
   "normalize+index 200 series": 30,
