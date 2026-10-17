@@ -21,7 +21,7 @@ Elles priment sur le reste du document quand il dit autre chose.
 | Premier jour de semaine des règles (2026-10-16) | Une règle **sans `WKST`** se lit avec le lundi (RFC 5545), partout, quelle que soit la locale : la même règle donne les mêmes dates que Google, Outlook ou le serveur. Une série **créée dans DzCalendar** (commandes, interface) reçoit `WKST` = premier jour de la locale, **écrit explicitement** dans la règle. L'affichage (grilles, numéros de semaine) suit la locale. |
 | Menu contextuel (2026-10-16) | **Toutes les actions accessibles par un menu contextuel** sur la cellule et sur l'événement (clic droit, appui long tactile, touche Menu / Maj+F10). Voir D.3 bis et `docs/behaviors/context-menu.md`. |
 
-Restent ouvertes : K.3, K.4, K.6–K.8, K.10, K.12–K.16.
+Restent ouvertes : K.3, K.4, K.6, K.7, K.10, K.12–K.16 (K.8 tranché en Phase 9).
 
 ### Ajustements après la Phase 0 (spikes et revues, détail dans ROADMAP.md)
 
@@ -68,6 +68,14 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 9 (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : écriture vers le serveur par un `save` optionnel par source (optimiste, retour en arrière annoncé en cas de refus, modification protégée d'un rechargement tant que l'envoi est en cours ; sans `save`, le serveur fait autorité) ; K.8 tranché : table Windows → IANA (CLDR), puis le fuseau IANA dont les règles concordent (avertissement `zone-guessed`), sinon le décalage que donnent les règles du VTIMEZONE à chaque heure (`zone-fixed-offset`) ; budgets core 33 ko, ical 7,5 ko.
+- **B.7** — un chunk est fait de dates entières, demandées sur `datesWindow` (UTC+14 → UTC−12) : changer de zone ne recharge rien. `FetchRequest.window` vaut `null` pour une source non découpée. Une réponse peut porter ses problèmes (`SourceResult`). `onLoading`/`onSourceError` deviennent un seul `onSource(notice)` (`loading`, `error`, `problems`, `save-error`, `saved`) et un `KernelEvent` `source`. `fnSource(id, fn, { chunk, … })`, `jsonSource` gagne `params` et des noms de paramètres annulables. `recurrence: 'server'` abandonné (un serveur qui envoie des occurrences envoie des événements). Fichiers : `source/{source,manager,chunks,json-source,export,array-source}`. `store.replaceSourceChunks` applique plusieurs chunks en une transaction. L'id `events` est réservé à l'option du même nom.
+- **B.5/B.8** — `EventInput.seriesId` + `recurrenceId` : un override en entrée, relié à sa série dans le même lot. `sourceOf` : ce qu'une édition crée sur une série de source (override, queue coupée) appartient à cette source pour `save` et pour la livraison suivante (adopté sous son id).
+- **D.7** — `update({ sources })` : liste complète, specs comparées par identité ; `refetch()` ; `aria-busy` pendant un chargement ; les `messages` de l'application se posent sur ceux de la locale.
+- **Paquet `@dzcalendar/ical`** — `parseICal`, `serializeICal`, `icalSource`, `windowsZone` ; dépend de core (et rrule par core), sans `Date` ni DOM (test de pureté).
+
 ### Ajustements après la Phase 8 (détail dans ROADMAP.md)
 
 - **B.15** — `intentFor(key, { mode: 'cursor'|'event'|'grab', rtl, grid: 'time'|'day' })` ; en plus : `stepHit` (un jour garde l'heure murale et le passage ; dans un trou, le premier instant après ; un créneau avance en temps écoulé, donc les deux passages d'une heure répétée sont visités), `eventHit`, `grabStep(ctx, grid, held, op, fit)` (eventHit → stepHit → `fit` de la vue → `proposeMove`/`proposeResize`), `heldEvent`. Parité clavier/souris testée sur des séquences.
@@ -79,6 +87,7 @@ Ils priment sur les sections citées.
 - **D.7** — `ScopeRequest` devient une union avec `{ kind: 'delete' }` ; réglage vivant `keyboardUndo` ; Ctrl/Cmd+Z seulement si `editable`. Entrée sur un événement = `onEventClick` (sinon `onEventOpen`). Au clavier, Entrée/Espace sur un créneau sélectionne aussi ce créneau quand `selectable` (le clavier n'a pas de glisser).
 - **G.1** — budgets relevés par le propriétaire : core 30 ko, dom 30 ko (mesurés 29,6 et 29,2) ; le CSS structurel est livré minifié (`scripts/css-literal.mjs`).
 - **J** — les fichiers `a11y/*` sont intégrés (`interact/keyboard.ts`, région live dans `calendar.ts`). axe-core 4.13.0 dans `npm run test:browser` (WCAG 2.0–2.2 A/AA et bonnes pratiques) ; seule exception admise : `target-size` sur un événement (exception « essentielle » de 2.5.8). ACR : `site/a11y-conformance.md`.
+
 
 ### Ajustements après la Phase 7 (détail dans ROADMAP.md)
 
@@ -162,6 +171,7 @@ Règle de partage : **tout fait de fuseau horaire (temps pur) va upstream. Toute
 ## A. Vue d'ensemble
 
 ### A.1 Couches et paquets
+
 
 ```
                           ┌──────────────────────────────────────────────────────────┐
@@ -1126,7 +1136,7 @@ Pas de `ApplicationRef.tick()` global. Compatible zoneless : la détection est e
 |---|---|---|
 | `@dzcalendar/core` | ≤ 28 ko (24 avant la Phase 6) | `@tzslot/core` (≈ 20 ko, dont le polyfill statique ≈ 19,7 ko) s'ajoute. Rééquilibré avec dom le 2026-10-16 (décision du propriétaire) : l'édition de séries et la validation sont dans le core ; la somme des budgets ne change pas. |
 | `@dzcalendar/rrule` | ≤ 7 ko | |
-| `@dzcalendar/ical` | ≤ 6 ko | |
+| `@dzcalendar/ical` | ≤ 7,5 ko | relevé par le propriétaire (Phase 9) |
 | `@dzcalendar/slots` | ≤ 5 ko | |
 | `@dzcalendar/dom` (dayGrid + timeGrid + list + multiMonth + interactions + a11y) | ≤ 26 ko (30 avant la Phase 6) | |
 | `@dzcalendar/angular` | ≤ 6 ko | hors Angular |
@@ -1350,7 +1360,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 - **Dépend de** : P7.
 
 ### Phase 9 : sources, iCal
-- **Livrables / fichiers** : `core/source/{manager,chunk-cache,json-source,fn-source}` ; `ical/*`.
+- **Livrables / fichiers** : `core/source/{manager,chunks,json-source,export}` ; `ical/*` (livré, voir « Ajustements après la Phase 9 »).
 - **Acceptation** : chunking mensuel ; deux chunks contigus manquants → une seule requête ; annulation vérifiée (`AbortSignal` abort appelée) ; réponse d'une génération périmée ignorée ; événement chevauchant deux chunks refcounté ; iCal : `TZID` IANA correct (#7456), RRULE + EXDATE + RECURRENCE-ID, `VTIMEZONE` personnalisé → Problem ou règle fixe ; aller-retour parse → serialize → parse identique sur 30 fixtures.
 - **Dépend de** : P5, P1.
 

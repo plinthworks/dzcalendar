@@ -6,6 +6,9 @@ import { createIdGenerator } from './ids.js';
 import { assertBusinessHours } from './rules/business-hours.js';
 import type { BusinessHoursInput } from './rules/business-hours.js';
 import { arraySource, loadStaticSource } from './source/array-source.js';
+import { createSourceManager } from './source/manager.js';
+import type { SourceManager, SourceNotice, Timers } from './source/manager.js';
+import type { EventSourceSpec } from './source/source.js';
 import type { StoreChange } from './store/changes.js';
 import { createHistory } from './commands/history.js';
 import type { History } from './commands/history.js';
@@ -53,6 +56,12 @@ export interface KernelOptions extends ModelOptions {
   readonly rules?: Omit<RulesContext, 'displayZone' | 'businessHours'>;
   /** Undo entries kept. Default 200. */
   readonly historyLimit?: number;
+  /** Fetched as the calendar moves (`kernel.sources` adds, removes, refetches). */
+  readonly sources?: readonly EventSourceSpec[];
+  /** Loading, fetch errors, problems in a delivery, saves refused. */
+  readonly onSource?: (n: SourceNotice) => void;
+  /** For retries; injectable for tests. Default: the global timers. */
+  readonly timers?: Timers;
 }
 
 export interface KernelState {
@@ -117,7 +126,9 @@ export type KernelEvent =
       /** Which way the dates moved, when they moved. */
       readonly direction?: 'prev' | 'next' | 'other';
     }
-  | { readonly type: 'store'; readonly change: StoreChange };
+  | { readonly type: 'store'; readonly change: StoreChange }
+  /** From the sources: loading, a failed fetch, problems in a delivery, a save. */
+  | { readonly type: 'source'; readonly notice: SourceNotice };
 
 export interface CalendarKernel {
   readonly store: EventStore;
@@ -156,6 +167,8 @@ export interface CalendarKernel {
   /** What gestures are checked against now: the zone, business hours, the rules given. */
   rules(): RulesContext;
   readonly history: History;
+  /** The sources: fetched for what the view shows, kept in step with the store. */
+  readonly sources: SourceManager;
   subscribe(fn: (e: KernelEvent) => void): () => void;
   destroy(): void;
 }
@@ -211,8 +224,21 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     }),
     { limit: o.historyLimit ?? 200 },
   );
+  const sources = createSourceManager({
+    store,
+    normalize: () => ({ displayZone: timeZone, newId: idGen }),
+    now,
+    // The `events` option is its own array source, loaded apart.
+    reserved: ['events'],
+    notify: (notice) => {
+      o.onSource?.(notice);
+      emit({ type: 'source', notice });
+    },
+    ...(o.timers && { timers: o.timers }),
+  });
   let state = computeState();
   let model: ViewModel | null = null;
+  const fetchShown = () => sources.setRange(state.range.start, state.range.end, timeZone);
   let held = 0;
   let pending: StateCause[] = [];
   let direction: 'prev' | 'next' | 'other' | undefined;
@@ -262,6 +288,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   const changeState = (cause: StateCause) => {
     state = computeState();
     model = null;
+    fetchShown();
     pending.push(cause);
     flush();
   };
@@ -271,6 +298,8 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     model = model && family?.update ? { family: model.family, model: family.update(model.model, store.snapshot, change) } : null;
     emit({ type: 'store', change });
   });
+  fetchShown();
+  for (const spec of o.sources ?? []) sources.add(spec);
 
   return {
     store,
@@ -364,7 +393,9 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     },
     rules: rulesNow,
     history,
+    sources,
     destroy() {
+      sources.destroy();
       unsubscribe();
       history.destroy();
       listeners.clear();

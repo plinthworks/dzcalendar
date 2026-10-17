@@ -132,7 +132,12 @@ function normalizeObject(input: EventInput, ctx: NormalizeContext, path: string)
     : timedSpan(input, ctx, path, start.parsed, endParsed, duration, problems);
 
   if (!span || isError()) return failed();
-  const event = Object.freeze({ ...common, ...span }) as CalEvent;
+  let event = Object.freeze({ ...common, ...span }) as CalEvent;
+  if (given(input.recurrenceId)) {
+    const ref = overrideRef(input, path, event, problems);
+    if (!ref) return failed();
+    event = Object.freeze({ ...event, ref }) as CalEvent;
+  }
   if (!given(input.rrule)) return { ok: true, value: { kind: 'event', event }, problems };
 
   // A series: the event is its first occurrence; the rules repeat it.
@@ -140,6 +145,56 @@ function normalizeObject(input: EventInput, ctx: NormalizeContext, path: string)
   if (!set || isError()) return failed();
   const series: Series = { id: event.id, revision: 0, base: event, set, overrides: new Map() };
   return { ok: true, value: { kind: 'series', series }, problems };
+}
+
+/**
+ * The occurrence an override stands for, keyed as the series keys it: a date,
+ * or the original start in full. A wall time is read in the override's zone;
+ * `normalizeMany` re-keys it in the series' zone when the series is there.
+ */
+function overrideRef(input: EventInput, path: string, event: CalEvent, problems: Problem[]): { seriesId: string; key: string } | null {
+  const at = `${path}.recurrenceId`;
+  if (given(input.rrule) || typeof input.seriesId !== 'string' || input.seriesId === '') {
+    problems.push(problem('invalid-recurrence-id', 'error', at, given(input.rrule) ? 'an override cannot repeat' : 'needs seriesId'));
+    return null;
+  }
+  const p = parseTemporal(input.recurrenceId, at, 'start');
+  const v = p.ok ? p.parsed : null;
+  let key: string | null = null;
+  if (v && event.allDay) key = (v.kind === 'date' ? v.value : v.kind === 'instant' ? null : v.value.toPlainDate())?.toString() ?? null;
+  else if (v && !event.allDay) {
+    const zone = event.start.timeZoneId;
+    key = v.kind === 'zoned' ? v.value.toString() : v.kind === 'instant' ? v.value.toZonedDateTimeISO(zone).toString() : v.kind === 'wall' ? placeWall(v.value, zone, at).value.toString() : null;
+  }
+  if (key === null) {
+    problems.push(problem('invalid-recurrence-id', 'error', at, String(input.recurrenceId)));
+    return null;
+  }
+  return { seriesId: input.seriesId, key };
+}
+
+/**
+ * Overrides meet their series: each joins the series' `overrides`, keyed in
+ * the series' zone. One whose series is not in the batch stays a plain event.
+ */
+function linkOverrides(items: Normalized[], problems: Problem[], tag: (p: Problem) => Problem): void {
+  const at = new Map<string, number>();
+  items.forEach((it, i) => it.kind === 'series' && at.set(it.series.id, i));
+  for (const [i, it] of items.entries()) {
+    const ref = it.kind === 'event' ? it.event.ref : undefined;
+    if (!ref || it.kind !== 'event') continue;
+    const si = at.get(ref.seriesId);
+    const sr = si === undefined ? undefined : (items[si] as { series: Series }).series;
+    if (!sr || sr.base.allDay !== it.event.allDay) {
+      problems.push(tag(problem('orphan-override', 'warning', `events[${i}].seriesId`, ref.seriesId)));
+      const { ref: _r, ...plain } = it.event;
+      items[i] = { kind: 'event', event: Object.freeze(plain) as CalEvent };
+      continue;
+    }
+    const key = sr.base.allDay ? ref.key : Temporal.ZonedDateTime.from(ref.key).withTimeZone(sr.base.start.timeZoneId).toString();
+    if (key !== ref.key) items[i] = { kind: 'event', event: Object.freeze({ ...it.event, ref: { seriesId: sr.id, key } }) as CalEvent };
+    items[si!] = { kind: 'series', series: { ...sr, overrides: new Map([...sr.overrides, [key, it.event.id]]) } };
+  }
 }
 
 function recurrenceSet(input: EventInput, ctx: NormalizeContext, path: string, event: CalEvent, problems: Problem[]): RRuleSet | null {
@@ -449,5 +504,6 @@ export function normalizeMany(
     seen.add(event.id);
     items.push(item.kind === 'event' ? { kind: 'event', event } : { kind: 'series', series: { ...item.series, id: event.id, base: event, ...(sourceId !== undefined && { sourceId }) } });
   }
+  linkOverrides(items, problems, tag);
   return { items, report: { accepted: items.length, rejected, problems } };
 }

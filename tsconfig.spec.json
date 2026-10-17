@@ -21,6 +21,9 @@
       "@dzcalendar/dom": [
         "./packages/dom/src/index.ts"
       ],
+      "@dzcalendar/ical": [
+        "./packages/ical/src/index.ts"
+      ],
       "@dzcalendar/motion-gsap": [
         "./packages/motion-gsap/src/index.ts"
       ]

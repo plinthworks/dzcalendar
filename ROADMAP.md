@@ -198,7 +198,7 @@ Measured after the fixes: normalize+index 61–67 ms, replaceSourceChunk 10k
 
 - Series (`seriesIdx`, `seriesTouched`, `EventInstance.origin` other than
   `single`) — Phase 5. Move/resize commands — Phase 6–7. Source manager,
-  chunk cache, json/fn sources — Phase 9. `commands.schema.json` — Phase 18.
+  chunk cache, json/fn sources — done in Phase 9. `commands.schema.json` — Phase 18.
 
 ## Phase 2 — projection, axis, layout (pure) ✅ (2026-10-16)
 
@@ -851,6 +851,86 @@ From the Phase 5 architect review, to do with the editing:
 - `too-many-occurrences` drawn by the DOM (Phase 5 note): with the
   problems panel, later.
 
-## Next — Phase 9: sources, iCal
+## Phase 9 — sources, iCal ✅ (2026-10-17)
 
-See `ARCHITECTURE.md` J. Phase 9.
+Owner's decisions: write-back by an optional `save` per source (optimistic,
+reverted on refusal); custom `VTIMEZONE` → Windows table, then a match on
+IANA rules, then fixed offsets; budgets core 33 kB, ical 7.5 kB.
+
+- Core `source/`: `createSourceManager` — whole-date chunks (week from
+  Monday, month, year, none) fetched over `datesWindow` (the dates as they
+  exist anywhere, UTC+14 → UTC−12: a zone change fetches nothing);
+  contiguous missing chunks → one request; `prefetch`; at most 4 in flight;
+  abort of what is no longer needed; generations (an answer from before a
+  `refetch` is ignored); retries with exponential backoff; `staleAfter`;
+  12 spare chunks kept per source (LRU); synchronous sources applied before
+  `setRange` returns; `idle()`. One answer = one store change
+  (`store.replaceSourceChunks`, atomic over chunks; an event over two
+  chunks is owned by both). `jsonSource` (GET/POST, params, `map`),
+  `fnSource`, `exportInputs` / `eventInput` / `seriesInput`.
+- Write-back: `save({ sourceId, edits, cause })` for commands, undo and
+  redo, one at a time per source; edits carry what the gesture created on
+  a source's series (override, split tail — `sourceOf`); refusal reverts by
+  identity (else refetch), purges the history, is announced; pending tags
+  are shielded from deliveries, then the source is fetched again.
+- `EventInput.seriesId` + `recurrenceId`: an override as input, linked to
+  its series in the same batch (re-keyed in the series' zone);
+  `invalid-recurrence-id`, `orphan-override`.
+- Kernel: `sources`, `onSource(notice)`, `timers`, `kernel.sources`, a
+  `source` `KernelEvent`; `events` is reserved. DOM: `aria-busy` and
+  `dz-loading` while loading, refused save and failed fetch announced (EN/FR),
+  `update({ sources })`, `refetch()`; an application's `messages` are laid
+  over the locale's (a set from before a version still works).
+- `@dzcalendar/ical`: `parseICal` (unfolding, params, escapes, VEVENT with
+  RRULE/EXDATE/RDATE/RECURRENCE-ID, STATUS, TRANSP, X-WR-TIMEZONE; TZID:
+  IANA, prefixed, Windows via CLDR, custom VTIMEZONE matched over the years
+  used then the latest, else per-time offsets from its own rules; missing
+  END closed with an error; UTC starts of a series stay UTC),
+  `serializeICal` (75-octet folding, VTIMEZONE from real transitions with
+  RRULE observances for the last regular year), `icalSource` (`webcal:`).
+- Playground `sources.html`: a simulated server (latency, outage, refuses
+  Fridays), a request log, `.ics` import and export.
+- Tests: 811 (+ manager, save, JSON, overrides; 72 ical incl. 32 fixtures
+  round-tripped and a store-level round trip); conformance `ical-parse`
+  (10 cases, 214 in all); browser 74/74 (one request for three months,
+  busy and no flash on refetch, axe while loading, a refused save put back
+  and said, a Chicago series with a moved occurrence imported then
+  exported); bench `source delivery 10k over 12 months` ~90 ms (≤ 150).
+- Sizes: core 34.2 kB, ical 7.9 kB — both over by < 5 %; dom 29.6 kB.
+
+### Reviews (architect; code review by execution), fixed
+- What "this occurrence" / "this and following" created on a source series
+  never reached `save` (lost after a refetch, doubled after a refusal):
+  attributed through `sourceOf`, reverted with the rest, adopted when
+  delivered back under its id.
+- A source with id `events` collided with the kernel's `events`: refused.
+- `remove()` stalled the queue of other sources.
+- A failed chunk was fetched again at every state change: an identical
+  range is a no-op.
+- A new spec with another chunk unit left old chunks' events; eviction
+  dropped chunks holding a pending save.
+- iCal: old events spoiled VTIMEZONE matching (fixed offset all year); the
+  written VTIMEZONE ended a year after the first event; a missing
+  `END:VEVENT` lost every later event; a UTC series start was moved to the
+  calendar's zone (DST shift); `RANGE=THISANDFUTURE` silent; several
+  VCALENDARs; `webcal:`; the round-trip test stripped offsets.
+- A flaky browser check (month focus ring read before its frame) now waits.
+
+### Not done in Phase 9, on purpose
+- Creating an event into a source (`save` sees edits of a source's events
+  only; creation is the application's, `onCreateRequest`).
+- Overrides delivered apart from their series (another chunk, a later
+  answer) are not relinked: documented server contract.
+- `jsonSource` sends `timeZone`, but a zone change does not refetch
+  (documented; `refetch()`).
+- `RELATED-TO` for split series in iCal; fixed-offset TZIDs written as
+  `+05:30` are not standard for other readers.
+- `maxConcurrent` / `keepChunks` not exposed by the kernel or DOM.
+- A notice emitted before the DOM subscribes (a failing synchronous source
+  at construction) is not announced.
+- A later edit queued after a failed save is sent relative to the failed
+  state; the refetch after settle repairs it.
+
+## Next — Phase 10: list, multiMonth, custom views
+
+See `ARCHITECTURE.md` J. Phase 10.

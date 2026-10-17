@@ -27,7 +27,8 @@
         "layout-column",
         "navigation",
         "rrule-expand",
-        "series-edit"
+        "series-edit",
+        "ical-parse"
       ]
     },
     "description": {

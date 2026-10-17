@@ -398,7 +398,10 @@ describe('normalizeMany', () => {
     const block = /export type ProblemCode =([\s\S]*?);/.exec(types)![1]!;
     const codes = [...block.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]!);
     const dir = new URL('.', import.meta.url);
-    const self = readdirSync(dir).filter((f) => f.endsWith('.test.ts')).map((f) => readFileSync(new URL(f, dir), 'utf8')).join('\n');
+    const ical = new URL('../../ical/test/', import.meta.url);
+    const read = (d: URL) => readdirSync(d).filter((f) => f.endsWith('.test.ts')).map((f) => readFileSync(new URL(f, d), 'utf8'));
+    // iCal's codes are asserted by the ical package's own tests.
+    const self = [...read(dir), ...read(ical)].join('\n');
     expect(codes.length).toBeGreaterThan(15);
     // Asserted, not merely mentioned: the code must sit inside an expected array
     // or a toContain, so a comment or a stray string cannot satisfy this.

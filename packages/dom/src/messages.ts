@@ -88,6 +88,10 @@ export interface DzMessages {
   readonly grabCancelled: string;
   /** `undo`: the key that undoes it here ("⌘Z", "Ctrl+Z"), empty when the calendar's undo keys are off. */
   eventDeleted(parts: { title: string; undo: string }): string;
+  /** A source refused to save an edit: put back (`reverted`), or fetched again. */
+  saveFailed(parts: { title: string; reverted: boolean }): string;
+  /** A source could not be fetched (after its retries). */
+  readonly loadFailed: string;
   /** Grab mode: a timed event put on the all-day row, a day event put in the hours (with the length it gets). */
   readonly becomesAllDay: string;
   becomesTimed(parts: { length: string }): string;
@@ -154,6 +158,8 @@ export const EN: DzMessages = {
   grabHelpStart: 'Alt and Shift with arrows change its start.',
   grabCancelled: 'Move cancelled',
   eventDeleted: ({ title, undo }) => (undo ? `${title} deleted. ${undo} to undo.` : `${title} deleted.`),
+  saveFailed: ({ title, reverted }) => `${title} could not be saved. ${reverted ? 'It is back as it was.' : 'Reloading.'}`,
+  loadFailed: 'Some events could not be loaded.',
   becomesAllDay: 'It becomes an all-day event',
   becomesTimed: ({ length }) => `It becomes a timed event of ${length}`,
   deleteWhich: 'Delete which events?',
@@ -217,6 +223,8 @@ export const FR: DzMessages = {
   grabHelpStart: 'Alt, Maj et flèches pour son début.',
   grabCancelled: 'Déplacement annulé',
   eventDeleted: ({ title, undo }) => (undo ? `« ${title} » supprimé. ${undo} pour annuler.` : `« ${title} » supprimé.`),
+  saveFailed: ({ title, reverted }) => `« ${title} » n’a pas pu être enregistré. ${reverted ? 'Il est revenu comme avant.' : 'Rechargement.'}`,
+  loadFailed: 'Des événements n’ont pas pu être chargés.',
   becomesAllDay: 'Il devient un événement sur la journée',
   becomesTimed: ({ length }) => `Il devient un événement horaire de ${length}`,
   deleteWhich: 'Supprimer quels événements ?',

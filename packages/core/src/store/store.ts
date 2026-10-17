@@ -43,6 +43,36 @@ export function viewWindow(startDate: PlainDate, endDate: PlainDate, displayZone
   } as ViewWindow;
 }
 
+/**
+ * Whole dates as they exist anywhere on earth: from the first date's midnight
+ * at UTC+14 to the end date's at UTC−12. What a source's chunk is fetched
+ * over, so the calendar can change zone without fetching again.
+ */
+export function datesWindow(startDate: PlainDate, endDate: PlainDate, displayZone: ZoneId): ViewWindow {
+  return {
+    start: startDate.toZonedDateTime({ timeZone: '+14:00' }).toInstant(),
+    end: endDate.toZonedDateTime({ timeZone: '-12:00' }).toInstant(),
+    startDate,
+    endDate,
+    displayZone,
+  } as ViewWindow;
+}
+
+/**
+ * The source something belongs to: its own, or — for what an edit made here
+ * on a source's series (an override, the part cut off by "this and
+ * following") — that series' source, up the chain of splits.
+ */
+export function sourceOf(x: CalEvent | Series, getSeries: (id: SeriesId) => Series | undefined): string | undefined {
+  if (x.sourceId !== undefined) return x.sourceId;
+  let sr: Series | undefined = 'base' in x ? (x.splitFrom ? getSeries(x.splitFrom.seriesId) : undefined) : x.ref ? getSeries(x.ref.seriesId) : undefined;
+  for (let i = 0; sr && i < 64; i++) {
+    if (sr.sourceId !== undefined) return sr.sourceId;
+    sr = sr.splitFrom ? getSeries(sr.splitFrom.seriesId) : undefined;
+  }
+  return undefined;
+}
+
 export interface EventInstance {
   /** The event id (escaped), or `seriesId@recurrenceKey` for an occurrence. */
   readonly key: string;
@@ -315,6 +345,8 @@ export interface EventStore {
    * as the source says on the next delivery.
    */
   replaceSourceChunk(sourceId: string, chunk: string, items: readonly Normalized[]): StoreChange;
+  /** Several chunks of one source in one transaction: one delivery, one change, one redraw. */
+  replaceSourceChunks(sourceId: string, entries: readonly (readonly [chunk: string, items: readonly Normalized[]])[]): StoreChange;
   subscribe(fn: (change: StoreChange) => void): () => void;
 }
 
@@ -393,7 +425,7 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
     return change;
   };
 
-  return {
+  const store: EventStore = {
     get snapshot() {
       return snapshot;
     },
@@ -406,60 +438,81 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
     },
 
     replaceSourceChunk(sourceId, chunk, items) {
-      const chunkKey = `${sourceId}\u0000${chunk}`;
+      return store.replaceSourceChunks(sourceId, [[chunk, items]]);
+    },
+
+    replaceSourceChunks(sourceId, entries) {
       const { events, series } = snapshot.state;
       let owners = snapshot.state.owners;
+      let chunks = snapshot.state.chunks;
       const problems: Problem[] = [];
       const mutations: Mutation[] = [];
-      const delivered = new Set<string>();
+      // Said once even when two chunks of one delivery both carry it.
+      const emitted = new Set<string>();
+      const deliveredBy = new Map<string, Set<string>>();
 
-      for (const item of items) {
-        const kind = item.kind;
-        const id = kind === 'event' ? item.event.id : item.series.id;
-        const tag = `${kind}:${id}`;
-        const current = kind === 'event' ? events.get(id) : series.get(id);
-        // An id is one thing: an event and a series may not share it, whoever brought them.
-        const other = kind === 'event' ? series.get(id) : events.get(id);
-        if ((current && current.sourceId !== sourceId) || other) {
-          // Someone else holds this id now (a user's, another source's):
-          // refuse, and stop counting this chunk among the id's owners.
-          problems.push(problem('duplicate-id', 'error', `${sourceId}/${chunk}`, id));
-          const rest = (owners.get(tag) ?? []).filter((k) => k !== chunkKey);
-          owners = rest.length > 0 ? owners.set(tag, rest) : owners.delete(tag);
-          continue;
-        }
-        if (delivered.has(tag)) continue;
-        delivered.add(tag);
-        const own = owners.get(tag);
-        if (!own) owners = owners.set(tag, [chunkKey]);
-        else if (!own.includes(chunkKey)) owners = owners.set(tag, [...own, chunkKey]);
-        if (kind === 'event') {
-          const tagged = item.event.sourceId === sourceId ? item.event : ({ ...item.event, sourceId } as CalEvent);
-          mutations.push({ kind: 'event', ...(current && { before: current as CalEvent }), after: tagged });
-        } else {
-          const tagged = item.series.sourceId === sourceId ? item.series : { ...item.series, sourceId };
-          mutations.push({ kind: 'series', ...(current && { before: current as Series }), after: tagged });
+      for (const [chunk, items] of entries) {
+        const chunkKey = `${sourceId}\u0000${chunk}`;
+        const delivered = new Set<string>();
+        deliveredBy.set(chunkKey, delivered);
+        for (const item of items) {
+          const kind = item.kind;
+          const id = kind === 'event' ? item.event.id : item.series.id;
+          const tag = `${kind}:${id}`;
+          const current = kind === 'event' ? events.get(id) : series.get(id);
+          // An id is one thing: an event and a series may not share it, whoever brought them.
+          const other = kind === 'event' ? series.get(id) : events.get(id);
+          // A local object made on this source's series (an override saved to
+          // the server, now delivered back under the same id) is adopted.
+          const adopt = current !== undefined && current.sourceId === undefined && sourceOf(current, (sid) => series.get(sid)) === sourceId;
+          if ((current && current.sourceId !== sourceId && !adopt) || other) {
+            // Someone else holds this id now (a user's, another source's):
+            // refuse, and stop counting this chunk among the id's owners.
+            problems.push(problem('duplicate-id', 'error', `${sourceId}/${chunk}`, id));
+            const rest = (owners.get(tag) ?? []).filter((k) => k !== chunkKey);
+            owners = rest.length > 0 ? owners.set(tag, rest) : owners.delete(tag);
+            continue;
+          }
+          if (delivered.has(tag)) continue;
+          delivered.add(tag);
+          const own = owners.get(tag);
+          if (!own) owners = owners.set(tag, [chunkKey]);
+          else if (!own.includes(chunkKey)) owners = owners.set(tag, [...own, chunkKey]);
+          if (emitted.has(tag)) continue;
+          emitted.add(tag);
+          if (kind === 'event') {
+            const tagged = item.event.sourceId === sourceId ? item.event : ({ ...item.event, sourceId } as CalEvent);
+            mutations.push({ kind: 'event', ...(current && { before: current as CalEvent }), after: tagged });
+          } else {
+            const tagged = item.series.sourceId === sourceId ? item.series : { ...item.series, sourceId };
+            mutations.push({ kind: 'series', ...(current && { before: current as Series }), after: tagged });
+          }
         }
       }
 
-      for (const tag of snapshot.state.chunks.get(chunkKey) ?? []) {
-        if (delivered.has(tag)) continue;
-        const rest = (owners.get(tag) ?? []).filter((k) => k !== chunkKey);
-        if (rest.length > 0) {
-          owners = owners.set(tag, rest);
-          continue;
+      // Withdrawn only after every chunk has said what it carries: an event
+      // that moved from one chunk to its neighbour in this delivery stays.
+      for (const [chunkKey, delivered] of deliveredBy) {
+        for (const tag of snapshot.state.chunks.get(chunkKey) ?? []) {
+          if (delivered.has(tag)) continue;
+          const rest = (owners.get(tag) ?? []).filter((k) => k !== chunkKey);
+          if (rest.length > 0) {
+            owners = owners.set(tag, rest);
+            continue;
+          }
+          owners = owners.delete(tag);
+          const [kind, ...idParts] = tag.split(':');
+          const id = idParts.join(':');
+          // Only what this source still owns: the id may now be a user's.
+          if (kind === 'event') {
+            const current = events.get(id);
+            if (current && current.sourceId === sourceId) mutations.push({ kind: 'event', before: current });
+          } else {
+            const current = series.get(id);
+            if (current && current.sourceId === sourceId) mutations.push({ kind: 'series', before: current });
+          }
         }
-        owners = owners.delete(tag);
-        const [kind, ...idParts] = tag.split(':');
-        const id = idParts.join(':');
-        // Only what this source still owns: the id may now be a user's.
-        if (kind === 'event') {
-          const current = events.get(id);
-          if (current && current.sourceId === sourceId) mutations.push({ kind: 'event', before: current });
-        } else {
-          const current = series.get(id);
-          if (current && current.sourceId === sourceId) mutations.push({ kind: 'series', before: current });
-        }
+        chunks = delivered.size > 0 ? chunks.set(chunkKey, [...delivered]) : chunks.delete(chunkKey);
       }
 
       // The source is the authority on its series too: what was edited locally
@@ -473,7 +526,9 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
         const kept = new Set(m.after ? m.after.overrides.values() : []);
         for (const id of was.overrides.values()) {
           const ev = events.get(id);
-          if (ev && ev.sourceId === undefined && !kept.has(id) && !localGone.has(`event:${id}`)) {
+          // Local: made here, or made here on the source's series and never delivered by it.
+          const local = ev && (ev.sourceId === undefined || (ev.sourceId === sourceId && !owners.has(`event:${id}`)));
+          if (ev && local && !kept.has(id) && !localGone.has(`event:${id}`)) {
             localGone.add(`event:${id}`);
             mutations.push({ kind: 'event', before: ev });
           }
@@ -498,7 +553,6 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
         }
       }
 
-      const chunks = delivered.size > 0 ? snapshot.state.chunks.set(chunkKey, [...delivered]) : snapshot.state.chunks.delete(chunkKey);
       const base = snapshot.withSourceBookkeeping(owners, chunks);
       const { next, touched, seriesTouched, applied } = base.withMutations(mutations, { stampAt: base.version + 1 });
       const change = describe(base, next, touched, seriesTouched, applied, 'source', problems);
@@ -510,6 +564,7 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
       return () => listeners.delete(fn);
     },
   };
+  return store;
 }
 
 export { keyOf };

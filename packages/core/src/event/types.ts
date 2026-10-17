@@ -41,6 +41,13 @@ export interface EventInput {
   rrule?: string | readonly string[];
   exdate?: readonly TemporalInput[];
   rdate?: readonly TemporalInput[];
+  /**
+   * With `recurrenceId`, the event replaces one occurrence of the series
+   * `seriesId` (iCalendar's RECURRENCE-ID): the occurrence that *would have*
+   * started then. Linked when the series comes in the same batch.
+   */
+  seriesId?: SeriesId;
+  recurrenceId?: TemporalInput;
   display?: EventDisplay;
   status?: EventStatus;
   /** Feeds the slot engine: a busy event blocks availability. Default: not cancelled. */

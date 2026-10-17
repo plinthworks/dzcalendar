@@ -28,7 +28,13 @@ export type ProblemCode =
   | 'invalid-rdate'
   | 'too-many-occurrences'
   | 'unknown-occurrence'
-  | 'invalid-edit';
+  | 'invalid-edit'
+  | 'invalid-recurrence-id'
+  | 'orphan-override'
+  | 'ical-syntax'
+  | 'ical-unsupported'
+  | 'zone-guessed'
+  | 'zone-fixed-offset';
 
 export type Severity = 'error' | 'warning';
 

@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@dzcalendar/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
       '@dzcalendar/dom': fileURLToPath(new URL('./packages/dom/src/index.ts', import.meta.url)),
+      '@dzcalendar/ical': fileURLToPath(new URL('./packages/ical/src/index.ts', import.meta.url)),
       '@dzcalendar/motion-gsap': fileURLToPath(new URL('./packages/motion-gsap/src/index.ts', import.meta.url)),
     },
   },
@@ -17,6 +18,7 @@ export default defineConfig({
       input: {
         index: fileURLToPath(new URL('./playground/index.html', import.meta.url)),
         dst: fileURLToPath(new URL('./playground/dst.html', import.meta.url)),
+        sources: fileURLToPath(new URL('./playground/sources.html', import.meta.url)),
       },
     },
   },

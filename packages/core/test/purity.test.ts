@@ -10,6 +10,7 @@ import { join } from 'node:path';
  */
 const SRC = new URL('../src', import.meta.url).pathname;
 const RRULE = new URL('../../rrule/src', import.meta.url).pathname;
+const ICAL = new URL('../../ical/src', import.meta.url).pathname;
 
 const files = (dir: string): string[] =>
   readdirSync(dir).flatMap((f) => {
@@ -32,7 +33,7 @@ const FORBIDDEN: [string, RegExp][] = [
 ];
 
 describe('core purity', () => {
-  const all = [...files(SRC), ...files(RRULE)];
+  const all = [...files(SRC), ...files(RRULE), ...files(ICAL)];
 
   it('finds the sources', () => {
     expect(all.length).toBeGreaterThan(5);

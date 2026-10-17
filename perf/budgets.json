@@ -8,6 +8,7 @@
   "bytes per stored event": 1200,
   "replaceSourceChunk 10k": 70,
   "refetch 10k identical": 150,
+  "source delivery 10k over 12 months": 150,
   "layoutColumn 1000 overlapping": 5,
   "dayInfos 366": 15,
   "timeGrid week model (10k)": 25,

@@ -21,6 +21,7 @@ import {
   viewWindow,
 } from '../../packages/core/src/index.js';
 import { expandZoned, expandDates, parseRRule, serializeRRule } from '../../packages/rrule/src/index.js';
+import { parseICal } from '../../packages/ical/src/index.js';
 import type { EventInput, WallPolicy } from '../../packages/core/src/index.js';
 
 /**
@@ -133,6 +134,11 @@ const adapters: Record<string, (input: any) => unknown> = {
       })
       .map((s) => s.set.rules.map(serializeRRule).join(',') + (s.set.exdates.length > 0 ? `|EXDATE=${s.set.exdates.join(',')}` : ''));
     return { shown, series };
+  },
+  // An iCalendar text (its lines, joined with CRLF) read into event inputs: plain strings, compared exactly.
+  'ical-parse': ({ lines, defaultZone }) => {
+    const r = parseICal((lines as string[]).join('\r\n'), defaultZone ? { defaultZone } : {});
+    return { events: r.events, problems: r.problems.map((p) => p.code) };
   },
   normalize: ({ event, context }) => {
     const r = normalizeEvent(event as EventInput, { ...context, newId: createIdGenerator('k') });

@@ -13,7 +13,9 @@ import {
   createEventStore,
   createHistory,
   createIdGenerator,
+  createSourceManager,
   dayInfos,
+  fnSource,
   layoutColumn,
   normalizeMany,
   viewWindow,
@@ -77,6 +79,15 @@ results['replaceSourceChunk 10k'] = time(5, () => createEventStore().replaceSour
 const refetched = createEventStore();
 refetched.replaceSourceChunk('api', 'all', sourced);
 results['refetch 10k identical'] = time(5, () => refetched.replaceSourceChunk('api', 'all', normalizeMany(raw.map(({ id: _id, ...rest }) => rest), ctx, 'api').items));
+
+// Phase 9: one answer of a year cut into twelve monthly chunks — normalize, partition, apply.
+const yearSource = fnSource('api', () => raw, { chunk: { unit: 'month', prefetch: 0 } });
+results['source delivery 10k over 12 months'] = time(5, () => {
+  const m = createSourceManager({ store: createEventStore(), normalize: () => ctx });
+  m.add(yearSource);
+  m.setRange(Temporal.PlainDate.from('2026-01-01'), Temporal.PlainDate.from('2027-01-01'), 'Europe/Paris');
+  m.destroy();
+});
 
 const store = load();
 const w = viewWindow(Temporal.PlainDate.from('2026-06-01'), Temporal.PlainDate.from('2026-07-06'), 'Europe/Paris');

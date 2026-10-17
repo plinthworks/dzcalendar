@@ -7,7 +7,7 @@
     "test:ci": "vitest run --maxWorkers=1",
     "test:watch": "vitest",
     "spike": "node scripts/spikes.mjs",
-    "typecheck": "tsc -p packages/rrule/tsconfig.json --noEmit && tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/dom/tsconfig.json --noEmit && tsc -p packages/motion-gsap/tsconfig.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
+    "typecheck": "tsc -p packages/rrule/tsconfig.json --noEmit && tsc -p packages/core/tsconfig.json --noEmit && tsc -p packages/ical/tsconfig.json --noEmit && tsc -p packages/dom/tsconfig.json --noEmit && tsc -p packages/motion-gsap/tsconfig.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
     "build": "node scripts/build.mjs",
     "bench": "node scripts/bench.mjs",
     "build:theme": "sass --no-source-map --style=expanded packages/theme/dzcalendar.scss packages/theme/dzcalendar.css",

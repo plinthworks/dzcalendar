@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — sources</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: var(--tz-bg); color: var(--tz-fg); color-scheme: var(--tz-color-scheme, light dark); }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: var(--tz-fg-muted); max-width: 75ch; }
+      .controls { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; flex-wrap: wrap; align-items: center; }
+      .layout { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1rem; }
+      @media (max-width: 60rem) { .layout { grid-template-columns: minmax(0, 1fr); } }
+      #log { font: 12px/1.5 ui-monospace, monospace; margin: 0; padding: 0.5rem; max-height: 36rem; overflow: auto; border: 1px solid var(--tz-border); border-radius: 6px; white-space: pre-wrap; }
+      #log:empty::before { content: 'Les requêtes et les enregistrements apparaissent ici.'; color: var(--tz-fg-muted); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sources : un serveur simulé, un fichier iCal</h1>
+      <p>
+        L'équipe vient d'un « serveur » JSON qui répond avec du retard, découpé par mois. Les mois voisins sont chargés à
+        l'avance. Déplacer un événement l'enregistre sur le serveur. Celui-ci refuse tout ce qui tombe un vendredi :
+        l'événement revient alors à sa place, et c'est annoncé.
+      </p>
+      <div class="controls">
+        <label>Latence <select id="latency"><option value="0">0 ms</option><option value="600" selected>600 ms</option><option value="2000">2 s</option></select></label>
+        <label><input type="checkbox" id="down" /> Serveur en panne</label>
+        <button type="button" id="refetch">Recharger</button>
+        <label>Importer un .ics <input type="file" id="ics" accept=".ics,text/calendar" /></label>
+        <button type="button" id="export">Exporter en .ics</button>
+        <span id="status" role="status"></span>
+      </div>
+      <div class="layout">
+        <div id="cal"></div>
+        <pre id="log" aria-label="Journal du serveur"></pre>
+      </div>
+    </main>
+    <script type="module" src="./sources.ts"></script>
+  </body>
+</html>

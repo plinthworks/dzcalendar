@@ -524,11 +524,15 @@ try {
       await p.click('.dz-toolbar__view[data-view="dayGridMonth"]');
       await p.focus('.dz-dg__cell[data-date="2026-10-21"]');
       await p.keyboard.press('Enter');
-      const ring = await p.evaluate(() => {
-        const id = document.activeElement?.dataset.segment;
-        const bar = [...document.querySelectorAll('.dz-bar.dz-focus')].find((b) => b.dataset.segment === id);
-        return bar ? getComputedStyle(bar).outlineStyle : null;
-      });
+      // The ring is mirrored at the next frame: wait for it rather than read at once (flaked 1 run in 3).
+      const ring = await p
+        .waitForFunction(() => {
+          const id = document.activeElement?.dataset.segment;
+          const bar = [...document.querySelectorAll('.dz-bar.dz-focus')].find((b) => b.dataset.segment === id);
+          return bar ? getComputedStyle(bar).outlineStyle : null;
+        }, null, { timeout: 2000 })
+        .then((h) => h.jsonValue())
+        .catch(() => null);
       check('keyboard month: the focused item’s bar shows the focus ring', ring === 'solid', String(ring));
       check('keyboard: no console error', errors.length === 0, errors.join(' | '));
       await p.close();
@@ -591,6 +595,58 @@ try {
     });
     check('dst: a repeated hour is drawn one hour tall (±1 px)', r <= 1, `${r}px`);
     check('dst: no console error', errors.length === 0, errors.join(' | '));
+    await p.close();
+  }
+
+  // ── sources: one request for contiguous months, busy while loading, a refused save put back ──
+  {
+    const { p, errors } = await page('/sources.html');
+    await p.waitForFunction(() => !document.querySelector('.dz-cal').hasAttribute('aria-busy') && document.querySelectorAll('.dz-bar').length > 0);
+    const gets = await p.evaluate(() => document.querySelector('#log').textContent.split('\n').filter((l) => l.includes('GET')).length);
+    check('sources: the month grid and a month each side come in one request', gets === 1, `${gets} requests`);
+    const before = await p.locator('.dz-bar').count();
+    await p.selectOption('#latency', '2000');
+    await p.click('#refetch');
+    const busy = await p.getAttribute('.dz-cal', 'aria-busy');
+    const during = await p.locator('.dz-bar').count();
+    check('sources: aria-busy while fetching again, the events stay meanwhile', busy === 'true' && during === before, `aria-busy=${busy}, ${during}/${before} bars`);
+    const busyAxe = await axeViolations(p, 'body');
+    check('axe: the sources page while loading — no violation', busyAxe.length === 0, busyAxe.join(' | '));
+    await p.waitForFunction(() => !document.querySelector('.dz-cal').hasAttribute('aria-busy'), null, { timeout: 5000 });
+    await p.selectOption('#latency', '0');
+    const moved = await p.evaluate(() => {
+      const cal = window.__dz();
+      cal.run({ type: 'event.move', id: 'planning-2026-10-19', start: '2026-10-23T10:00[Europe/Paris]' });
+      return String(cal.kernel.store.snapshot.getEvent('planning-2026-10-19').start);
+    });
+    await p.waitForFunction(() => document.querySelector('.dz-live').textContent.includes('enregistré'));
+    const back = await p.evaluate(() => String(window.__dz().kernel.store.snapshot.getEvent('planning-2026-10-19').start));
+    const said = await p.textContent('.dz-live');
+    check(
+      'sources: a move the server refuses shows at once, then goes back, said',
+      moved.startsWith('2026-10-23T10:00') && back.startsWith('2026-10-19T10:00') && said.includes('revenu'),
+      `${moved} → ${back}; « ${said} »`,
+    );
+    // iCal: a Chicago series with one occurrence moved (#7456: the TZID is honoured), imported, then exported.
+    await p.setInputFiles('#ics', `${root}/packages/ical/test/fixtures/05-series-override-7456.ics`);
+    await p.waitForFunction(() => window.__dz().kernel.sources.ids().includes('file'));
+    await p.waitForFunction(() => !document.querySelector('.dz-cal').hasAttribute('aria-busy'));
+    const review = await p.evaluate(() =>
+      window.__shown('2026-10-19', '2026-10-26').filter((x) => x.startsWith('file|')).map((x) => x.slice(5)),
+    );
+    check(
+      'ical: a Chicago series read in Chicago, its moved occurrence in place (Paris 16:00, 22nd at 21:00)',
+      review.join(' | ') === 'Review 10-20T16:00 | Review 10-21T16:00 | Review (moved) 10-22T21:00 | Review 10-23T16:00 | Review 10-24T16:00',
+      review.join(' | '),
+    );
+    const [download] = await Promise.all([p.waitForEvent('download'), p.click('#export')]);
+    const ics = readFileSync(await download.path(), 'utf8');
+    check(
+      'ical: the export writes the override and the zones it uses',
+      ics.includes('RECURRENCE-ID;TZID=America/Chicago:20261022T090000') && ics.includes('BEGIN:VTIMEZONE\r\nTZID:America/Chicago') && ics.includes('TZID:Europe/Paris'),
+      ics.slice(0, 300),
+    );
+    check('sources: no console error', errors.length === 0, errors.join(' | '));
     await p.close();
   }
 

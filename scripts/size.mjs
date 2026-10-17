@@ -11,7 +11,7 @@ import { minifyCssLiteral } from './css-literal.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const src = (p) => join(root, 'packages', p, 'src', 'index.ts');
-const alias = { '@dzcalendar/core': src('core'), '@dzcalendar/dom': src('dom'), '@dzcalendar/rrule': src('rrule') };
+const alias = { '@dzcalendar/core': src('core'), '@dzcalendar/dom': src('dom'), '@dzcalendar/rrule': src('rrule'), '@dzcalendar/ical': src('ical') };
 /** What `npm run build` ships: the structural CSS minified. */
 const shippedCss = {
   name: 'shipped-css',
@@ -34,6 +34,7 @@ const results = {
   // rrule is a dependency of core with its own line: each is counted once.
   'core (without polyfill)': await bundle(src('core'), ['@dzcalendar/rrule', ...poly]),
   'rrule (without polyfill)': await bundle(src('rrule'), ['@tzslot/core', ...poly]),
+  'ical (without core)': await bundle(src('ical'), ['@dzcalendar/core', '@dzcalendar/rrule', ...poly]),
   'dom (without core)': await bundle(src('dom'), ['@dzcalendar/core', ...poly]),
   'theme css': gzipSync(readFileSync(join(root, 'packages/theme/dzcalendar.css')), { level: 9 }).length,
   'motion-gsap (without gsap)': await bundle(src('motion-gsap'), ['gsap', '@dzcalendar/dom']),

@@ -4,7 +4,7 @@ import { createSettings } from './settings.js';
 import { attachInteractions } from './interact/host.js';
 import type { Interactions } from './interact/host.js';
 import type { LiveSettings } from './settings.js';
-import type { ActionItem, CalendarKernel, CreateRequest, DurationLike, EventInput, EventInstance, KernelOptions, NavDirection, PlainDate, ZoneId } from '@dzcalendar/core';
+import type { ActionItem, CalendarKernel, CreateRequest, DurationLike, EventInput, EventSourceSpec, SourceNotice, EventInstance, KernelOptions, NavDirection, PlainDate, ZoneId } from '@dzcalendar/core';
 import type { CalendarHooks, MenuHook, ViewController, ViewCtx } from './host.js';
 import { viewFactory } from './host.js';
 import { createMenu } from './menu.js';
@@ -55,6 +55,8 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly date?: PlainDate;
   readonly motion?: MotionAdapter;
   readonly events?: readonly EventInput[];
+  /** The whole list: sources gone are removed, new ones added, a changed spec (by identity) fetched again. */
+  readonly sources?: readonly EventSourceSpec[];
   readonly hooks?: CalendarHooks;
   readonly businessHours?: KernelOptions['businessHours'];
 }
@@ -74,6 +76,8 @@ export interface CalendarInstance {
   run(cmd: Command, opts?: { readonly validate?: boolean }): CommandResult;
   undo(): boolean;
   redo(): boolean;
+  /** Fetches one source again, or all; what is shown stays until the answers replace it. */
+  refetch(sourceId?: string): void;
   /** Shows a selection (null clears it), as if a person had made it; `onSelect` is not called. */
   select(selection: Selection | null): void;
   destroy(): void;
@@ -96,6 +100,8 @@ function sameHooks(a: CalendarHooks, b: CalendarHooks): boolean {
 }
 
 const messagesFor = (locale: string) => (locale.toLowerCase().startsWith('fr') ? FR : EN);
+/** An application's messages over the locale's: a set written before a version added keys still works. */
+const withDefaults = (given: DzMessages | undefined, locale: string): DzMessages => (given ? { ...messagesFor(locale), ...given } : messagesFor(locale));
 
 /** Right-to-left for Arabic, Hebrew, Persian…: from the locale (method or getter, as engines differ). */
 function directionOf(locale: string): 'ltr' | 'rtl' {
@@ -140,6 +146,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   const scheduler = new FrameScheduler(win);
   scope.add(() => scheduler.cancel());
   let messagesGiven = options.messages !== undefined;
+  // What the application gave, before the locale's defaults filled it: what a new `messages` is compared to.
+  let givenMessages: DzMessages | undefined = options.messages;
   const root = h(doc, 'div', 'dz-cal');
   root.dir = directionOf(kernel.getState().locale);
 
@@ -197,7 +205,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     kernel,
     scope,
     scheduler,
-    messages: options.messages ?? messagesFor(kernel.getState().locale),
+    messages: withDefaults(options.messages, kernel.getState().locale),
     locale: kernel.getState().locale,
     zone: kernel.getState().timeZone,
     motion: options.motion ?? NO_MOTION,
@@ -387,8 +395,23 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     scope.add(() => ro.disconnect());
   }
 
+  // Loading is a state of the whole calendar (aria-busy); a refused save and a
+  // failed fetch are said. The application hears them all through `onSource`.
+  const sourceNotice = (n: SourceNotice) => {
+    if (n.type === 'loading') {
+      root.classList.toggle('dz-loading', n.loading);
+      if (n.loading) root.setAttribute('aria-busy', 'true');
+      else root.removeAttribute('aria-busy');
+    } else if (n.type === 'save-error') {
+      const e = n.edits.find((x) => x.kind === 'event' || x.kind === 'series');
+      const ev = e && (e.kind === 'event' ? (e.after ?? e.before) : (e.after ?? e.before)?.base);
+      ctx.announce(ctx.messages.saveFailed({ title: ev?.title ?? '', reverted: n.reverted }));
+    } else if (n.type === 'error') ctx.announce(ctx.messages.loadFailed);
+  };
+  if (kernel.sources.loading) sourceNotice({ type: 'loading', loading: true });
   scope.add(
     kernel.subscribe((e) => {
+      if (e.type === 'source') return sourceNotice(e.notice);
       // A menu or a "+N" panel describes the screen as it was: any change closes it.
       menu.close(false);
       popover.close(false);
@@ -467,11 +490,14 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             dirty = true;
           }
           const newLocale = changes.locale && changes.locale !== state.locale ? changes.locale : null;
-          const newMessages = changes.messages && !shallowSame(changes.messages, ctx.messages) ? changes.messages : null;
-          if (newMessages) messagesGiven = true;
+          const newMessages = changes.messages && !shallowSame(changes.messages, givenMessages ?? ctx.messages) ? changes.messages : null;
+          if (newMessages) {
+            messagesGiven = true;
+            givenMessages = newMessages;
+          }
           if (newLocale) kernel.setLocale(newLocale);
           if (newMessages || newLocale) {
-            ctx.messages = newMessages ?? (messagesGiven ? ctx.messages : messagesFor(newLocale ?? state.locale));
+            ctx.messages = newMessages ? withDefaults(newMessages, newLocale ?? state.locale) : messagesGiven ? ctx.messages : messagesFor(newLocale ?? state.locale);
             ctx.locale = newLocale ?? ctx.locale;
             ctx.epoch++;
             dirty = true;
@@ -479,6 +505,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           if (changes.timeZone && changes.timeZone !== state.timeZone) kernel.setTimeZone(changes.timeZone);
           if ('businessHours' in changes && changes.businessHours !== undefined) kernel.setOptions({ businessHours: changes.businessHours });
           if (changes.events) kernel.setEvents(changes.events);
+          if (changes.sources) {
+            const keep = new Set(changes.sources.map((x) => x.id));
+            for (const id of kernel.sources.ids()) if (!keep.has(id)) kernel.sources.remove(id);
+            for (const spec of changes.sources) kernel.sources.add(spec);
+          }
           if (viewChanges) kernel.setView(viewType, changes.date);
         });
       } finally {
@@ -493,6 +524,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     run: (cmd, opts) => kernel.run(cmd, opts),
     undo: () => kernel.history.undo(),
     redo: () => kernel.history.redo(),
+    refetch: (id) => kernel.sources.refetch(id),
     select: (sel) => interactions?.select(sel),
     destroy() {
       scope.dispose();
