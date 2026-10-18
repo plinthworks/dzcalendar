@@ -248,3 +248,50 @@ export const FR: DzMessages = {
   moveEvent: 'Déplacer…',
   resizeEvent: 'Changer la durée…',
 };
+
+/**
+ * Languages by BCP 47 tag, lowercase: `ar`, `es`, `de-ch`. English and French
+ * are built in; `import '@dzcalendar/dom/locales/ar'` (or `es`, `de`) adds one,
+ * and `defineLocale` any other — a new language, or a region's own wording.
+ */
+const LOCALES = new Map<string, DzMessages | ((locale: string) => DzMessages)>([
+  ['en', EN],
+  ['fr', FR],
+]);
+
+/** The words for a language (`'pt'`) or a language in a region (`'pt-br'`). The later definition wins. */
+export function defineLocale(code: string, messages: DzMessages | ((locale: string) => DzMessages)): void {
+  LOCALES.set(code.toLowerCase(), messages);
+  MADE.clear();
+}
+/** Words made by a locale's function, per full locale (with its -u- keywords: digits follow them). */
+const MADE = new Map<string, DzMessages>();
+
+/**
+ * The words for a locale: its exact tag (`ar-SA`), then its language (`ar`),
+ * else English. Unicode extensions (`-u-ca-…`) are ignored.
+ */
+export function messagesForLocale(locale: string): DzMessages {
+  const tag = locale.toLowerCase().split('-u-')[0]!.replace(/_/g, '-');
+  const parts = tag.split('-');
+  for (let n = parts.length; n > 0; n--) {
+    const found = LOCALES.get(parts.slice(0, n).join('-'));
+    if (typeof found === 'function') {
+      let made = MADE.get(locale);
+      if (!made) {
+        // The tag as Intl reads it ('es_MX' → 'es-MX'); one it refuses falls back to the language.
+        const norm = locale.replace(/_/g, '-');
+        let tagged = parts[0]!;
+        try {
+          tagged = new Intl.Locale(norm).toString();
+        } catch {
+          /* the language alone */
+        }
+        MADE.set(locale, (made = found(tagged)));
+      }
+      return made;
+    }
+    if (found) return found;
+  }
+  return EN;
+}

@@ -1,0 +1,4 @@
+// The source of unlayered.css: the same theme outside any cascade layer, for
+// pages whose global reset is itself unlayered (Tailwind 3's preflight,
+// Bootstrap's reboot, normalize.css). Pair it with `cssLayers: false`.
+@use 'dzcalendar' with ($layer: false);

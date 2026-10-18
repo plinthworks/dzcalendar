@@ -17,3 +17,4 @@ export type { TimeLabels } from './render/event.js';
 export { createDayGridView } from './views/daygrid.js';
 export { RowWindow, onScrollFrame } from './render/window.js';
 export { NodePool } from './render/pool.js';
+export { altDate } from './render/alt.js';

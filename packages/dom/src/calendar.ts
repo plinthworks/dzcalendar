@@ -8,7 +8,7 @@ import type { Weekday, ActionItem, CalendarKernel, CreateRequest, DurationLike, 
 import type { CalendarHooks, MenuHook, ViewController, ViewCtx } from './host.js';
 import { viewFactory } from './host.js';
 import { createMenu } from './menu.js';
-import { EN, FR } from './messages.js';
+import { messagesForLocale } from './messages.js';
 import type { DzMessages } from './messages.js';
 import { NO_MOTION } from './motion.js';
 import type { MotionAdapter } from './motion.js';
@@ -17,6 +17,7 @@ import { FrameScheduler } from './render/frame.js';
 import { h } from './render/reconcile.js';
 import { Scope } from './render/scope.js';
 import { DZ_CSS, ensureStyles } from './styles.js';
+import { THEME_NAMES, ensureTheme, isKnownTheme } from './themes.js';
 import { createToolbar } from './toolbar.js';
 // Built-in views register themselves.
 import './views/timegrid.js';
@@ -25,10 +26,19 @@ import './views/daygrid.js';
 export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   /** A kernel built elsewhere (shared store, tests). Otherwise one is made from the options. */
   readonly kernel?: CalendarKernel;
-  /** Default: FR for French locales, EN otherwise. */
-  readonly messages?: DzMessages;
+  /** Default: the locale's (EN and FR built in; `@dzcalendar/dom/locales/ar|es|de`, `defineLocale`), else EN. */
+  /** Any of the words, over the locale's (`defineLocale` takes a complete set). */
+  readonly messages?: Partial<DzMessages>;
   /** False under a CSP without inline styles: include `DZ_CSS` yourself. */
   readonly injectStyles?: boolean;
+  /**
+   * The calendar's CSS in cascade layers (default true): any rule of the page
+   * outside a layer wins over it. False for a page whose global reset is
+   * unlayered (Tailwind 3, Bootstrap's reboot, normalize.css): the CSS is then
+   * plain, its class selectors outweigh those resets, and a page rule of the
+   * same weight coming after it wins. The first calendar of a document decides.
+   */
+  readonly cssLayers?: boolean;
   /** The calendar owns it from here: it is destroyed with the calendar, or when replaced. */
   readonly motion?: MotionAdapter;
   /** Where the time grid is scrolled to on first paint. Default PT8H. */
@@ -49,6 +59,24 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly weekends?: boolean;
   /** A number per week: on the month's rows, in the week's corner. Default false. */
   readonly weekNumbers?: boolean;
+  /**
+   * A ready-made family ('standard', 'slate', 'night', 'pastel', 'frost',
+   * 'solar', 'contrast' — with @dzcalendar/theme) or one made with
+   * `defineTheme`. Default 'standard'.
+   */
+  readonly theme?: string;
+  /** Light, dark, or the page's ('auto'). Default 'auto'. */
+  readonly scheme?: 'auto' | 'light' | 'dark';
+  /** Default 'comfortable'. */
+  readonly density?: 'compact' | 'comfortable' | 'spacious';
+  /**
+   * The calendar dates are written in ('islamic-umalqura', 'persian'…; Intl's
+   * names). The data and the grids stay Gregorian; titles, numbers and
+   * labels follow it. Default: the locale's.
+   */
+  readonly displayCalendar?: string | null;
+  /** A second calendar shown beside the dates (a cell's day, a heading's date). Default none. */
+  readonly secondaryCalendar?: string | null;
   /** Months side by side at most in a multi-month view (1: a stack). Default 3. */
   readonly multiMonthMaxColumns?: number;
   /**
@@ -68,7 +96,8 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
 }
 
 export interface CalendarUpdate extends Partial<LiveSettings> {
-  readonly messages?: DzMessages;
+  /** Any of the words, laid over the locale's: replaces what an earlier `messages` gave. */
+  readonly messages?: Partial<DzMessages>;
   readonly locale?: string;
   readonly timeZone?: ZoneId;
   readonly view?: string;
@@ -87,6 +116,11 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly multiMonthMaxColumns?: number;
   /** The view switcher's buttons; equal lists change nothing. */
   readonly headerViews?: readonly string[];
+  readonly theme?: string;
+  readonly scheme?: 'auto' | 'light' | 'dark';
+  readonly density?: 'compact' | 'comfortable' | 'spacious';
+  readonly displayCalendar?: string | null;
+  readonly secondaryCalendar?: string | null;
 }
 
 export interface CalendarInstance {
@@ -140,16 +174,70 @@ const entryHint = (family: string): string =>
 const hiddenOf = (hidden: readonly Weekday[] | undefined, weekends: boolean | undefined): Weekday[] =>
   [...new Set([...(hidden ?? []), ...(weekends === false ? ([6, 7] as const) : [])])].sort() as Weekday[];
 
-const messagesFor = (locale: string) => (locale.toLowerCase().startsWith('fr') ? FR : EN);
+/** The registered language's words (`defineLocale`, `@dzcalendar/dom/locales/*`), else English. */
+const messagesFor = (locale: string) => messagesForLocale(locale);
 /** An application's messages over the locale's: a set written before a version added keys still works. */
-const withDefaults = (given: DzMessages | undefined, locale: string): DzMessages => (given ? { ...messagesFor(locale), ...given } : messagesFor(locale));
+const withDefaults = (given: Partial<DzMessages> | undefined, locale: string): DzMessages => (given ? { ...messagesFor(locale), ...given } : messagesFor(locale));
+
+/** A locale whose dates are written in `calendar` (Intl's `-u-ca-`); none: the locale as it is. */
+function withCalendar(locale: string, calendar: string | null | undefined): string {
+  let base: Intl.Locale;
+  try {
+    base = new Intl.Locale(locale);
+  } catch {
+    throw new RangeError(`not a locale: ${locale}`);
+  }
+  if (!calendar) return locale;
+  let canonical: string;
+  try {
+    // Case and aliases as Intl takes them ('Islamic-Umalqura', 'islamicc' → 'islamic-civil').
+    canonical = new Intl.Locale('und', { calendar: calendar.toLowerCase() }).calendar ?? calendar;
+  } catch {
+    throw new RangeError(`not a calendar name: ${calendar}`);
+  }
+  // A well-formed name Intl does not support would be ignored by it, silently: said here instead.
+  const supported = (Intl as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('calendar');
+  if (supported && !supported.includes(canonical)) throw new RangeError(`not a calendar Intl supports here: ${calendar}`);
+  return new Intl.Locale(base.toString(), { calendar: canonical }).toString();
+}
+
+/** A locale without its calendar keyword: what an application gave, when the kernel's carries one. */
+function withoutCalendar(locale: string): string {
+  try {
+    const l = new Intl.Locale(locale);
+    if (!l.calendar) return locale;
+    return l.toString().replace(`-ca-${l.calendar}`, '').replace(/-u$/, '');
+  } catch {
+    return locale;
+  }
+}
+
+/** A bad theme, scheme or density is a configuration error, said before anything changes. */
+function checkLook(o: { theme?: string | undefined; scheme?: string | undefined; density?: string | undefined }): void {
+  if (o.theme !== undefined && !isKnownTheme(o.theme)) throw new RangeError(`unknown theme: ${o.theme} (${THEME_NAMES.join(', ')}, or defineTheme first)`);
+  if (o.scheme !== undefined && !['auto', 'light', 'dark'].includes(o.scheme)) throw new RangeError(`scheme is 'auto', 'light' or 'dark': ${o.scheme}`);
+  if (o.density !== undefined && !['compact', 'comfortable', 'spacious'].includes(o.density)) throw new RangeError(`density is 'compact', 'comfortable' or 'spacious': ${o.density}`);
+}
+
+/** The second calendar's locale, or null when it is the one the dates are already written in. */
+function altLocaleOf(base: string, display: string | null, secondary: string | null): string | null {
+  if (!secondary) return null;
+  const alt = withCalendar(base, secondary);
+  const shown = new Intl.DateTimeFormat(withCalendar(base, display)).resolvedOptions().calendar;
+  return new Intl.DateTimeFormat(alt).resolvedOptions().calendar === shown ? null : alt;
+}
 
 /** Right-to-left for Arabic, Hebrew, Persian…: from the locale (method or getter, as engines differ). */
+/** Right-to-left scripts' languages, for engines without `Intl.Locale#getTextInfo` (older WebViews). */
+const RTL = new Set(['ar', 'arc', 'ckb', 'dv', 'fa', 'he', 'iw', 'ks', 'ku', 'ps', 'sd', 'syr', 'ug', 'ur', 'yi']);
 function directionOf(locale: string): 'ltr' | 'rtl' {
   try {
     const l = new Intl.Locale(locale) as Intl.Locale & { getTextInfo?: () => { direction?: string }; textInfo?: { direction?: string } };
     const info = typeof l.getTextInfo === 'function' ? l.getTextInfo() : l.textInfo;
-    return info?.direction === 'rtl' ? 'rtl' : 'ltr';
+    if (info?.direction) return info.direction === 'rtl' ? 'rtl' : 'ltr';
+    // A script subtag decides first (az-Arab is right to left, ku-Latn is not).
+    if (l.script) return ['Arab', 'Hebr', 'Thaa', 'Syrc', 'Nkoo', 'Adlm', 'Rohg'].includes(l.script) ? 'rtl' : 'ltr';
+    return RTL.has(l.language) ? 'rtl' : 'ltr';
   } catch {
     return 'ltr';
   }
@@ -163,9 +251,14 @@ function directionOf(locale: string): 'ltr' | 'rtl' {
 export function createCalendar(host: HTMLElement, options: CalendarOptions = {}): CalendarInstance {
   const doc = host.ownerDocument;
   const win = doc.defaultView;
-  if (options.injectStyles !== false) ensureStyles(host, 'core', DZ_CSS);
+  const cssLayers = options.cssLayers !== false;
+  if (options.injectStyles !== false) ensureStyles(host, 'core', DZ_CSS, cssLayers);
 
   const owned = !options.kernel;
+  // The locale as given; what the kernel and the labels use carries the display calendar.
+  let baseLocale = options.locale || doc.documentElement.lang || 'en';
+  let displayCalendar = options.displayCalendar ?? null;
+  let secondaryCalendar = options.secondaryCalendar ?? null;
   // Defaults go after the spread: `timeZone: undefined` (a framework's unset
   // input) or `locale: ''` (an empty lang attribute) must not erase them.
   const kernel =
@@ -174,8 +267,13 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       ...options,
       timeZone: options.timeZone || Temporal.Now.timeZoneId(),
       hiddenDays: hiddenOf(options.hiddenDays, options.weekends),
-      locale: options.locale || doc.documentElement.lang || 'en',
+      locale: withCalendar(baseLocale, displayCalendar),
     } as KernelOptions);
+  if (options.kernel) {
+    // Someone else's kernel: its locale is the base; a display calendar asked here is applied now, not at a later update.
+    baseLocale = withoutCalendar(options.kernel.getState().locale);
+    if (options.displayCalendar) options.kernel.setLocale(withCalendar(baseLocale, displayCalendar));
+  }
 
   const drawable = (type: string) => {
     const spec = kernel.getViewSpec(type);
@@ -189,9 +287,22 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   scope.add(() => scheduler.cancel());
   let messagesGiven = options.messages !== undefined;
   // What the application gave, before the locale's defaults filled it: what a new `messages` is compared to.
-  let givenMessages: DzMessages | undefined = options.messages;
+  let givenMessages: Partial<DzMessages> | undefined = options.messages;
   const root = h(doc, 'div', 'dz-cal');
   root.dir = directionOf(kernel.getState().locale);
+  // Theme, scheme, density: attributes the stylesheets read.
+  const look = { theme: options.theme ?? 'standard', scheme: options.scheme ?? 'auto', density: options.density ?? 'comfortable' };
+  checkLook(look);
+  const applyLook = () => {
+    // Always set: the theme's families (the standard one too) are keyed on it.
+    root.dataset['dzTheme'] = look.theme;
+    if (look.scheme === 'auto') delete root.dataset['dzScheme'];
+    else root.dataset['dzScheme'] = look.scheme;
+    if (look.density === 'comfortable') delete root.dataset['dzDensity'];
+    else root.dataset['dzDensity'] = look.density;
+    if (options.injectStyles !== false) ensureTheme(host, look.theme, cssLayers);
+  };
+  applyLook();
   let hidden: { days: readonly Weekday[] | undefined; weekends: boolean | undefined } = { days: options.hiddenDays, weekends: options.weekends };
   const columns = (n: number) => {
     if (!Number.isInteger(n) || n < 1) throw new RangeError(`multiMonthMaxColumns must be a whole number ≥ 1: ${n}`);
@@ -261,6 +372,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     epoch: 0,
     snapMinutes: settings.current.snapMinutes ?? 15,
     weekNumbers: options.weekNumbers === true,
+    altLocale: altLocaleOf(baseLocale, displayCalendar, secondaryCalendar),
     virtualizeAbove: (() => {
       const v = options.virtualizeAbove ?? 500;
       if (!(v >= 0)) throw new RangeError(`virtualizeAbove must be a number ≥ 0 (Infinity: never): ${v}`);
@@ -268,6 +380,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     })(),
     printing: false,
     injectStyles: options.injectStyles !== false,
+    cssLayers,
     popoverElement: popover.element,
     openMenu(target, at, returnFocus) {
       const state = kernel.getState();
@@ -521,7 +634,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           ctx.locale = e.state.locale;
           ctx.epoch++;
         }
-        if (e.causes.includes('locale')) root.dir = directionOf(e.state.locale);
+        if (e.causes.includes('locale')) {
+          root.dir = directionOf(e.state.locale);
+          // Changed by someone else (another calendar on the kernel, the kernel itself): that is the base now.
+          if (e.state.locale !== withCalendar(baseLocale, displayCalendar)) baseLocale = withoutCalendar(e.state.locale);
+        }
       }
       paint();
       if (e.type === 'state' && (e.causes.includes('view') || e.causes.includes('navigate'))) (measureLanes(), measureStack());
@@ -610,6 +727,14 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       if (changes.multiMonthMaxColumns !== undefined && !(Number.isInteger(changes.multiMonthMaxColumns) && changes.multiMonthMaxColumns >= 1)) {
         throw new RangeError(`multiMonthMaxColumns must be a whole number ≥ 1: ${changes.multiMonthMaxColumns}`);
       }
+      checkLook(changes);
+      // Locale and calendars together, checked before anything changes (a bad one must not stick).
+      const touchesLocale = Boolean(changes.locale) || 'displayCalendar' in changes || 'secondaryCalendar' in changes;
+      const nextBase = changes.locale || baseLocale;
+      const nextDisplay = 'displayCalendar' in changes ? (changes.displayCalendar ?? null) : displayCalendar;
+      const nextSecondary = 'secondaryCalendar' in changes ? (changes.secondaryCalendar ?? null) : secondaryCalendar;
+      const nextEffective = touchesLocale ? withCalendar(nextBase, nextDisplay) : null;
+      if (touchesLocale && nextSecondary) withCalendar(nextBase, nextSecondary);
       if (changes.hiddenDays?.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw new RangeError(`hiddenDays are ISO weekdays, 1 (Monday) to 7 (Sunday): ${changes.hiddenDays.join(', ')}`);
       if (('hiddenDays' in changes || 'weekends' in changes) && hiddenOf('hiddenDays' in changes ? changes.hiddenDays : hidden.days, 'weekends' in changes ? changes.weekends : hidden.weekends).length >= 7) {
         throw new RangeError('every day of the week is hidden');
@@ -633,7 +758,28 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             ctx.epoch++;
             dirty = true;
           }
-          const newLocale = changes.locale && changes.locale !== state.locale ? changes.locale : null;
+          // Only when asked: a locale changed elsewhere (a shared kernel) is not put back by an unrelated update.
+          const newLocale = nextEffective !== null && nextEffective !== state.locale ? nextEffective : null;
+          if (touchesLocale) {
+            baseLocale = nextBase;
+            displayCalendar = nextDisplay;
+            secondaryCalendar = nextSecondary;
+            const alt = altLocaleOf(baseLocale, displayCalendar, secondaryCalendar);
+            if (alt !== ctx.altLocale) {
+              ctx.altLocale = alt;
+              ctx.epoch++;
+              dirty = true;
+            }
+          }
+          if ((changes.theme && changes.theme !== look.theme) || (changes.scheme && changes.scheme !== look.scheme) || (changes.density && changes.density !== look.density)) {
+            look.theme = changes.theme ?? look.theme;
+            look.scheme = changes.scheme ?? look.scheme;
+            look.density = changes.density ?? look.density;
+            applyLook();
+            // Another density: another scale, lanes and stacks measured again.
+            measureLanes();
+            measureStack();
+          }
           const newMessages = changes.messages && !shallowSame(changes.messages, givenMessages ?? ctx.messages) ? changes.messages : null;
           if (newMessages) {
             messagesGiven = true;
@@ -641,7 +787,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           }
           if (newLocale) kernel.setLocale(newLocale);
           if (newMessages || newLocale) {
-            ctx.messages = newMessages ? withDefaults(newMessages, newLocale ?? state.locale) : messagesGiven ? ctx.messages : messagesFor(newLocale ?? state.locale);
+            // The application's words over the (new) locale's: switching language keeps the overrides, not the old language.
+            ctx.messages = withDefaults(newMessages ?? (messagesGiven ? givenMessages : undefined), newLocale ?? state.locale);
             ctx.locale = newLocale ?? ctx.locale;
             ctx.epoch++;
             dirty = true;

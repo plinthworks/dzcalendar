@@ -264,14 +264,19 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   function titleFor(range: ViewRange, spec: ViewSpec): string {
     switch (spec.alignment) {
       case 'month': {
-        // Several months (a list or a multi-month view of `duration: { months: 3 }`): the stretch.
+        // The months the period covers *as the locale writes them*: a Gregorian
+        // month in a Hijri display spans two Hijri months, and says so.
         const last = range.activeEnd.subtract({ days: 1 });
-        return last.month === range.activeStart.month && last.year === range.activeStart.year
-          ? formatTemporal(range.activeStart, { month: 'long', year: 'numeric' }, locale)
+        const one = formatTemporal(range.activeStart, { month: 'long', year: 'numeric' }, locale);
+        return one === formatTemporal(last, { month: 'long', year: 'numeric' }, locale)
+          ? one
           : formatRangeTitle(range.activeStart, last, { month: 'short', year: 'numeric' }, locale);
       }
-      case 'year':
-        return formatTemporal(range.activeStart, { year: 'numeric' }, locale);
+      case 'year': {
+        const last = range.activeEnd.subtract({ days: 1 });
+        const one = formatTemporal(range.activeStart, { year: 'numeric' }, locale);
+        return one === formatTemporal(last, { year: 'numeric' }, locale) ? one : formatRangeTitle(range.activeStart, last, { year: 'numeric' }, locale);
+      }
       default: {
         const first = range.dates[0] ?? range.activeStart;
         const last = range.dates[range.dates.length - 1] ?? range.activeEnd.subtract({ days: 1 });

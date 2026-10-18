@@ -1,0 +1,16 @@
+/*
+ * @dzcalendar/theme/tailwind.css — DzCalendar beside Tailwind CSS v4.
+ *
+ * Import it BEFORE Tailwind:
+ *
+ *   @import '@dzcalendar/theme/tailwind.css';
+ *   @import 'tailwindcss';
+ *
+ * The calendar's CSS is in the cascade layer `dzcalendar` (sub-layers
+ * dzcalendar.base and dzcalendar.theme). This order puts it after Tailwind's
+ * preflight (`@layer base`), which would otherwise reset its borders,
+ * margins and paddings, and before your components and utilities: Tailwind
+ * utilities on your own markup inside the calendar (eventContent) still win.
+ */
+@layer theme, base, dzcalendar, components, utilities;
+@import './dzcalendar.css';

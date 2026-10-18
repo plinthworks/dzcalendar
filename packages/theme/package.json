@@ -8,9 +8,24 @@
     ".": "./dzcalendar.css",
     "./dzcalendar.css": "./dzcalendar.css",
     "./dzcalendar.scss": "./dzcalendar.scss",
-    "./dzcalendar": { "sass": "./dzcalendar.scss", "default": "./dzcalendar.css" }
+    "./dzcalendar": {
+      "sass": "./dzcalendar.scss",
+      "default": "./dzcalendar.css"
+    },
+    "./tailwind.css": "./tailwind.css",
+    "./unlayered.css": "./unlayered.css",
+    "./tailwind3.css": "./tailwind3.css"
   },
-  "files": ["dzcalendar.css", "dzcalendar.scss"],
-  "sideEffects": ["*.css"],
+  "files": [
+    "dzcalendar.css",
+    "dzcalendar.scss",
+    "tailwind.css",
+    "unlayered.css",
+    "unlayered.scss",
+    "tailwind3.css"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
   "sass": "./dzcalendar.scss"
 }

@@ -18,6 +18,15 @@
       "@dzcalendar/core": [
         "./packages/core/src/index.ts"
       ],
+      "@dzcalendar/dom/locales/ar": [
+        "./packages/dom/src/locales/ar.ts"
+      ],
+      "@dzcalendar/dom/locales/es": [
+        "./packages/dom/src/locales/es.ts"
+      ],
+      "@dzcalendar/dom/locales/de": [
+        "./packages/dom/src/locales/de.ts"
+      ],
       "@dzcalendar/dom/toolkit": [
         "./packages/dom/src/toolkit.ts"
       ],

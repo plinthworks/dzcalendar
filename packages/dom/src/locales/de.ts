@@ -1,0 +1,82 @@
+/** `import '@dzcalendar/dom/locales/de'`: the calendar's words in German, for every `de` locale. */
+import { defineLocale } from '@dzcalendar/dom';
+import type { DzMessages } from '@dzcalendar/dom';
+
+/** The words for one locale of the language: numbers as that locale writes them (\`ar-SA\` Arabic-Indic, \`-u-nu-latn\` Latin). */
+export function messagesDe(locale = 'de'): DzMessages {
+const nf = new Intl.NumberFormat(locale);
+const n = (x: number) => nf.format(x);
+const termine = (c: number) => `${n(c)} ${c === 1 ? 'Termin' : 'Termine'}`;
+
+return {
+  today: 'Heute',
+  previous: 'Zurück',
+  next: 'Weiter',
+  allDay: 'Ganztägig',
+  dayDoesNotExist: 'Diesen Tag gibt es in dieser Zeitzone nicht',
+  gapBand: ({ from, to }) => `${from}–${to} gibt es nicht`,
+  repeatBand: ({ from, to }) => `${from}–${to} gibt es zweimal`,
+  secondPassMark: '*',
+  realDuration: ({ duration }) => `tatsächlich ${duration}`,
+  eventLabel: ({ title, time }) => `${title}, ${time}`,
+  untitled: '(ohne Titel)',
+  now: 'Jetzt',
+  moreLink: ({ count }) => `+${n(count)} weitere`,
+  moreLabel: ({ count, date }) => `${count === 1 ? '1 weiterer Termin' : `${n(count)} weitere Termine`}, ${date}`,
+  closePopover: 'Schließen',
+  views: { dayGridMonth: 'Monat', dayGridWeek: 'Woche', dayGridDay: 'Tag', timeGridWeek: 'Woche', timeGridDay: 'Tag', listDay: 'Liste', listWeek: 'Liste', listMonth: 'Liste', listYear: 'Liste', multiMonthYear: 'Jahr' },
+  newEventAt: ({ time }) => `Neuer Termin um ${time}`,
+  newEventOn: ({ date }) => `Neuer ganztägiger Termin am ${date}`,
+  dayLabel: ({ date, count }) => (count === 0 ? date : `${date}, ${termine(count)}`),
+  viewSwitcher: 'Ansicht',
+  goToDay: 'Zu diesem Tag',
+  openEvent: 'Öffnen',
+  deleteEvent: 'Löschen',
+  dropRefused: 'Hier nicht erlaubt',
+  eventMoved: ({ title, time }) => (time ? `„${title}“ verschoben auf ${time}` : `„${title}“ verschoben`),
+  eventResized: ({ title, time }) => (time ? `Neues Ende von „${title}“: ${time}` : `Dauer von „${title}“ geändert`),
+  movedIntoGap: ({ time }) => `Diese Uhrzeit gibt es an diesem Tag nicht; verschoben auf ${time}`,
+  changeWhich: 'Welche Termine ändern?',
+  whichReading: ({ time }) => `${time} – welches Mal?`,
+  reading: ({ time, offset, first }) => `${time} (${first ? 'erstes' : 'zweites'} Mal, ${offset})`,
+  scopeThis: 'Dieser Termin',
+  scopeFollowing: 'Dieser und alle folgenden Termine',
+  scopeAll: 'Alle Termine',
+  skippedHour: 'Diese Stunde gibt es heute nicht; der Termin beginnt an ihrem Ende',
+  actions: 'Aktionen',
+  eventResizedStart: ({ title, time }) => (time ? `Neuer Beginn von „${title}“: ${time}` : `Dauer von „${title}“ geändert`),
+  cursorSlot: ({ date, time }) => `${date}, ${time}`,
+  cursorAllDay: ({ date }) => `${date}, ganztägig`,
+  timeSlots: 'Zeitfenster',
+  range: ({ from, to }) => `${from} bis ${to}`,
+  selected: ({ span }) => `Ausgewählt: ${span}`,
+  violation: (code) =>
+    ({ constraint: 'außerhalb der erlaubten Zeiten', overlap: 'überschneidet sich mit einem anderen Termin', allow: 'von der Anwendung abgelehnt', 'valid-range': 'außerhalb der angezeigten Daten', 'not-editable': 'kann nicht geändert werden' })[code],
+  noFurther: 'Weiter geht es nicht',
+  notEditable: 'Dieser Termin kann nicht geändert werden',
+  cannotMove: 'Dieser Termin kann nicht verschoben werden',
+  cannotResize: 'Diese Dauer kann hier nicht geändert werden',
+  grabbed: ({ title }) => `„${title}“ aufgenommen.`,
+  grabHelp: 'Pfeiltasten verschieben ihn, Bild auf und Bild ab um eine Woche, Umschalt mit Pfeiltasten ändert das Ende, Eingabe legt ihn ab, Esc bricht ab.',
+  grabHelpResize: 'Pfeiltasten ändern das Ende, Eingabe legt ihn ab, Esc bricht ab.',
+  grabHelpStart: 'Alt und Umschalt mit Pfeiltasten ändern den Beginn.',
+  grabCancelled: 'Verschieben abgebrochen',
+  eventDeleted: ({ title, undo }) => (undo ? `„${title}“ gelöscht. ${undo} zum Rückgängigmachen.` : `„${title}“ gelöscht.`),
+  saveFailed: ({ title, reverted }) => `„${title}“ konnte nicht gespeichert werden. ${reverted ? 'Der vorherige Stand ist wiederhergestellt.' : 'Wird neu geladen.'}`,
+  loadFailed: 'Einige Termine konnten nicht geladen werden.',
+  noEvents: 'Keine Termine',
+  weekShort: ({ week }) => `KW ${n(week)}`,
+  weekLabel: ({ week }) => `Kalenderwoche ${n(week)}`,
+  goToMonth: 'Zu diesem Monat',
+  becomesAllDay: 'Er wird zu einem ganztägigen Termin',
+  becomesTimed: ({ length }) => `Er wird zu einem Termin von ${length}`,
+  deleteWhich: 'Welche Termine löschen?',
+  undone: 'Rückgängig gemacht',
+  redone: 'Wiederhergestellt',
+  moveEvent: 'Verschieben…',
+  resizeEvent: 'Dauer ändern…',
+};
+}
+
+export const DE: DzMessages = messagesDe();
+defineLocale('de', messagesDe);

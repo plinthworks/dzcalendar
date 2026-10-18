@@ -24,6 +24,9 @@ export default defineConfig({
       // Subpaths first: '@dzcalendar/dom' would otherwise swallow '@dzcalendar/dom/list'.
       '@dzcalendar/dom/list': fileURLToPath(new URL('./packages/dom/src/list.ts', import.meta.url)),
       '@dzcalendar/dom/multimonth': fileURLToPath(new URL('./packages/dom/src/multimonth.ts', import.meta.url)),
+      '@dzcalendar/dom/locales/ar': fileURLToPath(new URL('./packages/dom/src/locales/ar.ts', import.meta.url)),
+      '@dzcalendar/dom/locales/es': fileURLToPath(new URL('./packages/dom/src/locales/es.ts', import.meta.url)),
+      '@dzcalendar/dom/locales/de': fileURLToPath(new URL('./packages/dom/src/locales/de.ts', import.meta.url)),
       '@dzcalendar/dom/toolkit': fileURLToPath(new URL('./packages/dom/src/toolkit.ts', import.meta.url)),
       '@dzcalendar/dom/custom': fileURLToPath(new URL('./packages/dom/src/custom.ts', import.meta.url)),
       '@dzcalendar/core/views': fileURLToPath(new URL('./packages/core/src/views.ts', import.meta.url)),
@@ -42,6 +45,8 @@ export default defineConfig({
         sources: fileURLToPath(new URL('./playground/sources.html', import.meta.url)),
         angular: fileURLToPath(new URL('./playground/angular.html', import.meta.url)),
         perf: fileURLToPath(new URL('./playground/perf.html', import.meta.url)),
+        themes: fileURLToPath(new URL('./playground/themes.html', import.meta.url)),
+        resets: fileURLToPath(new URL('./playground/resets.html', import.meta.url)),
       },
     },
   },

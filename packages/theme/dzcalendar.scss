@@ -51,65 +51,101 @@ $tones: (
   'slate': (#475569, #94a3b8),
 ) !default;
 
-$emit: true !default;
+/// Ready-made families (`theme: 'slate'` → data-dz-theme): each a (light, dark) palette,
+/// chosen for AA contrast and checked by axe in Chrome. Names are ours; palettes are
+/// inspired by well-loved editor themes (GitHub Primer, One Dark/Tokyo Night,
+/// Catppuccin, Nord, Solarized). `contrast` is the high-contrast family.
+$themes: (
+  'slate': (
+    bg: (#ffffff, #0d1117), bg-raised: (#f6f8fa, #151b23), fg: (#1f2328, #f0f6fc), fg-muted: (#59636e, #9198a1),
+    border: (#d1d9e0, #3d444d), accent: (#0969da, #4493f8), accent-fg: (#ffffff, #0d1117), danger: (#d1242f, #f85149), warning: (#9a6700, #d29922),
+  ),
+  'night': (
+    bg: (#fafafa, #1a1b26), bg-raised: (#f0f0f1, #24283b), fg: (#383a42, #c0caf5), fg-muted: (#5f626d, #9aa5ce),
+    border: (#d4d4d6, #3b4261), accent: (#3561d4, #7aa2f7), accent-fg: (#ffffff, #1a1b26), danger: (#c62828, #f7768e), warning: (#8a5c00, #e0af68),
+  ),
+  'pastel': (
+    bg: (#eff1f5, #1e1e2e), bg-raised: (#e6e9ef, #313244), fg: (#4c4f69, #cdd6f4), fg-muted: (#5c5f77, #a6adc8),
+    border: (#ccd0da, #45475a), accent: (#1e66f5, #89b4fa), accent-fg: (#ffffff, #1e1e2e), danger: (#b3082f, #f38ba8), warning: (#8f5508, #f9e2af),
+  ),
+  'frost': (
+    bg: (#eceff4, #2e3440), bg-raised: (#e5e9f0, #3b4252), fg: (#2e3440, #eceff4), fg-muted: (#4c566a, #c3cad8),
+    border: (#d8dee9, #4c566a), accent: (#4a6a94, #88c0d0), accent-fg: (#ffffff, #2e3440), danger: (#a3434c, #e0828c), warning: (#85600f, #ebcb8b),
+  ),
+  'solar': (
+    bg: (#fdf6e3, #002b36), bg-raised: (#eee8d5, #073642), fg: (#4a5d64, #a1afaf), fg-muted: (#56696f, #8fa2a4),
+    border: (#d9cfb0, #2b4a52), accent: (#1d6ca3, #4aa3e8), accent-fg: (#ffffff, #002b36), danger: (#b52b29, #ff6b68), warning: (#7a6100, #d4a017),
+  ),
+  'contrast': (
+    bg: (#ffffff, #000000), bg-raised: (#f0f0f0, #1a1a1a), fg: (#000000, #ffffff), fg-muted: (#1a1a1a, #e6e6e6),
+    border: (#000000, #ffffff), accent: (#0037a8, #ffd60a), accent-fg: (#ffffff, #000000), danger: (#a00000, #ff8080), warning: (#5c4000, #ffd60a),
+  ),
+) !default;
 
-@function value($colour) {
+$emit: true !default;
+/// True: everything in the cascade layer dzcalendar.theme (a page's unlayered
+/// rules win). False: no layer — for pages whose global reset is itself
+/// unlayered (Tailwind 3, Bootstrap's reboot): see tailwind3.css.
+$layer: true !default;
+
+/// One side of a colour: 1 light, 2 dark (a single colour is both).
+@function side($colour, $i) {
   @if meta.type-of($colour) == 'list' and list.length($colour) == 2 {
-    @return light-dark(list.nth($colour, 1), list.nth($colour, 2));
+    @return list.nth($colour, $i);
   }
   @return $colour;
 }
 
-/// Palette variables on the current selector, by name without prefix: (accent: #e11d48) sets --tz-accent.
-@mixin palette($colours) {
-  @each $name, $colour in $colours {
-    --tz-#{$name}: #{value($colour)};
+/// A family's defaults on `$sel`: the palette as --dzp-* (what the calendar
+/// reads *after* --tz-*: a page's own --tz-* always wins), and the tones.
+/// Light and dark without light-dark(): plain values, switched by the
+/// calendar's `scheme`, the page's [data-theme] and the system's preference —
+/// it works back to Safari 15.4.
+@mixin vars($palette, $i) {
+  @each $name, $colour in $palette {
+    --dzp-#{$name}: #{side($colour, $i)};
+  }
+  @each $name, $colour in $tones {
+    --dz-tone-#{$name}: #{side($colour, $i)};
   }
 }
+@mixin family($sel, $palette) {
+  #{$sel} { @include vars($palette, 1); }
+  @media (prefers-color-scheme: dark) {
+    #{$sel}:not([data-dz-scheme='light']) { @include vars($palette, 2); }
+  }
+  [data-theme='light'] #{$sel}:not([data-dz-scheme='dark']) { @include vars($palette, 1); }
+  [data-theme='dark'] #{$sel}:not([data-dz-scheme='light']) { @include vars($palette, 2); }
+  #{$sel}[data-dz-scheme='light'] { @include vars($palette, 1); }
+  #{$sel}[data-dz-scheme='dark'] { @include vars($palette, 2); }
+}
 
-@if $emit {
-  /**
-   * @dzcalendar/theme — one import and the calendar is presentable.
-   * Generated from dzcalendar.scss — edit that file, then `npm run build:theme`.
-   *
-   * Optional: the calendar's injected CSS reads every colour as
-   * var(--dz-x, var(--tz-x, system colour)). This file only gives those
-   * variables values, plus the few rules variables cannot express.
-   * light-dark() needs Chrome 123, Safari 17.5 or Firefox 120.
-   */
-  :root {
-    @include palette(
-      (
-        bg: $bg,
-        bg-raised: $bg-raised,
-        fg: $fg,
-        fg-muted: $fg-muted,
-        border: $border,
-        accent: $accent,
-        accent-fg: $accent-fg,
-        danger: $danger,
-        warning: $warning,
-      )
-    );
-    --tz-font: #{$font};
-    --tz-radius: #{$radius};
+@mixin body {
+  :root, :host {
     /* On :root, not .dz-cal: a size set on the host or any ancestor must reach the calendar. */
     @each $name, $size in $calendar {
       --dz-#{$name}: #{$size};
     }
-    @each $name, $colour in $tones {
-      --dz-tone-#{$name}: #{value($colour)};
-    }
   }
+  .dz-cal { --dzp-radius: #{$radius}; --dzp-font: #{$font}; }
 
   [data-theme='light'] { --tz-color-scheme: light; }
   [data-theme='dark'] { --tz-color-scheme: dark; }
 
+  // The standard family (the attribute is always set by the calendar), then the others.
+  @include family(
+    ".dz-cal[data-dz-theme='standard']",
+    (bg: $bg, bg-raised: $bg-raised, fg: $fg, fg-muted: $fg-muted, border: $border, accent: $accent, accent-fg: $accent-fg, danger: $danger, warning: $warning)
+  );
+  @each $name, $palette in $themes {
+    @include family(".dz-cal[data-dz-theme='#{$name}']", $palette);
+  }
+
   // Not the pressed view button: its accent background carries white text.
-  .dz-toolbar__btn:hover:not(:disabled):not([aria-pressed='true']) { background: var(--tz-bg-raised); }
+  .dz-toolbar__btn:hover:not(:disabled):not([aria-pressed='true']) { background: var(--dzc-bg-raised); }
   .dz-ev:hover { filter: brightness(0.97); }
   .dz-tg__head,
-  .dz-tg__allday { background: var(--tz-bg); }
+  .dz-tg__allday { background: var(--dzc-bg); }
 
   @media (forced-colors: active) {
     .dz-tg__dayhead--today .dz-tg__dayhead-date { forced-color-adjust: none; background: Highlight; color: HighlightText; }
@@ -121,16 +157,37 @@ $emit: true !default;
     .dz-ev, .dz-bar { transition: box-shadow 120ms ease, filter 120ms ease; }
   }
 
-  // Paper (D.9): what scrolls on screen is printed whole — `preparePrint()` (or
-  // `autoPrint`) has mounted it — in its colours, no event cut across pages,
-  // no buttons.
+  // Paper: the layout is the calendar's own (it prints without this file); the theme keeps the colours.
   @media print {
-    .dz-cal { --dz-height: auto; height: auto; }
     .dz-cal, .dz-cal * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .dz-tg, .dz-dg, .dz-tg__body, .dz-dg__body, .dz-tg__allday, .dz-list { overflow: visible !important; max-height: none !important; height: auto !important; flex: none !important; }
-    .dz-ev, .dz-bar, .dz-list__li, .dz-mm__month { break-inside: avoid; }
-    // Every lane printed: a day's row grows to hold them (no "+N" on paper).
-    .dz-dg__week { flex: none !important; min-height: var(--dz-week-min, 5.5rem); }
-    .dz-toolbar__btn, .dz-toolbar__views, .dz-cursor, .dz-ghost { display: none !important; }
+  }
+
+  // High contrast: lines that are seen, not guessed.
+  // (An outline, not a border: the events' own borders — the accent edge, none on backgrounds — stay.)
+  .dz-cal[data-dz-theme='contrast'] {
+    .dz-ev:not(.dz-ev--bg), .dz-bar:not(.dz-bar--bg) { outline: 1px solid var(--dzc-fg); outline-offset: -1px; }
+    .dz-dg__cell, .dz-tg__col { border-color: var(--dzc-fg); }
+  }
+}
+
+@if $emit {
+  /**
+   * @dzcalendar/theme — one import and the calendar is presentable.
+   * Generated from dzcalendar.scss — edit that file, then `npm run build:theme`.
+   *
+   * Optional: the calendar reads every colour as --dz-x, else --tz-x, else
+   * --dzp-x, else a system colour. This file gives the --dzp-* defaults of each
+   * family (`theme` option) for light and dark; a page's own --tz-* palette —
+   * shared with tzslot — wins over them, and the calendar's --dz-* over both.
+   */
+  @if $layer {
+    // In the cascade layer dzcalendar.theme, after the calendar's own dzcalendar.base:
+    // any rule of the page outside a layer wins over both.
+    @layer dzcalendar.base, dzcalendar.theme;
+    @layer dzcalendar.theme {
+      @include body;
+    }
+  } @else {
+    @include body;
   }
 }

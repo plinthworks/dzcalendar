@@ -45,6 +45,9 @@ const results = {
   'dom/list (without dom)': await bundle(join(root, 'packages/dom/src/list.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
   'dom/multimonth (without dom)': await bundle(join(root, 'packages/dom/src/multimonth.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
   'dom/custom (without dom)': await bundle(join(root, 'packages/dom/src/custom.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
+  'dom/locales/ar (without dom)': await bundle(join(root, 'packages/dom/src/locales/ar.ts'), ['@dzcalendar/core', '@dzcalendar/dom', ...poly]),
+  'dom/locales/es (without dom)': await bundle(join(root, 'packages/dom/src/locales/es.ts'), ['@dzcalendar/core', '@dzcalendar/dom', ...poly]),
+  'dom/locales/de (without dom)': await bundle(join(root, 'packages/dom/src/locales/de.ts'), ['@dzcalendar/core', '@dzcalendar/dom', ...poly]),
   // ng-packagr's bundle: run `npm run build` first.
   'angular (without Angular, core, dom)': await bundle(join(root, 'packages/angular/dist/fesm2022/dzcalendar-angular.mjs'), ['@angular/core', '@dzcalendar/core', '@dzcalendar/dom', ...poly]),
   'theme css': gzipSync(readFileSync(join(root, 'packages/theme/dzcalendar.css')), { level: 9 }).length,

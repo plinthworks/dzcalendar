@@ -13,6 +13,7 @@ import { attachMenuTriggers } from '../menu.js';
 import { applyEventLook, fillEvent, startReadingOf, timeLabels, unmountEvent } from '../render/event.js';
 import { KeyedList, contentsHost, h } from '../render/reconcile.js';
 import { onScrollFrame } from '../render/window.js';
+import { altDate } from '../render/alt.js';
 import { NodePool } from '../render/pool.js';
 
 interface WeekItem {
@@ -319,6 +320,9 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
 
   function drawWeek(el: HTMLElement, it: WeekItem): void {
     const { week } = it;
+    const sec = sections.find((x) => x.model.weeks.includes(week));
+    const d0 = sec?.model.weeks[0]?.dates[0];
+    if (d0) firstShown = d0;
     const p = parts.get(it.key)!;
     const s = state!;
     p.week = week;
@@ -384,6 +388,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     }));
   }
 
+  /** The first date the view shows (its own month's in a multi-month view: each month's first cell). */
+  let firstShown: PlainDate = Temporal.PlainDate.from('1970-01-01');
   function drawCell(cell: HTMLElement, c: CellItem): void {
     cell.setAttribute('role', 'gridcell');
     cell.style.setProperty('--col', String(c.col));
@@ -393,7 +399,9 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     cell.classList.toggle('dz-dg__cell--closed', c.closed);
     if (c.today) cell.setAttribute('aria-current', 'date');
     else cell.removeAttribute('aria-current');
-    const long = formatTemporal(c.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, ctx.locale);
+    // The month too on a grid's first day: a grid starting mid-month would otherwise show bare numbers.
+    const alt = ctx.altLocale ? altDate(c.date, ctx.altLocale, c.col === 0 && c.date.equals(firstShown)) : null;
+    const long = formatTemporal(c.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, ctx.locale) + (alt ? ` (${alt.long})` : '');
     cell.setAttribute('aria-label', ctx.messages.dayLabel({ date: long, count: c.count }));
     // Roving focus: the cursor's cell is the grid's one tab stop.
     cell.tabIndex = cursorDate?.equals(c.date) ? 0 : -1;
@@ -417,6 +425,13 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     const old = cell.querySelector(':scope > .dz-dg__num');
     if (old) old.replaceWith(num);
     else cell.prepend(num);
+    // The second calendar's day beside the number (said in the cell's name, so hidden here).
+    cell.querySelector(':scope > .dz-dg__alt')?.remove();
+    if (alt) {
+      const a = h(doc, 'span', 'dz-dg__alt', alt.short);
+      a.setAttribute('aria-hidden', 'true');
+      num.after(a);
+    }
     cell.querySelector(':scope > .dz-dg__wk')?.remove();
     if (c.week !== null) {
       // The week's number, leading to that week where a week view exists.

@@ -1104,6 +1104,78 @@ budgets at the measure + 3 % (core 36, dom 35.1, dom/list 4.8 kB).
   `perf:browser`.
 - An announcement when entering a crowded day ("N events listed").
 
-## Next — Phase 13: complete theme, i18n, density
+## Phase 13 — complete theme, i18n, density: done
 
-See `ARCHITECTURE.md` J. Phase 13.
+The owner's brief: DzCalendar serves any project, not only Sehhaty — a base
+CSS the client overrides entirely without effort, the same for the words;
+light and dark built in, and a few ready-made looks.
+
+- **Owner's decisions**: families `standard`, `slate`, `night`, `pastel`,
+  `frost`, `solar`, `contrast`, each light and dark (palettes inspired by
+  Primer, Tokyo Night/One, Catppuccin, Nord, Solarized; names ours);
+  `defineTheme` for one's own; densities; Arabic, Spanish, German as imports;
+  Hijri display in this phase. After the review: **the page first** (a
+  page's `--tz-*` beats a family), **iOS 15.4** as the floor (no
+  `light-dark()`), **`cssLayers: false` + `tailwind3.css`** for unlayered
+  resets, Arabic shipped as written (no native review pending).
+- CSS: the calendar's CSS in cascade layers `dzcalendar.base` then
+  `dzcalendar.theme` (a page's unlayered rule wins whatever its specificity);
+  layered sheets appended (after a framework's own layers), unlayered ones
+  first. Every colour reads `--dz-x`, else the palette resolved once on
+  `.dz-cal` (`--dzc-*`: the page's `--tz-*`, else the family's `--dzp-*`,
+  else a system colour). Families switched by `scheme`, `[data-theme]` and
+  `prefers-color-scheme` with plain values; `color-mix()` tints fall back to
+  the raised background under `@supports not`. `data-dz-theme` (always),
+  `data-dz-scheme`, `data-dz-density`. Print layout in the base layer, no
+  `!important`. Forced colours: pressed view, today, dots, outlines.
+- Theme package: `dzcalendar.css` (layered), `unlayered.css` (+ `.scss`),
+  `tailwind.css` (v4 layer order), `tailwind3.css`; 2.4 kB gzip.
+- DOM: options `theme`, `scheme`, `density`, `displayCalendar`,
+  `secondaryCalendar`, `cssLayers`; `defineTheme`, `themeCss` (CSP),
+  `THEME_NAMES`; redefined themes update every sheet (shadow roots too);
+  the alternate date beside each day (its month on the 1st, read from the
+  day part), in headings and spoken names; Hijri titles naming every month
+  covered (core `titleFor`); locale and calendars validated together before
+  any change (canonical names and aliases taken as Intl takes them); an
+  unrelated update never puts back a locale changed elsewhere, a shared
+  kernel's locale followed; RTL fallback list.
+- i18n: `@dzcalendar/dom/locales/{ar,es,de}` (2.1, 1.6, 1.7 kB);
+  `defineLocale` takes words or a function of the full locale (digits follow
+  it: `ar-SA` Arabic-Indic, `-u-nu-latn` Latin); `messages` is a
+  `Partial<DzMessages>` kept across locale switches. Angular inputs for all.
+- Checks: 938 tests; Chrome 123/123 — axe on 7 families × light/dark ×
+  week/month, contrast pairs computed (text, muted, on accent ≥ 4.5, accent
+  ≥ 3), forced colours, captures, and **the real Tailwind 3 preflight,
+  Bootstrap 5.3 reboot and Tailwind 4's layered preflight**: every element of
+  a week, a month and a list keeps the boxes and colours of a bare page
+  (only a pointer cursor on `role="button"` events differs); the comparison
+  is shown to catch Tailwind 3 breaking a layered calendar.
+- Sizes: dom 37.2 kB (budget raised to measured + 3 %: 38.3 kB — themes,
+  calendars, validation, unlayered mode); theme css 2.4 kB.
+
+### Reviews (architect; code review by execution in Chrome), fixed
+- Architect: messages lost on a locale switch; `Partial` messages; Hijri
+  titles naming one month; RTL fallback; CSP (`themeCss`); Tailwind order;
+  forced-colours gaps; contrast checks beyond axe; captures; `:host`; print
+  `!important` beating page rules; contrast outlines; values validated.
+- Code review: one bad `locale` with a `displayCalendar` broke every later
+  `update()` (and blamed the calendar); any `update()` put back a locale
+  changed on a shared kernel; prepended layered CSS lost to Tailwind 4's
+  preflight even with the recipe; families inert in a shadow root
+  (documented: load the theme there) and redefinitions not reaching shadow
+  roots; Arabic counts in Latin digits beside Arabic-Indic dates; the Hijri
+  month missing on the 1st in ja/zh/ko; `'Islamic-Umalqura'` and aliases
+  refused.
+
+### Not done in Phase 13, on purpose
+- A native review of the Arabic words (owner: ship as written).
+- `contrast.css` as a separate file: the `contrast` family covers it.
+- Families generated as `defineTheme` entries to reach shadow roots by
+  themselves: loading the theme CSS in the root is documented instead.
+- Visual checks on a real iOS 15/16 device: the fallbacks are checked by
+  construction (no `light-dark()` in the theme; `@supports not` for
+  `color-mix()`), not on WebKit.
+
+## Next — Phase 14: slots
+
+See `ARCHITECTURE.md` J. Phase 14.

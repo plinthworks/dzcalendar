@@ -3,9 +3,11 @@
  */
 export { createCalendar } from './calendar.js';
 export type { CalendarOptions, CalendarInstance, CalendarUpdate } from './calendar.js';
-export { EN, FR } from './messages.js';
+export { EN, FR, defineLocale, messagesForLocale } from './messages.js';
 export type { DzMessages } from './messages.js';
 export { DZ_CSS, ensureStyles } from './styles.js';
+export { defineTheme, themeCss, THEME_NAMES } from './themes.js';
+export type { ThemeTokens, ThemeColor, ThemeName } from './themes.js';
 export { NO_MOTION } from './motion.js';
 export type { MotionAdapter } from './motion.js';
 export { registerView } from './host.js';

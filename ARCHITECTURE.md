@@ -68,6 +68,14 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 13 (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : un outil pour tout projet (pas seulement Sehhaty) : CSS de base surchargeable sans effort, mots aussi ; familles `standard`, `slate`, `night`, `pastel`, `frost`, `solar`, `contrast` en clair et sombre, `defineTheme` ; densités ; arabe, espagnol, allemand en imports ; affichage hégirien. Après revue : **la page d'abord** (un `--tz-*` de la page bat la famille) ; plancher **iOS/Safari 15.4** (pas de `light-dark()`) ; **`cssLayers: false`** et `tailwind3.css` pour les remises à zéro hors couche (Tailwind 3, Bootstrap) ; arabe livré tel quel ; budget dom à la mesure + 3 % (38,3 ko).
+- **F** — couches `dzcalendar.base` puis `dzcalendar.theme` ; feuilles en couches ajoutées en fin (après les couches d'un framework), sans couches en tête. Couleur = `--dz-x`, sinon `--dzc-x` résolu sur `.dz-cal` (`--tz-x` de la page, sinon `--dzp-x` de la famille, sinon couleur système). Familles par valeurs simples commutées par `scheme`, `[data-theme]`, `prefers-color-scheme` ; repli `@supports not` pour `color-mix()`. Remplace « `light-dark()` seul » de la Phase 4. `contrast.css` remplacé par la famille `contrast`.
+- **D.7/D.8** — options `theme`, `scheme`, `density`, `displayCalendar`, `secondaryCalendar`, `cssLayers` (création) ; locale et calendriers validés ensemble avant toute mutation ; un `update()` sans rapport ne remet pas une locale changée ailleurs (kernel partagé suivi). `messages` est un `Partial`, gardé au changement de langue ; `defineLocale` accepte une fonction de la locale complète (chiffres de la locale).
+- **B.18** — `titleFor` des alignements mois/année nomme tous les mois du calendrier affiché (`formatRangeTitle`).
+- **I** — `@dzcalendar/theme` : `dzcalendar.css`, `unlayered.css`, `tailwind.css` (v4), `tailwind3.css` ; `docs/theming.md`, `docs/i18n.md` ; `playground/themes.html`, `playground/resets.html` (vraies remises à zéro Tailwind 3, Bootstrap 5.3, Tailwind 4 vérifiées dans Chrome).
+
 ### Ajustements après la Phase 12 (détail dans ROADMAP.md)
 
 - **Décisions du propriétaire** : dans le mois, les boutons d'accessibilité d'un jour sont ceux des barres dessinées, tous une fois le jour ouvert (Entrée) ; virtualisation au-delà d'un seuil (`virtualizeAbove`, 500 par défaut) ; « +N » automatique en grille horaire (`eventMaxStack`) ; l'impression montre tout (plafonds levés) ; recyclage des nœuds (`render/pool.ts`) ; budgets à la mesure + 3 % (core 36, dom 35,1, dom/list 4,8 ko).
@@ -1404,7 +1412,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 - **Dépend de** : P10.
 
 ### Phase 13 : thème complet, i18n, densité
-- **Livrables / fichiers** : `theme/*` (tokens, tailwind, contrast, print), messages EN/FR, tests de dérive CSS.
+- **Livrables / fichiers** : `theme/*` (tokens, tailwind, contrast, print), messages EN/FR, tests de dérive CSS (livré, voir « Ajustements après la Phase 13 »).
 - **Acceptation** : le test de dérive SCSS/CSS passe ; capture Chrome en clair/sombre/densités ; `forced-colors` lisible.
 - **Dépend de** : P4 (peut commencer plus tôt).
 

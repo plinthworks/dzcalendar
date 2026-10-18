@@ -6,7 +6,8 @@
  */
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
@@ -806,6 +807,152 @@ try {
     const restore = await p.evaluate(() => (window.__dz.preparePrint(), document.querySelectorAll('.dz-list__ev').length));
     check('list year: preparePrint mounts every entry', restore > 10000, String(restore));
     check('list year: no console error', errors.length === 0, errors.join(' | '));
+    await p.close();
+  }
+
+  // ── Phase 13: every family readable (axe, light and dark), a page's rule wins, density ──
+  {
+    const { p, errors } = await page('/');
+    await p.waitForSelector('.dz-ev');
+    const failing = [];
+    for (const theme of ['standard', 'slate', 'night', 'pastel', 'frost', 'solar', 'contrast']) {
+      for (const scheme of ['light', 'dark']) {
+        for (const view of ['timeGridWeek', 'dayGridMonth']) {
+          await p.evaluate((o) => window.__dz().update(o), { theme, scheme, view });
+          await p.waitForTimeout(50);
+          const found = await axeViolations(p, '.dz-cal');
+          if (found.length > 0) failing.push(`${theme}/${scheme}/${view}: ${found.join(' ; ')}`);
+        }
+      }
+    }
+    check('themes: axe finds nothing on 7 families × light/dark × week/month', failing.length === 0, failing.join(' | '));
+    // axe leaves colour-mixed backgrounds "incomplete": the palette's key pairs are measured here, for every family and scheme.
+    const pairs = [];
+    for (const theme of ['standard', 'slate', 'night', 'pastel', 'frost', 'solar', 'contrast']) {
+      for (const scheme of ['light', 'dark']) {
+        await p.evaluate((o) => window.__dz().update(o), { theme, scheme });
+        const r = await p.evaluate(() => {
+          const cal = document.querySelector('.dz-cal');
+          const probe = (fg, bg) => {
+            const el = document.createElement('span');
+            // As the calendar reads them: the page's --tz-*, else the family's --dzp-* defaults.
+            const read = (v) => `var(${v}, var(${v.replace('--tz-', '--dzp-')}))`;
+            el.style.color = read(fg);
+            el.style.background = read(bg);
+            cal.append(el);
+            const cs = getComputedStyle(el);
+            const out = [cs.color, cs.backgroundColor];
+            el.remove();
+            return out;
+          };
+          const lum = (c) => {
+            const [r, g, b] = c.match(/[\d.]+/g).slice(0, 3).map(Number).map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+            return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+          };
+          const ratio = ([a, b]) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+          return {
+            text: ratio(probe('--tz-fg', '--tz-bg')),
+            muted: ratio(probe('--tz-fg-muted', '--tz-bg')),
+            mutedRaised: ratio(probe('--tz-fg-muted', '--tz-bg-raised')),
+            onAccent: ratio(probe('--tz-accent-fg', '--tz-accent')),
+            accent: ratio(probe('--tz-accent', '--tz-bg')),
+          };
+        });
+        const low = Object.entries(r).filter(([k, v]) => v < (k === 'accent' ? 3 : 4.5)).map(([k, v]) => `${k} ${v.toFixed(2)}`);
+        if (low.length) pairs.push(`${theme}/${scheme}: ${low.join(', ')}`);
+      }
+    }
+    check('themes: text ≥ 4.5:1 (on bg and raised), on accent ≥ 4.5:1, accent ≥ 3:1 — every family, light and dark', pairs.length === 0, pairs.join(' | '));
+    // Captures (ARCHITECTURE J, Phase 13): light, dark, densities, forced colours — for a person to look at.
+    const shots = join(root, 'node_modules', '.cache', 'dzcalendar', 'captures');
+    mkdirSync(shots, { recursive: true });
+    const box = await p.evaluate(() => { const r = document.querySelector('.dz-cal').getBoundingClientRect(); return { x: r.x, y: r.y + window.scrollY, width: r.width, height: r.height }; });
+    for (const [name, o] of [['light', { theme: 'standard', scheme: 'light' }], ['dark', { scheme: 'dark' }], ['compact', { scheme: 'light', density: 'compact' }], ['spacious', { density: 'spacious' }]]) {
+      await p.evaluate((x) => window.__dz().update(x), o);
+      await p.waitForTimeout(80);
+      await p.screenshot({ path: join(shots, `${name}.png`), clip: box, fullPage: true });
+    }
+    await p.evaluate(() => window.__dz().update({ density: 'comfortable', scheme: 'auto' }));
+    await p.emulateMedia({ forcedColors: 'active' });
+    await p.waitForTimeout(80);
+    await p.screenshot({ path: join(shots, 'forced-colors.png'), clip: box, fullPage: true });
+    const forced = await axeViolations(p, '.dz-cal');
+    check('forced colours: axe finds nothing; captures in node_modules/.cache/dzcalendar/captures', forced.length === 0, forced.join(' | '));
+    await p.emulateMedia({ forcedColors: 'none' });
+    // A page's plain rule, weaker in specificity than ours, still wins: our CSS is in a layer.
+    await p.evaluate(() => window.__dz().update({ theme: 'standard', scheme: 'light', view: 'timeGridWeek' }));
+    await p.addStyleTag({ content: '.dz-ev { border-radius: 0px; } .dz-cal { --dz-accent: rgb(10, 125, 90); }' });
+    const won = await p.evaluate(() => ({
+      radius: getComputedStyle(document.querySelector('.dz-tg__col .dz-ev')).borderTopLeftRadius,
+      accent: getComputedStyle(document.querySelector('.dz-toolbar__view[aria-pressed="true"]')).backgroundColor,
+    }));
+    check('a page rule wins without a fight (layers): radius 0, accent changed', won.radius === '0px' && won.accent === 'rgb(10, 125, 90)', JSON.stringify(won));
+    // Beside a framework's global reset (the real files: Tailwind 3's preflight, Bootstrap 5's reboot;
+    // Tailwind 4's is the same preflight in @layer base). The calendar must look as it does on a bare page:
+    // every element's boxes and colours compared with the bare page's, element by element.
+    {
+      // (Not border-style: preflight's 0-width solid shows nothing; widths say whether a border is drawn.)
+      const BOX = ['borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginLeft', 'borderTopLeftRadius', 'backgroundColor', 'color', 'fontSize', 'fontWeight', 'textDecorationLine', 'listStyleType', 'cursor'];
+      const look = async (query) => {
+        const rp = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+        await rp.goto(new URL(`/resets.html?${query}`, base).href, { waitUntil: 'networkidle' });
+        await rp.waitForSelector('.dz-ev, .dz-bar, .dz-list__ev');
+        const out = await rp.evaluate((props) => [...document.querySelectorAll('.dz-cal, .dz-cal *')].slice(0, 600).map((el) => {
+          const cs = getComputedStyle(el);
+          return [el.className && typeof el.className === 'string' ? el.className.split(' ')[0] : el.tagName, ...props.map((k) => cs[k])].join('|');
+        }), BOX);
+        await rp.close();
+        return out;
+      };
+      // The one thing tolerated: preflight and reboot give \`[role=button]\` a pointer cursor (our events
+      // are buttons) — harmless, and what a clickable thing usually shows. Anything else is a failure.
+      const pointerOnly = (x, y) => {
+        const [p, q] = [x.split('|'), y.split('|')];
+        return p.length === q.length && p.every((v, k) => v === q[k] || (k === p.length - 1 && q[k] === 'pointer'));
+      };
+      const differs = (a, b, tolerant = true) => {
+        const bad = [];
+        for (let k = 0; k < Math.max(a.length, b.length); k++) {
+          if (a[k] === b[k] || (tolerant && a[k] && b[k] && pointerOnly(a[k], b[k]))) continue;
+          bad.push(`${a[k]}  ≠  ${b[k]}`);
+        }
+        return bad;
+      };
+      for (const view of ['timeGridWeek', 'dayGridMonth', 'listWeek']) {
+        const bare = await look(`reset=none&layers=1&view=${view}`);
+        const bareFlat = await look(`reset=none&layers=0&view=${view}`);
+        check(`${view}: plain CSS (cssLayers: false) looks exactly as the layered one`, differs(bare, bareFlat).length === 0, differs(bare, bareFlat).slice(0, 3).join('\n'));
+        for (const [reset, layers] of [['tailwind4', 1], ['tailwind3', 0], ['bootstrap', 0]]) {
+          const d = differs(bare, await look(`reset=${reset}&layers=${layers}&view=${view}`));
+          check(`${view} beside ${reset}${layers ? '' : ' (cssLayers: false)'}: untouched by its reset`, d.length === 0, `${d.length} differences\n${d.slice(0, 4).join('\n')}`);
+        }
+        // The check sees what a reset does: layered, beside Tailwind 3, the calendar is broken (why cssLayers: false exists).
+        const broken = differs(bare, await look(`reset=tailwind3&layers=1&view=${view}`));
+        check(`${view}: the comparison sees Tailwind 3 breaking a layered calendar`, broken.length > 0, 'no difference seen');
+      }
+      // The page first: a --tz-* of the page wins over a family's palette; a page rule wins over ours, layered or not.
+      for (const layers of [1, 0]) {
+        const rp = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+        const page = encodeURIComponent(':root { --tz-accent: rgb(1, 2, 3); } .dz-ev { border-top-left-radius: 0px; }');
+        await rp.goto(new URL(`/resets.html?reset=${layers ? 'none' : 'bootstrap'}&layers=${layers}&theme=slate&page=${page}`, base).href, { waitUntil: 'networkidle' });
+        await rp.waitForSelector('.dz-ev');
+        const got = await rp.evaluate(() => ({
+          pressed: getComputedStyle(document.querySelector('.dz-toolbar__btn[aria-pressed="true"]')).backgroundColor,
+          radius: getComputedStyle(document.querySelector('.dz-tg__col .dz-ev')).borderTopLeftRadius,
+        }));
+        check(`page first (${layers ? 'layered' : 'cssLayers: false'}): the page's --tz-accent beats the slate family; its .dz-ev rule beats ours`, got.pressed === 'rgb(1, 2, 3)' && got.radius === '0px', JSON.stringify(got));
+        await rp.close();
+      }
+    }
+    const scale = async () => p.evaluate(() => document.querySelector('.dz-tg__col').getBoundingClientRect().height);
+    const comfortable = await scale();
+    await p.evaluate(() => window.__dz().update({ density: 'compact' }));
+    const compact = await scale();
+    await p.evaluate(() => window.__dz().update({ density: 'spacious' }));
+    const spacious = await scale();
+    check('density: compact < comfortable < spacious (the minute’s height)', compact < comfortable && comfortable < spacious, JSON.stringify({ compact, comfortable, spacious }));
+    await p.evaluate(() => window.__dz().update({ density: 'comfortable', scheme: 'auto' }));
+    check('themes: no console error', errors.length === 0, errors.join(' | '));
     await p.close();
   }
 

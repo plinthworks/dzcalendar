@@ -62,8 +62,12 @@ export interface ViewCtx {
   snapMinutes: number;
   /** False under a CSP without inline styles: a view family's own CSS is the application's to include. */
   readonly injectStyles: boolean;
+  /** Plain CSS, outside the cascade layers (option `cssLayers: false`). */
+  readonly cssLayers: boolean;
   /** Week numbers on the month's rows and the week's corner. */
   weekNumbers: boolean;
+  /** A second calendar's locale (`-u-ca-`), for the date shown beside each date; null: none. */
+  altLocale: string | null;
   /**
    * Above this many events in a view, only what is on screen (plus a margin)
    * is mounted, the rest as it scrolls into view. Below it, everything is.

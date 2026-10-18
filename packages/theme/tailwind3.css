@@ -1,0 +1,15 @@
+/*
+ * @dzcalendar/theme/tailwind3.css — DzCalendar beside Tailwind CSS v3 (and
+ * any page whose reset is outside a cascade layer: Bootstrap, normalize.css).
+ *
+ * Tailwind 3's preflight is not in a layer, so it would beat a layered
+ * calendar. Here everything is plain CSS instead:
+ *
+ *   1. createCalendar(host, { cssLayers: false })
+ *      (Angular: provideDzCalendar({ cssLayers: false }))
+ *   2. @import '@dzcalendar/theme/tailwind3.css';   after @tailwind base;
+ *
+ * The calendar's class selectors outweigh preflight's element and * rules,
+ * and a rule of yours of the same weight, written after, wins.
+ */
+@import './unlayered.css';

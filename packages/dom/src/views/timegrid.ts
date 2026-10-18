@@ -9,6 +9,7 @@ import { applyEventLook, fillEvent, formatMinutes, timeLabels, timedContent, unm
 import { KeyedList, contentsHost, h } from '../render/reconcile.js';
 import { onScrollFrame } from '../render/window.js';
 import { NodePool } from '../render/pool.js';
+import { altDate } from '../render/alt.js';
 
 const HM = { hour: '2-digit', minute: '2-digit' } as const;
 
@@ -96,6 +97,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       el.replaceChildren(
         h(doc, 'span', 'dz-tg__dayhead-weekday', formatTemporal(date, { weekday: 'short' }, ctx.locale)),
         h(doc, 'span', 'dz-tg__dayhead-date', formatTemporal(date, { day: 'numeric' }, ctx.locale)),
+        ...(ctx.altLocale ? [h(doc, 'span', 'dz-tg__dayhead-alt', altDate(date, ctx.altLocale).short)] : []),
       );
       // A day that is not 24 hours long says so where the eye lands first.
       if (axis.day.lengthMinutes !== 1440) {
@@ -192,7 +194,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const { column } = it;
     const p = parts.get(it.key)!;
     el.dataset['date'] = column.key;
-    const name = formatTemporal(column.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale);
+    const name = formatTemporal(column.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale) + (ctx.altLocale ? ` (${altDate(column.date, ctx.altLocale).long})` : '');
     const length = column.axis.day.lengthMinutes;
     el.setAttribute('aria-label', length === 1440 ? name : length === 0 ? `${name}, ${ctx.messages.dayDoesNotExist}` : `${name}, ${formatMinutes(length, ctx.locale)}`);
     el.classList.toggle('dz-tg__col--today', it.today);

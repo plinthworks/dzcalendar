@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — thèmes</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: #52525b; max-width: 75ch; }
+      .controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(26rem, 1fr)); gap: 1rem; }
+      figure { margin: 0; }
+      figcaption { font-weight: 600; margin-bottom: 0.25rem; }
+      .grid .dz-cal { --dz-height: 24rem; border-radius: 8px; padding: 0.25rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Thèmes, densités, langues</h1>
+      <p>Chaque famille en clair et en sombre (option <code>theme</code> et <code>scheme</code>), puis l'arabe de droite à gauche avec la date hégirienne (Umm al-Qura) à côté de la date grégorienne.</p>
+      <div class="controls">
+        <label>Vue <select id="view"><option value="dayGridMonth">Mois</option><option value="timeGridWeek">Semaine</option></select></label>
+        <label>Densité <select id="density"><option value="comfortable">confortable</option><option value="compact">compacte</option><option value="spacious">aérée</option></select></label>
+      </div>
+      <div class="grid" id="grid"></div>
+    </main>
+    <script type="module" src="./themes.ts"></script>
+  </body>
+</html>

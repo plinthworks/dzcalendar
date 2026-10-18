@@ -95,7 +95,16 @@ export class DzCalendar implements OnDestroy {
   readonly weekends = input<boolean | undefined>(undefined);
   readonly weekNumbers = input<boolean | undefined>(undefined);
   readonly hiddenDays = input<readonly Weekday[] | undefined>(undefined);
-  readonly messages = input<DzMessages | undefined>(undefined);
+  /** Any of the words, over the locale's. */
+  readonly messages = input<Partial<DzMessages> | undefined>(undefined);
+  /** 'standard', 'slate', 'night', 'pastel', 'frost', 'solar', 'contrast', or one made with `defineTheme`. */
+  readonly theme = input<string | undefined>(undefined);
+  readonly scheme = input<'auto' | 'light' | 'dark' | undefined>(undefined);
+  readonly density = input<'compact' | 'comfortable' | 'spacious' | undefined>(undefined);
+  /** The calendar dates are written in ('islamic-umalqura'…); null: the locale's. */
+  readonly displayCalendar = input<string | null | undefined>(undefined);
+  /** A second calendar shown beside each date; null: none. */
+  readonly secondaryCalendar = input<string | null | undefined>(undefined);
   /** Everything else `update()` takes. */
   readonly options = input<DzCalendarOptions>({});
 
@@ -138,6 +147,11 @@ export class DzCalendar implements OnDestroy {
         weekNumbers: this.weekNumbers(),
         hiddenDays: this.hiddenDays(),
         messages: this.messages(),
+        theme: this.theme(),
+        scheme: this.scheme(),
+        density: this.density(),
+        displayCalendar: this.displayCalendar(),
+        secondaryCalendar: this.secondaryCalendar(),
         timeGrid: axis ? { ...this.options().timeGrid, axis } : undefined,
       }),
       hooks: this.hooks(),

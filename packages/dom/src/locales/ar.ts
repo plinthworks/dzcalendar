@@ -1,0 +1,123 @@
+/**
+ * `import '@dzcalendar/dom/locales/ar'`: the calendar's words in Arabic, for
+ * every `ar` locale (the calendar turns right to left from the locale itself).
+ * Times, offsets and key names inside a sentence are isolated (FSI … PDI) so
+ * they keep their own direction; counts follow Arabic's six plural forms.
+ */
+import { defineLocale } from '@dzcalendar/dom';
+import type { DzMessages } from '@dzcalendar/dom';
+
+/** The words for one locale of the language: numbers as that locale writes them (\`ar-SA\` Arabic-Indic, \`-u-nu-latn\` Latin). */
+export function messagesAr(locale = 'ar'): DzMessages {
+const nf = new Intl.NumberFormat(locale);
+const plural = new Intl.PluralRules(locale);
+const n = (x: number) => nf.format(x);
+/** A left-to-right fragment (a time, an offset, a key) kept whole inside right-to-left text. */
+const iso = (s: string) => (s ? `⁨${s}⁩` : s);
+
+/** "N events", by Arabic's plural forms. */
+function events(c: number): string {
+  switch (plural.select(c)) {
+    case 'zero':
+      return 'لا أحداث';
+    case 'one':
+      return 'حدث واحد';
+    case 'two':
+      return 'حدثان';
+    case 'few':
+      return `${n(c)} أحداث`;
+    case 'many':
+      return `${n(c)} حدثًا`;
+    default:
+      return `${n(c)} حدث`;
+  }
+}
+
+/** "N more events". */
+function more(c: number): string {
+  switch (plural.select(c)) {
+    case 'one':
+      return 'حدث آخر';
+    case 'two':
+      return 'حدثان آخران';
+    case 'few':
+      return `${n(c)} أحداث أخرى`;
+    case 'many':
+      return `${n(c)} حدثًا آخر`;
+    default:
+      return `${n(c)} حدث آخر`;
+  }
+}
+
+return {
+  today: 'اليوم',
+  previous: 'السابق',
+  next: 'التالي',
+  allDay: 'طوال اليوم',
+  dayDoesNotExist: 'هذا اليوم غير موجود في هذه المنطقة الزمنية',
+  gapBand: ({ from, to }) => `الفترة ${iso(`${from}–${to}`)} غير موجودة`,
+  repeatBand: ({ from, to }) => `الفترة ${iso(`${from}–${to}`)} تتكرر مرتين`,
+  secondPassMark: '*',
+  realDuration: ({ duration }) => `${duration} فعليًا`,
+  eventLabel: ({ title, time }) => `${title}، ${iso(time)}`,
+  untitled: '(بلا عنوان)',
+  now: 'الآن',
+  moreLink: ({ count }) => `+${n(count)} أخرى`,
+  moreLabel: ({ count, date }) => `${more(count)}، ${date}`,
+  closePopover: 'إغلاق',
+  views: { dayGridMonth: 'شهر', dayGridWeek: 'أسبوع', dayGridDay: 'يوم', timeGridWeek: 'أسبوع', timeGridDay: 'يوم', listDay: 'قائمة', listWeek: 'قائمة', listMonth: 'قائمة', listYear: 'قائمة', multiMonthYear: 'سنة' },
+  newEventAt: ({ time }) => `حدث جديد في ${iso(time)}`,
+  newEventOn: ({ date }) => `حدث جديد طوال اليوم في ${date}`,
+  dayLabel: ({ date, count }) => (count === 0 ? date : `${date}، ${events(count)}`),
+  viewSwitcher: 'العرض',
+  goToDay: 'الانتقال إلى هذا اليوم',
+  openEvent: 'فتح',
+  deleteEvent: 'حذف',
+  dropRefused: 'غير مسموح هنا',
+  eventMoved: ({ title, time }) => (time ? `تم نقل «${title}» إلى ${iso(time)}` : `تم نقل «${title}»`),
+  eventResized: ({ title, time }) => (time ? `ينتهي «${title}» الآن في ${iso(time)}` : `تم تغيير مدة «${title}»`),
+  movedIntoGap: ({ time }) => `هذا الوقت غير موجود في ذلك اليوم؛ تم النقل إلى ${iso(time)}`,
+  changeWhich: 'ما الأحداث التي تريد تغييرها؟',
+  whichReading: ({ time }) => `أي ${iso(time)}؟`,
+  reading: ({ time, offset, first }) => `${iso(time)} ${first ? 'الأولى' : 'الثانية'} (${iso(offset)})`,
+  scopeThis: 'هذا الحدث',
+  scopeFollowing: 'هذا الحدث والأحداث التالية',
+  scopeAll: 'كل الأحداث',
+  skippedHour: 'هذه الساعة غير موجودة اليوم؛ يبدأ الحدث عند نهايتها',
+  actions: 'إجراءات',
+  eventResizedStart: ({ title, time }) => (time ? `يبدأ «${title}» الآن في ${iso(time)}` : `تم تغيير مدة «${title}»`),
+  cursorSlot: ({ date, time }) => `${date}، ${iso(time)}`,
+  cursorAllDay: ({ date }) => `${date}، طوال اليوم`,
+  timeSlots: 'الفترات الزمنية',
+  range: ({ from, to }) => `من ${iso(from)} إلى ${iso(to)}`,
+  selected: ({ span }) => `تم التحديد: ${span}`,
+  violation: (code) =>
+    ({ constraint: 'خارج الساعات المسموح بها', overlap: 'يتداخل مع حدث آخر', allow: 'رفضه التطبيق', 'valid-range': 'خارج التواريخ المعروضة', 'not-editable': 'لا يمكن تغييره' })[code],
+  noFurther: 'لا يمكن التقدم أكثر',
+  notEditable: 'لا يمكن تغيير هذا الحدث',
+  cannotMove: 'لا يمكن نقل هذا الحدث',
+  cannotResize: 'لا يمكن تغيير هذه المدة هنا',
+  grabbed: ({ title }) => `تم التقاط «${title}».`,
+  grabHelp: `الأسهم لنقله، و${iso('Page Up')} و${iso('Page Down')} بأسبوع، و${iso('Shift')} مع الأسهم لتغيير نهايته، و${iso('Enter')} لوضعه، و${iso('Escape')} للإلغاء.`,
+  grabHelpResize: `الأسهم لتغيير نهايته، و${iso('Enter')} لوضعه، و${iso('Escape')} للإلغاء.`,
+  grabHelpStart: `${iso('Alt')} و${iso('Shift')} مع الأسهم لتغيير بدايته.`,
+  grabCancelled: 'تم إلغاء النقل',
+  eventDeleted: ({ title, undo }) => (undo ? `تم حذف «${title}». ${iso(undo)} للتراجع.` : `تم حذف «${title}».`),
+  saveFailed: ({ title, reverted }) => `تعذّر حفظ «${title}». ${reverted ? 'أُعيد إلى ما كان عليه.' : 'جارٍ إعادة التحميل.'}`,
+  loadFailed: 'تعذّر تحميل بعض الأحداث.',
+  noEvents: 'لا توجد أحداث لعرضها',
+  weekShort: ({ week }) => `أ${n(week)}`,
+  weekLabel: ({ week }) => `الأسبوع ${n(week)}`,
+  goToMonth: 'الانتقال إلى هذا الشهر',
+  becomesAllDay: 'يصبح حدثًا طوال اليوم',
+  becomesTimed: ({ length }) => `يصبح حدثًا مدته ${length}`,
+  deleteWhich: 'ما الأحداث التي تريد حذفها؟',
+  undone: 'تم التراجع',
+  redone: 'تمت الإعادة',
+  moveEvent: 'نقل…',
+  resizeEvent: 'تغيير المدة…',
+};
+}
+
+export const AR: DzMessages = messagesAr();
+defineLocale('ar', messagesAr);

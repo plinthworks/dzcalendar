@@ -27,6 +27,18 @@
     "./toolkit": {
       "types": "./src/toolkit.ts",
       "default": "./src/toolkit.ts"
+    },
+    "./locales/ar": {
+      "types": "./src/locales/ar.ts",
+      "default": "./src/locales/ar.ts"
+    },
+    "./locales/es": {
+      "types": "./src/locales/es.ts",
+      "default": "./src/locales/es.ts"
+    },
+    "./locales/de": {
+      "types": "./src/locales/de.ts",
+      "default": "./src/locales/de.ts"
     }
   }
 }

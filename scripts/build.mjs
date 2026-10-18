@@ -55,7 +55,7 @@ function typescript(name) {
     ...shared(name),
     type: 'module',
     // The DOM's built-in views register themselves on import: a bundler must keep those modules.
-    sideEffects: name === 'dom' ? ['./views/*.js', './calendar.js', './list.js', './multimonth.js', './custom.js'] : false,
+    sideEffects: name === 'dom' ? ['./views/*.js', './calendar.js', './list.js', './multimonth.js', './custom.js', './locales/*.js'] : false,
     main: './index.js',
     module: './index.js',
     types: './index.d.ts',
@@ -67,6 +67,8 @@ function typescript(name) {
         './multimonth': { types: './multimonth.d.ts', default: './multimonth.js' },
         './custom': { types: './custom.d.ts', default: './custom.js' },
         './toolkit': { types: './toolkit.d.ts', default: './toolkit.js' },
+        // Languages, one import each: `import '@dzcalendar/dom/locales/ar'`.
+        ...Object.fromEntries(['ar', 'es', 'de'].map((l) => [`./locales/${l}`, { types: `./locales/${l}.d.ts`, default: `./locales/${l}.js` }])),
       }),
       ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' } }),
       './package.json': './package.json',
