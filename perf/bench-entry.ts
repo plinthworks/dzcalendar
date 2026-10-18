@@ -7,6 +7,8 @@
 import {
   BUILTIN_VIEWS,
   Temporal,
+  buildResourceTree,
+  flattenRows,
   buildDayGridModel,
   buildTimeGridModel,
   computeViewRange,
@@ -105,6 +107,17 @@ const weekRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTI
 results['timeGrid week model (10k)'] = time(20, () => buildTimeGridModel(weekRange, store.snapshot, { displayZone: 'Europe/Paris' }));
 const monthRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.dayGridMonth!, nav);
 results['dayGrid month model (10k)'] = time(20, () => buildDayGridModel(monthRange, store.snapshot, { displayZone: 'Europe/Paris', maxLanes: 4 }));
+// Phase 15a: twenty doctors, the 10k events spread over them (one resource each).
+const rStore = createEventStore();
+rStore.replaceSourceChunk('r', '*', normalizeMany(inputs(10_000).map((e, i) => ({ ...e, resourceId: `doc${i % 20}` })), ctx, 'r').items);
+const doctors = buildResourceTree(Array.from({ length: 20 }, (_, i) => ({ id: `doc${i}`, title: `Doctor ${i}`, ...(i % 4 === 0 && { timeZone: 'Asia/Riyadh', businessHours: { daysOfWeek: [7, 1, 2, 3, 4], start: '08:00', end: '12:00' } }) }))).tree.order;
+const rWeek = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.resourceTimeGridWeek!, nav);
+results['resource week model (20 × 10k)'] = time(10, () => buildTimeGridModel(rWeek, rStore.snapshot, { displayZone: 'Europe/Paris', resources: doctors, businessHours: true }));
+const rMonth = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.resourceDayGridMonth!, nav);
+results['resource month model (20 × 10k)'] = time(10, () => buildDayGridModel(rMonth, rStore.snapshot, { displayZone: 'Europe/Paris', maxLanes: 4, resources: doctors, businessHours: true }));
+// The timeline's (15b) baseline: 500 resources in 25 departments, built and flattened, grouped.
+const many = Array.from({ length: 500 }, (_, i) => (i % 20 === 0 ? { id: `dep${i}`, title: `Department ${i}`, unit: `U${i % 3}` } : { id: `r${i}`, title: `Resource ${i}`, parentId: `dep${i - (i % 20)}` }));
+results['resource tree 500 + rows'] = time(20, () => flattenRows(buildResourceTree(many, { orderBy: 'title' }).tree, { groupBy: 'unit' }));
 // Phase 12: W, the worst case — 10 000 events in one week.
 const wStore = createEventStore();
 wStore.replaceSourceChunk('w', '*', normalizeMany(inputs(10_000).map((e, i) => {

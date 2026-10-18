@@ -111,6 +111,10 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   /** Bookable slots drawn in the week and day views (\`findSlots(...).slots\`); null: none. A new array redraws. */
   readonly availableSlots?: KernelOptions['availableSlots'];
   readonly hiddenDays?: KernelOptions['hiddenDays'];
+  /** What resource views show as columns; a new array replaces them (the same array changes nothing). */
+  readonly resources?: KernelOptions['resources'];
+  readonly resourceOrder?: KernelOptions['resourceOrder'];
+  readonly resourceGroupField?: KernelOptions['resourceGroupField'];
   /** Merged key by key over the current ones (`axis`, `slotMinutes`, `slotMin`…); equal values change nothing. */
   readonly timeGrid?: KernelOptions['timeGrid'];
   readonly weekends?: boolean;
@@ -165,7 +169,7 @@ function sameHooks(a: CalendarHooks, b: CalendarHooks): boolean {
   if (a === b) return true;
   const ea = a.event ?? {};
   const eb = b.event ?? {};
-  return shallowSame(ea, eb) && Object.keys(a).length === Object.keys(b).length;
+  return shallowSame(ea, eb) && shallowSame(a.resource ?? {}, b.resource ?? {}) && Object.keys(a).length === Object.keys(b).length;
 }
 
 /** Where a built-in family's renderer is imported from, for an error that says what to do. */
@@ -306,6 +310,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   };
   applyLook();
   let hidden: { days: readonly Weekday[] | undefined; weekends: boolean | undefined } = { days: options.hiddenDays, weekends: options.weekends };
+  /** The resources array last given: the same one again changes nothing. */
+  let resourcesGiven = options.resources;
   const columns = (n: number) => {
     if (!Number.isInteger(n) || n < 1) throw new RangeError(`multiMonthMaxColumns must be a whole number ≥ 1: ${n}`);
     root.style.setProperty('--dz-mm-cols', String(n));
@@ -582,7 +588,9 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   const guessStack = (): number => {
     const width = host.getBoundingClientRect().width;
     const em = win ? parseFloat(win.getComputedStyle(host).fontSize) || 16 : 16;
-    const cols = Math.max(1, kernel.getState().range.dates.length);
+    const st = kernel.getState();
+    // A resource view has a column per resource and date.
+    const cols = Math.max(1, st.range.dates.length * (st.view.resources ? Math.max(1, kernel.getResources().order.length) : 1));
     return width > 0 ? Math.max(2, Math.floor((width - 4 * em) / cols / (2.5 * em))) : 4;
   };
   kernel.setOptions({ timeGrid: { maxStack: stack === 'auto' ? guessStack() : stack } });
@@ -643,7 +651,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
         }
       }
       paint();
-      if (e.type === 'state' && (e.causes.includes('view') || e.causes.includes('navigate'))) (measureLanes(), measureStack());
+      // Another number of columns (a period, a view, resources): lanes and stacks measured again.
+      if (e.type === 'state' && (e.causes.includes('view') || e.causes.includes('navigate') || e.causes.includes('resources'))) (measureLanes(), measureStack());
     }),
   );
 
@@ -709,6 +718,9 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
 
   host.append(root);
   paint();
+  // What the initial resources could not be read as: said once, after the first paint.
+  const firstProblems = kernel.getResourceProblems();
+  if (options.resources && firstProblems.length > 0) settings.current.onResourceProblems?.(firstProblems);
 
   return {
     kernel,
@@ -799,6 +811,17 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           if ('businessHours' in changes && changes.businessHours !== undefined) kernel.setOptions({ businessHours: changes.businessHours });
           if ('availableSlots' in changes) kernel.setOptions({ availableSlots: changes.availableSlots ?? null });
           if (changes.timeGrid) kernel.setOptions({ timeGrid: changes.timeGrid });
+          if (changes.resources && changes.resources !== resourcesGiven) {
+            resourcesGiven = changes.resources;
+            const problems = kernel.setResources(changes.resources);
+            if (problems.length > 0) settings.current.onResourceProblems?.(problems);
+          }
+          if ('resourceOrder' in changes || 'resourceGroupField' in changes) {
+            kernel.setOptions({
+              ...('resourceOrder' in changes && { resourceOrder: changes.resourceOrder }),
+              ...('resourceGroupField' in changes && { resourceGroupField: changes.resourceGroupField }),
+            });
+          }
           if ('hiddenDays' in changes || 'weekends' in changes) {
             hidden = { days: 'hiddenDays' in changes ? changes.hiddenDays : hidden.days, weekends: 'weekends' in changes ? changes.weekends : hidden.weekends };
             kernel.setOptions({ hiddenDays: hiddenOf(hidden.days, hidden.weekends) });

@@ -92,7 +92,7 @@ describe('gutter and now', () => {
 
   it('locateNow finds the column and the position; outside the view, null', () => {
     const model = buildTimeGridModel(computeViewRange(d('2026-10-21'), BUILTIN_VIEWS.timeGridWeek!, nav), createEventStore().snapshot, opts);
-    expect(locateNow(model, Temporal.Instant.from('2026-10-21T08:15:00Z'))).toEqual({ column: 2, position: 615 });
+    expect(locateNow(model, Temporal.Instant.from('2026-10-21T08:15:00Z'))).toEqual({ column: 2, columns: [2], position: 615 });
     expect(locateNow(model, Temporal.Instant.from('2026-11-30T08:15:00Z'))).toBeNull();
   });
 });

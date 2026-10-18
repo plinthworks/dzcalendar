@@ -68,6 +68,8 @@ export interface DzMessages {
   cursorAllDay(parts: { date: string }): string;
   /** A bookable slot (availableSlots), its time range: what its button and the keyboard's cursor say. */
   freeSlot(parts: { time: string }): string;
+  /** In a resource view, whose column or cell: "Dr Ali, Wednesday 21 October". */
+  ofResource(parts: { resource: string; place: string }): string;
   /** The time grid's cursor before it has a place: what it is. */
   readonly timeSlots: string;
   /** From one moment or day to another. */
@@ -96,6 +98,8 @@ export interface DzMessages {
   readonly loadFailed: string;
   /** A list view with nothing in its period. */
   readonly noEvents: string;
+  /** A resource view without any resource (none given, or not loaded yet). */
+  readonly noResources: string;
   /** A week number, short (in a cell) and spoken. */
   weekShort(parts: { week: number }): string;
   weekLabel(parts: { week: number }): string;
@@ -129,7 +133,7 @@ export const EN: DzMessages = {
   moreLink: ({ count }) => `+${count} more`,
   moreLabel: ({ count, date }) => `${count} more ${count === 1 ? 'event' : 'events'}, ${date}`,
   closePopover: 'Close',
-  views: { dayGridMonth: 'Month', dayGridWeek: 'Week', dayGridDay: 'Day', timeGridWeek: 'Week', timeGridDay: 'Day', listDay: 'List', listWeek: 'List', listMonth: 'List', listYear: 'List', multiMonthYear: 'Year' },
+  views: { dayGridMonth: 'Month', dayGridWeek: 'Week', dayGridDay: 'Day', timeGridWeek: 'Week', timeGridDay: 'Day', listDay: 'List', listWeek: 'List', listMonth: 'List', listYear: 'List', multiMonthYear: 'Year', resourceTimeGridDay: 'Day', resourceTimeGridWeek: 'Week', resourceDayGridDay: 'Day', resourceDayGridWeek: 'Week', resourceDayGridMonth: 'Month' },
   newEventAt: ({ time }) => `New event at ${time}`,
   newEventOn: ({ date }) => `New all-day event on ${date}`,
   dayLabel: ({ date, count }) => (count === 0 ? date : `${date}, ${count} ${count === 1 ? 'event' : 'events'}`),
@@ -153,6 +157,7 @@ export const EN: DzMessages = {
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, all day`,
   freeSlot: ({ time }) => `Free slot, ${time}`,
+  ofResource: ({ resource, place }) => `${resource}, ${place}`,
   timeSlots: 'Time slots',
   range: ({ from, to }) => `${from} to ${to}`,
   selected: ({ span }) => `Selected: ${span}`,
@@ -171,6 +176,7 @@ export const EN: DzMessages = {
   saveFailed: ({ title, reverted }) => `${title} could not be saved. ${reverted ? 'It is back as it was.' : 'Reloading.'}`,
   loadFailed: 'Some events could not be loaded.',
   noEvents: 'No events to show',
+  noResources: 'No resources to show',
   weekShort: ({ week }) => `W${week}`,
   weekLabel: ({ week }) => `Week ${week}`,
   goToMonth: 'Go to this month',
@@ -199,7 +205,7 @@ export const FR: DzMessages = {
   moreLink: ({ count }) => `+${count} autre${count > 1 ? 's' : ''}`,
   moreLabel: ({ count, date }) => `${count} autre${count > 1 ? 's' : ''} événement${count > 1 ? 's' : ''}, ${date}`,
   closePopover: 'Fermer',
-  views: { dayGridMonth: 'Mois', dayGridWeek: 'Semaine', dayGridDay: 'Jour', timeGridWeek: 'Semaine', timeGridDay: 'Jour', listDay: 'Liste', listWeek: 'Liste', listMonth: 'Liste', listYear: 'Liste', multiMonthYear: 'Année' },
+  views: { dayGridMonth: 'Mois', dayGridWeek: 'Semaine', dayGridDay: 'Jour', timeGridWeek: 'Semaine', timeGridDay: 'Jour', listDay: 'Liste', listWeek: 'Liste', listMonth: 'Liste', listYear: 'Liste', multiMonthYear: 'Année', resourceTimeGridDay: 'Jour', resourceTimeGridWeek: 'Semaine', resourceDayGridDay: 'Jour', resourceDayGridWeek: 'Semaine', resourceDayGridMonth: 'Mois' },
   newEventAt: ({ time }) => `Nouvel événement à ${time}`,
   newEventOn: ({ date }) => `Nouvel événement le ${date}`,
   dayLabel: ({ date, count }) => (count === 0 ? date : `${date}, ${count} événement${count > 1 ? 's' : ''}`),
@@ -223,6 +229,7 @@ export const FR: DzMessages = {
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, journée`,
   freeSlot: ({ time }) => `Créneau libre, ${time}`,
+  ofResource: ({ resource, place }) => `${resource}, ${place}`,
   timeSlots: 'Créneaux horaires',
   range: ({ from, to }) => `${from} à ${to}`,
   selected: ({ span }) => `Sélection : ${span}`,
@@ -241,6 +248,7 @@ export const FR: DzMessages = {
   saveFailed: ({ title, reverted }) => `« ${title} » n’a pas pu être enregistré. ${reverted ? 'Il est revenu comme avant.' : 'Rechargement.'}`,
   loadFailed: 'Des événements n’ont pas pu être chargés.',
   noEvents: 'Aucun événement à afficher',
+  noResources: 'Aucune ressource à afficher',
   weekShort: ({ week }) => `S${week}`,
   weekLabel: ({ week }) => `Semaine ${week}`,
   goToMonth: 'Aller à ce mois',

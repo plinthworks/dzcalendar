@@ -1,6 +1,7 @@
 import { normalizeIntervals, subtractSpans } from '../intervals.js';
 import type { MsSpan } from '../intervals.js';
 import type { CalEvent, EventId, ResourceId } from '../event/types.js';
+import type { ResourceTree } from '../resource/types.js';
 import type { StoreSnapshot } from '../store/store.js';
 import { viewWindow } from '../store/store.js';
 import type { PlainDate, ZonedDateTime, ZoneId } from '../temporal.js';
@@ -41,6 +42,12 @@ export interface RulesContext {
   readonly allow?: (p: Placement) => boolean;
   /** Days outside it are not reachable (exclusive end). */
   readonly validRange?: { readonly start?: PlainDate; readonly end?: PlainDate };
+  /**
+   * The resources: each one an event goes on checks its own `eventConstraint`
+   * (else the calendar's) against its own business hours in its own zone,
+   * and its `eventOverlap` decides for the events it shares.
+   */
+  readonly resources?: ResourceTree;
 }
 
 /** A proposal as instants: an all-day one covers its days in the calendar's zone. */
@@ -95,21 +102,36 @@ export function validateProposal(
 
   const fromDate = dateOf(p.start, zone).subtract({ days: 1 });
   const toDate = dateOf(p.end, zone).add({ days: 1 });
-  if (rules.constraint !== undefined) {
+  // One check per resource the event goes on (its own rule and hours, in its zone), else the calendar's.
+  const resources = rules.resources ? p.resourceIds.flatMap((id) => rules.resources!.byId.get(id)?.resource ?? []) : [];
+  const checks = resources.length > 0
+    ? resources.map((r) => ({ spec: r.eventConstraint ?? rules.constraint, hours: r.businessHours ?? rules.businessHours, zone: r.timeZone ?? zone, id: r.id }))
+    : [{ spec: rules.constraint, hours: rules.businessHours, zone, id: undefined }];
+  for (const c of checks) {
+    if (c.spec === undefined) continue;
     let allowed: MsSpan[];
-    const c = rules.constraint;
+    const spec = c.spec;
     // Business hours as a constraint with none given constrains nothing (rather than refusing everything).
-    if (c === 'businessHours') allowed = rules.businessHours === undefined ? [span] : businessIntervals(fromDate, toDate, rules.businessHours, zone);
-    else if ('groupId' in c) {
+    if (spec === 'businessHours') {
+      // Read in the resource's zone: two days of margin cover any offset between it and the calendar's.
+      allowed = c.hours === undefined ? [span] : businessIntervals(fromDate.subtract({ days: 1 }), toDate.add({ days: 1 }), c.hours, c.zone);
+    } else if ('groupId' in spec) {
       allowed = snap
         .queryInstances(viewWindow(fromDate, toDate, zone))
-        .filter((i) => i.event.groupId === c.groupId && i.event.id !== ev.id)
+        .filter((i) => i.event.groupId === spec.groupId && i.event.id !== ev.id)
         .map((i) => spanOf(i.event.start, i.event.end, zone));
-    } else allowed = [...c.spans];
-    if (subtractSpans([span], normalizeIntervals(allowed)).length > 0) v('constraint');
+    } else allowed = [...spec.spans];
+    if (subtractSpans([span], normalizeIntervals(allowed)).length > 0) {
+      v('constraint', c.id);
+      break;
+    }
   }
 
-  if (rules.overlap !== undefined && rules.overlap !== true) {
+  // A resource's `eventOverlap` decides for the events it shares: false refuses, true allows, whatever the calendar says.
+  const strict = new Set(resources.filter((r) => r.eventOverlap === false).map((r) => r.id));
+  const lenient = new Set(resources.filter((r) => r.eventOverlap === true).map((r) => r.id));
+  const global = rules.overlap ?? true;
+  if (global !== true || strict.size > 0) {
     const moving = { ...ev, start: p.start, end: p.end, resourceIds: p.resourceIds } as CalEvent;
     const others = snap.queryInstances(viewWindow(fromDate, toDate, zone), { includeBackground: false });
     for (const inst of others) {
@@ -117,10 +139,16 @@ export function validateProposal(
       if (o.id === ev.id || (ev.ref && o.ref && ev.ref.seriesId === o.ref.seriesId && ev.ref.key === o.ref.key)) continue;
       if (opts.movingSeries !== undefined && o.ref?.seriesId === opts.movingSeries) continue;
       // Resources: only events that share one meet (none on either side shares the calendar).
-      if (p.resourceIds.length > 0 && o.resourceIds.length > 0 && !o.resourceIds.some((r) => p.resourceIds.includes(r))) continue;
+      const shared = o.resourceIds.filter((r) => p.resourceIds.includes(r));
+      if (p.resourceIds.length > 0 && o.resourceIds.length > 0 && shared.length === 0) continue;
       const os = spanOf(o.start, o.end, zone);
       if (!(os.s < span.e && os.e > span.s)) continue;
-      if (rules.overlap === false || !rules.overlap(o, moving)) {
+      const refused = shared.some((r) => strict.has(r))
+        ? true
+        : shared.length > 0 && shared.every((r) => lenient.has(r))
+          ? false
+          : global === false || (global !== true && !global(o, moving));
+      if (refused) {
         v('overlap', o.id);
         break;
       }

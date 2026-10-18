@@ -940,6 +940,101 @@ try {
       await p.close();
     }
 
+    // ── Phase 15a: resource columns (four doctors in two services, one of them in Riyadh) ──
+    {
+      const { p, errors } = await page('/resources.html');
+      await p.waitForSelector('.dz-tg__col[data-resource] .dz-ev');
+      const geo = await p.evaluate(() => {
+        const cols = [...document.querySelectorAll('.dz-tg__col')];
+        const box = (el) => el.getBoundingClientRect();
+        const heads = [...document.querySelectorAll('.dz-tg__resource')];
+        const groups = [...document.querySelectorAll('.dz-tg__group')];
+        const had = document.querySelector('.dz-tg__col[data-resource="haddad"]');
+        const minute = box(had).height / Number(getComputedStyle(had).getPropertyValue('--dz-len'));
+        const offs = [...had.querySelectorAll('.dz-off')].map((o) => Math.round((box(o).top - box(had).top) / minute));
+        const shared = [...document.querySelectorAll('.dz-ev[data-event-id="c"]')].map((e) => [e.closest('.dz-tg__col').dataset.resource, Math.round(box(e).top)]);
+        return {
+          resources: cols.map((c) => c.dataset.resource),
+          // Each resource's head over its column; each group's over its two.
+          headDrift: Math.max(...heads.map((h, i) => Math.abs(box(h).left - box(cols[i]).left) + Math.abs(box(h).right - box(cols[i]).right))),
+          groupDrift: Math.max(...groups.map((g, i) => Math.abs(box(g).left - box(cols[i * 2]).left) + Math.abs(box(g).right - box(cols[i * 2 + 1]).right))),
+          dayHeads: document.querySelectorAll('.dz-tg__dayhead').length,
+          offs,
+          shared,
+        };
+      });
+      check('resources: one column per doctor, in order', geo.resources.join() === 'benali,haddad,martin,nour', geo.resources.join());
+      check('resources: heads and groups sit over their columns (≤ 2 px)', geo.headDrift <= 2 && geo.groupDrift <= 2, JSON.stringify(geo));
+      check('resources: a one-day resource view has no row of dates', geo.dayHeads === 0, String(geo.dayHeads));
+      // The grid starts at 06:00. Riyadh (UTC+3) opens 08:00–12:00, 07:00–11:00 in Paris (UTC+2 on 21 October):
+      // shaded from 06:00 (minute 0) and from 11:00 (minute 300).
+      check("resources: Riyadh's hours shaded in Paris time (from 06:00 and from 11:00)", geo.offs.join() === '0,300', geo.offs.join());
+      check('resources: an event on two doctors is drawn in both columns, at the same height', geo.shared.length === 2 && geo.shared[0][1] === geo.shared[1][1] && geo.shared.map((x) => x[0]).join() === 'benali,haddad', JSON.stringify(geo.shared));
+      const v = await axeViolations(p, '.dz-cal');
+      check('axe: the resource day view has no violation', v.length === 0, v.join('\n'));
+      // A drag from one doctor to another, at the same hour.
+      const drag = async (sel, toResource, dy) => {
+        const b = await p.locator(sel).first().boundingBox();
+        const t = await p.locator(`.dz-tg__col[data-resource="${toResource}"]`).boundingBox();
+        await p.mouse.move(b.x + 20, b.y + 8);
+        await p.mouse.down();
+        await p.mouse.move(b.x + 40, b.y + 20, { steps: 4 });
+        await p.mouse.move(t.x + 40, b.y + 8 + dy, { steps: 10 });
+        await p.mouse.up();
+        await p.waitForTimeout(150);
+      };
+      const resOf = (id) => p.evaluate((x) => window.__cal.kernel.store.snapshot.getEvent(x).resourceIds.join(), id);
+      await drag('.dz-tg__col[data-resource="benali"] .dz-ev[data-event-id="a"]', 'martin', 0);
+      check('resources: a drag moves the event to the other doctor, same time', (await resOf('a')) === 'martin' && (await p.evaluate(() => String(window.__cal.kernel.store.snapshot.getEvent('a').start))).startsWith('2026-10-21T09:00'), await resOf('a'));
+      // 09:00 → 11:30 in Paris is 12:30 in Riyadh: the doctor's own hours refuse it.
+      const minute = await p.evaluate(() => { const c = document.querySelector('.dz-tg__col'); return c.getBoundingClientRect().height / Number(getComputedStyle(c).getPropertyValue('--dz-len')); });
+      await drag('.dz-ev[data-event-id="a"]', 'haddad', 150 * minute);
+      check("resources: a drop outside the Riyadh doctor's hours is refused", (await resOf('a')) === 'martin', await resOf('a'));
+      // 09:00 → 10:00 in Paris is 11:00 in Riyadh: accepted.
+      await drag('.dz-ev[data-event-id="a"]', 'haddad', 60 * minute);
+      check("resources: a drop inside the Riyadh doctor's hours goes", (await resOf('a')) === 'haddad', await resOf('a'));
+      // The keyboard: from one doctor's column to the next.
+      await p.locator('.dz-cursor').first().focus();
+      await p.keyboard.press('ArrowDown');
+      await p.keyboard.press('Alt+ArrowRight');
+      const label = await p.evaluate(() => document.activeElement.getAttribute('aria-label'));
+      check("resources: Alt+right goes to the next doctor's column, and says so", label.startsWith('Dr Haddad, '), label);
+      await p.screenshot({ path: join(root, 'node_modules', '.cache', 'dzcalendar', 'captures', 'resources-day.png'), clip: { x: 0, y: 0, width: 1400, height: 950 } });
+      // The week: every doctor's seven days under the doctor's head.
+      await p.evaluate(() => window.__cal.update({ view: 'resourceTimeGridWeek' }));
+      await p.waitForSelector('.dz-tg__dayhead');
+      const week = await p.evaluate(() => {
+        const cols = [...document.querySelectorAll('.dz-tg__col')];
+        const heads = [...document.querySelectorAll('.dz-tg__resource')];
+        const box = (el) => el.getBoundingClientRect();
+        const days = [...document.querySelectorAll('.dz-tg__dayhead')];
+        return {
+          cols: cols.length,
+          spanDrift: Math.max(...heads.map((h, i) => Math.abs(box(h).left - box(cols[i * 7]).left) + Math.abs(box(h).right - box(cols[i * 7 + 6]).right))),
+          dayDrift: Math.max(...days.map((d, i) => Math.abs(box(d).left - box(cols[i]).left))),
+          edge: getComputedStyle(cols[7]).borderInlineStartWidth,
+        };
+      });
+      check('resources: the week has 28 columns, each head over its doctor’s seven days, each date over its column', week.cols === 28 && week.spanDrift <= 2 && week.dayDrift <= 2, JSON.stringify(week));
+      check("resources: a stronger line where a doctor's days start", week.edge === '2px', week.edge);
+      const vw = await axeViolations(p, '.dz-cal');
+      check('axe: the resource week has no violation', vw.length === 0, vw.join('\n'));
+      await p.evaluate(() => window.__cal.update({ view: 'resourceDayGridMonth' }));
+      await p.waitForSelector('.dz-dg__resource');
+      const month = await p.evaluate(() => {
+        const row = document.querySelector('.dz-dg__week');
+        const cells = [...row.querySelectorAll('.dz-dg__cell')];
+        const box = (el) => el.getBoundingClientRect();
+        const heads = [...document.querySelectorAll('.dz-dg__resource')];
+        return { cells: cells.length, drift: Math.max(...heads.map((h, i) => Math.abs(box(h).left - box(cells[i * 7]).left) + Math.abs(box(h).right - box(cells[i * 7 + 6]).right))) };
+      });
+      check('resources: the month row holds every doctor’s week, heads over them', month.cells === 28 && month.drift <= 2, JSON.stringify(month));
+      const vm = await axeViolations(p, '.dz-cal');
+      check('axe: the resource month has no violation', vm.length === 0, vm.join('\n'));
+      check('resources: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
     // Beside a framework's global reset (the real files: Tailwind 3's preflight, Bootstrap 5's reboot;
     // Tailwind 4's is the same preflight in @layer base). The calendar must look as it does on a bare page:
     // every element's boxes and colours compared with the bare page's, element by element.

@@ -27,6 +27,11 @@ deletes, undoes — without a mouse, or with a screen reader.
   day's hours), PageUp/PageDown the period (the same date). Past the last
   shown day the period changes and the cursor goes on. Right to left, ← is
   the next day. Up from a day's first slot is its all-day row.
+- **Resource views** (owner's decision, 15a): ←/→ stay in the days of the
+  cursor's resource — past its last day the period changes, same resource;
+  **Alt+←/→** go to the previous or next resource, the same day and time
+  (and, holding an event, move it there). Everything the cursor says starts
+  with the resource ("Dr Haddad, Wednesday 21 October, 09:00").
 - **Slots step in elapsed time**: on the 25-hour Sunday the cursor visits
   02:00 (+02:00) … then 02:00 (+01:00) — both passes, told apart by offset;
   on the 23-hour Sunday, 01:45 goes to 03:00.

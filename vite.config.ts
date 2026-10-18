@@ -49,6 +49,7 @@ export default defineConfig({
         themes: fileURLToPath(new URL('./playground/themes.html', import.meta.url)),
         resets: fileURLToPath(new URL('./playground/resets.html', import.meta.url)),
         slots: fileURLToPath(new URL('./playground/slots.html', import.meta.url)),
+        resources: fileURLToPath(new URL('./playground/resources.html', import.meta.url)),
       },
     },
   },

@@ -25,13 +25,18 @@ interface Held {
   readonly ghosts: HTMLElement[];
   sources: HTMLElement[];
   readonly node: HTMLElement | null;
+  /** In a resource view, the column it is in now (where it was taken, then where each step put it). */
+  resourceId: string | undefined;
   /** How it was taken: to move it (M, "Move…") or to change its length ("Change duration…"). */
   readonly mode: 'move' | 'resize';
 }
 
 const HM = { hour: '2-digit', minute: '2-digit' } as const;
 const sameHit = (a: Hit, b: Hit) =>
-  a.kind === b.kind && a.date.equals(b.date) && (a.kind === 'slot' ? b.kind === 'slot' && a.instant.equals(b.instant) : b.kind === 'day' && a.allDayRow === b.allDayRow);
+  a.kind === b.kind &&
+  a.date.equals(b.date) &&
+  a.resourceId === b.resourceId &&
+  (a.kind === 'slot' ? b.kind === 'slot' && a.instant.equals(b.instant) : b.kind === 'day' && a.allDayRow === b.allDayRow);
 const DAY = { weekday: 'long', day: 'numeric', month: 'long' } as const;
 
 /**
@@ -82,7 +87,13 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     }
     return best;
   }
+  /** In a resource view, whose column the cursor is in: said first ("Dr Ali, Wednesday…"). */
+  const titleOf = (id: string) => ctx.kernel.getResources().byId.get(id)?.resource.title || id;
   function hitLabel(hit: Hit): string {
+    const place = placeLabel(hit);
+    return hit.resourceId === undefined ? place : m().ofResource({ resource: titleOf(hit.resourceId), place });
+  }
+  function placeLabel(hit: Hit): string {
     if (hit.kind === 'day') return hit.allDayRow ? m().cursorAllDay({ date: dayWords(hit.date) }) : dayWords(hit.date);
     const label = m().cursorSlot({ date: dayWords(hit.date), time: timeWords(hit.instant.toZonedDateTimeISO(zone())) });
     const free = freeSlotAt(hit);
@@ -104,7 +115,10 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       : m().range({ from: `${dayWords(a.toPlainDate())} ${timeWords(a)}`, to: `${dayWords(b.toPlainDate())} ${timeWords(b)}` });
   }
   function proposalWords(p: Proposal, was: CalEvent): string {
-    let text = spanWords(p);
+    // Onto other resources: their names first ("Dr Martin, Wednesday…").
+    const moved = p.resourceIds.join('\u0000') !== was.resourceIds.join('\u0000');
+    const span = spanWords(p);
+    let text = moved && p.resourceIds.length > 0 ? p.resourceIds.reduceRight((place, id) => m().ofResource({ resource: titleOf(id), place }), span) : span;
     if (p.allDay !== was.allDay) text += `. ${p.allDay ? m().becomesAllDay : m().becomesTimed({ length: lengthWords(p) })}`;
     if (p.skipped) text += `. ${m().skippedHour}`;
     if (!p.valid) text += `. ${m().dropRefused}${p.violations.length > 0 ? ` : ${[...new Set(p.violations.map((v) => m().violation(v.code)))].join(', ')}` : ''}`;
@@ -122,7 +136,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
    * time grid between the all-day row and the hours. Null: nowhere to go.
    */
   function land(from: Hit, to: Hit, step: Step): Hit | null {
-    if (grid === 'time' && step.slots !== 0 && from.kind === 'day') return step.slots > 0 ? (keys!.firstSlot?.(from.date) ?? null) : null;
+    if (grid === 'time' && step.slots !== 0 && from.kind === 'day') return step.slots > 0 ? (keys!.firstSlot?.(from.date, from.resourceId) ?? null) : null;
     let target = to;
     // Up to six more days: past a skipped day, or the hidden days of a week.
     for (let tries = 0; tries < 7; tries++) {
@@ -182,7 +196,8 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       live.onSlotClick!(free);
       return true;
     }
-    live.onDateClick?.(at.kind === 'slot' ? { allDay: false, date: at.date, instant: at.instant } : { allDay: true, date: at.date });
+    const resource = at.resourceId !== undefined ? { resourceId: at.resourceId } : {};
+    live.onDateClick?.(at.kind === 'slot' ? { allDay: false, date: at.date, instant: at.instant, ...resource } : { allDay: true, date: at.date, ...resource });
     // The keyboard's tap: the slot is selected, for "new event here" through `onSelect`.
     if (live.selectable) {
       const sel = selectionBetween(shared.interaction(null), at, at);
@@ -198,6 +213,11 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
         return moveCursor(at, land(at, stepHit(shared.interaction(null), at, intent.step), intent.step), intent.extend);
       case 'line':
         return moveCursor(at, keys!.lineEdge(at, intent.edge), intent.extend);
+      case 'across': {
+        // Not a resource view: Alt+arrows are not the calendar's.
+        const to = keys!.stepAcross?.(at, intent.delta);
+        return to === undefined ? false : moveCursor(at, to, false);
+      }
       case 'period': {
         // The cursor's date moves by the view's own step (a month: the 31st becomes the 30th), the way the view did.
         const before = ctx.kernel.getState();
@@ -289,7 +309,12 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     if (held || shared.busy) return;
     if (!editable(inst)) return ctx.announce(m().notEditable);
     const id = inst.event.id;
-    held = { instance: inst, event: inst.event, proposal: null, kind, edge: 'end', ghosts: [], sources: [], node: node ?? keys!.nodeFor(id), mode: kind };
+    const taken = node ?? keys!.nodeFor(id);
+    // A resource view: the column it was taken in; from the menu, its first resource that has a column. Elsewhere none.
+    const resourceId = ctx.kernel.getState().view.resources
+      ? (taken?.closest<HTMLElement>('[data-resource]')?.dataset['resource'] ?? inst.event.resourceIds.find((r) => ctx.kernel.getResources().byId.has(r)))
+      : undefined;
+    held = { instance: inst, event: inst.event, proposal: null, kind, edge: 'end', ghosts: [], sources: [], node: taken, mode: kind, resourceId };
     shared.holding = true;
     shared.showSelection(null);
     anchor = null;
@@ -309,14 +334,31 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     for (const n of h.sources) n.classList.remove('dz-ev--source');
     h.sources = sourcesOf(h.instance.event.id);
     for (const n of h.sources) n.classList.add('dz-ev--source');
-    keys!.reveal(eventHit(ev, h.kind === 'resize' ? h.edge : 'start', { displayZone: zone(), grid }));
+    const edgeHit = eventHit(ev, h.kind === 'resize' ? h.edge : 'start', { displayZone: zone(), grid });
+    keys!.reveal(h.resourceId !== undefined ? { ...edgeHit, resourceId: h.resourceId } : edgeHit);
     const geo = surface.measure(shared.layerOrigin());
-    const span = { start: ev.start, end: ev.end, allDay: ev.allDay };
+    const span = { start: ev.start, end: ev.end, allDay: ev.allDay, resourceIds: ev.resourceIds };
     const p = h.proposal;
     syncGhosts(shared.layer, h.ghosts, surface.boxesFor(geo, span, 0), { kind: 'event', node: h.node, instance: h.instance, title: h.instance.event.title || m().untitled }, {
       invalid: p ? !p.valid : false,
       time: p ? timeOf(ctx, h.kind === 'resize' && h.edge === 'end' ? p.end : p.start, p) : '',
     });
+  }
+
+  /** Alt+Left/Right while holding: the next resource, the same day and time. */
+  function across(delta: 1 | -1): void {
+    const h = held!;
+    const ic = shared.interaction(h.instance);
+    let landed: Hit | null | undefined = null;
+    const p = grabStep(ic, grid, h.event, { kind: 'move', step: { days: 0, slots: 0 } }, (_to, from) => (landed = keys!.stepAcross?.(from, delta)) ?? null, h.resourceId);
+    if (!p) return ctx.announce(m().noFurther);
+    const to = landed as Hit | null | undefined;
+    if (to?.resourceId !== undefined) h.resourceId = to.resourceId;
+    h.event = heldEvent(p);
+    h.proposal = { ...p, event: h.instance.event };
+    h.kind = 'move';
+    drawHeld(h);
+    ctx.announce(proposalWords(p, h.instance.event));
   }
 
   function step(kind: 'move' | 'resize', edge: 'start' | 'end', by: Step): void {
@@ -329,8 +371,12 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       if (!resizable) return ctx.announce(m().cannotResize);
     }
     const ic = shared.interaction(h.instance);
-    const p = grabStep(ic, grid, h.event, kind === 'move' ? { kind, step: by } : { kind, edge, step: by }, (to, from) => land(from, to, by));
+    let landed: Hit | null = null;
+    const p = grabStep(ic, grid, h.event, kind === 'move' ? { kind, step: by } : { kind, edge, step: by }, (to, from) => (landed = land(from, to, by)), h.resourceId);
     if (!p) return ctx.announce(m().noFurther);
+    // Set in the callback: TypeScript cannot see it, hence the cast.
+    const to = landed as Hit | null;
+    if (kind === 'move' && to?.resourceId !== undefined) h.resourceId = to.resourceId;
     h.event = heldEvent(p);
     h.proposal = { ...p, event: ev };
     h.kind = kind;
@@ -348,8 +394,8 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
   }
 
   /** After a grab: the event where it is now, else where it was, else the cursor. */
-  function refocus(eventId: string, date: PlainDate | null, fallback: HTMLElement | null): void {
-    const node = (date && keys!.nodeFor(eventId, date)) || keys!.nodeFor(eventId) || (fallback?.isConnected ? fallback : null);
+  function refocus(eventId: string, date: PlainDate | null, fallback: HTMLElement | null, resourceId?: string): void {
+    const node = (date && keys!.nodeFor(eventId, date, resourceId)) || keys!.nodeFor(eventId) || (fallback?.isConnected ? fallback : null);
     if (node) return node.focus();
     const home = keys!.home();
     if (home) show(home);
@@ -392,7 +438,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     }
     if (ctx.scope.isDisposed) return;
     const at = p.start instanceof Temporal.PlainDate ? p.start : (p.start as ZonedDateTime).withTimeZone(zone()).toPlainDate();
-    if (outcome?.done && outcome.eventId) refocus(outcome.eventId, at, null);
+    if (outcome?.done && outcome.eventId) refocus(outcome.eventId, at, null, h.resourceId);
     else refocus(h.instance.event.id, null, h.node);
   }
 
@@ -450,6 +496,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       if (intent.kind === 'move' && held.mode === 'resize') step('resize', 'end', intent.step);
       else if (intent.kind === 'move') step('move', 'start', intent.step);
       else if (intent.kind === 'resize') step('resize', intent.edge, intent.step);
+      else if (intent.kind === 'across') across(intent.delta);
       else if (intent.kind === 'commit') void commit();
       else if (intent.kind === 'cancel') letGo(true);
     },
@@ -479,8 +526,9 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       const h = held;
       const ic = shared.interaction(h.instance);
       const ev = h.event;
-      const p = h.kind === 'resize' ? grabStep(ic, grid, ev, { kind: 'resize', edge: h.edge, step: { days: 0, slots: 0 } }, () => hit) : grabStep(ic, grid, ev, { kind: 'move', step: { days: 0, slots: 0 } }, () => hit);
+      const p = h.kind === 'resize' ? grabStep(ic, grid, ev, { kind: 'resize', edge: h.edge, step: { days: 0, slots: 0 } }, () => hit, h.resourceId) : grabStep(ic, grid, ev, { kind: 'move', step: { days: 0, slots: 0 } }, () => hit, h.resourceId);
       if (!p) return;
+      if (hit.resourceId !== undefined && h.kind === 'move') h.resourceId = hit.resourceId;
       h.event = heldEvent(p);
       h.proposal = { ...p, event: h.instance.event };
       drawHeld(h);
@@ -519,6 +567,12 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
   ctx.scope.add(() => {
     if (held) release(held);
   });
+  // The resources changed under a held event: the column it is over may be gone. It is let go, said.
+  ctx.scope.add(
+    ctx.kernel.subscribe((e) => {
+      if (held && !shared.busy && e.type === 'state' && e.causes.includes('resources')) letGo(true);
+    }),
+  );
 
   return {
     grab(instance, kind) {

@@ -21,6 +21,8 @@ export interface ViewSpec {
   /** How far prev/next move. Default: the duration. */
   readonly dateIncrement?: DurationLike;
   readonly showNonCurrentDates: boolean;
+  /** A resource view: its family draws one column per resource and date (timeGrid, dayGrid). */
+  readonly resources?: boolean;
 }
 
 /** The dates a view covers. `start`/`end` include padding days; `active*` is the period itself. */

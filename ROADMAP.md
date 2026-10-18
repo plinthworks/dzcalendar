@@ -4,12 +4,21 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–14, each committed (`git log --oneline`: Phase 14 is
-  the commit titled "Phase 14"). Every check green at that commit: `npm test` (1 012),
-  `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
-  `test:browser` (131), `perf:browser`, `test:package`.
-- **Next:** Phase 15 — Pro resources and timeline (`ARCHITECTURE.md` J);
-  its design decisions are to be validated with the owner first.
+- **Done:** Phases 0–14 and 15a, each committed (`git log --oneline`: the
+  last is titled "Phase 15a"). Every check green at that commit: `npm test`
+  (1 072), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
+  `test:browser` (147), `perf:browser`, `test:package`.
+- **Now:** Phase 15, split in two by the owner (2026-10-18): **15a**
+  resource model + resource columns (timeGrid/dayGrid by resource), then
+  **15b** timeline + 2D windowing. Decisions validated: see
+  "Phase 15 — owner's decisions" below.
+- **15a done** (commit titled "Phase 15a"). **Next: 15b** — the timeline
+  (with and without resources, `elapsed` axis, two labelled 02:00s, the
+  resource area with tree, groups and field columns, 2D windowing, budget
+  G.2 500 × 10 000, `treegrid`) in a new `@dzcalendar/pro`; its design
+  decisions are to be validated with the owner first.
+- **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
+  that URL; the owner authorised pushing on 2026-10-18).
 - **Left after it:** 16 Pro print / export /
   editor, 17 animations, 18 ecosystem (Web Component, React/Vue,
   FullCalendar options translator), 19+ native (Swift/Kotlin from
@@ -1274,6 +1283,99 @@ See `ARCHITECTURE.md` J. Phase 14.
   the Phase 13 and Phase 14 commits (noise around a tight budget, not a
   regression); the budget is left as it is.
 
-## Next — Phase 15: Pro, resources and timeline
+## Phase 15 — Pro, resources and timeline (in progress)
 
 See `ARCHITECTURE.md` J. Phase 15.
+
+### Owner's decisions (2026-10-18)
+
+- **Split:** 15a — the resource model (tree, groups, resources in the
+  kernel) and the resource views in columns (week/day/month by resource:
+  Sehhaty's "one doctor per column"); 15b — the timeline (with and without
+  resources) and windowing on both axes (500 × 10 000). Each sub-phase has
+  its own reviews and commit.
+- **Zone (K.6):** every column is drawn in the calendar's zone; a
+  resource's `timeZone` serves its business hours (shaded outside them,
+  each computed in its own zone) and slots. No per-column zone.
+- **Interactions:** everything from the start — drag from one resource to
+  another, resize, select a range on a resource, context menu, keyboard,
+  the same rules (constraint, overlap, a resource's `eventConstraint` /
+  `eventOverlap`), undo.
+- **Resource area (15b):** expandable tree, grouping by a field, several
+  field columns with adjustable widths.
+- **Package boundary (K.5):** resource columns live in core and dom, next
+  to the grids they extend (as MUI X keeps them free); `@dzcalendar/pro`
+  is born in 15b with the timeline, a new family.
+- **Licence:** still all MIT (2026-10-16 decision): `@dzcalendar/pro` is a
+  code boundary, no key, no watermark — `license.ts` is not written.
+- **15a follow-ups (2026-10-18):** an empty resource view says "No
+  resources to show"; events on no resource (or an unknown one) stay out of
+  resource views; ←/→ stay in one resource's days and **Alt+←/→** go to the
+  next resource (cursor and held event); size budgets raised to measured
+  + 3 % (core 39.4 kB, dom 41.7 kB, locales/ar 2.2 kB); Chrome's first
+  `timeGridWeek:U` frame 27 ms (26 measured; 25–27 at the Phase 14 commit,
+  a budget at its edge).
+
+### 15a — resource columns ✅ (2026-10-18)
+
+**Built**
+- `core/resource/{types,tree,rows}`: `buildResourceTree` (order, orderBy
+  fields or function, cycles, duplicates, unknown parents → Problems, never
+  throws), `fieldOf`, `flattenRows` (expanded, groups, filter — ready for
+  the timeline's area), `columnResources`.
+- Kernel: `resources`, `setResources` (cause `'resources'`),
+  `getResources`, `getResourceProblems`, `resourceOrder`,
+  `resourceGroupField`; rules carry the tree.
+- Views `resourceTimeGridDay/Week`, `resourceDayGridDay/Week/Month`: the
+  time and day grids with a column per resource and date (resources first),
+  heads and group heads, per-resource business hours read in the resource's
+  zone, the now line in every column of today, slots per resource.
+- Rules: a resource's `eventConstraint` (else the calendar's) against its
+  own hours in its zone; its `eventOverlap` decides for shared events.
+- Interactions: drag between resources (the grabbed one swapped, others
+  kept), resize, select, date click and context menu with `resourceId`,
+  keyboard (labels say the resource, Alt+←/→, grab across resources),
+  undo.
+- DOM: `render/resource-heads.ts`, `hooks.resource.content`,
+  `onResourceProblems`, `noResources`, `ofResource` (5 languages, `،` in
+  Arabic); Angular `[resources]`, `(resourceProblems)`.
+- Tests: `core/test/resources.test.ts`, `dom/test/resources15.test.ts`,
+  conformance `resource-tree` (10) and `resource-rules` (10, one on the
+  25 October fall-back), 16 Chrome checks (`playground/resources.html`,
+  capture `resources-day.png`), benches `resource week model (20 × 10k)`,
+  `resource month model (20 × 10k)`, `resource tree 500 + rows`.
+- Docs: `docs/resources.md`, `docs/behaviors/resources.md`, keyboard sheet.
+
+**Reviews fixed**
+- Regression: in a plain time grid an event with a `resourceId` could not
+  be moved by keyboard (the grab took a resource no column had).
+- An all-day event on two resources taken from the second one's bar
+  swapped the wrong one (bars now carry their column's resource).
+- Resources replaced during a keyboard grab: it is let go; a cursor whose
+  column vanished starts again at home.
+- `eventMaxStack: 'auto'` measured again when resources change.
+- Resource problems reach the application (`onResourceProblems`); no
+  English sentence in Problem details; `fieldOf` reads own keys only; a
+  throwing `resourceOrder` comparison is a warning, not a crash.
+- `resourceColumns` renamed `columnResources` and the heads file
+  `resource-heads.ts` (the timeline's area will have field columns).
+- Week-view arrows that jumped six days back onto the next resource
+  (owner's decision: Alt+arrows for resources).
+- Missing tests (undo, `resourceEditable: false`, problems callback,
+  empty view), behaviour sheet, 500-resource bench, ARCHITECTURE
+  contradictions (K.5/K.6, Pro scope, file tree).
+
+**Not done on purpose**
+- Dates above resources; per-column zones (K.6); horizontal scrolling of
+  many resource columns (use the day view or the timeline).
+- An "unassigned" column; `unknown-resource` for events (resources may
+  arrive after events).
+- `resource.set` as an undoable command (`setResources` is data, like
+  `setEvents`).
+- Row state (expanded, collapsed groups) in the kernel, windowed
+  per-resource rows, an overlap check indexed by resource, `didMount` /
+  `willUnmount` for resource heads, a resource click: with the timeline
+  (15b).
+- Slots stay instants: a resource's zone is not given to `findSlots`.
+- ical's size (7.9 kB against 7.5) was already over before this phase:
+  left for the owner.

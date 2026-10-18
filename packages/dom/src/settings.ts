@@ -1,8 +1,11 @@
-import type { AvailableSlot, Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection } from '@dzcalendar/core';
+import type { AvailableSlot, Problem, Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection } from '@dzcalendar/core';
 import type { MenuHook, ScopeRequest } from './host.js';
 
 /** A click on an empty day or moment. */
-export type DateClick = { readonly allDay: true; readonly date: PlainDate } | { readonly allDay: false; readonly date: PlainDate; readonly instant: Instant };
+/** A click on empty time; `resourceId`: in a resource view, whose column. */
+export type DateClick =
+  | { readonly allDay: true; readonly date: PlainDate; readonly resourceId?: string }
+  | { readonly allDay: false; readonly date: PlainDate; readonly instant: Instant; readonly resourceId?: string };
 
 /**
  * The options read at the moment they are used — callbacks, the editing
@@ -49,6 +52,8 @@ export interface LiveSettings {
   readonly onProposalRefused?: (proposal: Proposal) => void;
   /** Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo inside the calendar. Default true. */
   readonly keyboardUndo?: boolean;
+  /** What the resources given (option or `update`) could not be read as: refused entries, dropped fields. Called only when there are some. */
+  readonly onResourceProblems?: (problems: readonly Problem[]) => void;
 }
 
 type Handler<K extends keyof LiveSettings> = {
@@ -68,6 +73,7 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   onDateClick: {},
   onEventClick: {},
   onSlotClick: {},
+  onResourceProblems: {},
   chooseScope: {},
   dragEdgeNavigate: {},
   eventResizableFromStart: {},

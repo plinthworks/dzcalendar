@@ -13,6 +13,7 @@ import type { StoreChange } from '../store/changes.js';
 import { viewWindow } from '../store/store.js';
 import type { StoreSnapshot } from '../store/store.js';
 import type { DurationLike, Instant, PlainDate, ZoneId, ZonedDateTime } from '../temporal.js';
+import type { Resource } from '../resource/types.js';
 import type { Transition } from '../zone.js';
 import { isBackground } from './daygrid.js';
 import type { ViewRange } from './spec.js';
@@ -27,6 +28,14 @@ export interface TimeGridOptions {
   /** Gutter tick step, in minutes. Default 60. */
   readonly slotMinutes?: number;
   readonly resourceId?: string;
+  /**
+   * A resource view: one column per resource and date, resources first
+   * (each resource's days side by side). Each column shows that resource's
+   * events and its own business hours (read in its zone).
+   */
+  readonly resources?: readonly Resource[];
+  /** Above the resources' heads, one per run of resources sharing a group (from `columnResources`). */
+  readonly resourceGroups?: readonly ResourceGroupHead[];
   /**
    * Bookable slots to draw (what @dzcalendar/slots' findSlots gives, or any
    * start/end pairs): each column gets the ones starting in its hours.
@@ -94,6 +103,8 @@ export interface PlacedTimed {
 export interface AvailableSlot {
   readonly start: Instant | ZonedDateTime;
   readonly end: Instant | ZonedDateTime;
+  /** In a resource view, only that resource's columns show it; without, every column does. */
+  readonly resourceId?: string;
 }
 
 /** A slot placed in a column, in axis minutes. */
@@ -108,10 +119,28 @@ export interface PlacedSlot {
   readonly slot: AvailableSlot;
 }
 
+/** A group's head above its resources' columns. */
+export interface ResourceGroupHead {
+  readonly value: string;
+  /** Index of its first resource, and how many follow. */
+  readonly from: number;
+  readonly count: number;
+}
+
+/** A resource's head above its columns (its days). */
+export interface ResourceHead {
+  readonly resource: Resource;
+  /** First column, and how many (the shown days). */
+  readonly from: number;
+  readonly count: number;
+}
+
 export interface TimeGridColumn {
-  /** The date, ISO: what the DOM keys the column on. */
+  /** The date, ISO, and the resource's id after a `|` in a resource view: what the DOM keys the column on. */
   readonly key: string;
   readonly date: PlainDate;
+  /** In a resource view, whose column this is. */
+  readonly resource: Resource | null;
   readonly axis: ColumnAxis;
   /** A day the zone skipped: drawn folded, with nothing in it. */
   readonly folded: boolean;
@@ -129,6 +158,8 @@ export interface TimeGridColumn {
 export interface AllDayBar {
   readonly segment: Segment;
   readonly lane: number;
+  /** The first column it is drawn over (the segment's day, after the resource's columns before it). */
+  readonly column: number;
 }
 
 export interface TimeGridModel {
@@ -139,7 +170,10 @@ export interface TimeGridModel {
   readonly columns: readonly TimeGridColumn[];
   /** Graduations for the left gutter, from an ordinary column when there is one. */
   readonly gutter: readonly AxisTick[];
-  readonly allDay: { readonly bars: readonly AllDayBar[]; readonly lanes: number; readonly background: readonly Segment[] };
+  readonly allDay: { readonly bars: readonly AllDayBar[]; readonly lanes: number; readonly background: readonly AllDayBar[] };
+  /** A resource view's heads: resources over their days, groups over their resources. Empty otherwise. */
+  readonly resourceHeads: readonly ResourceHead[];
+  readonly groupHeads: readonly ResourceGroupHead[];
 }
 
 function axisFor(date: PlainDate, o: TimeGridOptions): ColumnAxis {
@@ -150,9 +184,12 @@ function axisFor(date: PlainDate, o: TimeGridOptions): ColumnAxis {
   });
 }
 
-function queryOpts(o: TimeGridOptions) {
-  return o.resourceId !== undefined ? { resourceId: o.resourceId } : {};
+function queryOpts(o: TimeGridOptions, resource: Resource | null = null) {
+  return resource ? { resourceId: resource.id } : o.resourceId !== undefined ? { resourceId: o.resourceId } : {};
 }
+
+/** A column's key: its date, and its resource in a resource view. */
+const columnKey = (date: PlainDate, resource: Resource | null) => (resource ? `${date.toString()}|${resource.id}` : date.toString());
 
 /** Which pass of a repeated hour an instant belongs to, given the day's fall-backs. */
 function readingOf(i: Instant, zone: ZoneId, repeats: readonly Transition[]): Reading {
@@ -185,12 +222,18 @@ function endReadingOf(start: Instant, end: Instant, zone: ZoneId, repeats: reado
  * One day column: its axis, its events placed side by side. Queries only that
  * day, so `updateTimeGridModel` can rebuild one column and keep the others.
  */
-export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: TimeGridOptions, axis: ColumnAxis = axisFor(date, o)): TimeGridColumn {
-  const key = date.toString();
-  if (axis.length === 0) return { key, date, axis, folded: true, events: [], background: [], more: [], offHours: [], slots: [] };
+export function buildTimeGridColumn(
+  date: PlainDate,
+  snap: StoreSnapshot,
+  o: TimeGridOptions,
+  axis: ColumnAxis = axisFor(date, o),
+  resource: Resource | null = null,
+): TimeGridColumn {
+  const key = columnKey(date, resource);
+  if (axis.length === 0) return { key, date, resource, axis, folded: true, events: [], background: [], more: [], offHours: [], slots: [] };
 
   const day = axis.day;
-  const instances = snap.queryInstances(viewWindow(date, date.add({ days: 1 }), o.displayZone), queryOpts(o));
+  const instances = snap.queryInstances(viewWindow(date, date.add({ days: 1 }), o.displayZone), queryOpts(o, resource));
   const order = new Map(instances.map((inst, i) => [inst.key, i]));
   const mode = o.axis ?? 'wall';
 
@@ -207,7 +250,9 @@ export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: Tim
       const t = seg.to.epochMilliseconds;
       const inside = f === t ? f >= aStart && f < aEnd : t > aStart && f < aEnd;
       if (!inside) continue;
-      segs.push(f >= aStart && t <= aEnd ? seg : { ...seg, startsHere: seg.startsHere && f >= aStart, endsHere: seg.endsHere && t <= aEnd });
+      const cut = f >= aStart && t <= aEnd ? seg : { ...seg, startsHere: seg.startsHere && f >= aStart, endsHere: seg.endsHere && t <= aEnd };
+      // An event on two resources has a piece in each column: each its own key.
+      segs.push(resource ? { ...cut, key: `${cut.key}|${resource.id}` } : cut);
     }
   }
 
@@ -244,7 +289,7 @@ export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: Tim
   const max = o.maxStack !== undefined && o.maxStack !== null && Number.isInteger(o.maxStack) && o.maxStack >= 1 ? o.maxStack : null;
   if (max === null || !placements.some((p) => p.lanes > max)) {
     const events = placements.map((p) => place(byKey.get(p.key)!, p));
-    return { key, date, axis, folded: false, events, background, more: [], offHours: offHoursOf(date, axis, o), slots: slotsOf(axis, o) };
+    return { key, date, resource, axis, folded: false, events, background, more: [], offHours: offHoursOf(date, axis, o, resource), slots: slotsOf(axis, o, resource) };
   }
   // A cluster wider than `max`: its first `max - 1` lanes are drawn, as wide as
   // `max` lanes allow; the others go behind "+N" in lane `max - 1`, one link per
@@ -284,7 +329,7 @@ export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: Tim
     end = Math.max(end, h.top + h.visualHeight);
   }
   close();
-  return { key, date, axis, folded: false, events, background, more, offHours: offHoursOf(date, axis, o), slots: slotsOf(axis, o) };
+  return { key, date, resource, axis, folded: false, events, background, more, offHours: offHoursOf(date, axis, o, resource), slots: slotsOf(axis, o, resource) };
 }
 
 /** A slot's start or end as an Instant; null for anything else (a string, a date): such a slot is not drawn. */
@@ -297,7 +342,7 @@ export const slotInstant = (x: unknown): Instant | null =>
  * under the next one's start stops there: with a step shorter than the
  * duration, each start keeps a part of its own to click.
  */
-function slotsOf(axis: ColumnAxis, o: TimeGridOptions): PlacedSlot[] {
+function slotsOf(axis: ColumnAxis, o: TimeGridOptions, resource: Resource | null): PlacedSlot[] {
   if (!o.availableSlots?.length) return [];
   const a = axis.start.epochMilliseconds;
   const b = axis.end.epochMilliseconds;
@@ -306,6 +351,7 @@ function slotsOf(axis: ColumnAxis, o: TimeGridOptions): PlacedSlot[] {
     const start = slotInstant(slot?.start);
     const end = slotInstant(slot?.end);
     if (!start || !end) continue;
+    if (resource && typeof slot.resourceId === 'string' && slot.resourceId !== resource.id) continue;
     const s = start.epochMilliseconds;
     const e = end.epochMilliseconds;
     if (e <= s || e <= a || s >= b) continue;
@@ -322,10 +368,17 @@ function slotsOf(axis: ColumnAxis, o: TimeGridOptions): PlacedSlot[] {
   });
 }
 
-/** What is not open, inside the axis's hours, as positions. Read with `toEndPosition` at the ends. */
-function offHoursOf(date: PlainDate, axis: ColumnAxis, o: TimeGridOptions): TimeGridColumn['offHours'] {
-  if (o.businessHours === undefined || o.businessHours === false) return [];
-  const open = businessIntervals(date, date.add({ days: 1 }), o.businessHours, o.displayZone);
+/**
+ * What is not open, inside the axis's hours, as positions. Read with
+ * `toEndPosition` at the ends. A resource's own hours win over the
+ * calendar's, and are read in its zone (a doctor in Riyadh seen from Paris).
+ */
+function offHoursOf(date: PlainDate, axis: ColumnAxis, o: TimeGridOptions, resource: Resource | null): TimeGridColumn['offHours'] {
+  const hours = resource?.businessHours ?? o.businessHours;
+  if (hours === undefined || hours === false) return [];
+  const zone = resource?.timeZone ?? o.displayZone;
+  // The resource's dates around this one: its zone may be a day ahead or behind.
+  const open = zone === o.displayZone ? businessIntervals(date, date.add({ days: 1 }), hours, zone) : businessIntervals(date.subtract({ days: 1 }), date.add({ days: 2 }), hours, zone);
   const closed = subtractSpans([{ s: axis.start.epochMilliseconds, e: axis.end.epochMilliseconds }], open);
   return closed.map((x) => {
     const top = axis.toPosition(Temporal.Instant.fromEpochMilliseconds(x.s));
@@ -334,14 +387,33 @@ function offHoursOf(date: PlainDate, axis: ColumnAxis, o: TimeGridOptions): Time
 }
 
 function buildAllDay(range: ViewRange, snap: StoreSnapshot, o: TimeGridOptions): TimeGridModel['allDay'] {
-  const instances = snap.queryInstances(viewWindow(range.start, range.end, o.displayZone), queryOpts(o)).filter((i) => i.event.allDay);
   const view = dateIndex(range.dates);
-  const order = new Map(instances.map((inst, i) => [inst.key, i]));
-  const bars: Segment[] = [];
-  const background: Segment[] = [];
-  for (const inst of instances) (isBackground(inst.event.display) ? background : bars).push(...segmentAllDay(inst, view));
-  const packed = packLanes(bars.map((s) => ({ key: s.key, start: s.dayIndex, end: s.dayIndex + s.dayCount, rank: [order.get(s.instance.key) ?? 0] })));
-  return { bars: bars.map((segment) => ({ segment, lane: packed.lanes.get(segment.key)! })), lanes: packed.laneCount, background };
+  const n = range.dates.length;
+  const bars: { segment: Segment; column: number }[] = [];
+  const background: AllDayBar[] = [];
+  const order = new Map<string, number>();
+  // A resource view: each resource's days are its own columns, its bars its own keys.
+  const owners: (Resource | null)[] = o.resources ? [...o.resources] : [null];
+  owners.forEach((resource, r) => {
+    const instances = snap.queryInstances(viewWindow(range.start, range.end, o.displayZone), queryOpts(o, resource)).filter((i) => i.event.allDay);
+    instances.forEach((inst, i) => order.set(inst.key, i));
+    for (const inst of instances) {
+      for (const seg of segmentAllDay(inst, view)) {
+        const segment = resource ? { ...seg, key: `${seg.key}|${resource.id}` } : seg;
+        const column = r * n + seg.dayIndex;
+        if (isBackground(inst.event.display)) background.push({ segment, lane: 0, column });
+        else bars.push({ segment, column });
+      }
+    }
+  });
+  const packed = packLanes(bars.map((b) => ({ key: b.segment.key, start: b.column, end: b.column + b.segment.dayCount, rank: [order.get(b.segment.instance.key) ?? 0] })));
+  return { bars: bars.map((b) => ({ segment: b.segment, column: b.column, lane: packed.lanes.get(b.segment.key)! })), lanes: packed.laneCount, background };
+}
+
+/** Each resource over its days. */
+function resourceHeadsOf(range: ViewRange, o: TimeGridOptions): ResourceHead[] {
+  const n = range.dates.length;
+  return (o.resources ?? []).map((resource, r) => ({ resource, from: r * n, count: n }));
 }
 
 function gutterOf(columns: readonly TimeGridColumn[], o: TimeGridOptions): AxisTick[] {
@@ -356,8 +428,21 @@ function gutterOf(columns: readonly TimeGridColumn[], o: TimeGridOptions): AxisT
  * left, the gutter. Pure — the same snapshot and options give the same model.
  */
 export function buildTimeGridModel(range: ViewRange, snap: StoreSnapshot, o: TimeGridOptions): TimeGridModel {
-  const columns = range.dates.map((date) => buildTimeGridColumn(date, snap, o));
-  return { version: snap.version, range, options: o, columns, gutter: gutterOf(columns, o), allDay: buildAllDay(range, snap, o) };
+  // The axis is the day's in the calendar's zone: built once per date, shared by every resource's column.
+  const axes = range.dates.map((date) => axisFor(date, o));
+  const columns = o.resources
+    ? o.resources.flatMap((r) => range.dates.map((date, i) => buildTimeGridColumn(date, snap, o, axes[i], r)))
+    : range.dates.map((date, i) => buildTimeGridColumn(date, snap, o, axes[i]));
+  return {
+    version: snap.version,
+    range,
+    options: o,
+    columns,
+    gutter: gutterOf(columns, o),
+    allDay: buildAllDay(range, snap, o),
+    resourceHeads: resourceHeadsOf(range, o),
+    groupHeads: o.resourceGroups ?? [],
+  };
 }
 
 const overlaps = (s: number, e: number, spans: readonly { s: number; e: number }[]) => spans.some((x) => x.s < e && x.e > s);
@@ -377,7 +462,7 @@ export function updateTimeGridModel(prev: TimeGridModel, snap: StoreSnapshot, ch
   const columns = prev.columns.map((col) => {
     if (col.folded || (!everything && !overlaps(col.axis.start.epochMilliseconds, col.axis.end.epochMilliseconds, change.dirtySpans))) return col;
     touched = true;
-    return buildTimeGridColumn(col.date, snap, o, col.axis);
+    return buildTimeGridColumn(col.date, snap, o, col.axis, col.resource);
   });
   const first = prev.range.dates[0];
   const last = prev.range.dates[prev.range.dates.length - 1];
@@ -390,10 +475,18 @@ export function updateTimeGridModel(prev: TimeGridModel, snap: StoreSnapshot, ch
   return { ...prev, version: snap.version, columns, allDay };
 }
 
-/** Where "now" falls: which column, how far down. Kept out of the memoized model — it moves every minute. */
-export function locateNow(model: TimeGridModel, now: Instant): { readonly column: number; readonly position: number } | null {
+/**
+ * Where "now" falls: which column, how far down — the first, and in a
+ * resource view every resource's column of that day (`columns`). Kept out of
+ * the memoized model: it moves every minute.
+ */
+export function locateNow(model: TimeGridModel, now: Instant): { readonly column: number; readonly columns: readonly number[]; readonly position: number } | null {
   const t = now.epochMilliseconds;
-  const column = model.columns.findIndex((c) => !c.folded && c.axis.start.epochMilliseconds <= t && t < c.axis.end.epochMilliseconds);
-  if (column === -1) return null;
-  return { column, position: model.columns[column]!.axis.toPosition(now) };
+  const columns: number[] = [];
+  model.columns.forEach((c, i) => {
+    if (!c.folded && c.axis.start.epochMilliseconds <= t && t < c.axis.end.epochMilliseconds) columns.push(i);
+  });
+  const column = columns[0];
+  if (column === undefined) return null;
+  return { column, columns, position: model.columns[column]!.axis.toPosition(now) };
 }

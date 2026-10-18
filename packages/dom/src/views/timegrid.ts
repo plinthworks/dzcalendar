@@ -1,5 +1,5 @@
 import { Temporal, formatTemporal, locateNow, weekNumber, weekRulesFor } from '@dzcalendar/core';
-import type { AllDayBar, AxisBand, Hit, MoreTimed, PlacedSlot, PlacedTimed, PlainDate, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
+import type { AllDayBar, AxisBand, Hit, MoreTimed, PlacedSlot, PlacedTimed, PlainDate, ResourceGroupHead, ResourceHead, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
 import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
 import { handles } from '../interact/handles.js';
 import type { ViewController, ViewCtx } from '../host.js';
@@ -10,6 +10,7 @@ import { KeyedList, contentsHost, h } from '../render/reconcile.js';
 import { onScrollFrame } from '../render/window.js';
 import { NodePool } from '../render/pool.js';
 import { altDate } from '../render/alt.js';
+import { drawResourceHeads, noResourcesNote } from '../render/resource-heads.js';
 
 const HM = { hour: '2-digit', minute: '2-digit' } as const;
 
@@ -27,6 +28,8 @@ interface ColumnItem {
   readonly sig: string;
   readonly column: TimeGridColumn;
   readonly today: boolean;
+  /** Its place among the columns (grid column `index + 2`, after the gutter). */
+  readonly index: number;
 }
 
 interface EventItem {
@@ -70,8 +73,10 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   const head = h(doc, 'div', 'dz-tg__row dz-tg__head');
   const corner = h(doc, 'div', 'dz-tg__corner');
   head.append(corner);
+  const groupsHost = contentsHost(doc, 'dz-tg__groups');
+  const resourcesHost = contentsHost(doc, 'dz-tg__resources');
   const headsHost = contentsHost(doc, 'dz-tg__heads');
-  head.append(headsHost);
+  head.append(groupsHost, resourcesHost, headsHost);
   const allday = h(doc, 'div', 'dz-tg__row dz-tg__allday');
   const alldayLabel = h(doc, 'div', 'dz-tg__allday-label');
   const track = h(doc, 'div', 'dz-tg__allday-track');
@@ -89,7 +94,10 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   let model: TimeGridModel | null = null;
   let gutterEpoch = -1;
   const parts = new Map<string, ColumnParts>();
-  let nowEl: HTMLElement | null = null;
+  /** The now line, one per column of today (every resource's). */
+  let nowEls: HTMLElement[] = [];
+  /** The header's row of dates: below the resources' (and groups'), absent in a one-day resource view. */
+  let dateRow = 1;
   let created: HTMLElement[] = [];
 
   // ── headers ────────────────────────────────────────────────────────────────
@@ -112,8 +120,15 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       }
       if (it.today) el.setAttribute('aria-current', 'date');
       else el.removeAttribute('aria-current');
+      // Placed only under resource heads; a plain view's heads flow into the header's one row.
+      if (dateRow > 1) {
+        el.style.gridRow = String(dateRow);
+        el.style.gridColumn = String(it.index + 2);
+      }
     },
   );
+  const resourceHeads = drawResourceHeads(ctx, groupsHost, resourcesHost, 'dz-tg', 2);
+  const emptyNote = noResourcesNote(ctx, root);
 
   // ── all-day row ────────────────────────────────────────────────────────────
   interface BarItem {
@@ -122,6 +137,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     readonly content: string;
     readonly bar: AllDayBar;
     readonly bg: boolean;
+    /** The resource of the column it starts in (a resource view): what a grab on it holds. */
+    readonly resourceId: string | undefined;
   }
   const bars = new KeyedList<BarItem>(
     track,
@@ -133,8 +150,10 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       el.classList.toggle('dz-bar--cont-start', !s.startsHere);
       el.classList.toggle('dz-bar--cont-end', !s.endsHere);
       el.style.setProperty('--lane', String(it.bar.lane));
-      el.style.setProperty('--col', String(s.dayIndex));
+      el.style.setProperty('--col', String(it.bar.column));
       el.style.setProperty('--span', String(s.dayCount));
+      if (it.resourceId !== undefined) el.dataset['resource'] = it.resourceId;
+      else delete el.dataset['resource'];
       if (!changed.content) return;
       applyEventLook(el, ev);
       handles(el, s, it.bg);
@@ -206,7 +225,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     (el, it) => drawColumn(el, it),
     // A column leaving (navigation) takes its events' hooks with it.
     (el) => {
-      const p = parts.get(el.dataset['date'] ?? '');
+      const p = parts.get(el.dataset['key'] ?? '');
       p?.events.clear();
       p?.background.clear();
       p?.more.clear();
@@ -217,11 +236,18 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   function drawColumn(el: HTMLElement, it: ColumnItem): void {
     const { column } = it;
     const p = parts.get(it.key)!;
-    el.dataset['date'] = column.key;
-    const name = formatTemporal(column.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale) + (ctx.altLocale ? ` (${altDate(column.date, ctx.altLocale).long})` : '');
+    el.dataset['key'] = column.key;
+    el.dataset['date'] = column.date.toString();
+    if (column.resource) el.dataset['resource'] = column.resource.id;
+    else delete el.dataset['resource'];
+    const day = formatTemporal(column.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale) + (ctx.altLocale ? ` (${altDate(column.date, ctx.altLocale).long})` : '');
+    // In a resource view the column says whose it is first: "Dr Ali, Wednesday 21 October".
+    const name = column.resource ? ctx.messages.ofResource({ resource: column.resource.title || column.resource.id, place: day }) : day;
     const length = column.axis.day.lengthMinutes;
     el.setAttribute('aria-label', length === 1440 ? name : length === 0 ? `${name}, ${ctx.messages.dayDoesNotExist}` : `${name}, ${formatMinutes(length, ctx.locale)}`);
     el.classList.toggle('dz-tg__col--today', it.today);
+    const per = model?.range.dates.length ?? 1;
+    el.classList.toggle('dz-tg__col--resource-start', column.resource !== null && it.index > 0 && it.index % per === 0);
     el.classList.toggle('dz-tg__col--folded', column.folded);
     el.style.setProperty('--dz-len', String(column.axis.length));
     if (column.folded) {
@@ -455,7 +481,11 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   cursorNode.style.gridColumn = '2 / span 1';
   allday.prepend(cursorNode);
 
-  const columnOf = (date: PlainDate) => model?.columns.find((c) => c.key === date.toString());
+  /** The column of a date (and resource, in a resource view: without one, the date's first). */
+  const columnOf = (date: PlainDate, resourceId?: string) =>
+    model?.columns.find((c) => c.date.equals(date) && (resourceId === undefined || c.resource?.id === resourceId));
+  /** A hit in a column: its resource with it. */
+  const own = <T extends Hit>(hit: T, col: TimeGridColumn): T => (col.resource ? { ...hit, resourceId: col.resource.id } : hit);
   const snapMs = () => Math.max(1, ctx.snapMinutes) * 60_000;
   /** The minutes-to-pixels scale of a drawn column (one layout read). */
   const pxOf = (col: TimeGridColumn) => {
@@ -467,7 +497,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const p = Math.max(0, Math.min(col.axis.length - ctx.snapMinutes, minutes));
     const at = col.axis.fromPosition(p);
     const band = at.exists ? undefined : col.axis.bands.find((b) => b.kind === 'gap' && p >= b.from && p < b.to);
-    return { kind: 'slot', date: col.date, instant: band ? col.axis.fromPosition(band.to).instant : at.instant };
+    return own({ kind: 'slot', date: col.date, instant: band ? col.axis.fromPosition(band.to).instant : at.instant }, col);
   };
   /** The first slot below the top of the scrolled hours. */
   const topSlot = (col: TimeGridColumn): Hit | null => {
@@ -489,7 +519,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     fit(hit) {
       const cols = model?.columns ?? [];
       if (cols.length === 0) return null;
-      const col = columnOf(hit.date);
+      const col = columnOf(hit.date, hit.resourceId);
       if (!col) {
         const st = ctx.kernel.getState();
         // A hidden weekday, wherever it is: null, and the keyboard steps on past it (a day view: Friday → Monday).
@@ -499,16 +529,27 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
         // A hidden day inside the period: null, and the keyboard steps on past it.
         return Temporal.PlainDate.compare(hit.date, r.end) >= 0 ? 'next' : null;
       }
-      if (hit.kind === 'day') return hit.allDayRow ? hit : { kind: 'day', date: hit.date, allDayRow: true };
+      if (hit.kind === 'day') return hit.allDayRow && hit.resourceId === col.resource?.id ? hit : own({ kind: 'day', date: hit.date, allDayRow: true }, col);
       if (!usable(col)) return null;
       const s = col.axis.start.epochMilliseconds;
       const last = Math.max(s, col.axis.end.epochMilliseconds - snapMs());
       const ms = Math.max(s, Math.min(last, hit.instant.epochMilliseconds));
-      return ms === hit.instant.epochMilliseconds ? hit : { kind: 'slot', date: hit.date, instant: Temporal.Instant.fromEpochMilliseconds(ms) };
+      if (ms === hit.instant.epochMilliseconds && hit.resourceId === col.resource?.id) return hit;
+      return own({ kind: 'slot', date: hit.date, instant: Temporal.Instant.fromEpochMilliseconds(ms), ...(hit.gap && { gap: true as const }) }, col);
+    },
+    stepAcross(hit, delta) {
+      const heads = model?.resourceHeads ?? [];
+      if (heads.length === 0) return undefined;
+      const i = heads.findIndex((x) => x.resource.id === hit.resourceId);
+      const next = heads[(i < 0 ? 0 : i) + delta];
+      const col = next ? columnOf(hit.date, next.resource.id) : undefined;
+      if (!col) return null;
+      const f = keys.fit(own(hit, col));
+      return f && typeof f === 'object' ? f : null;
     },
     showCursor(hit, label) {
       const cols = model?.columns ?? [];
-      const index = cols.findIndex((c) => c.date.equals(hit.date));
+      const index = cols.findIndex((c) => c.date.equals(hit.date) && (hit.resourceId === undefined || c.resource?.id === hit.resourceId));
       if (index < 0) return;
       const node = h(doc, 'div', 'dz-cursor');
       node.tabIndex = 0;
@@ -538,9 +579,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const cols = model?.columns ?? [];
       if (hit.kind === 'day') {
         const col = edge === 'start' ? cols[0] : cols[cols.length - 1];
-        return col ? { kind: 'day', date: col.date, allDayRow: true } : hit;
+        return col ? own({ kind: 'day', date: col.date, allDayRow: true }, col) : hit;
       }
-      const col = columnOf(hit.date);
+      const col = columnOf(hit.date, hit.resourceId);
       if (!col || !usable(col)) return hit;
       return edge === 'start' ? slotAt(col, 0) : slotAt(col, col.axis.length);
     },
@@ -549,7 +590,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const host = node.closest('.dz-tg__col, .dz-tg__allday-track');
       return host ? [...host.querySelectorAll<HTMLElement>('[data-event-id][tabindex]')] : [];
     },
-    nodeFor(eventId, date) {
+    nodeFor(eventId, date, resourceId) {
       // Out of the window: mounted for the keyboard (and kept while it has the focus).
       if (win && model) {
         for (const c of model.columns) for (const e of c.events) if (e.segment.instance.event.id === eventId) kept.add(e.segment.key);
@@ -562,32 +603,37 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
         if (link) return link;
       }
       if (date) {
-        const inColumn = all.find((n) => n.closest<HTMLElement>('.dz-tg__col')?.dataset['date'] === date.toString());
-        if (inColumn) return inColumn;
+        const inColumn = (r?: string) =>
+          all.find((n) => {
+            const c = n.closest<HTMLElement>('.dz-tg__col');
+            return c !== null && c.dataset['date'] === date.toString() && (r === undefined || c.dataset['resource'] === r);
+          });
+        const found = (resourceId !== undefined && inColumn(resourceId)) || inColumn();
+        if (found) return found;
       }
       return all[0] ?? null;
     },
     cursorFor(node) {
       const inst = model ? findSegment(model, node.dataset['key'] ?? '')?.instance : undefined;
       const colEl = node.closest<HTMLElement>('.dz-tg__col');
-      const col = colEl ? model?.columns.find((c) => c.key === colEl.dataset['date']) : undefined;
+      const col = colEl ? model?.columns.find((c) => c.key === colEl.dataset['key']) : undefined;
       if (col && usable(col)) {
         const start = inst && !inst.event.allDay ? (inst.event.start as ZonedDateTime).toInstant() : col.axis.start;
-        const f = keys.fit({ kind: 'slot', date: col.date, instant: start });
+        const f = keys.fit(own({ kind: 'slot', date: col.date, instant: start }, col));
         return f && typeof f === 'object' ? f : null;
       }
       // An all-day bar: the first day it shows on.
       const bar = model?.allDay.bars.find((b) => b.segment.key === node.dataset['key']);
-      const day = bar ? model?.columns[bar.segment.dayIndex] : undefined;
-      return day ? { kind: 'day', date: day.date, allDayRow: true } : null;
+      const day = bar ? model?.columns[bar.column] : undefined;
+      return day ? own({ kind: 'day', date: day.date, allDayRow: true }, day) : null;
     },
-    firstSlot(date) {
-      const col = columnOf(date);
+    firstSlot(date, resourceId) {
+      const col = columnOf(date, resourceId);
       return col ? topSlot(col) : null;
     },
     reveal(hit) {
       if (hit.kind !== 'slot') return;
-      const col = columnOf(hit.date);
+      const col = columnOf(hit.date, hit.resourceId);
       if (!col || !usable(col)) return;
       const px = pxOf(col);
       if (px <= 0) return;
@@ -625,7 +671,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const els = [...colsHost.querySelectorAll<HTMLElement>(':scope > .dz-tg__col')];
       const cols: ColGeo[] = [];
       for (const el of els) {
-        const column = m?.columns.find((c) => c.key === el.dataset['date']);
+        const column = m?.columns.find((c) => c.key === el.dataset['key']);
         if (!column) continue;
         const r = el.getBoundingClientRect();
         cols.push({ left: r.left, right: r.right, top: r.top, height: r.height, column });
@@ -641,36 +687,44 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       if (cols.length === 0) return null;
       const cx = Math.max(cols[0]!.left, Math.min(cols[cols.length - 1]!.right - 1, x));
       const c = cols.find((k) => cx >= k.left && cx < k.right) ?? cols[cols.length - 1]!;
-      if (geo.track && y >= geo.track.top && y < geo.track.bottom) return { kind: 'day', date: c.column.date, allDayRow: true };
+      if (geo.track && y >= geo.track.top && y < geo.track.bottom) return own({ kind: 'day', date: c.column.date, allDayRow: true }, c.column);
       if (c.column.folded || c.column.axis.length === 0) return null;
       const axis = c.column.axis;
       const cy = Math.max(geo.view.top, Math.min(geo.view.bottom - 1, y));
       const px = c.height / axis.length;
       const minutes = Math.max(0, Math.min(axis.length - 1e-6, (cy - (c.top - scrollY)) / px));
       const at = axis.fromPosition(minutes);
-      if (at.exists) return { kind: 'slot', date: c.column.date, instant: at.instant };
+      if (at.exists) return own({ kind: 'slot', date: c.column.date, instant: at.instant }, c.column);
       // In a skipped hour: the first moment after it (03:00), flagged so the drop is announced.
       const band = axis.bands.find((x) => x.kind === 'gap' && minutes >= x.from && minutes < x.to);
-      return { kind: 'slot', date: c.column.date, instant: band ? axis.fromPosition(band.to).instant : at.instant, gap: true };
+      return own({ kind: 'slot', date: c.column.date, instant: band ? axis.fromPosition(band.to).instant : at.instant, gap: true }, c.column);
     },
     boxesFor(geo, span, scrollY) {
       const o = geo.origin;
       const out: Box[] = [];
+      // In a resource view, only the columns of the resources it is (or would be) on.
+      const on = span.resourceIds ?? (span.resourceId !== undefined ? [span.resourceId] : null);
+      const mine = (k: ColGeo) => !k.column.resource || !on || on.includes(k.column.resource.id);
       if (span.allDay) {
         if (!geo.track) return out;
         const first = span.start as PlainDate;
         const last = (span.end as PlainDate).subtract({ days: 1 });
-        const inside = geo.cols.filter((k) => Temporal.PlainDate.compare(k.column.date, first) >= 0 && Temporal.PlainDate.compare(k.column.date, last) <= 0);
-        if (inside.length === 0) return out;
+        const inside = geo.cols.filter((k) => mine(k) && Temporal.PlainDate.compare(k.column.date, first) >= 0 && Temporal.PlainDate.compare(k.column.date, last) <= 0);
         const h = Math.min(22, geo.track.bottom - geo.track.top - 4);
-        const left = Math.min(...inside.map((k) => k.left));
-        const right = Math.max(...inside.map((k) => k.right));
-        out.push({ x: left - o.x + 2, y: geo.track.top - o.y + 2, w: right - left - 4, h });
+        // One box per resource: its days are side by side, another resource's are elsewhere.
+        const runs = new Map<string, ColGeo[]>();
+        for (const k of inside) (runs.get(k.column.resource?.id ?? '') ?? runs.set(k.column.resource?.id ?? '', []).get(k.column.resource?.id ?? '')!).push(k);
+        for (const run of runs.values()) {
+          const left = Math.min(...run.map((k) => k.left));
+          const right = Math.max(...run.map((k) => k.right));
+          out.push({ x: left - o.x + 2, y: geo.track.top - o.y + 2, w: right - left - 4, h });
+        }
         return out;
       }
       const s = (span.start as ZonedDateTime).epochMilliseconds;
       const e = (span.end as ZonedDateTime).epochMilliseconds;
       for (const k of geo.cols) {
+        if (!mine(k)) continue;
         const axis = k.column.axis;
         if (k.column.folded || axis.length === 0) continue;
         const a = Math.max(s, axis.start.epochMilliseconds);
@@ -704,15 +758,18 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     // The keyboard's cursor: the very slot (or all-day day) it stands on.
     const cur = keys.cursorAt(target);
     if (cur) {
-      if (cur.kind === 'day') return { target: { kind: 'day', date: cur.date }, anchor: target as HTMLElement };
-      const c = columnOf(cur.date);
+      if (cur.kind === 'day') return { target: { kind: 'day', date: cur.date, ...(cur.resourceId !== undefined && { resourceId: cur.resourceId }) }, anchor: target as HTMLElement };
+      const c = columnOf(cur.date, cur.resourceId);
       if (!c) return null;
       const r = c.axis.fromPosition(c.axis.toPosition(cur.instant), { prefer: { offset: cur.instant.toZonedDateTimeISO(ctx.zone).offset } });
-      return { target: { kind: 'slot', date: cur.date, instant: cur.instant, exists: true, ambiguous: r.ambiguous, alternative: r.ambiguous ? (r.instant.equals(cur.instant) ? r.alternative : r.instant) : null }, anchor: target as HTMLElement };
+      return {
+        target: { kind: 'slot', date: cur.date, instant: cur.instant, exists: true, ambiguous: r.ambiguous, alternative: r.ambiguous ? (r.instant.equals(cur.instant) ? r.alternative : r.instant) : null, ...(cur.resourceId !== undefined && { resourceId: cur.resourceId }) },
+        anchor: target as HTMLElement,
+      };
     }
     const colEl = target.closest<HTMLElement>('.dz-tg__col');
     if (!colEl) return null;
-    const col = model.columns.find((c) => c.key === colEl.dataset['date']);
+    const col = model.columns.find((c) => c.key === colEl.dataset['key']);
     if (!col || col.folded) return null;
     // A pointer gives a moment; the keyboard gives the column's first hour.
     let minutes = 0;
@@ -726,7 +783,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const snapped = Math.floor(minutes / snap) * snap;
     const at = col.axis.fromPosition(Math.max(0, Math.min(col.axis.length, snapped)));
     return {
-      target: { kind: 'slot', date: col.date, instant: at.instant, exists: at.exists, ambiguous: at.ambiguous, alternative: at.alternative },
+      target: { kind: 'slot', date: col.date, instant: at.instant, exists: at.exists, ambiguous: at.ambiguous, alternative: at.alternative, ...(col.resource && { resourceId: col.resource.id }) },
       anchor: colEl,
     };
   });
@@ -740,28 +797,39 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const m = next as TimeGridModel;
       created = [];
       const epoch = ctx.epoch;
-      const cols = m.columns.map((column): ColumnItem => ({ key: column.key, sig: `${idOf(column)}|${epoch}`, column, today: column.date.equals(state.today) }));
+      const cols = m.columns.map((column, index): ColumnItem => ({ key: column.key, sig: `${idOf(column)}|${epoch}`, column, today: column.date.equals(state.today), index }));
+      // Heads: groups, then resources, then dates (left out of a one-day resource view: the title says the day).
+      const resourced = m.resourceHeads.length > 0;
+      const rows = (m.groupHeads.length > 0 ? 1 : 0) + (resourced ? 1 : 0);
+      const withDates = !resourced || m.range.dates.length > 1;
+      dateRow = rows + 1;
+      if (rows > 0) corner.style.gridRow = `1 / span ${rows + (withDates ? 1 : 0)}`;
+      else corner.style.removeProperty('grid-row');
+      resourceHeads.sync(m.resourceHeads, m.groupHeads, epoch);
+      emptyNote(m.options.resources !== undefined && m.options.resources.length === 0);
       root.style.setProperty('--dz-cols', String(m.columns.length));
       alldayLabel.textContent = ctx.messages.allDay;
       // The week's number in the corner (the head is drawn, not read: the columns say their dates).
       const first = m.columns[0]?.date;
       corner.textContent = ctx.weekNumbers && first ? ctx.messages.weekShort({ week: weekNumber(first, { ...weekRulesFor(ctx.locale), firstDay: state.firstDay }) }) : '';
       if (!cursorHits.has(cursorNode)) cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
-      heads.sync(cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${c.today}|${epoch}` })));
+      heads.sync(withDates ? cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${c.today}|${epoch}|${c.index}|${dateRow}` })) : []);
       bars.sync([
-        ...m.allDay.background.map((segment) => ({
-          key: `bg:${segment.key}`,
-          sig: `${segment.dayIndex}|${segment.dayCount}`,
-          content: `${segment.instance.event.revision}|${epoch}`,
-          bar: { segment, lane: 0 },
+        ...m.allDay.background.map((bar) => ({
+          key: `bg:${bar.segment.key}`,
+          sig: `${bar.column}|${bar.segment.dayCount}`,
+          content: `${bar.segment.instance.event.revision}|${epoch}`,
+          bar,
           bg: true,
+          resourceId: m.columns[bar.column]?.resource?.id,
         })),
         ...m.allDay.bars.map((bar) => ({
           key: bar.segment.key,
-          sig: `${bar.lane}|${bar.segment.dayIndex}|${bar.segment.dayCount}`,
+          sig: `${bar.lane}|${bar.column}|${bar.segment.dayCount}`,
           content: `${bar.segment.instance.event.revision}|${bar.segment.startsHere}|${bar.segment.endsHere}|${epoch}`,
           bar,
           bg: false,
+          resourceId: m.columns[bar.column]?.resource?.id,
         })),
       ]);
       if (!model || model.gutter !== m.gutter || gutterEpoch !== epoch) drawGutter(m);
@@ -777,6 +845,22 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       if (!crowded) win = null;
       else if (!known) win = { from: 0, to: -1 };
       columns.sync(cols.map((c) => ({ ...c, sig: `${c.sig}|${c.today}` })));
+      // The cursor's column went away (its resource removed, or resource columns gone or come): it has no place
+      // any more. A fresh one waits in the all-day row; focused, the keyboard puts it at home with its words.
+      const at = cursorHits.get(cursorNode);
+      if (at && !m.columns.some((c) => c.date.equals(at.date) && c.resource?.id === at.resourceId)) {
+        const focused = doc.activeElement === cursorNode;
+        const fresh = h(doc, 'div', 'dz-cursor');
+        fresh.tabIndex = 0;
+        fresh.setAttribute('role', 'button');
+        fresh.setAttribute('aria-label', ctx.messages.timeSlots);
+        fresh.style.gridColumn = '2 / span 1';
+        allday.prepend(fresh);
+        const old = cursorNode;
+        cursorNode = fresh;
+        old.remove();
+        if (focused) fresh.focus();
+      }
       for (const key of parts.keys()) if (!cols.some((c) => c.key === key)) parts.delete(key);
       if (crowded && !known) measureWindow();
       return created;
@@ -784,17 +868,16 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
 
     tick(now) {
       const at = model ? locateNow(model, now) : null;
-      if (!at || !model) {
-        nowEl?.remove();
-        nowEl = null;
-        return;
-      }
-      const colEl = columns.get(model.columns[at.column]!.key);
-      if (!colEl) return;
-      nowEl ??= h(doc, 'div', 'dz-now');
-      nowEl.setAttribute('aria-hidden', 'true');
-      nowEl.style.setProperty('--t', String(at.position));
-      if (nowEl.parentElement !== colEl) colEl.append(nowEl);
+      const m = model;
+      const homes = at && m ? at.columns.flatMap((i) => columns.get(m.columns[i]!.key) ?? []) : [];
+      // One line per column of today (each resource's); the extra ones go.
+      while (nowEls.length > homes.length) nowEls.pop()!.remove();
+      homes.forEach((colEl, i) => {
+        const el = (nowEls[i] ??= h(doc, 'div', 'dz-now'));
+        el.setAttribute('aria-hidden', 'true');
+        el.style.setProperty('--t', String(at!.position));
+        if (el.parentElement !== colEl) colEl.append(el);
+      });
     },
 
     scrollTo(minutes) {
@@ -815,6 +898,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
 
     destroy() {
       bars.clear();
+      resourceHeads.clear();
       for (const p of parts.values()) {
         p.events.clear();
         p.background.clear();

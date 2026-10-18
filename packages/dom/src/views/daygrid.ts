@@ -15,6 +15,10 @@ import { KeyedList, contentsHost, h } from '../render/reconcile.js';
 import { onScrollFrame } from '../render/window.js';
 import { altDate } from '../render/alt.js';
 import { NodePool } from '../render/pool.js';
+import { drawResourceHeads, noResourcesNote } from '../render/resource-heads.js';
+
+/** A cell's key: its date, and its resource in a resource view (the same date shows once per resource). */
+const cellKey = (date: PlainDate, resourceId: string | undefined) => (resourceId === undefined ? date.toString() : `${date.toString()}|${resourceId}`);
 
 interface WeekItem {
   readonly key: string;
@@ -55,6 +59,10 @@ interface CellItem {
   readonly key: string;
   readonly sig: string;
   readonly date: PlainDate;
+  /** Whose cell, in a resource view; and whether it starts that resource's days in the row. */
+  readonly resourceId: string | undefined;
+  readonly resourceTitle: string;
+  readonly resourceStart: boolean;
   readonly col: number;
   readonly today: boolean;
   readonly outside: boolean;
@@ -112,6 +120,13 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
   const root = h(doc, 'div', multi ? 'dz-dg dz-mm' : 'dz-dg');
   const head = h(doc, 'div', 'dz-dg__head');
   head.setAttribute('role', 'row');
+  // A resource view's heads (groups, resources) above the weekdays.
+  const groupsHost = contentsHost(doc, 'dz-dg__groups');
+  const resourcesHost = contentsHost(doc, 'dz-dg__resources');
+  const weekdaysHost = contentsHost(doc, 'dz-dg__weekdays');
+  head.append(groupsHost, resourcesHost, weekdaysHost);
+  const resourceHeads = drawResourceHeads(ctx, groupsHost, resourcesHost, 'dz-dg', 1);
+  const emptyNote = noResourcesNote(ctx, root);
   const body = h(doc, 'div', 'dz-dg__body');
   if (multi) root.append(body);
   else {
@@ -125,8 +140,9 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
   /** Bar nodes reused across months and weeks. */
   const barPool = new NodePool(() => h(doc, 'div', 'dz-bar'));
   let created: HTMLElement[] = [];
-  /** The keyboard's day: its cell is the grid's tab stop. */
+  /** The keyboard's day (and resource, in a resource view): its cell is the grid's tab stop. */
   let cursorDate: PlainDate | null = null;
+  let cursorResource: string | undefined;
   const itemLists = new WeakMap<HTMLElement, { readonly host: HTMLElement; readonly list: KeyedList<ItemOfDay> }>();
   /**
    * A day's buttons for screen readers and the keyboard: those of the bars
@@ -134,19 +150,21 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
    * too. A crowded month thus holds cells × lanes nodes, not one per event.
    */
   const cellItems = new WeakMap<HTMLElement, CellItem>();
-  let expandedDate: PlainDate | null = null;
+  /** The cell entered (Enter): its key. */
+  let expanded: string | null = null;
   function syncItems(cell: HTMLElement, c: CellItem, all: boolean): void {
     const segs = all ? c.segs : c.drawn;
     itemLists.get(cell)?.list.sync(segs.map((seg) => ({ key: `item:${seg.key}`, sig: `${seg.instance.event.revision}|${ctx.epoch}`, seg })));
   }
   /** Every event of that day listed (and the last day entered back to its drawn ones). */
-  function expand(date: PlainDate | null): void {
-    if (expandedDate && date && expandedDate.equals(date)) return;
-    const prev = expandedDate ? cellOf(expandedDate) : null;
-    expandedDate = date;
+  function expand(date: PlainDate | null, resourceId?: string): void {
+    const key = date ? cellKey(date, resourceId ?? defaultResource()) : null;
+    if (expanded !== null && key === expanded) return;
+    const prev = expanded !== null ? cellByKey(expanded) : null;
+    expanded = key;
     const prevItem = prev ? cellItems.get(prev) : undefined;
     if (prev && prevItem) syncItems(prev, prevItem, false);
-    const cell = date ? cellOf(date) : null;
+    const cell = date ? cellOf(date, resourceId) : null;
     const item = cell ? cellItems.get(cell) : undefined;
     if (cell && item) syncItems(cell, item, true);
   }
@@ -217,10 +235,18 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
   );
 
   function weekdayHead(host: HTMLElement, m: DayGridModel): void {
+    const resourced = m.resourceHeads.length > 0;
+    const row = (m.groupHeads.length > 0 ? 1 : 0) + (resourced ? 1 : 0) + 1;
+    // A one-day resource view: the resources are the columns, the title says the day.
+    const dates = resourced && (m.weeks[0]?.dates.length ?? 0) === m.resourceHeads.length ? [] : (m.weeks[0]?.dates ?? []);
     host.replaceChildren(
-      ...(m.weeks[0]?.dates ?? []).map((d) => {
+      ...dates.map((d, i) => {
         const c = h(doc, 'div', 'dz-dg__weekday', formatTemporal(d, { weekday: 'short' }, ctx.locale));
         c.setAttribute('role', 'columnheader');
+        if (resourced) {
+          c.style.gridRow = String(row);
+          c.style.gridColumn = String(i + 1);
+        }
         return c;
       }),
     );
@@ -345,7 +371,24 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
         const closed = week.closed[i] ?? false;
         const items = segs.map((sg) => `${sg.key}:${sg.instance.event.revision}`).join(',');
         const wk = i === 0 && ctx.weekNumbers ? weekNumber(date, { ...weekRulesFor(ctx.locale), firstDay: s.firstDay }) : null;
-        return { key: date.toString(), sig: `${i}|${today}|${outside}|${closed}|${items}|${wk}|${ctx.epoch}`, date, col: i, today, outside, closed, count, segs, drawn, week: wk };
+        const res = week.resources[i] ?? null;
+        const resourceStart = res !== null && i > 0 && week.resources[i - 1] !== res;
+        return {
+          key: cellKey(date, res?.id),
+          sig: `${i}|${today}|${outside}|${closed}|${items}|${wk}|${resourceStart}|${ctx.epoch}`,
+          date,
+          resourceId: res?.id,
+          resourceTitle: res ? res.title || res.id : '',
+          resourceStart,
+          col: i,
+          today,
+          outside,
+          closed,
+          count,
+          segs,
+          drawn,
+          week: wk,
+        };
       }),
     );
     const items: BarItem[] = [];
@@ -357,7 +400,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     // "+N" links, where a day hides something: keyed by date, so a link keeps its node (and focus).
     const lane = Math.max(0, (max ?? 1) - 1);
     p.more.sync(
-      week.hiddenPerDay.flatMap((n, i) => (n === 0 ? [] : [{ key: week.dates[i]!.toString(), sig: `${n}|${i}|${lane}|${ctx.epoch}`, col: i, count: n, lane, date: week.dates[i]! }])),
+      week.hiddenPerDay.flatMap((n, i) => (n === 0 ? [] : [{ key: cellKey(week.dates[i]!, week.resources[i]?.id), sig: `${n}|${i}|${lane}|${ctx.epoch}`, col: i, count: n, lane, date: week.dates[i]! }])),
     );
   }
 
@@ -394,6 +437,9 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     cell.setAttribute('role', 'gridcell');
     cell.style.setProperty('--col', String(c.col));
     cell.dataset['date'] = c.date.toString();
+    if (c.resourceId !== undefined) cell.dataset['resource'] = c.resourceId;
+    else delete cell.dataset['resource'];
+    cell.classList.toggle('dz-dg__cell--resource-start', c.resourceStart);
     cell.classList.toggle('dz-dg__cell--today', c.today);
     cell.classList.toggle('dz-dg__cell--outside', c.outside);
     cell.classList.toggle('dz-dg__cell--closed', c.closed);
@@ -402,9 +448,10 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     // The month too on a grid's first day: a grid starting mid-month would otherwise show bare numbers.
     const alt = ctx.altLocale ? altDate(c.date, ctx.altLocale, c.col === 0 && c.date.equals(firstShown)) : null;
     const long = formatTemporal(c.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, ctx.locale) + (alt ? ` (${alt.long})` : '');
-    cell.setAttribute('aria-label', ctx.messages.dayLabel({ date: long, count: c.count }));
+    // In a resource view the cell says whose it is first.
+    cell.setAttribute('aria-label', ctx.messages.dayLabel({ date: c.resourceTitle ? ctx.messages.ofResource({ resource: c.resourceTitle, place: long }) : long, count: c.count }));
     // Roving focus: the cursor's cell is the grid's one tab stop.
-    cell.tabIndex = cursorDate?.equals(c.date) ? 0 : -1;
+    cell.tabIndex = cursorDate?.equals(c.date) && cursorResource === c.resourceId ? 0 : -1;
     // The day number leads to that day, where a day view exists (the context menu's "Go to this day" too).
     const dayView = ctx.kernel.getViewSpec('timeGridDay') ? 'timeGridDay' : ctx.kernel.getViewSpec('dayGridDay') ? 'dayGridDay' : null;
     const num = h(doc, dayView ? 'button' : 'span', 'dz-dg__num', formatTemporal(c.date, { day: 'numeric' }, ctx.locale));
@@ -446,7 +493,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       cell.prepend(wk);
     }
     cellItems.set(cell, c);
-    syncItems(cell, c, expandedDate?.equals(c.date) === true);
+    syncItems(cell, c, expanded === c.key);
   }
 
   /** The cell's own button for an event: what the keyboard focuses and a screen reader reads in the day. */
@@ -561,10 +608,20 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
 
   // ── keyboard: the cells are the cursor, their items the events ─────────
   // A date may be drawn twice in a multi-month view (a padding day of the next month): its own month's cell wins.
-  const cellOf = (date: PlainDate) => (wakeMonthOf(date), cellOfDrawn(date));
-  const cellOfDrawn = (date: PlainDate) =>
-    body.querySelector<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"]:not(.dz-dg__cell--outside)`) ??
-    body.querySelector<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"]`);
+  /** The first resource of a resource view (a hit without one lands there); undefined in a plain view. */
+  const defaultResource = (): string | undefined => sections[0]?.model.resourceHeads[0]?.resource.id;
+  const cellOf = (date: PlainDate, resourceId?: string) => (wakeMonthOf(date), cellOfDrawn(date, resourceId ?? defaultResource()));
+  const cellOfDrawn = (date: PlainDate, resourceId: string | undefined) => {
+    const all = [...body.querySelectorAll<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"]`)].filter((c) => c.dataset['resource'] === resourceId);
+    return all.find((c) => !c.classList.contains('dz-dg__cell--outside')) ?? all[0] ?? null;
+  };
+  const cellByKey = (key: string) => {
+    const [date, ...rest] = key.split('|');
+    return cellOfDrawn(Temporal.PlainDate.from(date!), rest.length > 0 ? rest.join('|') : undefined);
+  };
+  /** A hit on a cell: its date, and its resource in a resource view. */
+  const dayHit = (date: PlainDate, resourceId: string | undefined): Hit => (resourceId === undefined ? { kind: 'day', date } : { kind: 'day', date, resourceId });
+  const cellHit = (el: HTMLElement): Hit | null => (el.dataset['date'] ? dayHit(Temporal.PlainDate.from(el.dataset['date']), el.dataset['resource']) : null);
   const shownDates = () => allWeeks().flatMap((w) => (multi ? w.dates.filter((_, i) => !w.outside[i]) : w.dates));
   const homeDate = (): PlainDate | null => {
     const dates = shownDates();
@@ -572,11 +629,12 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     return dates.find((d) => d.equals(st.today)) ?? dates.find((d) => Temporal.PlainDate.compare(d, st.range.activeStart) >= 0) ?? dates[0] ?? null;
   };
   /** One tab stop: the cursor's cell. */
-  function rove(date: PlainDate | null): void {
+  function rove(date: PlainDate | null, resourceId: string | undefined = date && cursorDate?.equals(date) ? cursorResource : defaultResource()): void {
     cursorDate = date;
+    cursorResource = date ? resourceId : undefined;
     // The cursor left the entered day: its hidden events' buttons go again.
-    if (expandedDate && !(date && date.equals(expandedDate))) expand(null);
-    const stop = date ? cellOf(date) : null;
+    if (expanded !== null && !(date && cellKey(date, resourceId) === expanded)) expand(null);
+    const stop = date ? cellOf(date, resourceId) : null;
     for (const c of body.querySelectorAll<HTMLElement>('.dz-dg__cell')) c.tabIndex = c === stop ? 0 : -1;
   }
   const weekOf = (date: PlainDate) => allWeeks().find((w) => w.dates.some((d, i) => d.equals(date) && !(multi && w.outside[i])));
@@ -598,7 +656,9 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
   ctx.scope.on(root, 'focusin', (e) => {
     const t = e.target as Element | null;
     if (t?.matches('.dz-dg__item')) for (const v of visualsOf(t as HTMLElement)) v.classList.add('dz-focus');
-    if (t?.matches('.dz-dg__cell') && t instanceof HTMLElement && t.dataset['date'] && cursorDate?.toString() !== t.dataset['date']) rove(Temporal.PlainDate.from(t.dataset['date']));
+    if (t?.matches('.dz-dg__cell') && t instanceof HTMLElement && t.dataset['date'] && (cursorDate?.toString() !== t.dataset['date'] || cursorResource !== t.dataset['resource'])) {
+      rove(Temporal.PlainDate.from(t.dataset['date']), t.dataset['resource']);
+    }
   });
   ctx.scope.on(root, 'focusout', (e) => {
     const t = e.target as Element | null;
@@ -609,12 +669,16 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     allDayRow: false,
     home() {
       const d = homeDate();
-      return d ? { kind: 'day', date: d } : null;
+      return d ? dayHit(d, defaultResource()) : null;
     },
     fit(hit) {
       const dates = shownDates();
       if (dates.length === 0) return null;
-      if (dates.some((d) => d.equals(hit.date))) return hit.kind === 'day' && !hit.allDayRow ? hit : { kind: 'day', date: hit.date };
+      if (dates.some((d) => d.equals(hit.date))) {
+        // In a resource view, a hit without a known resource lands on the first one's cell.
+        const rid = defaultResource() === undefined ? undefined : sections[0]!.model.resourceHeads.some((x) => x.resource.id === hit.resourceId) ? hit.resourceId : defaultResource();
+        return hit.kind === 'day' && !hit.allDayRow && hit.resourceId === rid ? hit : dayHit(hit.date, rid);
+      }
       // A hidden weekday, wherever it is: null, and the keyboard steps on past it (a day view: Friday → Monday).
       if ((state ?? ctx.kernel.getState()).view.hiddenDays.includes(hit.date.dayOfWeek as never)) return null;
       // The period's bounds (a month grid's padding included; a multi-month view's months only).
@@ -625,30 +689,44 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       return null;
     },
     showCursor(hit) {
-      rove(hit.date);
-      cellOf(hit.date)?.focus();
+      rove(hit.date, hit.resourceId);
+      cellOf(hit.date, hit.resourceId)?.focus();
     },
     isCursor: (el) => el.matches('.dz-dg__cell'),
-    cursorAt: (el) => (el.matches('.dz-dg__cell') && el instanceof HTMLElement && el.dataset['date'] ? { kind: 'day', date: Temporal.PlainDate.from(el.dataset['date']) } : null),
+    cursorAt: (el) => (el.matches('.dz-dg__cell') && el instanceof HTMLElement ? cellHit(el) : null),
     lineEdge(hit, edge) {
       const w = weekOf(hit.date);
-      const inRow = w ? w.dates.filter((_, i) => !(multi && w.outside[i])) : [];
+      // The line is the cursor's resource's days in the row (all the row outside a resource view).
+      const inRow = w ? w.dates.filter((_, i) => !(multi && w.outside[i]) && w.resources[i]?.id === hit.resourceId) : [];
       const d = edge === 'start' ? inRow[0] : inRow[inRow.length - 1];
-      return d ? { kind: 'day', date: d } : hit;
+      return d ? dayHit(d, hit.resourceId) : hit;
+    },
+    stepAcross(hit, delta) {
+      const heads = sections[0]?.model.resourceHeads ?? [];
+      if (heads.length === 0) return undefined;
+      const i = heads.findIndex((x) => x.resource.id === hit.resourceId);
+      const next = heads[(i < 0 ? 0 : i) + delta];
+      return next ? dayHit(hit.date, next.resource.id) : null;
     },
     itemsAt: (hit) => {
-      expand(hit.date);
-      return [...(cellOf(hit.date)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])];
+      expand(hit.date, hit.resourceId);
+      return [...(cellOf(hit.date, hit.resourceId)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])];
     },
     itemsAround: (node) => [...(node.closest('.dz-dg__items')?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])],
-    nodeFor(eventId, date) {
-      if (date) expand(date);
-      const inCell = date ? [...(cellOf(date)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])].find((n) => n.dataset['eventId'] === eventId) : undefined;
-      return inCell ?? [...body.querySelectorAll<HTMLElement>('.dz-dg__item')].find((n) => n.dataset['eventId'] === eventId) ?? null;
+    nodeFor(eventId, date, resourceId) {
+      // Its cell in that resource's days, else in any resource's that day, else anywhere.
+      const inCellOf = (r: string | undefined) => {
+        if (!date) return undefined;
+        expand(date, r);
+        return [...(cellOf(date, r)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])].find((n) => n.dataset['eventId'] === eventId);
+      };
+      const inAnyCell = () =>
+        date ? [...body.querySelectorAll<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"] .dz-dg__item`)].find((n) => n.dataset['eventId'] === eventId) : undefined;
+      return inCellOf(resourceId) ?? inAnyCell() ?? [...body.querySelectorAll<HTMLElement>('.dz-dg__item')].find((n) => n.dataset['eventId'] === eventId) ?? null;
     },
     cursorFor(node) {
-      const date = node.closest<HTMLElement>('.dz-dg__cell')?.dataset['date'];
-      return date ? { kind: 'day', date: Temporal.PlainDate.from(date) } : null;
+      const cell = node.closest<HTMLElement>('.dz-dg__cell');
+      return cell ? cellHit(cell) : null;
     },
     reveal() {
       /* the month does not scroll */
@@ -670,7 +748,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     readonly bottom: number;
     readonly left: number;
     readonly right: number;
-    readonly cells: readonly { readonly left: number; readonly right: number; readonly date: PlainDate; readonly outside: boolean }[];
+    readonly cells: readonly { readonly left: number; readonly right: number; readonly date: PlainDate; readonly outside: boolean; readonly resourceId: string | undefined }[];
   }
   interface Geo {
     readonly weeks: readonly WeekGeo[];
@@ -703,7 +781,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
         const r = row.getBoundingClientRect();
         const cells = [...row.querySelectorAll<HTMLElement>('.dz-dg__cell')].map((c) => {
           const cr = c.getBoundingClientRect();
-          return { left: cr.left, right: cr.right, date: Temporal.PlainDate.from(c.dataset['date']!), outside: c.classList.contains('dz-dg__cell--outside') };
+          return { left: cr.left, right: cr.right, date: Temporal.PlainDate.from(c.dataset['date']!), outside: c.classList.contains('dz-dg__cell--outside'), resourceId: c.dataset['resource'] };
         });
         // In reading order, so a right-to-left row still finds its cells by position.
         cells.sort((a, b) => a.left - b.left);
@@ -722,7 +800,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       if (cells.length === 0) return null;
       const cx = Math.max(cells[0]!.left, Math.min(cells[cells.length - 1]!.right - 1, x));
       const c = cells.find((k) => cx >= k.left && cx < k.right) ?? cells[cells.length - 1]!;
-      return { kind: 'day', date: c.date };
+      return dayHit(c.date, c.resourceId);
     },
     boxesFor(geo, span) {
       const zone = ctx.zone;
@@ -736,12 +814,19 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       }
       const o = geo.origin;
       const out: Box[] = [];
+      // In a resource view, only the cells of the resources it is (or would be) on: one box per resource and row.
+      const on = span.resourceIds ?? (span.resourceId !== undefined ? [span.resourceId] : null);
       for (const w of geo.weeks) {
-        const inside = w.cells.filter((c) => !(multi && c.outside) && Temporal.PlainDate.compare(c.date, first) >= 0 && Temporal.PlainDate.compare(c.date, last) <= 0);
-        if (inside.length === 0) continue;
-        const left = Math.min(...inside.map((c) => c.left));
-        const right = Math.max(...inside.map((c) => c.right));
-        out.push({ x: left - o.x + 2, y: w.top + geo.laneTop - o.y, w: right - left - 4, h: geo.laneHeight });
+        const inside = w.cells.filter(
+          (c) => !(multi && c.outside) && (c.resourceId === undefined || !on || on.includes(c.resourceId)) && Temporal.PlainDate.compare(c.date, first) >= 0 && Temporal.PlainDate.compare(c.date, last) <= 0,
+        );
+        const runs = new Map<string, typeof inside>();
+        for (const c of inside) (runs.get(c.resourceId ?? '') ?? runs.set(c.resourceId ?? '', []).get(c.resourceId ?? '')!).push(c);
+        for (const run of runs.values()) {
+          const left = Math.min(...run.map((c) => c.left));
+          const right = Math.max(...run.map((c) => c.right));
+          out.push({ x: left - o.x + 2, y: w.top + geo.laneTop - o.y, w: right - left - 4, h: geo.laneHeight });
+        }
       }
       return out;
     },
@@ -761,7 +846,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     }
     const cell = target.closest<HTMLElement>('.dz-dg__cell');
     if (!cell) return null;
-    return { target: { kind: 'day', date: Temporal.PlainDate.from(cell.dataset['date']!) }, anchor: cell };
+    const resource = cell.dataset['resource'];
+    return { target: { kind: 'day', date: Temporal.PlainDate.from(cell.dataset['date']!), ...(resource !== undefined && { resourceId: resource }) }, anchor: cell };
   });
 
   return {
@@ -778,7 +864,14 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       const focused = root.contains(doc.activeElement);
       root.setAttribute('aria-label', s.title);
       // The cursor stays on its day while it is shown; otherwise today, or the period's first day.
-      if (!cursorDate || !shownDates().some((d) => d.equals(cursorDate!))) cursorDate = homeDate();
+      if (!cursorDate || !shownDates().some((d) => d.equals(cursorDate!))) {
+        cursorDate = homeDate();
+        cursorResource = sections[0]?.model.resourceHeads[0]?.resource.id;
+      }
+      // Resources changed under the cursor: the first one's cell.
+      const heads = sections[0]?.model.resourceHeads ?? [];
+      if (heads.length === 0) cursorResource = undefined;
+      else if (!heads.some((x) => x.resource.id === cursorResource)) cursorResource = heads[0]!.resource.id;
       root.classList.toggle('dz-dg--month', s.view.alignment === 'month' || multi);
       if (multi) {
         // A crowded year draws the months near the cursor's first; the rest wake as they come near the screen.
@@ -808,16 +901,18 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       }
       else {
         const m = sections[0]!.model;
-        weekdayHead(head, m);
+        resourceHeads.sync(m.resourceHeads, m.groupHeads, ctx.epoch);
+        emptyNote(m.options.resources !== undefined && m.options.resources.length === 0);
+        weekdayHead(weekdaysHost, m);
         root.style.setProperty('--dz-cols', String(m.weeks[0]?.dates.length ?? 7));
         created.push(...weeks.sync(weekItems(sections[0]!)));
       }
       const live = new Set(sections.flatMap((x) => weekItems(x).map((w) => w.key)));
       for (const key of parts.keys()) if (!live.has(key)) parts.delete(key);
       // A cell whose content did not change was not redrawn: the tab stop is set on all of them.
-      rove(cursorDate);
+      rove(cursorDate, cursorResource);
       // The focused day went away (hidden days changed): the focus goes to the cursor's day, not to the page.
-      if (focused && !root.contains(doc.activeElement) && cursorDate) cellOf(cursorDate)?.focus();
+      if (focused && !root.contains(doc.activeElement) && cursorDate) cellOf(cursorDate, cursorResource)?.focus();
       return created;
     },
     tick() {
@@ -830,6 +925,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     },
     destroy() {
       for (const p of parts.values()) p.bars.clear();
+      resourceHeads.clear();
       weeks.clear();
       months.clear();
       parts.clear();

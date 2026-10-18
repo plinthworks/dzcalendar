@@ -25,7 +25,18 @@ export interface InteractionSurface<G = unknown> {
   /** The calendar point at a viewport point; `scrollY` is how far the scroller moved since `measure`. */
   hitAt(geo: G, x: number, y: number, scrollY: number): Hit | null;
   /** Where an event spanning `[start, end)` shows, in ghost-layer boxes. */
-  boxesFor(geo: G, span: { readonly start: ZonedDateTime | PlainDate; readonly end: ZonedDateTime | PlainDate; readonly allDay: boolean }, scrollY: number): Box[];
+  boxesFor(
+    geo: G,
+    span: {
+      readonly start: ZonedDateTime | PlainDate;
+      readonly end: ZonedDateTime | PlainDate;
+      readonly allDay: boolean;
+      /** In a resource view, only these resources' columns (a proposal's); `resourceId`: a selection's. */
+      readonly resourceIds?: readonly string[];
+      readonly resourceId?: string;
+    },
+    scrollY: number,
+  ): Box[];
   /** Whether a press on this element is on the calendar's time (columns, cells, the all-day row) — not a header, the gutter or a scrollbar. */
   accepts(target: Element): boolean;
   /** Which occurrence an event node shows. */
@@ -64,14 +75,20 @@ export interface KeyboardSurface {
   itemsAt(hit: Hit): HTMLElement[];
   /** The events next to a focused one, in reading order (its day). */
   itemsAround(node: HTMLElement): HTMLElement[];
-  /** The node to focus for an event, on `date` when given (after a keyboard move, a delete…). */
-  nodeFor(eventId: string, date?: PlainDate): HTMLElement | null;
+  /** The node to focus for an event, on `date` (and in `resourceId`'s column) when given (after a keyboard move, a delete…). */
+  nodeFor(eventId: string, date?: PlainDate, resourceId?: string): HTMLElement | null;
   /** The hit the cursor goes back to from a focused event (Escape). */
   cursorFor(node: HTMLElement): Hit | null;
   /** A time grid with an all-day row above its hours: up from the first slot goes there, down from it comes back (`firstSlot`). */
   readonly allDayRow: boolean;
   /** The top slot in view on a day (from the all-day row down into the hours). */
-  firstSlot?(date: PlainDate): Hit | null;
+  firstSlot?(date: PlainDate, resourceId?: string): Hit | null;
+  /**
+   * A resource view (Alt+Left/Right): the same day and time in the next or
+   * previous resource's column. Null: no resource that way. Undefined: not a
+   * resource view.
+   */
+  stepAcross?(hit: Hit, delta: number): Hit | null | undefined;
   /** Scrolls so that `hit` is in view (a held event's edge going below the fold). */
   reveal(hit: Hit): void;
 }

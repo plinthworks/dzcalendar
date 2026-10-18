@@ -78,6 +78,13 @@ export const DZ_CSS = `
 .dz-tg__dayhead-date { display: inline-block; min-width: 1.75rem; padding: 0.125rem 0.25rem; border-radius: 999px; font-size: 1rem; font-weight: 600; }
 .dz-tg__dayhead--today .dz-tg__dayhead-date { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); }
 .dz-tg__dayhead-note { display: block; font-size: 0.625rem; color: var(--dz-warning, var(--dzc-warning)); }
+/* Resource views: a row of groups, a row of resources, each over its columns (placed by grid-row / grid-column). */
+.dz-tg__resource, .dz-dg__resource { padding: 0.375rem 0.25rem; text-align: center; font-size: 0.8125rem; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-inline-start: 1px solid var(--dz-border, var(--dzc-border)); }
+.dz-tg__group, .dz-dg__group { padding: 0.25rem; text-align: center; font-size: 0.6875rem; color: var(--dz-fg-muted, var(--dzc-fg-muted)); text-transform: uppercase; letter-spacing: 0.04em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-inline-start: 1px solid var(--dz-border, var(--dzc-border)); border-bottom: 1px solid var(--dz-border, var(--dzc-border)); }
+.dz-tg__corner { grid-column: 1; }
+/* Where one resource's days end and the next one's begin. */
+.dz-empty { margin: 0; padding: 2rem 1rem; text-align: center; color: var(--dz-fg-muted, var(--dzc-fg-muted)); }
+.dz-tg__col.dz-tg__col--resource-start, .dz-dg__cell.dz-dg__cell--resource-start { border-inline-start: 2px solid var(--dz-resource-border, var(--dz-border, var(--dzc-border))); }
 
 .dz-tg__allday { border-bottom: 1px solid var(--dz-border, var(--dzc-border)); min-height: calc(var(--dz-bar-height, 1.375rem) + 0.5rem); }
 .dz-tg__allday-label { font-size: 0.6875rem; color: var(--dz-fg-muted, var(--dzc-fg-muted)); padding: 0.375rem 0.25rem; text-align: end; }

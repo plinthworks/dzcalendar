@@ -35,6 +35,8 @@ export type ProblemCode =
   | 'ical-unsupported'
   | 'zone-guessed'
   | 'zone-fixed-offset'
+  | 'invalid-resource'
+  | 'resource-cycle'
   | 'invalid-availability'
   | 'invalid-slot-query';
 

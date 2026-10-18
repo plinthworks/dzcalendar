@@ -143,7 +143,7 @@ describe('view models', () => {
     expect(week.hiddenPerDay.every((n) => n === 0)).toBe(true);
     expect(week.background.map((s) => s.instance.key).sort()).toEqual(['bgAllDay', 'bgTimed']);
     const tg = buildTimeGridModel(computeViewRange(d('2026-10-21'), BUILTIN_VIEWS.timeGridWeek!, mon), snap, { displayZone: 'Europe/Paris' });
-    expect([tg.allDay.lanes, tg.allDay.bars.map((b) => b.segment.instance.key), tg.allDay.background.map((s) => s.instance.key)]).toEqual([1, ['normal'], ['bgAllDay']]);
+    expect([tg.allDay.lanes, tg.allDay.bars.map((b) => b.segment.instance.key), tg.allDay.background.map((b) => b.segment.instance.key)]).toEqual([1, ['normal'], ['bgAllDay']]);
   });
 
   it('time grid: all-day events go to the row above, packed in lanes', () => {

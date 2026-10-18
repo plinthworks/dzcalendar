@@ -21,7 +21,7 @@ Elles priment sur le reste du document quand il dit autre chose.
 | Premier jour de semaine des règles (2026-10-16) | Une règle **sans `WKST`** se lit avec le lundi (RFC 5545), partout, quelle que soit la locale : la même règle donne les mêmes dates que Google, Outlook ou le serveur. Une série **créée dans DzCalendar** (commandes, interface) reçoit `WKST` = premier jour de la locale, **écrit explicitement** dans la règle. L'affichage (grilles, numéros de semaine) suit la locale. |
 | Menu contextuel (2026-10-16) | **Toutes les actions accessibles par un menu contextuel** sur la cellule et sur l'événement (clic droit, appui long tactile, touche Menu / Maj+F10). Voir D.3 bis et `docs/behaviors/context-menu.md`. |
 
-Restent ouvertes : K.3, K.4, K.6, K.7, K.10, K.12–K.16 (K.8 tranché en Phase 9).
+Restent ouvertes : K.3, K.4, K.7, K.10, K.12–K.16 (K.8 tranché en Phase 9, K.5 et K.6 en Phase 15).
 
 ### Ajustements après la Phase 0 (spikes et revues, détail dans ROADMAP.md)
 
@@ -67,6 +67,25 @@ Ils priment sur les sections citées.
 - **C.3** — lectures d'offset portées par l'événement (pas le morceau) ; une fin n'est « seconde passe » que *dans* la seconde passe ; graduations alignées sur l'horloge murale (gouttière et mode `elapsed`). Graduations propres à la colonne de transition en mode `elapsed` : à faire.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
+
+### Ajustements après la Phase 15a (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire (15a)** : vue ressource sans ressource → message « Aucune ressource » (`noResources`) ; événements sans ressource ou sur une ressource inconnue → absents des vues ressource (colonne « non assigné » à rediscuter avec la timeline) ; clavier : ←/→ restent dans les jours d'une ressource, **Alt+←/→** passent à la ressource voisine au même jour et à la même heure (curseur et événement tenu) — nouvelle intention `across` dans `intentFor` ; budgets relevés (mesure + 3 %) : core 39,4 ko, dom 41,7 ko, locales/ar 2,2 ko, premier rendu `timeGridWeek:U` 27 ms (25–27 déjà mesurés à la Phase 14).
+- **B.9 réalisé autrement** : `ResourceInput` (`title` facultatif, champs libres par signature d'index au lieu de `group`, `eventConstraint`, `eventOverlap`) ; forme vérifiée et figée `Resource` (`input` gardé, `fieldOf` lit ressource → entrée → `extendedProps`, propres seulement) ; `ResourceNode.resource` est une `Resource` ; `ResourceTree.order` (profondeur d'abord) ; `buildResourceTree(unknown, { orderBy: ResourceOrder })` (champs `'-title'`, `'unit,title'` ou fonction ; une fonction qui lève → ordre d'entrée + avertissement) ; `flattenRows(tree, RowState, filter)` avec lignes `{kind:'resource', resource…}` / `{kind:'group', value, count, expanded}` ; `columnResources(tree, groupBy)` (ressources + têtes de groupes). Problèmes : `invalid-resource`, `resource-cycle` ajoutés ; `duplicate-id`, `unknown-resource`, `unknown-zone` réutilisés ; détails sans phrase.
+- **B.13** : `RulesContext.resources` ; chaque ressource de la proposition vérifie son `eventConstraint` (sinon celle du calendrier) contre ses heures (sinon celles du calendrier) **dans sa zone** ; `eventOverlap` d'une ressource tranche pour les événements qu'elle partage (`false` refuse, `true` permet) ; deux événements sans ressource commune ne se rencontrent pas, un événement sans ressource rencontre tous les autres ; une ressource inconnue de l'arbre suit les règles du calendrier. Détail de `constraint` = id de la ressource.
+- **B.15** : `proposeMove` remplace la ressource saisie par celle visée et garde les autres (A+C glissé de A vers B → B+C) ; `grabStep(…, resourceId)` ; `DateClick` et la cible du menu portent `resourceId`. Pas encore de `Hit` `time` (timeline, 15b).
+- **B.16/B.18** : `ViewSpec.resources` : les vues ressource sont les familles `timeGrid` et `dayGrid` (`resourceTimeGridDay/Week`, `resourceDayGridDay/Week/Month`), pas de nouvelles familles ; colonnes ressources d'abord (pas de dates au-dessus). Kernel : option `resources`, `setResources` (cause `'resources'`, hors historique : ce n'est pas la commande `resource.set` de B.14, reportée), `getResources`, `getResourceProblems`, `resourceOrder`, `resourceGroupField` (dans `ModelOptions`) ; **`ModelFamily.build` reçoit `resources` et `columns`** (changement de l'API `registerModelFamily`). Modèles : `TimeGridColumn.resource`, clés `date|id`, segments et barres suffixés `|id`, `AllDayBar.column`, `allDay.background: AllDayBar[]`, `resourceHeads`/`groupHeads`, `locateNow(...).columns` ; `DayGridWeek.resources` parallèle à `dates` (une rangée = les semaines de toutes les ressources), `firstColumn` compte les cellules ; `AvailableSlot.resourceId`. Tous les nœuds de l'arbre sont des colonnes, parents compris ; le groupement s'applique aux racines.
+- **D** : têtes `render/resource-heads.ts` (`.dz-tg__resource`/`.dz-dg__resource`, groupes, `aria-hidden` : chaque colonne ou cellule dit « Ressource, date », message `ofResource`) ; trait de 2 px au début des jours d'une ressource ; ghosts limités aux ressources de la proposition ; ligne de l'heure dans chaque colonne du jour ; `hooks.resource.content` (`ResourceContentCtx`) ; `onResourceProblems` ; Angular `[resources]`, `(resourceProblems)`. Les ressources remplacées pendant une saisie clavier la relâchent ; un curseur dont la colonne disparaît repart de sa place d'accueil.
+- **Pour 15b, relevé par l'architecte** : l'état des lignes (dépliées, groupes fermés) n'a pas encore de place dans le kernel ; le modèle construit toutes les colonnes et utilise des indices positionnels (`r × n + jour`) — la timeline aura besoin d'un constructeur de ligne par ressource fenêtré ; la vérification de chevauchement parcourt toute la fenêtre (à indexer par ressource sous 500 × 10 000) ; les hooks de ressource n'ont que `content`. Les créneaux restent des instants : la zone d'une ressource n'est pas passée à `findSlots`.
+
+### Décisions de la Phase 15 (2026-10-18, en cours)
+
+- **Découpage** : 15a = modèle de ressources + vues ressource en colonnes (timeGrid/dayGrid par ressource) ; 15b = timeline ± ressources + virtualisation 2D. Revues et commit par sous-phase.
+- **K.6 tranché** : toutes les colonnes dans la zone du calendrier ; la zone d'une ressource sert à ses business hours (calculées dans sa zone) et aux créneaux.
+- **Interactions complètes dès 15a** : glisser entre ressources, redimensionner, sélectionner sur une ressource, menu, clavier, règles (dont `eventConstraint`/`eventOverlap` de la ressource), annulation.
+- **Zone des ressources (15b)** : arbre, groupes par champ, plusieurs colonnes de champs à largeur réglable.
+- **K.5 tranché** : les colonnes de ressources (resource-timeGrid, resource-dayGrid) sont dans core et dom, à côté des grilles qu'elles étendent ; `@dzcalendar/pro` naît en 15b avec la timeline.
+- **K.9** : toujours tout en MIT, pas de `license.ts`.
 
 ### Ajustements après la Phase 14 (détail dans ROADMAP.md)
 
@@ -270,7 +289,7 @@ Règle de partage : **tout fait de fuseau horaire (temps pur) va upstream. Toute
 | `@dzcalendar/theme` | SCSS → CSS, tokens, Tailwind 3 et 4, `contrast.css` | MIT | 0 (minimal) |
 | `@dzcalendar/motion-gsap` | Adaptateur GSAP optionnel (Flip, transitions de vues) | MIT, peer `gsap` | 17 |
 | `@dzcalendar/conformance` | `cases/**/*.json`, schémas JSON, runner TS | MIT | 1 |
-| `@dzcalendar/pro` | timeline ±ressources, vues ressource verticales, arbre/groupes de ressources (UI), virtualisation 2D étendue, impression paginée, export PDF/PNG/XLSX/ICS, éditeur d'événement et de récurrence, slots avancés | FSL (source-available, bascule MIT après 2 ans) | 15–16 |
+| `@dzcalendar/pro` | timeline ±ressources, zone des ressources de la timeline (arbre, groupes, colonnes de champs), virtualisation 2D étendue, impression paginée, export PDF/PNG/XLSX/ICS, éditeur d'événement et de récurrence, slots avancés | FSL (source-available, bascule MIT après 2 ans) | 15–16 |
 | `@dzcalendar/pro-angular` | Wrappers Angular du Pro | FSL | 16 |
 | `@dzcalendar/compat-fullcalendar` | Traducteur d'options FC → DzCalendar, codemod | MIT | 18 |
 | `@dzcalendar/element`, `react`, `vue` | Web Component, adaptateurs | MIT | 18 |
@@ -285,7 +304,7 @@ Règle de partage : **tout fait de fuseau horaire (temps pur) va upstream. Toute
 - le modèle de ressources (types, arbre, `resourceId` sur les événements), parce que les événements le portent ;
 - slots de base, Angular, a11y.
 
-Pro : timeline, vues ressource verticales, UI de colonnes/groupes de ressources, virtualisation 2D à grande échelle, impression paginée, export, éditeur prêt à l'emploi, slots avancés (capacité, rotas, contraintes).
+Pro : timeline, zone des ressources de la timeline (les vues ressource en colonnes sont gratuites, K.5), virtualisation 2D à grande échelle, impression paginée, export, éditeur prêt à l'emploi, slots avancés (capacité, rotas, contraintes).
 
 Rien ne dépend du Pro dans les paquets MIT. Le Pro s'enregistre comme plugin de vues via `registerView` (D.1). La clé de licence est vérifiée hors ligne (signature Ed25519), sans appel réseau (question K.9).
 
@@ -629,7 +648,7 @@ export type ResourceRow =
 export function flattenRows(tree: ResourceTree, state: { expanded: ReadonlySet<ResourceId>; groups?: { field: string; collapsed: ReadonlySet<string> } },
   filter?: (r: ResourceInput) => boolean): ResourceRow[];     // O(n)
 ```
-Dans l'arbre, la zone de ressource sert aux business hours et aux slots. L'affichage reste dans la zone du calendrier (question K.6).
+Dans l'arbre, la zone de ressource sert aux business hours et aux slots. L'affichage reste dans la zone du calendrier (K.6, tranché en Phase 15).
 
 ### B.10 `project/` : projection événement → vue
 
@@ -1328,7 +1347,7 @@ dzcalendar/
 │  ├─ theme/
 │  │  ├─ package.json · dzcalendar.scss · dzcalendar.css (généré) · contrast.css · tailwind.css · tailwind3.css
 │  ├─ motion-gsap/          src/index.ts · flip.ts · view-transition.ts
-│  ├─ pro/                  (Phase 15+)  src/{index.ts, timeline/, resource-views/, resource-area/, virtual2d/, print/, export/, editor/, slots-pro/, license.ts}
+│  ├─ pro/                  (Phase 15+)  src/{index.ts, timeline/, resource-area/, virtual2d/, print/, export/, editor/, slots-pro/}  (resource-views : dans core/dom, K.5 ; pas de license.ts, K.9)
 │  └─ pro-angular/          (Phase 16)
 ├─ playground/
 │  ├─ index.html (Angular) · vanilla.html · tailwind.html · dst.html (4 zones côte à côte) · perf.html · a11y.html
@@ -1431,7 +1450,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 - **Dépend de** : P5 (disponibilités récurrentes), P2.
 
 ### Phase 15 : Pro, ressources et timeline
-- **Livrables / fichiers** : `pro/{timeline,resource-views,resource-area,virtual2d,license}`, `core/resource/*` (déjà posé en P1, complété ici).
+- **Livrables / fichiers** : 15a `core/resource/*` + colonnes de ressources dans `core/views` et `dom/views` (K.5) ; 15b `pro/{timeline,resource-area,virtual2d}`.
 - **Acceptation** : timeline avec et sans ressources ; arbre et groupes ; axe `elapsed` : colonnes de largeur 23/24/25 h exactes ; deux « 02:00 » étiquetés ; budget timeline G.2 (500×10 000) ; resource-timeGrid et resource-dayGrid ; accessibilité `treegrid`.
 - **Dépend de** : P12, P7.
 
@@ -1469,9 +1488,9 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 
 **K.4 `Intl` et Temporal.** Si le spike P0 montre que `formatToParts(number)` avec `timeZone`/`calendar` diffère entre natif et polyfill, il faut un adaptateur de formatage dédié, ce qui augmente la taille de `format/`.
 
-**K.5 Pro : frontière.** Faut-il que la **virtualisation 2D** et les **colonnes de ressources** soient Pro (comme dans le doc d'analyse), alors que le modèle de ressources est gratuit ? Le marché (MUI X) garde les ressources en MIT. Ce plan garde les types/arbre gratuits et la UI timeline/ressources en Pro ; à confirmer.
+**K.5 Pro : frontière.** *(Tranché le 2026-10-18 : colonnes de ressources gratuites, dans core et dom ; timeline en Pro.)* Faut-il que la **virtualisation 2D** et les **colonnes de ressources** soient Pro (comme dans le doc d'analyse), alors que le modèle de ressources est gratuit ? Le marché (MUI X) garde les ressources en MIT. Ce plan garde les types/arbre gratuits et la UI timeline/ressources en Pro ; à confirmer.
 
-**K.6 Fuseau par ressource.** La zone d'une ressource sert aux business hours et aux slots, mais l'affichage reste dans la zone du calendrier. Voulez-vous une colonne ressource affichée dans sa propre zone (utile pour des agendas de praticiens répartis sur plusieurs pays) ? C'est faisable avec un `ColumnAxis` par colonne, mais le Pro devrait alors gérer des colonnes à axes différents.
+**K.6 Fuseau par ressource.** *(Tranché le 2026-10-18 : toutes les colonnes dans la zone du calendrier.)* La zone d'une ressource sert aux business hours et aux slots, mais l'affichage reste dans la zone du calendrier. Voulez-vous une colonne ressource affichée dans sa propre zone (utile pour des agendas de praticiens répartis sur plusieurs pays) ? C'est faisable avec un `ColumnAxis` par colonne, mais le Pro devrait alors gérer des colonnes à axes différents.
 
 **K.7 Portée de RRULE.** `RSCALE` (autres calendriers), `BYEASTER`, `SKIP=…` : exclus de la v1 ? Hypothèse : oui. Les exceptions `EXRULE` (obsolète) : acceptées en lecture, jamais émises ?
 

@@ -29,6 +29,12 @@ export interface Step {
 export type Intent =
   /** Cursor: to the next day or slot (`extend`: Shift, the selection grows). Grab: the event moves. */
   | { readonly kind: 'move'; readonly step: Step; readonly extend: boolean }
+  /**
+   * A resource view, Alt+Left/Right: to the next or previous resource, the
+   * same day and time — the cursor, or the held event. (Plain arrows stay in
+   * the days of one resource.)
+   */
+  | { readonly kind: 'across'; readonly delta: 1 | -1 }
   /** Grab: one edge moves (Shift: the end; Alt+Shift: the start). */
   | { readonly kind: 'resize'; readonly edge: 'start' | 'end'; readonly step: Step }
   /** Cursor: to the first or last place of its line (a week row, a day's hours). */
@@ -97,10 +103,11 @@ export function intentFor(k: KeyLike, ctx: KeyContext): Intent | null {
   if (mod) return null;
   const step = arrow(key, ctx);
 
+  const across = (): Intent | null => (step && step.days !== 0 ? { kind: 'across', delta: step.days > 0 ? 1 : -1 } : null);
   if (ctx.mode === 'grab') {
     if (step) {
       if (k.shiftKey) return { kind: 'resize', edge: k.altKey ? 'start' : 'end', step };
-      return k.altKey ? null : { kind: 'move', step, extend: false };
+      return k.altKey ? across() : { kind: 'move', step, extend: false };
     }
     if (key === 'PageUp' || key === 'PageDown') return { kind: 'move', step: { ...NONE, days: key === 'PageUp' ? -7 : 7 }, extend: false };
     if (key === 'Enter' || key === ' ') return { kind: 'commit' };
@@ -119,7 +126,7 @@ export function intentFor(k: KeyLike, ctx: KeyContext): Intent | null {
     return null;
   }
 
-  if (k.altKey) return null;
+  if (k.altKey) return k.shiftKey ? null : across();
   if (step) return { kind: 'move', step, extend: k.shiftKey === true };
   if (key === 'Home' || key === 'End') return { kind: 'line', edge: key === 'Home' ? 'start' : 'end', extend: k.shiftKey === true };
   if (key === 'PageUp' || key === 'PageDown') return { kind: 'period', dir: key === 'PageUp' ? 'prev' : 'next' };
@@ -200,9 +207,12 @@ export function grabStep(
   held: CalEvent,
   op: { readonly kind: 'move'; readonly step: Step } | { readonly kind: 'resize'; readonly edge: 'start' | 'end'; readonly step: Step },
   fit: (to: Hit, from: Hit) => Hit | null = (h) => h,
+  /** In a resource view, the column the event is held in: a move across columns swaps it for the new one. */
+  resourceId?: string,
 ): Proposal | null {
   const edge = op.kind === 'resize' ? op.edge : 'start';
-  const from = eventHit(held, edge, { displayZone: ctx.displayZone, grid });
+  const at = eventHit(held, edge, { displayZone: ctx.displayZone, grid });
+  const from = resourceId !== undefined ? { ...at, resourceId } : at;
   const to = fit(stepHit(ctx, from, op.step), from);
   if (!to) return null;
   return op.kind === 'move' ? proposeMove(ctx, held, from, to) : proposeResize(ctx, held, op.edge, to);

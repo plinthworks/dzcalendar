@@ -20,6 +20,16 @@ describe('intentFor', () => {
   const time: KeyContext = { mode: 'cursor', rtl: false, grid: 'time' };
   const k = (key: string, mods: { shiftKey?: boolean; altKey?: boolean; ctrlKey?: boolean; metaKey?: boolean } = {}) => ({ key, ...mods });
 
+  it('Alt+left/right: to the next or previous resource (reading direction applied), cursor and grab; Alt+up/down are not ours', () => {
+    expect(intentFor(k('ArrowRight', { altKey: true }), time)).toEqual({ kind: 'across', delta: 1 });
+    expect(intentFor(k('ArrowRight', { altKey: true }), { ...time, rtl: true })).toEqual({ kind: 'across', delta: -1 });
+    expect(intentFor(k('ArrowLeft', { altKey: true }), { ...time, mode: 'grab' })).toEqual({ kind: 'across', delta: -1 });
+    expect(intentFor(k('ArrowUp', { altKey: true }), time)).toBeNull();
+    // Alt+Shift in grab mode is still the start's edge; on an event, Alt+arrows stay the page's.
+    expect(intentFor(k('ArrowRight', { altKey: true, shiftKey: true }), { ...time, mode: 'grab' })).toEqual({ kind: 'resize', edge: 'start', step: { days: 1, slots: 0 } });
+    expect(intentFor(k('ArrowRight', { altKey: true }), { ...time, mode: 'event' })).toBeNull();
+  });
+
   it('cursor in a time grid: left/right are days, up/down are slots, Shift extends', () => {
     expect(intentFor(k('ArrowRight'), time)).toEqual({ kind: 'move', step: { days: 1, slots: 0 }, extend: false });
     expect(intentFor(k('ArrowUp'), time)).toEqual({ kind: 'move', step: { days: 0, slots: -1 }, extend: false });

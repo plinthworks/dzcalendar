@@ -335,7 +335,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     const hit = surface.hitAt(geo, pe.clientX, pe.clientY, 0);
     if (!hit) return;
     const live = ctx.live();
-    live.onDateClick?.(hit.kind === 'slot' ? { allDay: false, date: hit.date, instant: hit.instant } : { allDay: true, date: hit.date });
+    const resource = hit.resourceId !== undefined ? { resourceId: hit.resourceId } : {};
+    live.onDateClick?.(hit.kind === 'slot' ? { allDay: false, date: hit.date, instant: hit.instant, ...resource } : { allDay: true, date: hit.date, ...resource });
     // A tap on a touch screen selects one slot, with two handles to pull its ends.
     if (p.type === 'touch' && live.selectable) {
       const sel = selectionBetween(interaction(null), hit, hit);

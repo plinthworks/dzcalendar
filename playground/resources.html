@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — ressources</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: #52525b; max-width: 80ch; }
+      .controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+      #log { min-height: 1.4em; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Un médecin par colonne</h1>
+      <p>Quatre médecins en deux services. Le Dr Haddad consulte depuis Riyad (dimanche–jeudi, 08:00–12:00 heure de Riyad) : ses heures sont lues dans son fuseau et grisées en dehors, et ses rendez-vous doivent y tenir. La Dre Benali refuse les chevauchements. Glisser un rendez-vous d'un médecin à l'autre, au clavier aussi (flèches gauche et droite d'une colonne à l'autre).</p>
+      <div class="controls">
+        <label>Vue <select id="view">
+          <option value="resourceTimeGridDay">Jour</option>
+          <option value="resourceTimeGridWeek">Semaine</option>
+          <option value="resourceDayGridDay">Jour (grille)</option>
+          <option value="resourceDayGridWeek">Semaine (grille)</option>
+          <option value="resourceDayGridMonth">Mois</option>
+        </select></label>
+        <label><input type="checkbox" id="group" checked /> Grouper par service</label>
+        <span id="log" role="status"></span>
+      </div>
+      <div id="cal"></div>
+    </main>
+    <script type="module" src="./resources.ts"></script>
+  </body>
+</html>

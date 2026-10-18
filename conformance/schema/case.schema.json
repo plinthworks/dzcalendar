@@ -29,7 +29,9 @@
         "rrule-expand",
         "series-edit",
         "ical-parse",
-        "slots"
+        "slots",
+        "resource-tree",
+        "resource-rules"
       ]
     },
     "description": {

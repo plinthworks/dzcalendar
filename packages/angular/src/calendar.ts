@@ -25,6 +25,8 @@ import type {
   EventSourceSpec,
   NormalizationReport,
   PlainDate,
+  Problem,
+  ResourceInput,
   Selection,
   SourceNotice,
   Weekday,
@@ -38,7 +40,7 @@ import { DzEventContent } from './templates.js';
 import type { EventContentContext } from './templates.js';
 
 /** The callbacks the component turns into outputs: not options (they would silence the outputs). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems'] as const;
 
 /** What `[options]` takes: what `update()` takes, less what has an input or an output of its own. */
 export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | (typeof OWN_CALLBACKS)[number]>;
@@ -108,6 +110,8 @@ export class DzCalendar implements OnDestroy {
   readonly secondaryCalendar = input<string | null | undefined>(undefined);
   /** Bookable slots drawn in the week and day views (`findSlots(...).slots` from @dzcalendar/slots); null: none. */
   readonly availableSlots = input<readonly AvailableSlot[] | null | undefined>(undefined);
+  /** What resource views show as columns (`resourceTimeGridDay`…); `resourceOrder` and `resourceGroupField` go in `options`. */
+  readonly resources = input<readonly ResourceInput[] | undefined>(undefined);
   /** Everything else `update()` takes. */
   readonly options = input<DzCalendarOptions>({});
 
@@ -123,6 +127,8 @@ export class DzCalendar implements OnDestroy {
   /** Loading, a failed fetch, problems in a delivery, a save refused. */
   readonly sourceNotice = output<SourceNotice>();
   readonly problems = output<NormalizationReport>();
+  /** What the `resources` given could not be read as. */
+  readonly resourceProblems = output<readonly Problem[]>();
 
   private readonly eventTemplate = contentChild(DzEventContent);
 
@@ -158,6 +164,7 @@ export class DzCalendar implements OnDestroy {
         displayCalendar: this.displayCalendar(),
         secondaryCalendar: this.secondaryCalendar(),
         availableSlots: this.availableSlots(),
+        resources: this.resources(),
         timeGrid: axis ? { ...this.options().timeGrid, axis } : undefined,
       }),
       hooks: this.hooks(),
@@ -178,6 +185,7 @@ export class DzCalendar implements OnDestroy {
       ...(untracked(this.settings) as CalendarOptions),
       onDateClick: (c) => this.emit(() => this.dateClick.emit(c)),
       onSlotClick: (x) => this.emit(() => this.slotClick.emit(x)),
+      onResourceProblems: (ps) => this.emit(() => this.resourceProblems.emit(ps)),
       onEventClick: (i) => this.emit(() => this.eventClick.emit(i)),
       onEventOpen: (i) => this.emit(() => this.eventOpen.emit(i)),
       onCreateRequest: (r) => this.emit(() => this.createRequest.emit(r)),

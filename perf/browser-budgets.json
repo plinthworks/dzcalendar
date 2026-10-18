@@ -1,6 +1,6 @@
 {
   "_comment": "ARCHITECTURE G.2 in Chrome, on the minified playground (npm run perf:browser). firstFrame ms (median of 3), nodes = elements in the calendar after the first frame; update = ms from changing one event to the next frame (≤ 1 layout).",
-  "timeGridWeek:U": { "firstFrame": 25, "nodes": 1000, "update": 16 },
+  "timeGridWeek:U": { "firstFrame": 27, "nodes": 1000, "update": 16 },
   "timeGridWeek:W": { "firstFrame": 150, "nodes": 3000, "update": 50 },
   "timeGridWeek:W:flat": { "query": "&stack=none&minute=3", "firstFrame": 400, "nodes": 16000, "update": 50 },
   "dayGridMonth:U": { "firstFrame": 50, "nodes": 800 },

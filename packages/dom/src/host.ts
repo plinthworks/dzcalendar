@@ -1,4 +1,4 @@
-import type { ActionItem, ActionTarget, CalendarKernel, Command, CommandResult, EditScope, EventInstance, Instant, KernelState, Proposal, RulesContext, Segment, ZoneId } from '@dzcalendar/core';
+import type { ActionItem, ActionTarget, CalendarKernel, Resource, Command, CommandResult, EditScope, EventInstance, Instant, KernelState, Proposal, RulesContext, Segment, ZoneId } from '@dzcalendar/core';
 import type { InteractionSurface } from './interact/surface.js';
 import type { LiveSettings } from './settings.js';
 
@@ -32,8 +32,20 @@ export interface EventHooks {
   willUnmount?: (arg: { el: HTMLElement; ctx: EventContentCtx }) => void;
 }
 
+/** What a resource's head is drawn from (the timeline's rows will add their depth and state). */
+export interface ResourceContentCtx {
+  readonly resource: Resource;
+}
+
+/** A resource view's head: what an application puts there (a photo, a specialty) instead of the title. */
+export interface ResourceHooks {
+  /** Null keeps the title. Runs when the resource (or the words in force) changed. */
+  content?: (ctx: ResourceContentCtx, el: HTMLElement) => string | Node | null;
+}
+
 export interface CalendarHooks {
   readonly event?: EventHooks;
+  readonly resource?: ResourceHooks;
 }
 
 export interface ContextMenuCtx {

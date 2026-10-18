@@ -28,11 +28,20 @@ import type { NavContext, ViewRange, ViewSpec } from './views/spec.js';
 import { buildTimeGridModel, updateTimeGridModel } from './views/timegrid.js';
 import type { AvailableSlot, TimeGridModel, TimeGridOptions } from './views/timegrid.js';
 import { isValidZone } from './zone.js';
+import type { Problem } from './event/problems.js';
+import { buildResourceTree } from './resource/tree.js';
+import { columnResources } from './resource/rows.js';
+import type { ColumnResources } from './resource/rows.js';
+import type { ResourceInput, ResourceOrder, ResourceTree } from './resource/types.js';
 
 /** Options that shape the models; changeable at any time with `setOptions`. */
 export interface ModelOptions {
-  readonly timeGrid?: Omit<TimeGridOptions, 'displayZone' | 'businessHours' | 'availableSlots'>;
-  readonly dayGrid?: Omit<DayGridOptions, 'displayZone' | 'businessHours' | 'showNonCurrentDates'>;
+  readonly timeGrid?: Omit<TimeGridOptions, 'displayZone' | 'businessHours' | 'availableSlots' | 'resources' | 'resourceGroups'>;
+  readonly dayGrid?: Omit<DayGridOptions, 'displayZone' | 'businessHours' | 'showNonCurrentDates' | 'resources' | 'resourceGroups'>;
+  /** How sibling resources are ordered after their `order`: field names (`'-title'` descending) or a comparison. */
+  readonly resourceOrder?: ResourceOrder | undefined;
+  /** Resource views group their columns (a timeline its rows) by this field: a head over each run. */
+  readonly resourceGroupField?: string | undefined;
   readonly businessHours?: BusinessHoursInput;
   /** Bookable slots drawn in the time grid (compared by identity: a new array redraws). */
   readonly availableSlots?: readonly AvailableSlot[] | null;
@@ -66,6 +75,8 @@ export interface KernelOptions extends ModelOptions {
   readonly onSource?: (n: SourceNotice) => void;
   /** For retries; injectable for tests. Default: the global timers. */
   readonly timers?: Timers;
+  /** What resource views show as columns (`setResources` replaces them). */
+  readonly resources?: readonly ResourceInput[];
 }
 
 export interface KernelState {
@@ -81,7 +92,18 @@ export interface KernelState {
 
 /** What a family's model is built from, and how it follows the store. */
 export interface ModelFamily<M = unknown> {
-  build(range: ViewRange, snap: StoreSnapshot, ctx: { readonly displayZone: ZoneId; readonly view: ViewSpec; readonly options: ModelOptions }): M;
+  build(
+    range: ViewRange,
+    snap: StoreSnapshot,
+    ctx: {
+      readonly displayZone: ZoneId;
+      readonly view: ViewSpec;
+      readonly options: ModelOptions;
+      /** The calendar's resources, in order; `columns` is what a resource view shows (groups included). */
+      readonly resources: ResourceTree;
+      readonly columns: ColumnResources;
+    },
+  ): M;
   /** Optional fine update after a store change; absent means rebuild. */
   update?(prev: M, snap: StoreSnapshot, change: StoreChange): M;
 }
@@ -93,23 +115,28 @@ export function registerModelFamily<M>(family: string, f: ModelFamily<M>): void 
   FAMILIES.set(family, f as ModelFamily);
 }
 
+/** A resource view's columns, for the families that draw them. */
+const resourceOpts = (view: ViewSpec, columns: ColumnResources) => (view.resources ? { resources: columns.resources, resourceGroups: columns.groups } : {});
+
 registerModelFamily<TimeGridModel>('timeGrid', {
-  build: (range, snap, { displayZone, options }) =>
+  build: (range, snap, { displayZone, view, options, columns }) =>
     buildTimeGridModel(range, snap, {
       ...options.timeGrid,
       displayZone,
       ...(options.businessHours !== undefined && { businessHours: options.businessHours }),
       ...(options.availableSlots && { availableSlots: options.availableSlots }),
+      ...resourceOpts(view, columns),
     }),
   update: updateTimeGridModel,
 });
 registerModelFamily<DayGridModel>('dayGrid', {
-  build: (range, snap, { displayZone, view, options }) =>
+  build: (range, snap, { displayZone, view, options, columns }) =>
     buildDayGridModel(range, snap, {
       ...options.dayGrid,
       displayZone,
       showNonCurrentDates: view.showNonCurrentDates,
       ...(options.businessHours !== undefined && { businessHours: options.businessHours }),
+      ...resourceOpts(view, columns),
     }),
   update: updateDayGridModel,
 });
@@ -120,7 +147,7 @@ export interface ViewModel<M = unknown> {
   readonly model: M;
 }
 
-export type StateCause = 'navigate' | 'view' | 'zone' | 'locale' | 'options' | 'today';
+export type StateCause = 'navigate' | 'view' | 'zone' | 'locale' | 'options' | 'today' | 'resources';
 
 export type KernelEvent =
   | {
@@ -165,6 +192,16 @@ export interface CalendarKernel {
   /** What the last `events`/`setEvents` load reported. */
   getProblems(): NormalizationReport | null;
   /**
+   * Replaces the resources (a `state` event, cause 'resources'): resource
+   * views redraw their columns, rules read the new ones. Returns what could
+   * not be read — never throws.
+   */
+  setResources(resources: readonly ResourceInput[]): readonly Problem[];
+  /** The resources in force, as a tree in order. */
+  getResources(): ResourceTree;
+  /** What the last `resources`/`setResources` reported. */
+  getResourceProblems(): readonly Problem[];
+  /**
    * Runs a command through the history: undoable; series created here take
    * the locale's first day as WKST. `validate` checks it against the rules
    * (constraint, overlap, allow, editable) — what a person's gesture asks for;
@@ -181,6 +218,10 @@ export interface CalendarKernel {
 }
 
 const systemNow = (): Instant => Temporal.Now.instant();
+
+/** Two orders are the same when they are the same function, or the same fields. */
+const sameOrder = (a: ResourceOrder | undefined, b: ResourceOrder | undefined) =>
+  a === b || (typeof a !== 'function' && typeof b !== 'function' && a !== undefined && b !== undefined && [a].flat().join() === [b].flat().join());
 
 /**
  * The calendar without a screen: date, view, zone, locale, options,
@@ -204,6 +245,8 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     ...(o.businessHours !== undefined && { businessHours: o.businessHours }),
     ...(o.hiddenDays && { hiddenDays: o.hiddenDays }),
     ...(o.availableSlots && { availableSlots: o.availableSlots }),
+    ...(o.resourceOrder !== undefined && { resourceOrder: o.resourceOrder }),
+    ...(o.resourceGroupField !== undefined && { resourceGroupField: o.resourceGroupField }),
   };
   const todayIn = (zone: ZoneId) => now().toZonedDateTimeISO(zone).toPlainDate();
   let date = o.initialDate ?? todayIn(timeZone);
@@ -227,6 +270,18 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   };
   let view = effectiveOf(raw);
 
+  let resourceInputs: readonly ResourceInput[] = o.resources ?? [];
+  let resourceTree: ResourceTree;
+  let resourceProblems: readonly Problem[];
+  let columns: ColumnResources;
+  const buildResources = () => {
+    const built = buildResourceTree(resourceInputs, options.resourceOrder !== undefined ? { orderBy: options.resourceOrder } : {});
+    resourceTree = built.tree;
+    resourceProblems = built.problems;
+    columns = columnResources(resourceTree, options.resourceGroupField);
+  };
+  buildResources();
+
   let problems: NormalizationReport | null = null;
   const idGen = createIdGenerator('ev');
   const loadEvents = (events: readonly EventInput[]) =>
@@ -235,7 +290,12 @@ export function createKernel(o: KernelOptions): CalendarKernel {
 
   const nav = (): NavContext => ({ firstDay, today: todayIn(timeZone) });
   let validating = false;
-  const rulesNow = (): RulesContext => ({ displayZone: timeZone, ...(options.businessHours !== undefined && { businessHours: options.businessHours }), ...o.rules });
+  const rulesNow = (): RulesContext => ({
+    displayZone: timeZone,
+    ...(options.businessHours !== undefined && { businessHours: options.businessHours }),
+    ...(resourceTree.order.length > 0 && { resources: resourceTree }),
+    ...o.rules,
+  });
   // Read at every command: the zone, the locale's first day and the rules may have changed since.
   const history = createHistory(
     store,
@@ -376,7 +436,9 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         (!next.dayGrid || same(options.dayGrid, next.dayGrid)) &&
         (!('businessHours' in next) || next.businessHours === options.businessHours) &&
         (!('availableSlots' in next) || next.availableSlots === options.availableSlots) &&
-        (!('hiddenDays' in next) || [...(next.hiddenDays ?? [])].sort().join() === [...(options.hiddenDays ?? [])].sort().join())
+        (!('hiddenDays' in next) || [...(next.hiddenDays ?? [])].sort().join() === [...(options.hiddenDays ?? [])].sort().join()) &&
+        (!('resourceOrder' in next) || sameOrder(next.resourceOrder, options.resourceOrder)) &&
+        (!('resourceGroupField' in next) || next.resourceGroupField === options.resourceGroupField)
       ) {
         return;
       }
@@ -388,7 +450,10 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         ...('businessHours' in next && { businessHours: next.businessHours }),
         ...('hiddenDays' in next && { hiddenDays: next.hiddenDays }),
         ...('availableSlots' in next && { availableSlots: next.availableSlots }),
+        ...('resourceOrder' in next && { resourceOrder: next.resourceOrder }),
+        ...('resourceGroupField' in next && { resourceGroupField: next.resourceGroupField }),
       } as ModelOptions;
+      if ('resourceOrder' in next || 'resourceGroupField' in next) buildResources();
       view = effectiveOf(raw);
       changeState('options');
     },
@@ -414,11 +479,19 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       if (model) return model;
       const family = FAMILIES.get(view.family);
       if (!family) throw new Error(`no model family registered for ${view.family}`);
-      model = { family: view.family, model: family.build(state.range, store.snapshot, { displayZone: timeZone, view, options }) };
+      model = { family: view.family, model: family.build(state.range, store.snapshot, { displayZone: timeZone, view, options, resources: resourceTree, columns }) };
       return model;
     },
     now,
     getProblems: () => problems,
+    setResources(next) {
+      resourceInputs = next;
+      buildResources();
+      changeState('resources');
+      return resourceProblems;
+    },
+    getResources: () => resourceTree,
+    getResourceProblems: () => resourceProblems,
     subscribe(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);

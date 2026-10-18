@@ -81,7 +81,20 @@ function finish(ctx: InteractionContext, p: Omit<Proposal, 'valid' | 'violations
   return { ...p, valid: violations.length === 0, violations };
 }
 
-const resourcesFor = (ev: CalEvent, over: Hit): readonly ResourceId[] => (over.resourceId !== undefined ? [over.resourceId] : ev.resourceIds);
+/**
+ * The resources after a move: the one grabbed on is swapped for the one
+ * under the pointer, the others kept (an event on two doctors, dragged from
+ * one to a third, stays on the other). Grabbed outside a resource column, it
+ * goes onto the one it is dropped on.
+ */
+function resourcesFor(ev: CalEvent, grab: Hit, over: Hit): readonly ResourceId[] {
+  const to = over.resourceId;
+  if (to === undefined || to === grab.resourceId) return ev.resourceIds;
+  const from = grab.resourceId;
+  if (from === undefined || !ev.resourceIds.includes(from)) return [to];
+  const out = ev.resourceIds.map((r) => (r === from ? to : r));
+  return out.filter((r, i) => out.indexOf(r) === i);
+}
 
 /**
  * Where `ev` goes when the point that grabbed it (`grab`) is over `over`. A
@@ -93,7 +106,7 @@ const resourcesFor = (ev: CalEvent, over: Hit): readonly ResourceId[] => (over.r
  * time grid, a day event becomes timed.
  */
 export function proposeMove(ctx: InteractionContext, ev: CalEvent, grab: Hit, over: Hit): Proposal {
-  const resourceIds = resourcesFor(ev, over);
+  const resourceIds = resourcesFor(ev, grab, over);
   if (over.kind === 'slot') {
     if (ev.allDay) {
       // A day event into the time grid: timed, at the snapped moment, default length.

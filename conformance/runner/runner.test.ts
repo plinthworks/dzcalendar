@@ -19,6 +19,10 @@ import {
   createEventStore,
   createHistory,
   viewWindow,
+  buildResourceTree,
+  flattenRows,
+  normalizeMany,
+  validateProposal,
 } from '../../packages/core/src/index.js';
 import { expandZoned, expandDates, parseRRule, serializeRRule } from '../../packages/rrule/src/index.js';
 import { parseICal } from '../../packages/ical/src/index.js';
@@ -47,6 +51,22 @@ const str = (x: { toString(): string } | null) => (x === null ? null : x.toStrin
 const slotText = (x: Slot) => `${x.start.toString({ smallestUnit: 'minute', timeZoneName: 'never' })}/${x.end.toString({ smallestUnit: 'minute', timeZoneName: 'never' })}`;
 
 const adapters: Record<string, (input: any) => unknown> = {
+  'resource-tree': ({ resources, orderBy, groupBy, expanded }) => {
+    const { tree, problems } = buildResourceTree(resources, orderBy !== undefined ? { orderBy } : {});
+    const rows = flattenRows(tree, { ...(groupBy && { groupBy }), ...(expanded && { expanded: new Set<string>(expanded) }) });
+    return {
+      rows: rows.map((r) => (r.kind === 'group' ? `[${r.value}]` : `${r.depth}:${r.resource.id}`)),
+      problems: problems.map((x) => `${x.code}@${x.path}`),
+    };
+  },
+  'resource-rules': ({ zone, resources, events, move, rules }) => {
+    const store = createEventStore();
+    store.replaceSourceChunk('c', 'all', normalizeMany(events, { displayZone: zone, newId: createIdGenerator('c') }, 'c').items);
+    const event = store.snapshot.getEvent(move.id)!;
+    const p = { event, start: Temporal.ZonedDateTime.from(move.start), end: Temporal.ZonedDateTime.from(move.end), resourceIds: move.resourceIds };
+    const v = validateProposal(store.snapshot, p, { displayZone: zone, resources: buildResourceTree(resources).tree, ...rules });
+    return { violations: v.map((x) => [x.code, x.detail ?? null]) };
+  },
   slots: ({ check, ...query }) => {
     if (check !== undefined) {
       const r = checkSlot(query, check);

@@ -13,6 +13,8 @@ import type { BusinessHoursInput } from '../rules/business-hours.js';
 import { dayInfo } from '../zone.js';
 import type { ViewRange } from './spec.js';
 import type { EventDisplay } from '../event/types.js';
+import type { Resource } from '../resource/types.js';
+import type { ResourceGroupHead, ResourceHead } from './timegrid.js';
 
 /** Inverse background is drawn by the DOM as the complement; neither takes a lane. */
 export const isBackground = (d: EventDisplay): boolean => d === 'background' || d === 'inverse-background';
@@ -22,6 +24,13 @@ export interface DayGridOptions {
   /** Rows of bars per day before "+N". Unlimited when absent or null. */
   readonly maxLanes?: number | null;
   readonly resourceId?: string;
+  /**
+   * A resource view: in each row, every resource's days side by side
+   * (resources first). Each resource's cells show its events, and are
+   * `closed` by its own business hours, read in its zone.
+   */
+  readonly resources?: readonly Resource[];
+  readonly resourceGroups?: readonly ResourceGroupHead[];
   /** Days without any open hour are marked `closed`. */
   readonly businessHours?: BusinessHoursInput;
   /** False: padding days outside the month are left empty — no events drawn there. Default true. */
@@ -36,10 +45,13 @@ export interface DayGridBar {
 }
 
 export interface DayGridWeek {
+  /** One per cell: in a resource view, the week's dates once per resource. */
   readonly dates: readonly PlainDate[];
+  /** Per cell, whose it is (null outside a resource view). */
+  readonly resources: readonly (Resource | null)[];
   /** `display: 'background'` events: tint whole days, take no lane, never hide anything behind "+N". */
   readonly background: readonly Segment[];
-  /** Index of this row's first date in `range.dates`. */
+  /** Index of this row's first cell among all the rows' cells (`range.dates` outside a resource view): `dayIndex - firstColumn` is a cell. */
   readonly firstColumn: number;
   readonly bars: readonly DayGridBar[];
   readonly laneCount: number;
@@ -62,6 +74,9 @@ export interface DayGridModel {
   readonly weeks: readonly DayGridWeek[];
   /** The lanes a day shows before "+N"; null: as many as needed. */
   readonly maxLanes: number | null;
+  /** A resource view's heads, over a row's cells. Empty otherwise. */
+  readonly resourceHeads: readonly ResourceHead[];
+  readonly groupHeads: readonly ResourceGroupHead[];
 }
 
 /**
@@ -78,41 +93,75 @@ export function buildDayGridModel(range: ViewRange, snap: StoreSnapshot, o: DayG
   const full = dateIndex(range.dates);
   const view = hideOutside ? { dates: range.dates, colOf: (d: PlainDate) => (inActive(d) ? full.colOf(d) : -1) } : full;
   const days = range.dates.map((d) => dayInfo(d, o.displayZone));
-  const instances = snap.queryInstances(viewWindow(range.start, range.end, o.displayZone), o.resourceId !== undefined ? { resourceId: o.resourceId } : {});
-
-  const segs: Segment[] = [];
-  const rank = new Map<string, readonly number[]>();
-  const bgSegs: Segment[] = [];
-  instances.forEach((inst, i) => {
-    rank.set(inst.key, [inst.event.allDay ? 0 : 1, i]);
-    const out = isBackground(inst.event.display) ? bgSegs : segs;
-    if (inst.event.allDay) out.push(...segmentAllDay(inst, view));
-    else out.push(...segmentTimed(inst, days).filter((sg) => !hideOutside || inActive(range.dates[sg.dayIndex]!)));
-  });
 
   let col = 0;
   const weekCols = range.weeks.map((w) => w.map(() => col++));
-  const rows = splitByWeek(segs, weekCols);
-  const bgRows = splitByWeek(bgSegs, weekCols);
-
-  const open = o.businessHours !== undefined && o.businessHours !== false ? businessIntervals(range.start, range.end, o.businessHours, o.displayZone) : null;
-  const closedOn = (d: PlainDate) => {
-    if (!open) return false;
-    const s = d.toZonedDateTime({ timeZone: o.displayZone }).epochMilliseconds;
-    const e = d.add({ days: 1 }).toZonedDateTime({ timeZone: o.displayZone }).epochMilliseconds;
-    return !open.some((x) => x.s < e && x.e > s);
+  const owners: (Resource | null)[] = o.resources ? [...o.resources] : [null];
+  const per = owners.length;
+  // Cells: each row holds every owner's days; `cellStart[r]` is the row's first cell among all rows.
+  const cellStart: number[] = [];
+  let cells = 0;
+  for (const w of range.weeks) {
+    cellStart.push(cells);
+    cells += w.length * per;
+  }
+  // A real day's index (in range.dates) to its cell for owner `k`.
+  const rowOf: number[] = [];
+  weekCols.forEach((cs, r) => cs.forEach(() => rowOf.push(r)));
+  const cellOf = (dayIndex: number, k: number) => {
+    const r = rowOf[dayIndex]!;
+    return cellStart[r]! + k * range.weeks[r]!.length + (dayIndex - weekCols[r]![0]!);
   };
 
-  const weeks = range.weeks.map((dates, r): DayGridWeek => {
-    const first = weekCols[r]![0] ?? 0;
+  const rows: Segment[][] = range.weeks.map(() => []);
+  const bgRows: Segment[][] = range.weeks.map(() => []);
+  const rank = new Map<string, readonly number[]>();
+  owners.forEach((resource, k) => {
+    const filter = resource ? { resourceId: resource.id } : o.resourceId !== undefined ? { resourceId: o.resourceId } : {};
+    const instances = snap.queryInstances(viewWindow(range.start, range.end, o.displayZone), filter);
+    const segs: Segment[] = [];
+    const bgSegs: Segment[] = [];
+    instances.forEach((inst, i) => {
+      rank.set(inst.key, [inst.event.allDay ? 0 : 1, i]);
+      const out = isBackground(inst.event.display) ? bgSegs : segs;
+      if (inst.event.allDay) out.push(...segmentAllDay(inst, view));
+      else out.push(...segmentTimed(inst, days).filter((sg) => !hideOutside || inActive(range.dates[sg.dayIndex]!)));
+    });
+    // Split by real weeks, then each piece moved to the owner's cells; its own key per owner.
+    const place = (into: Segment[][], split: Segment[][]) =>
+      split.forEach((row, r) => {
+        for (const sg of row) into[r]!.push(resource ? { ...sg, key: `${sg.key}|${resource.id}`, dayIndex: cellOf(sg.dayIndex, k) } : sg);
+      });
+    place(rows, splitByWeek(segs, weekCols));
+    place(bgRows, splitByWeek(bgSegs, weekCols));
+  });
+
+  // Business hours per owner: its own (else the calendar's), read in its zone.
+  const closedFor = owners.map((resource) => {
+    const hours = resource?.businessHours ?? o.businessHours;
+    if (hours === undefined || hours === false) return () => false;
+    const zone = resource?.timeZone ?? o.displayZone;
+    const open = businessIntervals(range.start.subtract({ days: 1 }), range.end.add({ days: 1 }), hours, zone);
+    return (d: PlainDate) => {
+      const s = d.toZonedDateTime({ timeZone: o.displayZone }).epochMilliseconds;
+      const e = d.add({ days: 1 }).toZonedDateTime({ timeZone: o.displayZone }).epochMilliseconds;
+      return !open.some((x) => x.s < e && x.e > s);
+    };
+  });
+
+  const weeks = range.weeks.map((week, r): DayGridWeek => {
+    const first = cellStart[r]!;
+    const dates = owners.length === 1 ? week : owners.flatMap(() => week);
+    const resources = owners.flatMap((res) => week.map(() => res));
     const outside = dates.map((d) => !inActive(d));
-    const closed = dates.map(closedOn);
+    const closed = owners.flatMap((_, k) => week.map((d) => closedFor[k]!(d)));
     const items: RowItem[] = rows[r]!.map((s) => ({ key: s.key, start: s.dayIndex - first, end: s.dayIndex - first + s.dayCount, rank: rank.get(s.instance.key)! }));
     const { lanes, laneCount } = packLanes(items);
     const bySeg = new Map(rows[r]!.map((s) => [s.key, s]));
+    const base = { dates, resources, firstColumn: first, background: bgRows[r]!, laneCount, outside, closed, segments: rows[r]! };
     if (o.maxLanes === undefined || o.maxLanes === null || laneCount <= o.maxLanes) {
       const bars = items.map((it) => ({ segment: bySeg.get(it.key)!, lane: lanes.get(it.key)!, pieces: [{ from: it.start, to: it.end }] }));
-      return { dates, firstColumn: first, background: bgRows[r]!, bars, laneCount, hiddenPerDay: dates.map(() => 0), hiddenKeysPerDay: dates.map(() => []), outside, closed, segments: rows[r]! };
+      return { ...base, bars, hiddenPerDay: dates.map(() => 0), hiddenKeysPerDay: dates.map(() => []) };
     }
     const over = computeOverflow(lanes, items, dates.length, o.maxLanes);
     const piecesOf = new Map<string, { from: number; to: number }[]>();
@@ -120,9 +169,11 @@ export function buildDayGridModel(range: ViewRange, snap: StoreSnapshot, o: DayG
     const bars = items
       .filter((it) => piecesOf.has(it.key))
       .map((it) => ({ segment: bySeg.get(it.key)!, lane: lanes.get(it.key)!, pieces: piecesOf.get(it.key)! }));
-    return { dates, firstColumn: first, background: bgRows[r]!, bars, laneCount, hiddenPerDay: over.hiddenPerDay, hiddenKeysPerDay: over.hiddenKeysPerDay, outside, closed, segments: rows[r]! };
+    return { ...base, bars, hiddenPerDay: over.hiddenPerDay, hiddenKeysPerDay: over.hiddenKeysPerDay };
   });
-  return { version: snap.version, range, options: o, weeks, maxLanes: o.maxLanes ?? null };
+  const w = range.weeks[0]?.length ?? 0;
+  const resourceHeads = (o.resources ?? []).map((resource, k) => ({ resource, from: k * w, count: w }));
+  return { version: snap.version, range, options: o, weeks, maxLanes: o.maxLanes ?? null, resourceHeads, groupHeads: o.resourceGroups ?? [] };
 }
 
 /**
