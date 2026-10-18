@@ -1205,6 +1205,17 @@ light and dark built in, and a few ready-made looks.
   construction (no `light-dark()` in the theme; `@supports not` for
   `color-mix()`), not on WebKit.
 
-## Next — Phase 14: slots
+## Phase 14 — slots (in progress)
 
 See `ARCHITECTURE.md` J. Phase 14.
+
+- **Owner's decisions (2026-10-18):**
+  - Availability = weekly windows in the provider's zone + dated exceptions
+    (closed day, special hours) + optional RRULE windows for rare cases.
+  - Busy = plain intervals from any source, plus the calendar's own events
+    (`busy: true`); Google / Graph / CalDAV free-busy adapters later, apart.
+  - Capacity (several seats per slot) is **Pro** (Phase 16), not in the MIT
+    package: Phase 14's acceptance drops `capacity`.
+  - Click in the availability view: the calendar reports the slot
+    (`onSlotClick`), the application books; its server re-checks with the
+    same engine before saving. Nothing is created optimistically.
