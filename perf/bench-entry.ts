@@ -24,6 +24,8 @@ import {
 import type { EventInput, Mutation } from '../packages/core/src/index.js';
 import { expandZoned, parseRRule } from '../packages/rrule/src/index.js';
 import { buildListModel, buildMultiMonthModel } from '../packages/core/src/views.js';
+import { findSlots } from '../packages/slots/src/index.js';
+import type { Busy } from '../packages/slots/src/index.js';
 
 // Run by node with --expose-gc; `gc` is not in @types/node's globals.
 const gc = (globalThis as { gc?: () => void }).gc;
@@ -183,4 +185,23 @@ if (typeof gc === 'function') {
   results['bytes per stored event'] = (process.memoryUsage().heapUsed - m0) / kept.snapshot.counts.events;
 }
 
+// Phase 14 (G.2): 30 days of 15-minute slots, open 08:00–20:00 every day in Riyadh, 300 bookings, buffers, notice, a daily cap.
+const slotBusy: Busy[] = Array.from({ length: 300 }, (_, i) => {
+  const start = Temporal.ZonedDateTime.from('2026-11-01T08:00[Asia/Riyadh]').add({ days: i % 30, minutes: 45 * Math.floor(i / 30) });
+  return { start, end: start.add({ minutes: 30 }) };
+});
+results['slots 30 days at 15 min'] = time(20, () =>
+  findSlots({
+    availability: { timeZone: 'Asia/Riyadh', weekly: [{ days: [1, 2, 3, 4, 5, 6, 7], from: '08:00', to: '20:00' }] },
+    from: '2026-11-01T00:00[Asia/Riyadh]',
+    to: '2026-12-01T00:00[Asia/Riyadh]',
+    duration: 15,
+    bufferBefore: 5,
+    bufferAfter: 5,
+    now: '2026-10-31T12:00[Asia/Riyadh]',
+    minNotice: 120,
+    maxPerDay: 40,
+    busy: slotBusy,
+  }),
+);
 process.stdout.write(JSON.stringify(results));

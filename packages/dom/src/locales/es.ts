@@ -47,6 +47,7 @@ return {
   eventResizedStart: ({ title, time }) => (time ? `Nuevo inicio de «${title}»: ${time}` : `Duración de «${title}» cambiada`),
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, todo el día`,
+  freeSlot: ({ time }) => `Hueco libre, ${time}`,
   timeSlots: 'Franjas horarias',
   range: ({ from, to }) => `${from} a ${to}`,
   selected: ({ span }) => `Seleccionado: ${span}`,

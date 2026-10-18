@@ -28,7 +28,8 @@
         "navigation",
         "rrule-expand",
         "series-edit",
-        "ical-parse"
+        "ical-parse",
+        "slots"
       ]
     },
     "description": {

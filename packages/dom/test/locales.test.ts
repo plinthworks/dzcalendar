@@ -27,6 +27,7 @@ const SAMPLES: Record<string, unknown> = {
   eventResizedStart: { title: 'T', time: '09:00' },
   cursorSlot: { date: 'D', time: '09:00' },
   cursorAllDay: { date: 'D' },
+  freeSlot: { time: 'T' },
   range: { from: 'A', to: 'B' },
   selected: { span: 'S' },
   violation: 'overlap',

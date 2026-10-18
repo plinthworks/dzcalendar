@@ -108,6 +108,8 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly sources?: readonly EventSourceSpec[];
   readonly hooks?: CalendarHooks;
   readonly businessHours?: KernelOptions['businessHours'];
+  /** Bookable slots drawn in the week and day views (\`findSlots(...).slots\`); null: none. A new array redraws. */
+  readonly availableSlots?: KernelOptions['availableSlots'];
   readonly hiddenDays?: KernelOptions['hiddenDays'];
   /** Merged key by key over the current ones (`axis`, `slotMinutes`, `slotMin`…); equal values change nothing. */
   readonly timeGrid?: KernelOptions['timeGrid'];
@@ -795,6 +797,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           }
           if (changes.timeZone && changes.timeZone !== state.timeZone) kernel.setTimeZone(changes.timeZone);
           if ('businessHours' in changes && changes.businessHours !== undefined) kernel.setOptions({ businessHours: changes.businessHours });
+          if ('availableSlots' in changes) kernel.setOptions({ availableSlots: changes.availableSlots ?? null });
           if (changes.timeGrid) kernel.setOptions({ timeGrid: changes.timeGrid });
           if ('hiddenDays' in changes || 'weekends' in changes) {
             hidden = { days: 'hiddenDays' in changes ? changes.hiddenDays : hidden.days, weekends: 'weekends' in changes ? changes.weekends : hidden.weekends };

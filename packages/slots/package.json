@@ -1,0 +1,14 @@
+{
+  "name": "@dzcalendar/slots",
+  "version": "0.0.0",
+  "description": "Bookable slots for DzCalendar: weekly hours and exceptions in the provider's zone, minus what is busy, with buffers, notice, horizon and a daily cap. Pure, browser and Node.",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@dzcalendar/core": "0.0.0",
+    "@dzcalendar/rrule": "0.0.0"
+  },
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  }
+}

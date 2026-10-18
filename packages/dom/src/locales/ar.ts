@@ -88,6 +88,7 @@ return {
   eventResizedStart: ({ title, time }) => (time ? `يبدأ «${title}» الآن في ${iso(time)}` : `تم تغيير مدة «${title}»`),
   cursorSlot: ({ date, time }) => `${date}، ${iso(time)}`,
   cursorAllDay: ({ date }) => `${date}، طوال اليوم`,
+  freeSlot: ({ time }) => `موعد متاح، ${iso(time)}`,
   timeSlots: 'الفترات الزمنية',
   range: ({ from, to }) => `من ${iso(from)} إلى ${iso(to)}`,
   selected: ({ span }) => `تم التحديد: ${span}`,

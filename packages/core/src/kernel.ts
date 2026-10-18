@@ -26,14 +26,16 @@ import type { NavDirection } from './views/nav.js';
 import { computeViewRange } from './views/range.js';
 import type { NavContext, ViewRange, ViewSpec } from './views/spec.js';
 import { buildTimeGridModel, updateTimeGridModel } from './views/timegrid.js';
-import type { TimeGridModel, TimeGridOptions } from './views/timegrid.js';
+import type { AvailableSlot, TimeGridModel, TimeGridOptions } from './views/timegrid.js';
 import { isValidZone } from './zone.js';
 
 /** Options that shape the models; changeable at any time with `setOptions`. */
 export interface ModelOptions {
-  readonly timeGrid?: Omit<TimeGridOptions, 'displayZone' | 'businessHours'>;
+  readonly timeGrid?: Omit<TimeGridOptions, 'displayZone' | 'businessHours' | 'availableSlots'>;
   readonly dayGrid?: Omit<DayGridOptions, 'displayZone' | 'businessHours' | 'showNonCurrentDates'>;
   readonly businessHours?: BusinessHoursInput;
+  /** Bookable slots drawn in the time grid (compared by identity: a new array redraws). */
+  readonly availableSlots?: readonly AvailableSlot[] | null;
   /** Weekdays no view shows (ISO: 6 and 7 for the weekend), unless a view names its own. */
   readonly hiddenDays?: readonly Weekday[];
 }
@@ -97,6 +99,7 @@ registerModelFamily<TimeGridModel>('timeGrid', {
       ...options.timeGrid,
       displayZone,
       ...(options.businessHours !== undefined && { businessHours: options.businessHours }),
+      ...(options.availableSlots && { availableSlots: options.availableSlots }),
     }),
   update: updateTimeGridModel,
 });
@@ -200,6 +203,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     ...(o.dayGrid && { dayGrid: o.dayGrid }),
     ...(o.businessHours !== undefined && { businessHours: o.businessHours }),
     ...(o.hiddenDays && { hiddenDays: o.hiddenDays }),
+    ...(o.availableSlots && { availableSlots: o.availableSlots }),
   };
   const todayIn = (zone: ZoneId) => now().toZonedDateTimeISO(zone).toPlainDate();
   let date = o.initialDate ?? todayIn(timeZone);
@@ -371,6 +375,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         (!next.timeGrid || same(options.timeGrid, next.timeGrid)) &&
         (!next.dayGrid || same(options.dayGrid, next.dayGrid)) &&
         (!('businessHours' in next) || next.businessHours === options.businessHours) &&
+        (!('availableSlots' in next) || next.availableSlots === options.availableSlots) &&
         (!('hiddenDays' in next) || [...(next.hiddenDays ?? [])].sort().join() === [...(options.hiddenDays ?? [])].sort().join())
       ) {
         return;
@@ -382,6 +387,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         ...(next.dayGrid && { dayGrid: { ...options.dayGrid, ...next.dayGrid } }),
         ...('businessHours' in next && { businessHours: next.businessHours }),
         ...('hiddenDays' in next && { hiddenDays: next.hiddenDays }),
+        ...('availableSlots' in next && { availableSlots: next.availableSlots }),
       } as ModelOptions;
       view = effectiveOf(raw);
       changeState('options');

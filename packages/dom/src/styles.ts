@@ -227,6 +227,33 @@ export const DZ_CSS = `
 .dz-toolbar__view:last-child { border-start-end-radius: var(--dz-radius, var(--dzc-radius)); border-end-end-radius: var(--dz-radius, var(--dzc-radius)); }
 .dz-toolbar__view[aria-pressed='true'] { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); border-color: var(--dz-accent, var(--dzc-accent)); }
 
+/* ── time grid: free slots (availableSlots), over the hours, under the events ── */
+.dz-slot {
+  position: absolute;
+  inset-inline: 2px;
+  top: calc(var(--t) * var(--dz-minute, 0.8px));
+  height: calc(var(--h) * var(--dz-minute, 0.8px));
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 0.25rem;
+  display: flex;
+  align-items: flex-start;
+  overflow: hidden;
+  border: 1px dashed var(--dz-slot-border, var(--dz-accent, var(--dzc-accent)));
+  border-radius: var(--dz-radius, var(--dzc-radius));
+  background: var(--dz-slot-bg, color-mix(in srgb, var(--dz-accent, var(--dzc-accent)) 8%, transparent));
+  color: var(--dz-slot-fg, var(--dz-fg, var(--dzc-fg)));
+  font: inherit;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  text-align: start;
+  cursor: pointer;
+  z-index: 0;
+}
+.dz-slot:hover { background: var(--dz-slot-hover-bg, color-mix(in srgb, var(--dz-accent, var(--dzc-accent)) 18%, transparent)); }
+.dz-slot:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: 1px; z-index: 3; }
+
 /* ── time grid: hours outside business hours ────────────────────────────── */
 .dz-off {
   position: absolute;
@@ -452,6 +479,7 @@ export const DZ_CSS = `
   .dz-now { border-top-color: CanvasText; }
   .dz-dg__cell--today { outline: 2px solid Highlight; outline-offset: -2px; }
   .dz-dg__cell--outside .dz-dg__num { opacity: 1; color: GrayText; }
+  .dz-slot { border: 1px dashed ButtonText; }
 }
 /* Without color-mix() (Safari before 16.2): plain palette colours instead of the tints, never nothing. */
 @supports not (color: color-mix(in srgb, red 50%, blue)) {
@@ -467,6 +495,7 @@ export const DZ_CSS = `
   .dz-dg__cell--closed { background-image: repeating-linear-gradient(135deg, transparent 0 7px, var(--dz-border, var(--dzc-border)) 7px 8px); }
   .dz-ghost, .dz-ghost--select, .dz-ghost.dz-event--invalid { background: var(--dz-bg-raised, var(--dzc-bg-raised)); }
   .dz-cursor:focus { background: transparent; }
+  .dz-slot, .dz-slot:hover { background: var(--dz-slot-bg, var(--dz-bg-raised, var(--dzc-bg-raised))); }
 }
 /* Paper: what scrolls is printed whole, no buttons (preparePrint() has mounted everything). */
 @media print {

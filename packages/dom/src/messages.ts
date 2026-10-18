@@ -66,6 +66,8 @@ export interface DzMessages {
   cursorSlot(parts: { date: string; time: string }): string;
   /** On the all-day row of a time grid. */
   cursorAllDay(parts: { date: string }): string;
+  /** A bookable slot (availableSlots), its time range: what its button and the keyboard's cursor say. */
+  freeSlot(parts: { time: string }): string;
   /** The time grid's cursor before it has a place: what it is. */
   readonly timeSlots: string;
   /** From one moment or day to another. */
@@ -150,6 +152,7 @@ export const EN: DzMessages = {
   eventResizedStart: ({ title, time }) => (time ? `${title} now starts at ${time}` : `${title} resized`),
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, all day`,
+  freeSlot: ({ time }) => `Free slot, ${time}`,
   timeSlots: 'Time slots',
   range: ({ from, to }) => `${from} to ${to}`,
   selected: ({ span }) => `Selected: ${span}`,
@@ -219,6 +222,7 @@ export const FR: DzMessages = {
   eventResizedStart: ({ title, time }) => (time ? `« ${title} » commence maintenant à ${time}` : `« ${title} » redimensionné`),
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, journée`,
+  freeSlot: ({ time }) => `Créneau libre, ${time}`,
   timeSlots: 'Créneaux horaires',
   range: ({ from, to }) => `${from} à ${to}`,
   selected: ({ span }) => `Sélection : ${span}`,

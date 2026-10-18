@@ -4,6 +4,7 @@
   "core/views (beyond core)": 1500,
   "rrule (without polyfill)": 7000,
   "ical (without core)": 7500,
+  "slots (without core)": 5000,
   "dom (without core)": 38300,
   "dom/list (without dom)": 4800,
   "dom/multimonth (without dom)": 3000,

@@ -17,6 +17,7 @@ import {
   untracked,
 } from '@angular/core';
 import type {
+  AvailableSlot,
   BusinessHoursInput,
   CreateRequest,
   EventInput,
@@ -37,7 +38,7 @@ import { DzEventContent } from './templates.js';
 import type { EventContentContext } from './templates.js';
 
 /** The callbacks the component turns into outputs: not options (they would silence the outputs). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick'] as const;
 
 /** What `[options]` takes: what `update()` takes, less what has an input or an output of its own. */
 export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | (typeof OWN_CALLBACKS)[number]>;
@@ -105,11 +106,15 @@ export class DzCalendar implements OnDestroy {
   readonly displayCalendar = input<string | null | undefined>(undefined);
   /** A second calendar shown beside each date; null: none. */
   readonly secondaryCalendar = input<string | null | undefined>(undefined);
+  /** Bookable slots drawn in the week and day views (`findSlots(...).slots` from @dzcalendar/slots); null: none. */
+  readonly availableSlots = input<readonly AvailableSlot[] | null | undefined>(undefined);
   /** Everything else `update()` takes. */
   readonly options = input<DzCalendarOptions>({});
 
   // ── what a person does ──
   readonly dateClick = output<DateClick>();
+  /** A free slot clicked (or Enter on it): the slot as given. Book it; the server checks it again. */
+  readonly slotClick = output<AvailableSlot>();
   readonly eventClick = output<EventInstance>();
   readonly eventOpen = output<EventInstance>();
   readonly createRequest = output<CreateRequest>();
@@ -152,6 +157,7 @@ export class DzCalendar implements OnDestroy {
         density: this.density(),
         displayCalendar: this.displayCalendar(),
         secondaryCalendar: this.secondaryCalendar(),
+        availableSlots: this.availableSlots(),
         timeGrid: axis ? { ...this.options().timeGrid, axis } : undefined,
       }),
       hooks: this.hooks(),
@@ -171,6 +177,7 @@ export class DzCalendar implements OnDestroy {
       ...this.defaults,
       ...(untracked(this.settings) as CalendarOptions),
       onDateClick: (c) => this.emit(() => this.dateClick.emit(c)),
+      onSlotClick: (x) => this.emit(() => this.slotClick.emit(x)),
       onEventClick: (i) => this.emit(() => this.eventClick.emit(i)),
       onEventOpen: (i) => this.emit(() => this.eventOpen.emit(i)),
       onCreateRequest: (r) => this.emit(() => this.createRequest.emit(r)),

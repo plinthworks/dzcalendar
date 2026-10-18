@@ -48,6 +48,9 @@
       "@dzcalendar/ical": [
         "./packages/ical/src/index.ts"
       ],
+      "@dzcalendar/slots": [
+        "./packages/slots/src/index.ts"
+      ],
       "@dzcalendar/motion-gsap": [
         "./packages/motion-gsap/src/index.ts"
       ]

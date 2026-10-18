@@ -12,7 +12,7 @@ import type { Segment, TimedSegment } from '../project/segment.js';
 import type { StoreChange } from '../store/changes.js';
 import { viewWindow } from '../store/store.js';
 import type { StoreSnapshot } from '../store/store.js';
-import type { DurationLike, Instant, PlainDate, ZoneId } from '../temporal.js';
+import type { DurationLike, Instant, PlainDate, ZoneId, ZonedDateTime } from '../temporal.js';
 import type { Transition } from '../zone.js';
 import { isBackground } from './daygrid.js';
 import type { ViewRange } from './spec.js';
@@ -27,6 +27,11 @@ export interface TimeGridOptions {
   /** Gutter tick step, in minutes. Default 60. */
   readonly slotMinutes?: number;
   readonly resourceId?: string;
+  /**
+   * Bookable slots to draw (what @dzcalendar/slots' findSlots gives, or any
+   * start/end pairs): each column gets the ones starting in its hours.
+   */
+  readonly availableSlots?: readonly AvailableSlot[];
   /** Hours outside are shaded (`offHours` on each column). */
   readonly businessHours?: BusinessHoursInput;
   /**
@@ -85,6 +90,24 @@ export interface PlacedTimed {
   readonly realMinutes?: number;
 }
 
+/** A slot that can be booked: anything with a start and an end, kept as given for the click. */
+export interface AvailableSlot {
+  readonly start: Instant | ZonedDateTime;
+  readonly end: Instant | ZonedDateTime;
+}
+
+/** A slot placed in a column, in axis minutes. */
+export interface PlacedSlot {
+  /** The start's epoch ms: what the DOM keys the slot on. */
+  readonly key: string;
+  readonly top: number;
+  readonly height: number;
+  readonly start: Instant;
+  readonly end: Instant;
+  /** The slot as given. */
+  readonly slot: AvailableSlot;
+}
+
 export interface TimeGridColumn {
   /** The date, ISO: what the DOM keys the column on. */
   readonly key: string;
@@ -99,6 +122,8 @@ export interface TimeGridColumn {
   readonly more: readonly MoreTimed[];
   /** Stretches outside business hours, in axis minutes. Empty without `businessHours`. */
   readonly offHours: readonly { readonly top: number; readonly height: number }[];
+  /** Bookable slots starting in this column's hours. Empty without `availableSlots`. */
+  readonly slots: readonly PlacedSlot[];
 }
 
 export interface AllDayBar {
@@ -162,7 +187,7 @@ function endReadingOf(start: Instant, end: Instant, zone: ZoneId, repeats: reado
  */
 export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: TimeGridOptions, axis: ColumnAxis = axisFor(date, o)): TimeGridColumn {
   const key = date.toString();
-  if (axis.length === 0) return { key, date, axis, folded: true, events: [], background: [], more: [], offHours: [] };
+  if (axis.length === 0) return { key, date, axis, folded: true, events: [], background: [], more: [], offHours: [], slots: [] };
 
   const day = axis.day;
   const instances = snap.queryInstances(viewWindow(date, date.add({ days: 1 }), o.displayZone), queryOpts(o));
@@ -219,7 +244,7 @@ export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: Tim
   const max = o.maxStack !== undefined && o.maxStack !== null && Number.isInteger(o.maxStack) && o.maxStack >= 1 ? o.maxStack : null;
   if (max === null || !placements.some((p) => p.lanes > max)) {
     const events = placements.map((p) => place(byKey.get(p.key)!, p));
-    return { key, date, axis, folded: false, events, background, more: [], offHours: offHoursOf(date, axis, o) };
+    return { key, date, axis, folded: false, events, background, more: [], offHours: offHoursOf(date, axis, o), slots: slotsOf(axis, o) };
   }
   // A cluster wider than `max`: its first `max - 1` lanes are drawn, as wide as
   // `max` lanes allow; the others go behind "+N" in lane `max - 1`, one link per
@@ -259,7 +284,27 @@ export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: Tim
     end = Math.max(end, h.top + h.visualHeight);
   }
   close();
-  return { key, date, axis, folded: false, events, background, more, offHours: offHoursOf(date, axis, o) };
+  return { key, date, axis, folded: false, events, background, more, offHours: offHoursOf(date, axis, o), slots: slotsOf(axis, o) };
+}
+
+const instantOf = (x: Instant | ZonedDateTime): Instant => ('toInstant' in x ? x.toInstant() : x);
+
+/** The slots starting inside the axis, placed; one running past the axis's end is cut there. */
+function slotsOf(axis: ColumnAxis, o: TimeGridOptions): PlacedSlot[] {
+  if (!o.availableSlots?.length) return [];
+  const a = axis.start.epochMilliseconds;
+  const b = axis.end.epochMilliseconds;
+  const out: PlacedSlot[] = [];
+  for (const slot of o.availableSlots) {
+    const start = instantOf(slot.start);
+    const end = instantOf(slot.end);
+    const ms = start.epochMilliseconds;
+    if (ms < a || ms >= b || end.epochMilliseconds <= ms) continue;
+    const top = axis.toPosition(start);
+    const bottom = end.epochMilliseconds >= b ? axis.length : axis.toEndPosition(end);
+    out.push({ key: String(ms), top, height: Math.max(0, bottom - top), start, end, slot });
+  }
+  return out.sort((x, y) => x.top - y.top);
 }
 
 /** What is not open, inside the axis's hours, as positions. Read with `toEndPosition` at the ends. */

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — créneaux</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: #52525b; max-width: 75ch; }
+      .controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+      #log { min-height: 1.4em; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Créneaux disponibles</h1>
+      <p>Un cabinet à Riyad (dimanche–jeudi, 08:00–12:00 et 13:00–16:00, rendez-vous de 30 min, 10 min de battement après, 2 h de préavis, 8 par jour au plus), vu depuis le fuseau choisi. Cliquer un créneau le réserve : la page le revérifie avec le même moteur, comme le ferait le serveur.</p>
+      <div class="controls">
+        <label>Fuseau du patient <select id="zone"><option>Europe/Paris</option><option>Asia/Riyadh</option><option>America/Chicago</option></select></label>
+        <span id="log" role="status"></span>
+      </div>
+      <div id="cal"></div>
+    </main>
+    <script type="module" src="./slots.ts"></script>
+  </body>
+</html>

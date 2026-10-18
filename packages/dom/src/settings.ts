@@ -1,4 +1,4 @@
-import type { Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection } from '@dzcalendar/core';
+import type { AvailableSlot, Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection } from '@dzcalendar/core';
 import type { MenuHook, ScopeRequest } from './host.js';
 
 /** A click on an empty day or moment. */
@@ -31,6 +31,12 @@ export interface LiveSettings {
   readonly onDateClick?: (click: DateClick) => void;
   readonly onEventClick?: (instance: EventInstance) => void;
   /**
+   * A free slot of \`availableSlots\` was clicked (or Enter on it): the slot as
+   * given. The application books it — its server checks it again
+   * (\`checkSlot\`) before saving; the calendar creates nothing.
+   */
+  readonly onSlotClick?: (slot: AvailableSlot) => void;
+  /**
    * A gesture on an occurrence of a series: how far it reaches. Resolve
    * null to cancel. Default: a "this / following / all" menu where it dropped.
    */
@@ -61,6 +67,7 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   onUnselect: {},
   onDateClick: {},
   onEventClick: {},
+  onSlotClick: {},
   chooseScope: {},
   dragEdgeNavigate: {},
   eventResizableFromStart: {},

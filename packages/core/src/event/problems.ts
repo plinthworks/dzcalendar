@@ -34,7 +34,9 @@ export type ProblemCode =
   | 'ical-syntax'
   | 'ical-unsupported'
   | 'zone-guessed'
-  | 'zone-fixed-offset';
+  | 'zone-fixed-offset'
+  | 'invalid-availability'
+  | 'invalid-slot-query';
 
 export type Severity = 'error' | 'warning';
 

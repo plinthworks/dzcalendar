@@ -1,5 +1,5 @@
 import { Temporal, formatTemporal, locateNow, weekNumber, weekRulesFor } from '@dzcalendar/core';
-import type { AllDayBar, AxisBand, Hit, MoreTimed, PlacedTimed, PlainDate, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
+import type { AllDayBar, AxisBand, Hit, MoreTimed, PlacedSlot, PlacedTimed, PlainDate, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
 import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
 import { handles } from '../interact/handles.js';
 import type { ViewController, ViewCtx } from '../host.js';
@@ -44,6 +44,13 @@ interface ColumnParts {
   readonly events: KeyedList<EventItem>;
   readonly background: KeyedList<EventItem>;
   readonly more: KeyedList<MoreItem>;
+  readonly slots: KeyedList<SlotItem>;
+}
+
+interface SlotItem {
+  readonly key: string;
+  readonly sig: string;
+  readonly placed: PlacedSlot;
 }
 
 interface MoreItem {
@@ -156,9 +163,10 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const hours = contentsHost(doc, 'dz-tg__hours');
       const bands = contentsHost(doc, 'dz-tg__bands');
       const bgHost = contentsHost(doc, 'dz-tg__bg');
+      const slotHost = contentsHost(doc, 'dz-tg__slots');
       const evHost = contentsHost(doc, 'dz-tg__events');
       const moreHost = contentsHost(doc, 'dz-tg__mores');
-      el.append(hours, bands, bgHost, evHost, moreHost);
+      el.append(hours, bands, bgHost, slotHost, evHost, moreHost);
       parts.set(it.key, {
         hours,
         bands,
@@ -177,6 +185,21 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
           },
           (b, m) => drawMore(b, m),
         ),
+        // Free slots: buttons out of the tab order (the grid keeps one tab stop; the cursor's Enter books them).
+        slots: new KeyedList<SlotItem>(
+          slotHost,
+          () => {
+            const b = h(doc, 'button', 'dz-slot') as HTMLButtonElement;
+            b.type = 'button';
+            b.tabIndex = -1;
+            b.addEventListener('click', () => {
+              const placed = slotOf.get(b);
+              if (placed) ctx.live().onSlotClick?.(placed.slot);
+            });
+            return b;
+          },
+          (b, it) => drawSlot(b, it.placed),
+        ),
       });
       return el;
     },
@@ -187,6 +210,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       p?.events.clear();
       p?.background.clear();
       p?.more.clear();
+      p?.slots.clear();
     },
   );
 
@@ -205,6 +229,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       p.bands.replaceChildren(h(doc, 'span', 'dz-tg__folded-label', ctx.messages.dayDoesNotExist));
       p.events.sync([]);
       p.background.sync([]);
+      p.slots.sync([]);
       return;
     }
     // Hour lines fall on the wall clock's hours: a grid from 08:30 starts half an hour before the first one.
@@ -220,8 +245,21 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     );
     p.bands.replaceChildren(...column.axis.bands.map((b) => drawBand(b)));
     p.background.sync(column.background.map(itemOf));
+    p.slots.sync(column.slots.map((placed) => ({ key: placed.key, sig: `${placed.top}|${placed.height}|${placed.end.epochMilliseconds}|${ctx.epoch}`, placed })));
     created.push(...p.events.sync(shown(column).map(itemOf)));
     p.more.sync(column.more.map((m) => ({ key: m.key, sig: `${m.top}|${m.height}|${m.left}|${m.width}|${m.events.length}|${ctx.epoch}`, more: m, date: column.date })));
+  }
+
+  // ── free slots (availableSlots) ──
+  const slotOf = new WeakMap<HTMLElement, PlacedSlot>();
+  function drawSlot(b: HTMLElement, placed: PlacedSlot): void {
+    slotOf.set(b, placed);
+    b.style.setProperty('--t', String(placed.top));
+    b.style.setProperty('--h', String(placed.height));
+    const from = formatTemporal(placed.start.toZonedDateTimeISO(ctx.zone).toPlainTime(), HM, ctx.locale);
+    const to = formatTemporal(placed.end.toZonedDateTimeISO(ctx.zone).toPlainTime(), HM, ctx.locale);
+    b.textContent = from;
+    b.setAttribute('aria-label', ctx.messages.freeSlot({ time: `${from}–${to}` }));
   }
 
   // ── "+N": a crowded cluster's hidden events, listed in the panel the month uses ──

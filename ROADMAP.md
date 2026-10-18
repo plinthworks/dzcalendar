@@ -1219,3 +1219,13 @@ See `ARCHITECTURE.md` J. Phase 14.
   - Click in the availability view: the calendar reports the slot
     (`onSlotClick`), the application books; its server re-checks with the
     same engine before saving. Nothing is created optimistically.
+- **Built (before the reviews):** `packages/slots` (`findSlots`, `checkSlot`,
+  `openSpans`, `busyFromEvents`; 2.4 kB gzip, budget 5), 49 conformance cases
+  (`conformance/cases/slots`, written by hand; clock-change dates checked
+  against Python's zoneinfo), `slots 30 days at 15 min` 5.6 ms (budget 25,
+  minified); core `availableSlots` model option → `TimeGridColumn.slots`;
+  DOM `.dz-slot` buttons, `onSlotClick`, the cursor's Enter, `freeSlot`
+  words (5 languages); Angular `[availableSlots]`/`(slotClick)`;
+  `playground/slots.html`; Chrome checks; `docs/slots.md`.
+- **Next:** architect + code reviews, fixes, full checks, ARCHITECTURE block,
+  commit, report.

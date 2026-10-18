@@ -887,6 +887,44 @@ try {
       accent: getComputedStyle(document.querySelector('.dz-toolbar__view[aria-pressed="true"]')).backgroundColor,
     }));
     check('a page rule wins without a fight (layers): radius 0, accent changed', won.radius === '0px' && won.accent === 'rgb(10, 125, 90)', JSON.stringify(won));
+    // ── Phase 14: free slots in the week (a provider in Riyadh, seen from Paris) ──
+    {
+      const { p, errors } = await page('/slots.html');
+      await p.waitForSelector('.dz-slot');
+      const geo = await p.evaluate(() => {
+        const col = document.querySelector('.dz-tg__col[data-date="2026-10-21"]');
+        const c = col.getBoundingClientRect();
+        const slots = [...col.querySelectorAll('.dz-slot')];
+        const first = slots[0].getBoundingClientRect();
+        const booked = col.querySelector('.dz-ev').getBoundingClientRect();
+        const minute = c.height / Number(getComputedStyle(col).getPropertyValue('--dz-len'));
+        return {
+          first: slots[0].textContent,
+          inside: slots.every((s) => { const r = s.getBoundingClientRect(); return r.left >= c.left - 0.5 && r.right <= c.right + 0.5 && r.width > c.width * 0.8; }),
+          // The booking is 10:00 in Riyadh, the first slot 11:00 (09:00 now + 2 h notice): 60 minutes lower.
+          gap: (first.top - booked.top) / minute,
+          height: first.height / minute,
+        };
+      });
+      check('slots: the first free slot of Wednesday is 10:00 in Paris (11:00 in Riyadh, after 2 h notice)', geo.first === '10:00', geo.first);
+      check('slots: inside their column, nearly its width', geo.inside, JSON.stringify(geo));
+      check('slots: placed at their minute (60 min below the 10:00 Riyadh booking), 30 min tall', Math.abs(geo.gap - 60) < 1 && Math.abs(geo.height - 30) < 1, JSON.stringify(geo));
+      const v = await axeViolations(p, '.dz-cal');
+      check('axe: the week with free slots has no violation', v.length === 0, v.join('\n'));
+      const before = await p.evaluate(() => document.querySelectorAll('.dz-ev').length);
+      await p.click('.dz-tg__col[data-date="2026-10-21"] .dz-slot');
+      await p.waitForFunction((n) => document.querySelectorAll('.dz-ev').length === n + 1, before);
+      const after = await p.evaluate(() => ({ log: document.querySelector('#log').textContent, first: document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot').textContent }));
+      // Booked 11:00–11:30 with 10 minutes after: 11:30 would touch the buffer, and the morning ends at 12:00 — the next is 13:00 in Riyadh, 12:00 in Paris.
+      check('slots: a click books it (checked again by the engine); the slot and its buffer are gone', /Réservé/.test(after.log) && after.first === '12:00', JSON.stringify(after));
+      await p.selectOption('#zone', 'Asia/Riyadh');
+      await p.waitForFunction(() => document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot')?.textContent === '13:00');
+      check('slots: in the provider’s own zone the same slot reads 13:00', true);
+      await p.screenshot({ path: join(root, 'node_modules', '.cache', 'dzcalendar', 'captures', 'slots-week.png'), clip: { x: 0, y: 0, width: 1400, height: 950 } });
+      check('slots: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
     // Beside a framework's global reset (the real files: Tailwind 3's preflight, Bootstrap 5's reboot;
     // Tailwind 4's is the same preflight in @layer base). The calendar must look as it does on a bare page:
     // every element's boxes and colours compared with the bare page's, element by element.

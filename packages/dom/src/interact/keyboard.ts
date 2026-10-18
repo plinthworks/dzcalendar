@@ -1,5 +1,5 @@
 import { Temporal, eventHit, formatTemporal, grabStep, heldEvent, intentFor, isUnchanged, resolveWall, selectionBetween, stepHit } from '@dzcalendar/core';
-import type { CalEvent, Command, EventInstance, Hit, Intent, PlainDate, Proposal, Selection, Step, ZonedDateTime } from '@dzcalendar/core';
+import type { AvailableSlot, CalEvent, Command, EventInstance, Hit, Intent, PlainDate, Proposal, Selection, Step, ZonedDateTime } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
 import { formatMinutes } from '../render/event.js';
 import { commitProposal, timeOf } from './commit.js';
@@ -65,9 +65,20 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     const r = resolveWall(z.toPlainDate(), z.toPlainTime(), z.timeZoneId, 'earlier');
     return r.ambiguous ? `${hm} (${z.offset})` : hm;
   }
+  /** The free slot (availableSlots) the cursor stands in, if any: Enter books it. */
+  function freeSlotAt(hit: Hit): AvailableSlot | null {
+    if (hit.kind !== 'slot') return null;
+    const t = hit.instant.epochMilliseconds;
+    const ms = (x: AvailableSlot['start']) => ('toInstant' in x ? x.toInstant() : x).epochMilliseconds;
+    return ctx.kernel.getOptions().availableSlots?.find((x) => ms(x.start) <= t && t < ms(x.end)) ?? null;
+  }
   function hitLabel(hit: Hit): string {
     if (hit.kind === 'day') return hit.allDayRow ? m().cursorAllDay({ date: dayWords(hit.date) }) : dayWords(hit.date);
-    return m().cursorSlot({ date: dayWords(hit.date), time: timeWords(hit.instant.toZonedDateTimeISO(zone())) });
+    const label = m().cursorSlot({ date: dayWords(hit.date), time: timeWords(hit.instant.toZonedDateTimeISO(zone())) });
+    const free = freeSlotAt(hit);
+    if (!free) return label;
+    const words = (x: AvailableSlot['start']) => timeWords(('toInstant' in x ? x.toInstant() : x).toZonedDateTimeISO(zone()));
+    return `${label}, ${m().freeSlot({ time: `${words(free.start)}–${words(free.end)}` })}`;
   }
   function spanWords(s: { readonly start: Selection['start']; readonly end: Selection['end']; readonly allDay: boolean }): string {
     if (s.allDay) {
@@ -154,6 +165,11 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     const live = ctx.live();
     if (anchor && shared.selection) {
       live.onSelect?.(shared.selection);
+      return true;
+    }
+    const free = live.onSlotClick ? freeSlotAt(at) : null;
+    if (free) {
+      live.onSlotClick!(free);
       return true;
     }
     live.onDateClick?.(at.kind === 'slot' ? { allDay: false, date: at.date, instant: at.instant } : { allDay: true, date: at.date });

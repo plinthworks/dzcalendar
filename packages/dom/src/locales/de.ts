@@ -47,6 +47,7 @@ return {
   eventResizedStart: ({ title, time }) => (time ? `Neuer Beginn von „${title}“: ${time}` : `Dauer von „${title}“ geändert`),
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, ganztägig`,
+  freeSlot: ({ time }) => `Freier Termin, ${time}`,
   timeSlots: 'Zeitfenster',
   range: ({ from, to }) => `${from} bis ${to}`,
   selected: ({ span }) => `Ausgewählt: ${span}`,

@@ -22,6 +22,8 @@ import {
 } from '../../packages/core/src/index.js';
 import { expandZoned, expandDates, parseRRule, serializeRRule } from '../../packages/rrule/src/index.js';
 import { parseICal } from '../../packages/ical/src/index.js';
+import { findSlots, checkSlot } from '../../packages/slots/src/index.js';
+import type { Slot } from '../../packages/slots/src/index.js';
 import type { EventInput, WallPolicy } from '../../packages/core/src/index.js';
 
 /**
@@ -41,7 +43,18 @@ interface Case {
 const ROOT = fileURLToPath(new URL('../cases', import.meta.url));
 const str = (x: { toString(): string } | null) => (x === null ? null : x.toString());
 
+/** A slot as an ISO interval, to the minute, offsets shown: `2026-10-25T02:00+02:00/2026-10-25T02:00+01:00`. */
+const slotText = (x: Slot) => `${x.start.toString({ smallestUnit: 'minute', timeZoneName: 'never' })}/${x.end.toString({ smallestUnit: 'minute', timeZoneName: 'never' })}`;
+
 const adapters: Record<string, (input: any) => unknown> = {
+  slots: ({ check, ...query }) => {
+    if (check !== undefined) {
+      const r = checkSlot(query, check);
+      return r.ok ? { ok: true, slot: slotText(r.slot) } : { ok: false, reason: r.reason };
+    }
+    const r = findSlots(query);
+    return { slots: r.slots.map(slotText), problems: r.problems.map((x) => x.code) };
+  },
   'zone-dayinfo': ({ date, zone }) => {
     const d = dayInfo(Temporal.PlainDate.from(date), zone);
     return {
