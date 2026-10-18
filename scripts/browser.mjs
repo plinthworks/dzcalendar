@@ -751,6 +751,64 @@ try {
     await p.close();
   }
 
+  // ── Phase 12: a crowded week ("+N", the scrolled hours), the list windowed, print ──
+  {
+    const { p, errors } = await page('/perf.html?view=timeGridWeek&set=W&n=10000');
+    await p.waitForFunction(() => window.__perf, null, { timeout: 120000 });
+    const tg = await p.evaluate(() => ({
+      more: document.querySelectorAll('.dz-more--tg').length,
+      events: document.querySelectorAll('.dz-tg__col .dz-ev:not(.dz-ev--bg)').length,
+      body: document.querySelector('.dz-tg__body').clientHeight,
+    }));
+    check('crowded week: "+N" per day, a bounded number of events, hours not squeezed by the all-day row', tg.more >= 7 && tg.events < 3000 && tg.body > 300, JSON.stringify(tg));
+    await p.click('.dz-more--tg');
+    const listed = await p.evaluate(() => document.querySelectorAll('.dz-pop .dz-bar').length);
+    check('crowded week: "+N" opens the panel with its events', listed > 50, String(listed));
+    await p.keyboard.press('Escape');
+    const crowdedAxe = await axeViolations(p, '.dz-cal');
+    check('axe: a crowded week ("+N" links) — no violation', crowdedAxe.length === 0, crowdedAxe.join(' | '));
+    // Print: everything mounted, the hours printed whole.
+    const printed = await p.evaluate(() => {
+      const restore = window.__dz.preparePrint();
+      return { restore: typeof restore };
+    });
+    await p.emulateMedia({ media: 'print' });
+    const paper = await p.evaluate(() => { const b = document.querySelector('.dz-tg__body'); return { client: b.clientHeight, scroll: b.scrollHeight }; });
+    check('print: the hours are printed whole (nothing left to scroll)', printed.restore === 'function' && paper.scroll - paper.client <= 16, JSON.stringify(paper));
+    await p.emulateMedia({ media: 'screen' });
+    check('crowded week: no console error', errors.length === 0, errors.join(' | '));
+    await p.close();
+  }
+  {
+    const { p, errors } = await page('/perf.html?view=listYear&set=U&n=10000');
+    await p.waitForFunction(() => window.__perf, null, { timeout: 120000 });
+    const scroller = '.dz-list';
+    const first = await p.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      el.scrollTop = 40000;
+      return el.scrollTop;
+    }, scroller);
+    await p.waitForTimeout(150);
+    const at = await p.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      const top = el.getBoundingClientRect().top;
+      const row = [...el.querySelectorAll('.dz-list__ev')].find((r) => r.getBoundingClientRect().bottom > top);
+      return { scroll: el.scrollTop, mounted: el.querySelectorAll('.dz-list__ev').length, key: row?.dataset.segment, y: row ? Math.round(row.getBoundingClientRect().top - top) : null };
+    }, scroller);
+    await p.evaluate((sel) => document.querySelector(sel).dispatchEvent(new Event('scroll')), scroller);
+    await p.waitForTimeout(150);
+    const again = await p.evaluate(({ sel, key }) => {
+      const el = document.querySelector(sel);
+      const row = [...el.querySelectorAll('.dz-list__ev')].find((r) => r.dataset.segment === key);
+      return row ? Math.round(row.getBoundingClientRect().top - el.getBoundingClientRect().top) : null;
+    }, { sel: scroller, key: at.key });
+    check('list year: windowed (bounded rows) and stable where it was scrolled', at.mounted < 400 && at.key !== undefined && Math.abs((again ?? 999) - at.y) <= 1 && Math.abs(at.scroll - first) < 2000, JSON.stringify({ first, at, again }));
+    const restore = await p.evaluate(() => (window.__dz.preparePrint(), document.querySelectorAll('.dz-list__ev').length));
+    check('list year: preparePrint mounts every entry', restore > 10000, String(restore));
+    check('list year: no console error', errors.length === 0, errors.join(' | '));
+    await p.close();
+  }
+
   // ── Angular (zoneless): a header of one's own on the controller's signals, two-way date, templates ──
   {
     const { p, errors } = await page('/angular.html');

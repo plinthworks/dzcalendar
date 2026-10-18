@@ -120,4 +120,17 @@ $emit: true !default;
     .dz-toolbar__btn { transition: background-color 120ms ease; }
     .dz-ev, .dz-bar { transition: box-shadow 120ms ease, filter 120ms ease; }
   }
+
+  // Paper (D.9): what scrolls on screen is printed whole — `preparePrint()` (or
+  // `autoPrint`) has mounted it — in its colours, no event cut across pages,
+  // no buttons.
+  @media print {
+    .dz-cal { --dz-height: auto; height: auto; }
+    .dz-cal, .dz-cal * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .dz-tg, .dz-dg, .dz-tg__body, .dz-dg__body, .dz-tg__allday, .dz-list { overflow: visible !important; max-height: none !important; height: auto !important; flex: none !important; }
+    .dz-ev, .dz-bar, .dz-list__li, .dz-mm__month { break-inside: avoid; }
+    // Every lane printed: a day's row grows to hold them (no "+N" on paper).
+    .dz-dg__week { flex: none !important; min-height: var(--dz-week-min, 5.5rem); }
+    .dz-toolbar__btn, .dz-toolbar__views, .dz-cursor, .dz-ghost { display: none !important; }
+  }
 }

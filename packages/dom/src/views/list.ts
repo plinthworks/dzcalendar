@@ -2,7 +2,7 @@ import { formatTemporal, registerModelFamily } from '@dzcalendar/core';
 import type { CalEvent, Command, EventInstance, KernelState, Segment } from '@dzcalendar/core';
 import { buildListModel } from '@dzcalendar/core/views';
 import type { ListDay, ListEntry, ListModel } from '@dzcalendar/core/views';
-import { KeyedList, applyEventLook, attachMenuTriggers, ensureStyles, fillEvent, formatMinutes, h, registerView, startReadingOf, timeLabels, unmountEvent } from '@dzcalendar/dom/toolkit';
+import { KeyedList, NodePool, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, ensureStyles, fillEvent, formatMinutes, h, registerView, startReadingOf, timeLabels, unmountEvent } from '@dzcalendar/dom/toolkit';
 import type { ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
 
 /** Layout only; the look comes with the CSS pass. */
@@ -18,22 +18,37 @@ export const LIST_CSS = `
 .dz-list__time .dz-ev__offset, .dz-list__time .dz-ev__real { color: var(--dz-fg, var(--tz-fg, CanvasText)); font-size: 0.6875rem; }
 .dz-list__dot { flex: none; align-self: center; inline-size: 0.625rem; block-size: 0.625rem; border-radius: 50%; background: var(--dz-event-accent, var(--tz-accent, Highlight)); }
 .dz-list__empty { padding: 2rem 1rem; text-align: center; color: var(--tz-fg-muted, GrayText); }
+.dz-list__gap { list-style: none; }
 `;
 
-interface DayItem {
+/** What stands for rows not mounted (windowed): their height, nothing else. */
+interface GapItem {
   readonly key: string;
   readonly sig: string;
-  readonly day: ListDay;
+  readonly gap: number;
 }
 
-interface EntryItem {
-  readonly key: string;
-  readonly sig: string;
-  readonly content: string;
-  readonly entry: ListEntry;
-  /** The day's place in the list, for the hooks' segment. */
-  readonly index: number;
-}
+type DayItem = { readonly key: string; readonly sig: string; readonly day: ListDay; readonly index: number } | GapItem;
+
+type EntryItem =
+  | {
+      readonly key: string;
+      readonly sig: string;
+      readonly content: string;
+      readonly entry: ListEntry;
+      /** The day's place in the list, for the hooks' segment. */
+      readonly index: number;
+      /** Its place among all the period's entries (1-based), and how many, when windowed. */
+      readonly pos: number;
+      readonly size: number;
+    }
+  | GapItem;
+
+const isGap = (it: DayItem | EntryItem): it is GapItem => 'gap' in it;
+
+/** Row heights before anything is measured (px); corrected by measuring mounted rows. */
+const EST_HEAD = 33;
+const EST_ENTRY = 33;
 
 /** The entry as a one-day segment, for the content hooks. */
 const segmentOf = (e: ListEntry, index: number): Segment => ({
@@ -73,23 +88,61 @@ export function createListView(ctx: ViewCtx): ViewController {
   const dayView = () => (ctx.kernel.getViewSpec('timeGridDay') ? 'timeGridDay' : ctx.kernel.getViewSpec('dayGridDay') ? 'dayGridDay' : null);
   const longDate = (day: ListDay) => formatTemporal(day.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, ctx.locale);
 
+  const gapNode = (tag: string) => {
+    const g = h(doc, tag, 'dz-list__gap');
+    g.setAttribute('aria-hidden', 'true');
+    return g;
+  };
+  const entryPool = new NodePool(() => h(doc, 'div', 'dz-list__ev'));
   const days = new KeyedList<DayItem>(
     body,
     (it) => {
+      if (isGap(it)) return gapNode('div');
       const section = h(doc, 'section', 'dz-list__day');
       const head = h(doc, 'h3', 'dz-list__head');
       const items = h(doc, 'ul', 'dz-list__items');
       section.append(head, items);
-      entryLists.set(it.key, new KeyedList<EntryItem>(items, () => {
-        const li = h(doc, 'li', 'dz-list__li');
-        const ev = h(doc, 'div', 'dz-list__ev');
-        ev.setAttribute('role', 'button');
-        li.append(ev);
-        return li;
-      }, (li, e, changed) => drawEntry(li.firstElementChild as HTMLElement, e, changed.created), (li) => unmountEvent(ctx, li.firstElementChild as HTMLElement)));
+      entryLists.set(
+        it.key,
+        new KeyedList<EntryItem>(
+          items,
+          (e) => {
+            if (isGap(e)) return gapNode('li');
+            const li = h(doc, 'li', 'dz-list__li');
+            const ev = entryPool.take();
+            ev.setAttribute('role', 'button');
+            li.append(ev);
+            return li;
+          },
+          (li, e, changed) => {
+            if (isGap(e)) li.style.height = `${e.gap}px`;
+            else {
+              if (e.size > 0) {
+                li.setAttribute('aria-setsize', String(e.size));
+                li.setAttribute('aria-posinset', String(e.pos));
+              } else {
+                li.removeAttribute('aria-setsize');
+                li.removeAttribute('aria-posinset');
+              }
+              if (changed.content) drawEntry(li.firstElementChild as HTMLElement, e, changed.created);
+            }
+          },
+          (li) => {
+            if (!li.classList.contains('dz-list__gap')) unmountEvent(ctx, li.firstElementChild as HTMLElement);
+          },
+          // The entry's node goes back to the pool: scrolling a long list reuses them.
+          (li) => {
+            const ev = li.firstElementChild as HTMLElement | null;
+            if (ev && !li.classList.contains('dz-list__gap')) entryPool.release(ev);
+          },
+        ),
+      );
       return section;
     },
-    (section, it) => drawDay(section, it),
+    (section, it) => {
+      if (isGap(it)) section.style.height = `${it.gap}px`;
+      else drawDay(section, it);
+    },
     (section) => {
       const key = section.dataset['key'] ?? '';
       entryLists.get(key)?.clear();
@@ -97,7 +150,7 @@ export function createListView(ctx: ViewCtx): ViewController {
     },
   );
 
-  function drawDay(section: HTMLElement, it: DayItem): void {
+  function drawDay(section: HTMLElement, it: Exclude<DayItem, GapItem>): void {
     const { day } = it;
     section.dataset['date'] = String(day.date);
     const head = section.firstElementChild as HTMLElement;
@@ -114,25 +167,6 @@ export function createListView(ctx: ViewCtx): ViewController {
     if (day.lengthMinutes !== 1440) head.append(h(doc, 'span', 'dz-list__len', formatMinutes(day.lengthMinutes, ctx.locale)));
   }
 
-  /** Each day's events, every render: a day's heading may be unchanged while its events are not. */
-  function syncEntries(day: ListDay, index: number): void {
-    const list = entryLists.get(String(day.date));
-    if (!list) return;
-    created.push(
-      ...list
-        .sync(
-          day.entries.map((entry) => ({
-            key: entry.key,
-            sig: '',
-            content: `${entry.instance.event.revision}|${entry.allDay}|${entry.start}|${entry.end}|${index}|${ctx.epoch}`,
-            entry,
-            index,
-          })),
-        )
-        .map((li) => li.firstElementChild as HTMLElement),
-    );
-  }
-
   /** The hours of the part on this day, with offsets where a repeated hour makes them ambiguous. */
   function labelsOf(e: ListEntry) {
     const ev = e.instance.event;
@@ -146,7 +180,7 @@ export function createListView(ctx: ViewCtx): ViewController {
     return timeLabels(ctx, part, { ...(start && { start }), ...(end && { end }), realMinutes });
   }
 
-  function drawEntry(el: HTMLElement, it: EntryItem, created: boolean): void {
+  function drawEntry(el: HTMLElement, it: Exclude<EntryItem, GapItem>, created: boolean): void {
     const e = it.entry;
     const ev = e.instance.event;
     byKey.set(e.key, e);
@@ -168,6 +202,187 @@ export function createListView(ctx: ViewCtx): ViewController {
     fillEvent(ctx, el, { instance: e.instance, segment: segmentOf(e, it.index), timeText: labels.text, displayZone: ctx.zone, family: 'list' }, fallback, created);
   }
 
+  // ── rows: what is mounted, and where the rest would be ──────────────────
+  // Every day heading and every entry is a row, in order. Their heights sit in
+  // a PrefixSums: estimated, then measured once mounted. Above the threshold
+  // only the rows in the scroller's view (and a view's height on each side) are
+  // mounted; gaps of the right height stand for the others.
+  interface Row {
+    readonly key: string;
+    readonly day: number;
+    /** -1 for a day's heading, else the entry's index in its day. */
+    readonly entry: number;
+  }
+  let rows: Row[] = [];
+  /** An entry key's row, and its place among all entries. */
+  const rowOf = new Map<string, number>();
+  /** A day heading's row, by date. */
+  const headOf = new Map<string, number>();
+  const order: string[] = [];
+  /** Heights estimated then measured, the visible range, the anchored corrections (shared with the other views). */
+  const rw = new RowWindow();
+  let windowed = false;
+  /** The rows mounted at the last draw, `to` exclusive. */
+  let shown = { from: 0, to: 0 };
+
+
+  function index(m: ListModel): void {
+    rows = [];
+    rowOf.clear();
+    headOf.clear();
+    order.length = 0;
+    m.days.forEach((d, di) => {
+      headOf.set(String(d.date), rows.length);
+      rows.push({ key: `head|${d.date}`, day: di, entry: -1 });
+      d.entries.forEach((e, ei) => {
+        rowOf.set(e.key, rows.length);
+        order.push(e.key);
+        rows.push({ key: e.key, day: di, entry: ei });
+      });
+    });
+    rw.reset(
+      rows.map((r) => r.key),
+      (i) => (rows[i]!.entry < 0 ? EST_HEAD : EST_ENTRY),
+    );
+  }
+
+  /** The rows on screen and a screen's height on each side, from the scroller. */
+  /** The scroller's offset and height, read on scroll, on resize, when measuring — not while rendering. */
+  let viewTop = 0;
+  /** Where the list was scrolled when printing began. */
+  let printedAt: number | null = null;
+  let viewHeight = -1;
+  const readView = () => {
+    viewTop = root.scrollTop || 0;
+    viewHeight = root.clientHeight || 0;
+  };
+  function visibleRows(): { from: number; to: number } {
+    if (viewHeight < 0) readView(); // the very first time only
+    return rw.visible(viewTop, viewHeight);
+  }
+
+  /** What stands for rows `[from, to)`: their height. */
+  const gapItem = (from: number, to: number): GapItem => {
+    const gap = rw.offsetOf(to) - rw.offsetOf(from);
+    return { key: `gap|${rows[from]!.key}`, sig: String(gap), gap };
+  };
+
+  /** Mounts what the window holds — and always the tab stop, so Tab reaches the list. */
+  function draw(): void {
+    const m = model;
+    if (!m) return;
+    const all = order.length;
+    windowed = !ctx.printing && all > ctx.virtualizeAbove;
+    const range = windowed ? visibleRows() : { from: 0, to: rows.length };
+    shown = range;
+    const keep = cursorKey !== null ? rowOf.get(cursorKey) : undefined;
+    const mounted = (r: number) => (r >= range.from && r < range.to) || r === keep;
+    const dayItems: DayItem[] = [];
+    let gapFrom = -1;
+    const flushGap = (to: number) => {
+      if (gapFrom >= 0) dayItems.push(gapItem(gapFrom, to));
+      gapFrom = -1;
+    };
+    const perDay = new Map<number, EntryItem[]>();
+    let r = 0;
+    m.days.forEach((day, di) => {
+      const head = r;
+      const end = head + 1 + day.entries.length;
+      let any = mounted(head);
+      for (let k = head + 1; k < end && !any; k++) any = mounted(k);
+      if (!any) {
+        if (gapFrom < 0) gapFrom = head;
+        r = end;
+        return;
+      }
+      flushGap(head);
+      dayItems.push({ key: String(day.date), sig: `${day.lengthMinutes}|${ctx.epoch}`, day, index: di });
+      const items: EntryItem[] = [];
+      let skip = -1;
+      for (let k = head + 1; k < end; k++) {
+        if (!mounted(k)) {
+          if (skip < 0) skip = k;
+          continue;
+        }
+        if (skip >= 0) items.push(gapItem(skip, k));
+        skip = -1;
+        const entry = day.entries[k - head - 1]!;
+        // Rows before it, less the headings up to its own: its place among the entries.
+        const pos = windowed ? k - di : 0;
+        items.push({
+          key: entry.key,
+          sig: `${pos}|${windowed ? all : 0}`,
+          content: `${entry.instance.event.revision}|${entry.allDay}|${entry.start}|${entry.end}|${di}|${ctx.epoch}`,
+          entry,
+          index: di,
+          pos,
+          size: windowed ? all : 0,
+        });
+      }
+      if (skip >= 0) items.push(gapItem(skip, end));
+      perDay.set(di, items);
+      r = end;
+    });
+    flushGap(rows.length);
+    days.sync(dayItems);
+    for (const [di, items] of perDay) {
+      const list = entryLists.get(String(m.days[di]!.date));
+      if (list) created.push(...list.sync(items).flatMap((li) => (li.classList.contains('dz-list__gap') ? [] : [li.firstElementChild as HTMLElement])));
+    }
+    if (windowed) scheduleMeasure();
+  }
+
+  // ── measuring: estimates corrected, the first visible row kept in place ──
+  let measuring = false;
+  function scheduleMeasure(): void {
+    if (measuring) return;
+    measuring = true;
+    ctx.scheduler.schedule({
+      read: () => {
+        measuring = false;
+        const found: [number, number][] = [];
+        for (const n of body.querySelectorAll<HTMLElement>('.dz-list__head, .dz-list__li')) {
+          const r = n.matches('h3') ? headOf.get((n.parentElement as HTMLElement).dataset['date'] ?? '') : rowOf.get((n.firstElementChild as HTMLElement).dataset['segment'] ?? '');
+          const size = n.getBoundingClientRect().height;
+          if (r !== undefined && size > 0) found.push([r, size]);
+        }
+        return { found, top: root.scrollTop };
+      },
+      write: ({ found, top }) => {
+        // What moves above the row at the top moves the scroll as much: that row stays put.
+        const next = rw.measure(found, top);
+        if (next === null) return;
+        root.scrollTop = next;
+        viewTop = next;
+        draw();
+      },
+    });
+  }
+
+  // Scrolling re-windows once a frame.
+  onScrollFrame(ctx.scope, root, () => windowed, () => {
+    readView();
+    const next = visibleRows();
+    if (next.from !== shown.from || next.to !== shown.to) draw();
+  });
+
+  /** Brings an entry into the window (scrolling to it), mounted now. */
+  function reveal(key: string): HTMLElement | null {
+    const r = rowOf.get(key);
+    if (r === undefined) return null;
+    if (windowed) {
+      const top = rw.offsetOf(r);
+      const bottom = top + rw.sizeOf(r);
+      const view = root.clientHeight || 0;
+      // Under the sticky heading of its day: one heading's height of room above.
+      if (top - EST_HEAD < root.scrollTop) root.scrollTop = Math.max(0, top - EST_HEAD);
+      else if (bottom > root.scrollTop + view) root.scrollTop = bottom - view;
+      cursorKey = key;
+      draw();
+    }
+    return entries().find((n) => n.dataset['segment'] === key) ?? null;
+  }
+
   // ── what the person does ──────────────────────────────────────────────
   const entries = () => [...body.querySelectorAll<HTMLElement>('.dz-list__ev')];
   const instanceOf = (el: Element | null): { el: HTMLElement; instance: EventInstance } | null => {
@@ -177,9 +392,12 @@ export function createListView(ctx: ViewCtx): ViewController {
   };
 
   function rove(key: string | null, focus: boolean): void {
+    const prev = cursorKey;
     cursorKey = key;
+    // The tab stop is always mounted: windowed, a new one may need drawing.
+    if (windowed && key && key !== prev && !entries().some((n) => n.dataset['segment'] === key)) draw();
     for (const n of entries()) n.tabIndex = n.dataset['segment'] === key ? 0 : -1;
-    if (focus && key) entries().find((n) => n.dataset['segment'] === key)?.focus();
+    if (focus && key) (reveal(key) ?? entries().find((n) => n.dataset['segment'] === key))?.focus();
   }
 
   const activate = (instance: EventInstance) => {
@@ -200,17 +418,17 @@ export function createListView(ctx: ViewCtx): ViewController {
       if (!scope || ctx.scope.isDisposed) return;
       command = { type: 'event.delete', id: ev.ref.seriesId, key: ev.ref.key, scope };
     }
-    // The focus goes on to the next event (or the one before) once this one is gone.
-    const all = entries();
-    const at = all.indexOf(node);
-    const next = all[at + 1] ?? all[at - 1];
+    // The focus goes on to the next event (or the one before) once this one is gone — in the
+    // period's order, mounted or not.
+    const at = order.indexOf(node.dataset['segment'] ?? '');
+    const next = order[at + 1] ?? order[at - 1] ?? null;
     const result = ctx.kernel.run(command, { validate: true });
     if (!result.ok) return ctx.refused(result, command);
     ctx.announce(ctx.messages.eventDeleted({ title: ev.title || ctx.messages.untitled, undo: undoKey() }));
-    cursorKey = next?.dataset['segment'] ?? null;
+    cursorKey = next;
     refocus = true;
     // Drawn already if the store change painted at once; otherwise at the next render.
-    if (cursorKey && entries().some((n) => n.dataset['segment'] === cursorKey)) {
+    if (cursorKey && byKey.has(cursorKey)) {
       refocus = false;
       rove(cursorKey, true);
     }
@@ -229,28 +447,31 @@ export function createListView(ctx: ViewCtx): ViewController {
   ctx.scope.on(root, 'keydown', (e) => {
     const ke = e as KeyboardEvent;
     const hit = instanceOf(ke.target as Element);
-    if (!hit || ke.altKey || ke.ctrlKey || ke.metaKey) return;
-    const all = entries();
-    const at = all.indexOf(hit.el);
+    if (!hit || ke.altKey || ke.ctrlKey || ke.metaKey || !model) return;
+    // Over the period's entries, mounted or not.
+    const at = order.indexOf(hit.el.dataset['segment'] ?? '');
     const dayStart = (dir: 1 | -1) => {
-      const section = hit.el.closest('.dz-list__day');
-      const sections = [...body.querySelectorAll<HTMLElement>('.dz-list__day')];
-      const target = sections[sections.indexOf(section as HTMLElement) + dir];
-      return target?.querySelector<HTMLElement>('.dz-list__ev') ?? null;
+      const r = rowOf.get(order[at]!);
+      const day = r === undefined ? -1 : rows[r]!.day;
+      for (let d = day + dir; d >= 0 && d < model!.days.length; d += dir) {
+        const first = model!.days[d]!.entries[0];
+        if (first) return first.key;
+      }
+      return undefined;
     };
-    let to: HTMLElement | null | undefined;
+    let to: string | undefined;
     switch (ke.key) {
       case 'ArrowDown':
-        to = all[at + 1];
+        to = order[at + 1];
         break;
       case 'ArrowUp':
-        to = all[at - 1];
+        to = order[at - 1];
         break;
       case 'Home':
-        to = all[0];
+        to = order[0];
         break;
       case 'End':
-        to = all[all.length - 1];
+        to = order[order.length - 1];
         break;
       case 'PageDown':
         to = dayStart(1);
@@ -272,7 +493,7 @@ export function createListView(ctx: ViewCtx): ViewController {
         return;
     }
     ke.preventDefault();
-    if (to) rove(to.dataset['segment'] ?? null, true);
+    if (to) rove(to, true);
   });
 
   attachMenuTriggers(ctx, root, (target) => {
@@ -294,15 +515,28 @@ export function createListView(ctx: ViewCtx): ViewController {
       created = [];
       root.setAttribute('aria-label', s.title);
       const focused = root.contains(doc.activeElement);
+      // Printing mounts every row; the window comes back where the reader was.
+      if (ctx.printing && printedAt === null) printedAt = root.scrollTop;
       byKey.clear();
-      days.sync(m.days.map((day) => ({ key: String(day.date), sig: `${day.lengthMinutes}|${ctx.epoch}`, day })));
-      m.days.forEach(syncEntries);
-      // Every entry redrawn or not is known by its key for the handlers.
       for (const day of m.days) for (const e of day.entries) byKey.set(e.key, e);
-      if (m.days.length === 0) {
-        empty.textContent = ctx.messages.noEvents;
-        if (!empty.isConnected) root.append(empty);
-      } else empty.remove();
+      // Windowed, the browser no longer anchors the scroll: the row at the top
+      // of the view is the anchor, kept where it is when rows come or go above it.
+      const anchor = windowed && rows.length > 0 && !ctx.printing ? (() => {
+        const r = rw.rowAt(viewTop);
+        return { key: rows[r]!.key, into: viewTop - rw.offsetOf(r), at: r };
+      })() : null;
+      index(m);
+      if (anchor) {
+        let r = rows.findIndex((x) => x.key === anchor.key);
+        if (r < 0) r = Math.min(anchor.at, rows.length - 1);
+        if (r >= 0) {
+          const top = Math.max(0, rw.offsetOf(r) + (rows[r]!.key === anchor.key ? anchor.into : 0));
+          if (Math.abs(top - viewTop) > 0.5) {
+            root.scrollTop = top;
+            viewTop = top;
+          }
+        }
+      }
       // The tab stop stays on its entry while it is listed; else on the same event (moved to
       // another day), else at the place it held; else the first.
       if (!cursorKey || !byKey.has(cursorKey)) {
@@ -311,7 +545,12 @@ export function createListView(ctx: ViewCtx): ViewController {
         const instance = cursorKey?.slice(0, cursorKey.lastIndexOf('|'));
         cursorKey = (all.find((e) => e.instance.key === instance) ?? all[Math.min(Math.max(was, 0), all.length - 1)])?.key ?? null;
       }
-      prevOrder = m.days.flatMap((d) => d.entries.map((e) => e.key));
+      prevOrder = [...order];
+      draw();
+      if (m.days.length === 0) {
+        empty.textContent = ctx.messages.noEvents;
+        if (!empty.isConnected) root.append(empty);
+      } else empty.remove();
       const lost = focused && !root.contains(doc.activeElement);
       rove(cursorKey, refocus || lost);
       // Nothing left to focus: the empty message holds it, so it does not fall to the page.
@@ -320,7 +559,17 @@ export function createListView(ctx: ViewCtx): ViewController {
         empty.focus();
       }
       refocus = false;
+      if (!ctx.printing && printedAt !== null) {
+        root.scrollTop = printedAt;
+        viewTop = printedAt;
+        printedAt = null;
+        if (windowed) draw();
+      }
       return created;
+    },
+    relayout() {
+      // Another size: the view's height read in a read phase, the window drawn in the write phase.
+      ctx.scheduler.schedule({ read: readView, write: () => windowed && draw() });
     },
     tick() {
       /* nothing moves with the minute */

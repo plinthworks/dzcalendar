@@ -143,6 +143,13 @@ export function buildColumnAxis(date: PlainDate, zone: ZoneId, o: ColumnAxisOpti
       const [from, to] = a < b ? [a, b] : [b, a];
       if (to > from) bands.push({ kind: t.kind, from, to, transition: t });
     }
+    // A day without a clock change keeps one offset from its midnight to the
+    // next: a position is a subtraction, no Temporal object made (ten thousand
+    // events in a week spent most of their model there). Instants outside the
+    // day clamp to its ends either way.
+    const midnight = day.start.epochMilliseconds;
+    const quiet = day.transitions.length === 0;
+    const fast = (i: Instant) => clamp((i.epochMilliseconds - midnight) / 60000 - minM);
     return {
       mode,
       day,
@@ -150,9 +157,9 @@ export function buildColumnAxis(date: PlainDate, zone: ZoneId, o: ColumnAxisOpti
       start: axisStart,
       end: axisEnd,
       bands,
-      toPosition: (i) => clamp(wallMinutes(date, i.toZonedDateTimeISO(zone).toPlainDateTime()) - minM),
+      toPosition: quiet ? fast : (i) => clamp(wallMinutes(date, i.toZonedDateTimeISO(zone).toPlainDateTime()) - minM),
       // Read one millisecond earlier, then step that millisecond back.
-      toEndPosition: (i) => clamp((wallMs(date, i.subtract({ milliseconds: 1 }).toZonedDateTimeISO(zone).toPlainDateTime()) + 1) / 60000 - minM),
+      toEndPosition: quiet ? fast : (i) => clamp((wallMs(date, i.subtract({ milliseconds: 1 }).toZonedDateTimeISO(zone).toPlainDateTime()) + 1) / 60000 - minM),
       fromPosition: (p, hint) => resolveAt(minM + p, policyOf(hint)),
       ticks(step) {
         assertStep(step);

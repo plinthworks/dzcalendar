@@ -12,6 +12,8 @@ import { registerView } from '../host.js';
 import { attachMenuTriggers } from '../menu.js';
 import { applyEventLook, fillEvent, startReadingOf, timeLabels, unmountEvent } from '../render/event.js';
 import { KeyedList, contentsHost, h } from '../render/reconcile.js';
+import { onScrollFrame } from '../render/window.js';
+import { NodePool } from '../render/pool.js';
 
 interface WeekItem {
   readonly key: string;
@@ -57,8 +59,10 @@ interface CellItem {
   readonly outside: boolean;
   readonly closed: boolean;
   readonly count: number;
-  /** Every event on this day, hidden by "+N" or not: the cell lists them for the keyboard and screen readers. */
+  /** Every event on this day, hidden by "+N" or not: what the day holds. */
   readonly segs: readonly Segment[];
+  /** Those drawn as bars: the only ones the cell lists until the day is entered (Enter). */
+  readonly drawn: readonly Segment[];
   /** The row's week number, on its first cell when week numbers are on. */
   readonly week: number | null;
 }
@@ -117,10 +121,34 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
   const allWeeks = () => sections.flatMap((x) => x.model.weeks);
   let state: KernelState | null = null;
   const parts = new Map<string, WeekParts>();
+  /** Bar nodes reused across months and weeks. */
+  const barPool = new NodePool(() => h(doc, 'div', 'dz-bar'));
   let created: HTMLElement[] = [];
   /** The keyboard's day: its cell is the grid's tab stop. */
   let cursorDate: PlainDate | null = null;
   const itemLists = new WeakMap<HTMLElement, { readonly host: HTMLElement; readonly list: KeyedList<ItemOfDay> }>();
+  /**
+   * A day's buttons for screen readers and the keyboard: those of the bars
+   * drawn, and — once the day is entered (Enter) — every event behind "+N"
+   * too. A crowded month thus holds cells × lanes nodes, not one per event.
+   */
+  const cellItems = new WeakMap<HTMLElement, CellItem>();
+  let expandedDate: PlainDate | null = null;
+  function syncItems(cell: HTMLElement, c: CellItem, all: boolean): void {
+    const segs = all ? c.segs : c.drawn;
+    itemLists.get(cell)?.list.sync(segs.map((seg) => ({ key: `item:${seg.key}`, sig: `${seg.instance.event.revision}|${ctx.epoch}`, seg })));
+  }
+  /** Every event of that day listed (and the last day entered back to its drawn ones). */
+  function expand(date: PlainDate | null): void {
+    if (expandedDate && date && expandedDate.equals(date)) return;
+    const prev = expandedDate ? cellOf(expandedDate) : null;
+    expandedDate = date;
+    const prevItem = prev ? cellItems.get(prev) : undefined;
+    if (prev && prevItem) syncItems(prev, prevItem, false);
+    const cell = date ? cellOf(date) : null;
+    const item = cell ? cellItems.get(cell) : undefined;
+    if (cell && item) syncItems(cell, item, true);
+  }
 
   const weekList = (host: HTMLElement) => new KeyedList<WeekItem>(
     host,
@@ -137,7 +165,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       const p: WeekParts = {
         week: null,
         cells: new KeyedList<CellItem>(cells, () => h(doc, 'div', 'dz-dg__cell'), (n, c) => drawCell(n, c)),
-        bars: new KeyedList<BarItem>(barsHost, () => h(doc, 'div', 'dz-bar'), (n, b, c) => drawBar(n, b, c), (n) => unmountEvent(ctx, n)),
+        bars: new KeyedList<BarItem>(barsHost, () => barPool.take(), (n, b, c) => drawBar(n, b, c), (n) => unmountEvent(ctx, n), (n) => barPool.release(n)),
         more: new KeyedList<MoreItem>(
           more,
           (m) => {
@@ -219,8 +247,75 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     grid.setAttribute('aria-label', name);
     grid.style.setProperty('--dz-cols', String(x.model.weeks[0]?.dates.length ?? 7));
     weekdayHead(grid.querySelector<HTMLElement>('.dz-dg__head')!, x.model);
-    created.push(...monthWeeks.get(x.key)!.sync(weekItems(x)));
+    fill(x.key, x, !asleep.has(x.key), el);
   }
+
+  // ── a crowded year: months far from the screen asleep, at the height they would take ──
+  /** Month keys whose weeks are not mounted. */
+  const asleep = new Set<string>();
+  /** The period last opened, to scroll to its date's month once. */
+  let shownYear = '';
+  /** A drawn month's height (every month has six weeks): what an asleep one keeps. */
+  let monthHeight = 0;
+  const crowdedYear = () =>
+    multi && !ctx.printing && sections.reduce((n, x) => n + x.model.weeks.reduce((k, w) => k + w.segments.length, 0), 0) > ctx.virtualizeAbove;
+  function fill(key: string, x: Section, awake: boolean, node?: HTMLElement): void {
+    // While it is created, the month's node is not in the list yet: handed over.
+    const el = node ?? months.get(key);
+    const grid = el?.querySelector<HTMLElement>('.dz-mm__grid');
+    const list = monthWeeks.get(key);
+    if (!el || !grid || !list) return;
+    if (awake) {
+      el.style.removeProperty('min-height');
+      grid.removeAttribute('aria-hidden');
+      created.push(...list.sync(weekItems(x)));
+    } else {
+      // The whole month's height (title included), on the element that had it.
+      if (monthHeight > 0) el.style.minHeight = `${monthHeight}px`;
+      // A grid without rows is not a grid to assistive technology: hidden until it wakes (the keyboard wakes it).
+      grid.setAttribute('aria-hidden', 'true');
+      list.clear();
+    }
+  }
+  /** The months meeting the scrolled view and a screen around it; the others asleep. Read, then write. */
+  function wake(): void {
+    if (!multi) return;
+    ctx.scheduler.schedule({
+      read: () => {
+        const view = body.getBoundingClientRect();
+        const margin = Math.max(view.height, 200);
+        const awakeMonth = sections.map((x) => months.get(x.key)).find((el, i) => el && !asleep.has(sections[i]!.key));
+        return {
+          crowded: crowdedYear() && view.height > 0,
+          height: awakeMonth?.getBoundingClientRect().height ?? 0,
+          near: sections.map((x) => {
+            const r = months.get(x.key)?.getBoundingClientRect();
+            return r ? r.bottom >= view.top - margin && r.top <= view.bottom + margin : true;
+          }),
+        };
+      },
+      write: ({ crowded, height, near }) => {
+        if (height > 0) monthHeight = height;
+        sections.forEach((x, i) => {
+          const el = months.get(x.key);
+          if (!el) return;
+          const keep = !crowded || monthHeight === 0 || near[i] || el.contains(doc.activeElement);
+          if (keep && asleep.delete(x.key)) fill(x.key, x, true);
+          else if (!keep && !asleep.has(x.key)) {
+            asleep.add(x.key);
+            fill(x.key, x, false);
+          }
+        });
+      },
+    });
+  }
+  /** A date's month awake now (the keyboard goes there). */
+  function wakeMonthOf(date: PlainDate): void {
+    if (asleep.size === 0) return;
+    const x = sections.find((m) => m.month !== null && m.month.year === date.year && m.month.month === date.month);
+    if (x && asleep.delete(x.key)) fill(x.key, x, true);
+  }
+  onScrollFrame(ctx.scope, body, () => multi && crowdedYear(), wake);
 
   function drawWeek(el: HTMLElement, it: WeekItem): void {
     const { week } = it;
@@ -236,13 +331,17 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     p.cells.sync(
       week.dates.map((date, i): CellItem => {
         const segs = week.segments.filter((sg) => sg.dayIndex - week.firstColumn <= i && i < sg.dayIndex - week.firstColumn + sg.dayCount);
+        const hiddenKeys = week.hiddenKeysPerDay[i] ?? [];
+        // A set: a crowded day hides a thousand events, and a list lookup per event was quadratic.
+        const hidden = hiddenKeys.length === 0 ? null : new Set(hiddenKeys);
+        const drawn = hidden === null ? segs : segs.filter((sg) => !hidden.has(sg.key));
         const count = segs.length;
         const today = date.equals(s.today);
         const outside = week.outside[i] ?? false;
         const closed = week.closed[i] ?? false;
         const items = segs.map((sg) => `${sg.key}:${sg.instance.event.revision}`).join(',');
         const wk = i === 0 && ctx.weekNumbers ? weekNumber(date, { ...weekRulesFor(ctx.locale), firstDay: s.firstDay }) : null;
-        return { key: date.toString(), sig: `${i}|${today}|${outside}|${closed}|${items}|${wk}|${ctx.epoch}`, date, col: i, today, outside, closed, count, segs, week: wk };
+        return { key: date.toString(), sig: `${i}|${today}|${outside}|${closed}|${items}|${wk}|${ctx.epoch}`, date, col: i, today, outside, closed, count, segs, drawn, week: wk };
       }),
     );
     const items: BarItem[] = [];
@@ -331,7 +430,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       }
       cell.prepend(wk);
     }
-    items.list.sync(c.segs.map((seg) => ({ key: `item:${seg.key}`, sig: `${seg.instance.event.revision}|${ctx.epoch}`, seg })));
+    cellItems.set(cell, c);
+    syncItems(cell, c, expandedDate?.equals(c.date) === true);
   }
 
   /** The cell's own button for an event: what the keyboard focuses and a screen reader reads in the day. */
@@ -446,7 +546,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
 
   // ── keyboard: the cells are the cursor, their items the events ─────────
   // A date may be drawn twice in a multi-month view (a padding day of the next month): its own month's cell wins.
-  const cellOf = (date: PlainDate) =>
+  const cellOf = (date: PlainDate) => (wakeMonthOf(date), cellOfDrawn(date));
+  const cellOfDrawn = (date: PlainDate) =>
     body.querySelector<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"]:not(.dz-dg__cell--outside)`) ??
     body.querySelector<HTMLElement>(`.dz-dg__cell[data-date="${date.toString()}"]`);
   const shownDates = () => allWeeks().flatMap((w) => (multi ? w.dates.filter((_, i) => !w.outside[i]) : w.dates));
@@ -458,6 +559,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
   /** One tab stop: the cursor's cell. */
   function rove(date: PlainDate | null): void {
     cursorDate = date;
+    // The cursor left the entered day: its hidden events' buttons go again.
+    if (expandedDate && !(date && date.equals(expandedDate))) expand(null);
     const stop = date ? cellOf(date) : null;
     for (const c of body.querySelectorAll<HTMLElement>('.dz-dg__cell')) c.tabIndex = c === stop ? 0 : -1;
   }
@@ -518,9 +621,13 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       const d = edge === 'start' ? inRow[0] : inRow[inRow.length - 1];
       return d ? { kind: 'day', date: d } : hit;
     },
-    itemsAt: (hit) => [...(cellOf(hit.date)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])],
+    itemsAt: (hit) => {
+      expand(hit.date);
+      return [...(cellOf(hit.date)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])];
+    },
     itemsAround: (node) => [...(node.closest('.dz-dg__items')?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])],
     nodeFor(eventId, date) {
+      if (date) expand(date);
       const inCell = date ? [...(cellOf(date)?.querySelectorAll<HTMLElement>('.dz-dg__item') ?? [])].find((n) => n.dataset['eventId'] === eventId) : undefined;
       return inCell ?? [...body.querySelectorAll<HTMLElement>('.dz-dg__item')].find((n) => n.dataset['eventId'] === eventId) ?? null;
     },
@@ -658,7 +765,32 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       // The cursor stays on its day while it is shown; otherwise today, or the period's first day.
       if (!cursorDate || !shownDates().some((d) => d.equals(cursorDate!))) cursorDate = homeDate();
       root.classList.toggle('dz-dg--month', s.view.alignment === 'month' || multi);
-      if (multi) months.sync(sections.map((x) => ({ key: x.key, sig: `${idOf(x.model)}|${s.today.toString()}|${ctx.epoch}`, section: x })));
+      if (multi) {
+        // A crowded year draws the months near the cursor's first; the rest wake as they come near the screen.
+        // Asleep only once a month's real height is known: before, an asleep month would collapse.
+        if (crowdedYear() && monthHeight > 0) {
+          const cursorMonth = (cursorDate ?? s.date).toString().slice(0, 7);
+          const at = Math.max(0, sections.findIndex((x) => x.key === cursorMonth));
+          sections.forEach((x, i) => (Math.abs(i - at) > 3 ? asleep.add(x.key) : asleep.delete(x.key)));
+        } else asleep.clear();
+        months.sync(sections.map((x) => ({ key: x.key, sig: `${idOf(x.model)}|${s.today.toString()}|${ctx.epoch}|${asleep.has(x.key)}`, section: x })));
+        // A new year (or a first one) opens on the month of its date, as a month view would show it.
+        const year = s.range.activeStart.toString();
+        if (year !== shownYear) {
+          shownYear = year;
+          const target = months.get((cursorDate ?? s.date).toString().slice(0, 7));
+          const first = sections[0] ? months.get(sections[0].key) : undefined;
+          if (target && first) {
+            ctx.scheduler.schedule({
+              read: () => target.offsetTop - first.offsetTop,
+              write: (top) => {
+                body.scrollTop = Math.max(0, top);
+                wake();
+              },
+            });
+          } else wake();
+        } else wake();
+      }
       else {
         const m = sections[0]!.model;
         weekdayHead(head, m);
@@ -675,6 +807,11 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     },
     tick() {
       /* today moves through kernel.refreshToday → a new state → render */
+    },
+    relayout() {
+      // Another width: months have another height; asleep ones take the new one when measured.
+      monthHeight = 0;
+      wake();
     },
     destroy() {
       for (const p of parts.values()) p.bars.clear();

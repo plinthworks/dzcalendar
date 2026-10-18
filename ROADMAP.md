@@ -1045,6 +1045,65 @@ Owner's decisions: signals only, Angular 19 and later (`^19 || ^20 || ^21
 - `pack:local` keeps version 0.0.0: a consumer's lockfile may keep an older
   tarball (`test:package` installs fresh each time).
 
-## Next — Phase 12: virtualisation of every view, print
+## Phase 12 — virtualisation of every view, print ✅ (2026-10-18)
 
-See `ARCHITECTURE.md` J. Phase 12.
+Owner's decisions: a month day lists its drawn events to assistive
+technology, all of them once entered (Enter); windowing only above
+`virtualizeAbove` (default 500 events), so the common case keeps a screen
+reader's full browse mode; an automatic time-grid "+N" (`eventMaxStack`);
+a shared windowing helper; printing shows everything; nodes recycled; size
+budgets at the measure + 3 % (core 36, dom 35.1, dom/list 4.8 kB).
+
+- Measured first (`playground/perf.html`, U = 10 000 over a year, W = 10 000
+  in a week): the worst cases were the month's hidden items (10 958 nodes),
+  the week's 10 256 slivers, the list's 55 277 nodes, and three hidden costs —
+  a quadratic lookup in month cells (68 ms), axis positions built from
+  Temporal objects (190 ms for a crowded week's model), and an all-day row
+  that grew without bound and squeezed the hours to 0 px.
+- Core: quiet-day fast path in `time-axis` (a subtraction; checked equal to
+  the slow path on 60 000 instants over 12 zones, historic offsets included);
+  `TimeGridOptions.maxStack` and `MoreTimed` "+N" runs; `kernel.getOptions()`.
+- DOM: month items on demand; time-grid windowing of the scrolled hours and
+  "+N" links (the month's panel); list windowing (`RowWindow`: estimated then
+  measured rows, anchored corrections, the top row kept across store
+  changes); multi-month months asleep at a whole month's height, the year
+  opening on its date's month; `NodePool` (event nodes, bars, list entries);
+  `KeyedList` removes what leaves before placing the rest (kept nodes never
+  move: the focus survives windowing); `ViewController.relayout()` on
+  resize; measurements through the frame scheduler; `preparePrint()` /
+  `autoPrint` (everything mounted, "+N" caps lifted, scroll restored); the
+  all-day row capped (`--dz-allday-max`); `eventMaxStack` guessed from the
+  host before the first paint; options validated (`eventMaxStack`,
+  `virtualizeAbove`). Theme: `@media print`.
+- `npm run perf:browser` (minified playground, median of 5, budgets in
+  `perf/browser-budgets.json`): week U 24 ms, week W 98 ms / 2 203 nodes
+  (was 540 / 28 903), month W 73 ms / 221 (was 176 / 10 958), list year
+  42 ms / 255 (was 291 / 55 277), year U 85 ms, one event changed: ≤ 33 ms,
+  one layout. Bench rows for the W models.
+- Tests: 908; browser 100/100 (a crowded week with axe, the list's scroll
+  stable, the hours printed whole).
+
+### Reviews (architect; code review by execution in Chrome), fixed
+- The kept nodes were moved by every window change (KeyedList walked past
+  nodes about to leave): the focus fell to the page while scrolling, after a
+  keyboard grab, after printing — removal now comes first.
+- No re-windowing on resize or when a hidden calendar appeared; layouts
+  forced inside writes (render, month waking); a windowed list jumping when
+  rows came or went above the view; asleep months collapsed before a height
+  was known, and sized on the grid instead of the month (17 px jumps);
+  asleep grids exposed without rows; `eventMaxStack: 1` drew "+N" outside the
+  column, bad values unchecked; `preparePrint` restore after destroy; the
+  month lanes guess (wrong at common sizes) removed; the perf page did not
+  exercise the week's window (a variant added).
+
+### Not done in Phase 12, on purpose
+- `visibleWindow()` on `ViewController` (the custom-view contract of D.2):
+  `relayout()` covers resizing; a window query for custom views waits for a
+  view that needs it.
+- A scroll-frame cost budget (script ms per frame while scrolling) in
+  `perf:browser`.
+- An announcement when entering a crowded day ("N events listed").
+
+## Next — Phase 13: complete theme, i18n, density
+
+See `ARCHITECTURE.md` J. Phase 13.

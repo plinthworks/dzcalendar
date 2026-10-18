@@ -1,5 +1,5 @@
 import { Temporal, formatTemporal, locateNow, weekNumber, weekRulesFor } from '@dzcalendar/core';
-import type { AllDayBar, AxisBand, Hit, PlacedTimed, PlainDate, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
+import type { AllDayBar, AxisBand, Hit, MoreTimed, PlacedTimed, PlainDate, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
 import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
 import { handles } from '../interact/handles.js';
 import type { ViewController, ViewCtx } from '../host.js';
@@ -7,6 +7,8 @@ import { registerView } from '../host.js';
 import { attachMenuTriggers } from '../menu.js';
 import { applyEventLook, fillEvent, formatMinutes, timeLabels, timedContent, unmountEvent } from '../render/event.js';
 import { KeyedList, contentsHost, h } from '../render/reconcile.js';
+import { onScrollFrame } from '../render/window.js';
+import { NodePool } from '../render/pool.js';
 
 const HM = { hour: '2-digit', minute: '2-digit' } as const;
 
@@ -40,6 +42,14 @@ interface ColumnParts {
   readonly bands: HTMLElement;
   readonly events: KeyedList<EventItem>;
   readonly background: KeyedList<EventItem>;
+  readonly more: KeyedList<MoreItem>;
+}
+
+interface MoreItem {
+  readonly key: string;
+  readonly sig: string;
+  readonly more: MoreTimed;
+  readonly date: PlainDate;
 }
 
 export interface TimeGridController extends ViewController {
@@ -134,6 +144,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   );
 
   // ── columns ────────────────────────────────────────────────────────────────
+  /** Event nodes reused across scrolling and weeks (one pool for every column). */
+  const eventPool = new NodePool(() => h(doc, 'div', 'dz-ev'));
   const columns = new KeyedList<ColumnItem>(
     colsHost,
     (it) => {
@@ -143,12 +155,26 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const bands = contentsHost(doc, 'dz-tg__bands');
       const bgHost = contentsHost(doc, 'dz-tg__bg');
       const evHost = contentsHost(doc, 'dz-tg__events');
-      el.append(hours, bands, bgHost, evHost);
+      const moreHost = contentsHost(doc, 'dz-tg__mores');
+      el.append(hours, bands, bgHost, evHost, moreHost);
       parts.set(it.key, {
         hours,
         bands,
-        events: new KeyedList<EventItem>(evHost, () => h(doc, 'div', 'dz-ev'), (n, e, c) => drawEvent(n, e.placed, false, c), (n) => unmountEvent(ctx, n)),
+        events: new KeyedList<EventItem>(evHost, () => eventPool.take(), (n, e, c) => drawEvent(n, e.placed, false, c), (n) => unmountEvent(ctx, n), (n) => eventPool.release(n)),
         background: new KeyedList<EventItem>(bgHost, () => h(doc, 'div', 'dz-ev dz-ev--bg'), (n, e, c) => drawEvent(n, e.placed, true, c)),
+        more: new KeyedList<MoreItem>(
+          moreHost,
+          () => {
+            const b = h(doc, 'button', 'dz-more dz-more--tg') as HTMLButtonElement;
+            b.type = 'button';
+            b.addEventListener('click', () => {
+              const m = moreOf.get(b);
+              if (m) openMoreTimed(b, m.more, m.date);
+            });
+            return b;
+          },
+          (b, m) => drawMore(b, m),
+        ),
       });
       return el;
     },
@@ -158,6 +184,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const p = parts.get(el.dataset['date'] ?? '');
       p?.events.clear();
       p?.background.clear();
+      p?.more.clear();
     },
   );
 
@@ -191,8 +218,113 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     );
     p.bands.replaceChildren(...column.axis.bands.map((b) => drawBand(b)));
     p.background.sync(column.background.map(itemOf));
-    created.push(...p.events.sync(column.events.map(itemOf)));
+    created.push(...p.events.sync(shown(column).map(itemOf)));
+    p.more.sync(column.more.map((m) => ({ key: m.key, sig: `${m.top}|${m.height}|${m.left}|${m.width}|${m.events.length}|${ctx.epoch}`, more: m, date: column.date })));
   }
+
+  // ── "+N": a crowded cluster's hidden events, listed in the panel the month uses ──
+  const moreOf = new WeakMap<HTMLElement, MoreItem>();
+  /** The events of the open panel, by key: what its clicks and menu resolve. */
+  let panelEvents = new Map<string, PlacedTimed>();
+  function drawMore(b: HTMLElement, m: MoreItem): void {
+    moreOf.set(b, m);
+    b.style.setProperty('--t', String(m.more.top));
+    b.style.setProperty('--h', String(m.more.height));
+    b.style.setProperty('--l', String(m.more.left));
+    b.style.setProperty('--w', String(m.more.width));
+    b.textContent = ctx.messages.moreLink({ count: m.more.events.length });
+    const first = m.more.events[0]!.segment.from.toZonedDateTimeISO(ctx.zone);
+    const when = `${formatTemporal(m.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale)}, ${formatTemporal(first.toPlainTime(), HM, ctx.locale)}`;
+    b.setAttribute('aria-label', ctx.messages.moreLabel({ count: m.more.events.length, date: when }));
+  }
+  function openMoreTimed(link: HTMLElement, more: MoreTimed, date: PlainDate): void {
+    panelEvents = new Map(more.events.map((p) => [p.segment.key, p]));
+    const nodes = more.events.map((p) => {
+      const ev = p.segment.instance.event;
+      const item = h(doc, 'div', 'dz-bar dz-bar--in-popover');
+      applyEventLook(item, ev);
+      item.dataset['segment'] = p.segment.key;
+      const title = ev.title || ctx.messages.untitled;
+      const labels = timeLabels(ctx, ev, { ...(p.startReading && { start: p.startReading }), ...(p.endReading && { end: p.endReading }) });
+      fillEvent(ctx, item, { instance: p.segment.instance, segment: p.segment, timeText: labels.text, displayZone: ctx.zone, family: 'timeGrid' }, () => [h(doc, 'span', 'dz-bar__time', labels.text), doc.createTextNode(` ${title}`)], true);
+      item.tabIndex = 0;
+      item.setAttribute('role', 'button');
+      item.setAttribute('aria-label', ctx.messages.eventLabel({ title, time: labels.spoken }));
+      return item;
+    });
+    ctx.openMore(link, formatTemporal(date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale), nodes, () => {
+      for (const n of nodes) unmountEvent(ctx, n);
+    });
+  }
+  const panelEvent = (target: EventTarget | null) => {
+    const item = (target as Element | null)?.closest<HTMLElement>('.dz-bar');
+    return item ? panelEvents.get(item.dataset['segment'] ?? '') : undefined;
+  };
+  ctx.scope.on(ctx.popoverElement, 'click', (e) => {
+    const p = panelEvent(e.target);
+    if (p) ctx.live().onEventClick?.(p.segment.instance);
+  });
+  ctx.scope.on(ctx.popoverElement, 'keydown', (e) => {
+    const ke = e as KeyboardEvent;
+    if (ke.key !== 'Enter' && ke.key !== ' ') return;
+    const p = panelEvent(ke.target);
+    if (!p) return;
+    ke.preventDefault();
+    ctx.live().onEventClick?.(p.segment.instance);
+  });
+  attachMenuTriggers(ctx, ctx.popoverElement, (target) => {
+    const item = target.closest<HTMLElement>('.dz-bar');
+    const p = item ? panelEvents.get(item.dataset['segment'] ?? '') : undefined;
+    return item && p ? { target: { kind: 'event', instance: p.segment.instance }, anchor: item } : null;
+  });
+
+  // ── windowing: above `virtualizeAbove` events, only the scrolled hours (and a screen above and below) ──
+  /** The minutes of the axis mounted, or null: everything. */
+  let win: { from: number; to: number } | null = null;
+  /** Mounted whatever the window: the focused event (and one asked for by the keyboard). */
+  const kept = new Set<string>();
+  const windowed = (m: TimeGridModel | null) =>
+    !ctx.printing && m !== null && m.columns.reduce((n, c) => n + c.events.length, 0) > ctx.virtualizeAbove;
+  const shown = (column: TimeGridColumn) =>
+    !win ? column.events : column.events.filter((e) => kept.has(e.segment.key) || (e.top < win!.to && e.top + e.visualHeight > win!.from));
+  /** The window for the current scroll, in steps of half a screen (so a scroll of a few pixels mounts nothing). */
+  function windowNow(m: TimeGridModel): { from: number; to: number } | null {
+    const col = m.columns.find(usable);
+    const px = col ? pxOf(col) : 0;
+    const view = body.clientHeight;
+    if (px <= 0 || view <= 0) return null; // no layout (jsdom, hidden): everything
+    const step = view / 2 / px;
+    const top = body.scrollTop / px;
+    const from = Math.floor((top - view / px) / step) * step;
+    const to = Math.ceil((top + 2 * view / px) / step) * step;
+    return { from, to };
+  }
+  /** Mounts what the window now covers; true when it moved. */
+  function rewindow(force = false, measured?: { from: number; to: number } | null): boolean {
+    if (!model) return false;
+    const was = win;
+    const next = windowed(model) ? (measured !== undefined ? measured : windowNow(model)) : null;
+    if (!force && (next === was || (next && was && next.from === was.from && next.to === was.to))) return false;
+    win = next;
+    for (const column of model.columns) {
+      if (column.folded) continue;
+      parts.get(column.key)?.events.sync(shown(column).map(itemOf));
+    }
+    return true;
+  }
+  onScrollFrame(ctx.scope, body, () => windowed(model), () => measureWindow());
+  /** The window read in a read phase, mounted in the write phase that follows. */
+  function measureWindow(): void {
+    ctx.scheduler.schedule({
+      read: () => (model && windowed(model) ? windowNow(model) : null),
+      write: (next) => rewindow(win === null || win.to < win.from, next),
+    });
+  }
+  ctx.scope.on(root, 'focusin', (e) => {
+    const key = (e.target as HTMLElement | null)?.closest<HTMLElement>('.dz-ev')?.dataset['key'];
+    kept.clear();
+    if (key) kept.add(key);
+  });
 
   function drawBand(b: AxisBand): HTMLElement {
     const el = h(doc, 'div', `dz-band dz-band--${b.kind}`);
@@ -374,7 +506,17 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       return host ? [...host.querySelectorAll<HTMLElement>('[data-event-id][tabindex]')] : [];
     },
     nodeFor(eventId, date) {
+      // Out of the window: mounted for the keyboard (and kept while it has the focus).
+      if (win && model) {
+        for (const c of model.columns) for (const e of c.events) if (e.segment.instance.event.id === eventId) kept.add(e.segment.key);
+        rewindow(true);
+      }
       const all = [...root.querySelectorAll<HTMLElement>('[data-event-id][tabindex]')].filter((n) => n.dataset['eventId'] === eventId);
+      // Behind "+N": the link that holds it takes the focus.
+      if (all.length === 0) {
+        const link = [...root.querySelectorAll<HTMLElement>('.dz-more--tg')].find((b) => moreOf.get(b)?.more.events.some((p) => p.segment.instance.event.id === eventId));
+        if (link) return link;
+      }
       if (date) {
         const inColumn = all.find((n) => n.closest<HTMLElement>('.dz-tg__col')?.dataset['date'] === date.toString());
         if (inColumn) return inColumn;
@@ -409,6 +551,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const room = ctx.snapMinutes * px * 2;
       if (y - room < body.scrollTop) body.scrollTop = Math.max(0, y - room);
       else if (y + room > body.scrollTop + body.clientHeight) body.scrollTop = y + room - body.clientHeight;
+      // What the keyboard looks at is mounted now, not at the next scroll event.
+      rewindow();
     },
   };
 
@@ -578,9 +722,19 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       ]);
       if (!model || model.gutter !== m.gutter || gutterEpoch !== epoch) drawGutter(m);
       gutterEpoch = epoch;
+      model = m;
+      // A crowded week keeps the window it has (the same scroll, the same scale:
+      // a store change or another week reads no layout). The first time, the
+      // columns are drawn with only what is kept, and the window is measured in
+      // the scheduler's read phase, mounted in its write phase. Without a layout
+      // (hidden, jsdom) the window is null: everything is mounted.
+      const crowded = windowed(m);
+      const known = crowded && win !== null && win.to >= win.from;
+      if (!crowded) win = null;
+      else if (!known) win = { from: 0, to: -1 };
       columns.sync(cols.map((c) => ({ ...c, sig: `${c.sig}|${c.today}` })));
       for (const key of parts.keys()) if (!cols.some((c) => c.key === key)) parts.delete(key);
-      model = m;
+      if (crowded && !known) measureWindow();
       return created;
     },
 
@@ -606,15 +760,21 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const el = col ? columns.get(col.key) : undefined;
       const px = el && col && col.axis.length > 0 ? el.getBoundingClientRect().height / col.axis.length : 0;
       body.scrollTop = minutes * (px || 0.8);
+      rewindow();
     },
 
     columnFor: (key) => columns.get(key),
+
+    relayout() {
+      if (windowed(model)) measureWindow();
+    },
 
     destroy() {
       bars.clear();
       for (const p of parts.values()) {
         p.events.clear();
         p.background.clear();
+        p.more.clear();
       }
       columns.clear();
       parts.clear();

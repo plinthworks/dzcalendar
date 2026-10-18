@@ -14,6 +14,8 @@
   "timeGrid week model (10k)": 25,
   "dayGrid month model (10k)": 50,
   "list year model (10k)": 150,
+  "timeGrid week model (W)": 100,
+  "dayGrid month model (W)": 60,
   "multiMonth model (10k)": 150,
   "expand daily 1 year": 5,
   "week of 200 series": 30,

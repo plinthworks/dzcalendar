@@ -92,7 +92,7 @@ export { navigate } from './views/nav.js';
 export type { NavDirection } from './views/nav.js';
 export type { ViewSpec, ViewFamily, ViewRange, NavContext } from './views/spec.js';
 export { buildTimeGridModel, buildTimeGridColumn, updateTimeGridModel, locateNow } from './views/timegrid.js';
-export type { TimeGridModel, TimeGridColumn, TimeGridOptions, PlacedTimed, AllDayBar, Reading } from './views/timegrid.js';
+export type { TimeGridModel, TimeGridColumn, TimeGridOptions, PlacedTimed, MoreTimed, AllDayBar, Reading } from './views/timegrid.js';
 export { buildDayGridModel, updateDayGridModel } from './views/daygrid.js';
 export type { DayGridModel, DayGridWeek, DayGridBar, DayGridOptions } from './views/daygrid.js';
 export { formatTemporal, formatToPartsTemporal, formatRangeTitle, weekdayNames, monthNames } from './format/intl.js';

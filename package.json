@@ -15,7 +15,8 @@
     "size": "node scripts/size.mjs",
     "test:browser": "node scripts/browser.mjs",
     "pack:local": "npm run build && rm -rf packed && mkdir packed && for p in rrule core ical dom motion-gsap theme angular; do (cd packages/$p/dist && npm pack --pack-destination ../../../packed >/dev/null); done && ls packed",
-    "test:package": "npm run pack:local && node scripts/package-smoke.mjs"
+    "test:package": "npm run pack:local && node scripts/package-smoke.mjs",
+    "perf:browser": "node scripts/perf-browser.mjs"
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.8.1",

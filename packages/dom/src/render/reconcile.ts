@@ -35,15 +35,26 @@ export class KeyedList<T extends Keyed> {
     private readonly create: (item: T) => HTMLElement,
     private readonly update: (el: HTMLElement, item: T, changed: Changed) => void,
     private readonly removed?: (el: HTMLElement) => void,
+    /** After a node left the container: a pool may take it back (`render/pool.ts`). */
+    private readonly released?: (el: HTMLElement) => void,
   ) {}
 
   /** Brings the container to `items`, in order. Returns the nodes created, for an entrance animation. */
   sync(items: readonly T[]): HTMLElement[] {
     const seen = new Set<string>();
+    for (const item of items) seen.add(item.key);
+    // What goes, goes first: a window that drops its first rows must not make
+    // every row after them move (a moved node loses the focus, and costs a layout).
+    for (const [key, entry] of this.nodes) {
+      if (seen.has(key)) continue;
+      this.removed?.(entry.el);
+      entry.el.remove();
+      this.nodes.delete(key);
+      this.released?.(entry.el);
+    }
     const created: HTMLElement[] = [];
     let cursor: ChildNode | null = this.container.firstChild;
     for (const item of items) {
-      seen.add(item.key);
       let entry = this.nodes.get(item.key);
       if (!entry) {
         const el = this.create(item);
@@ -65,12 +76,6 @@ export class KeyedList<T extends Keyed> {
       if (entry.el !== cursor) this.container.insertBefore(entry.el, cursor);
       else cursor = cursor.nextSibling;
     }
-    for (const [key, entry] of this.nodes) {
-      if (seen.has(key)) continue;
-      this.removed?.(entry.el);
-      entry.el.remove();
-      this.nodes.delete(key);
-    }
     return created;
   }
 
@@ -82,6 +87,7 @@ export class KeyedList<T extends Keyed> {
     for (const { el } of this.nodes.values()) {
       this.removed?.(el);
       el.remove();
+      this.released?.(el);
     }
     this.nodes.clear();
   }

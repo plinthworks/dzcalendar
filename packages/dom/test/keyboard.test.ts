@@ -105,15 +105,25 @@ describe('month: one tab stop, arrows between days, Enter into a day', () => {
     expect(active()).toBe(cell);
   });
 
-  it('events a crowded day hides behind "+N" are still in its cell, and their ring goes on the link', () => {
+  it('a crowded day lists its drawn events; entered (Enter), every one behind "+N" too, their ring on the link', () => {
     mount(
       Array.from({ length: 5 }, (_, i) => ({ id: `e${i}`, title: `E${i}`, start: `2026-10-21T0${i + 1}:00[Europe/Paris]` })),
       { dayMaxLanes: 3 },
     );
-    const items = [...document.querySelectorAll<HTMLElement>('.dz-dg__cell[data-date="2026-10-21"] .dz-dg__item')];
+    const cell = document.querySelector<HTMLElement>('.dz-dg__cell[data-date="2026-10-21"]')!;
+    // Two bars and "+3" in the third lane: two buttons until the day is entered (Phase 12, owner's choice).
+    expect(cell.querySelectorAll('.dz-dg__item')).toHaveLength(2);
+    expect(cell.getAttribute('aria-label')).toContain('5 événements');
+    cell.focus();
+    press('Enter');
+    const items = [...cell.querySelectorAll<HTMLElement>('.dz-dg__item')];
     expect(items).toHaveLength(5);
     items[4]!.focus();
     expect(document.querySelector('.dz-more.dz-focus')).not.toBeNull();
+    // Leaving the day: back to its drawn ones.
+    press('Escape');
+    press('ArrowRight');
+    expect(cell.querySelectorAll('.dz-dg__item')).toHaveLength(2);
   });
 });
 

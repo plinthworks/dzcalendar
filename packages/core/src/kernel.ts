@@ -144,6 +144,8 @@ export interface CalendarKernel {
   setLocale(locale: string): void;
   /** Shallow-merged per key (`timeGrid`, `dayGrid`) over the current options. */
   setOptions(options: ModelOptions): void;
+  /** The options in force (what `setOptions` merged). */
+  getOptions(): ModelOptions;
   /**
    * Replaces the "events" source. Unchanged events keep their objects and
    * revisions (the store diffs), so a framework passing a new array with the
@@ -382,6 +384,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     setEvents(events) {
       return loadEvents(events);
     },
+    getOptions: () => options,
     batch(fn) {
       held++;
       try {

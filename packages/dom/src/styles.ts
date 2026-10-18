@@ -52,7 +52,9 @@ export const DZ_CSS = `
 }
 /* The body may show a scrollbar; the rows above reserve the same gutter so columns line up. */
 .dz-tg__head, .dz-tg__allday, .dz-tg__body { scrollbar-gutter: stable; }
-.dz-tg__head, .dz-tg__allday { overflow-y: hidden; }
+.dz-tg__head { overflow-y: hidden; }
+/* A crowded all-day row scrolls on its own: a thousand all-day events must not squeeze the hours to nothing. */
+.dz-tg__allday { overflow-y: auto; max-height: var(--dz-allday-max, 10.5rem); flex: none; }
 .dz-tg__head { border-bottom: 1px solid var(--dz-border, var(--tz-border, GrayText)); }
 .dz-tg__dayhead { padding: 0.375rem 0.25rem; text-align: center; font-size: 0.8125rem; min-width: 0; }
 .dz-tg__dayhead-weekday { display: block; color: var(--dz-fg-muted, var(--tz-fg-muted, GrayText)); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -292,6 +294,21 @@ export const DZ_CSS = `
   text-align: start;
   cursor: pointer;
   white-space: nowrap;
+}
+/* In a time grid: where the hidden events are, in the cluster's last lane. */
+.dz-more--tg {
+  position: absolute;
+  top: calc(var(--t) * var(--dz-minute, 0.8px));
+  height: calc(var(--h) * var(--dz-minute, 0.8px));
+  inset-inline-start: calc(var(--l) * 100%);
+  width: calc(var(--w) * 100% - 3px);
+  margin: 0;
+  box-sizing: border-box;
+  border: 1px dashed var(--dz-border, var(--tz-border, GrayText));
+  background: var(--dz-bg, var(--tz-bg, Canvas));
+  overflow: hidden;
+  align-content: start;
+  z-index: 2;
 }
 .dz-more:hover, .dz-more:focus-visible { background: var(--dz-bg-raised, var(--tz-bg-raised, ButtonFace)); outline-offset: 1px; }
 

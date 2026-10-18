@@ -64,6 +64,13 @@ export interface ViewCtx {
   readonly injectStyles: boolean;
   /** Week numbers on the month's rows and the week's corner. */
   weekNumbers: boolean;
+  /**
+   * Above this many events in a view, only what is on screen (plus a margin)
+   * is mounted, the rest as it scrolls into view. Below it, everything is.
+   */
+  virtualizeAbove: number;
+  /** `preparePrint()` is in force: everything is mounted, nothing is windowed. */
+  printing: boolean;
   /** The "+N" panel: views attach their menu triggers to it too. */
   readonly popoverElement: HTMLElement;
   /**
@@ -101,6 +108,12 @@ export interface ViewController {
   tick(now: Instant, state: KernelState): void;
   /** First paint only: scroll to this many minutes from the start of the axis. */
   scrollTo?(minutes: number): void;
+  /**
+   * The calendar changed size (or appeared after being hidden): what is
+   * mounted is decided again — a window, a month's height. Read and write go
+   * through the frame scheduler.
+   */
+  relayout?(): void;
   destroy(): void;
 }
 

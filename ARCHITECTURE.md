@@ -68,6 +68,15 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 12 (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : dans le mois, les boutons d'accessibilité d'un jour sont ceux des barres dessinées, tous une fois le jour ouvert (Entrée) ; virtualisation au-delà d'un seuil (`virtualizeAbove`, 500 par défaut) ; « +N » automatique en grille horaire (`eventMaxStack`) ; l'impression montre tout (plafonds levés) ; recyclage des nœuds (`render/pool.ts`) ; budgets à la mesure + 3 % (core 36, dom 35,1, dom/list 4,8 ko).
+- **B.10/B.11** — `TimeGridOptions.maxStack` et `TimeGridColumn.more` (`MoreTimed`) ; chemin rapide des positions d'un jour sans changement d'heure ; `CalendarKernel.getOptions()`.
+- **D.1/D.2** — `ViewController.relayout?()` (redimensionnement) ; `visibleWindow()` reporté (le contrat des vues custom de D.2 attendra une vue qui en a besoin) ; `KeyedList` retire ce qui part avant de placer le reste et a un crochet `released` ; boîte à outils : `RowWindow`, `onScrollFrame`, `NodePool`. Les mesures passent par le `FrameScheduler`.
+- **D.6** — un mois endormi est `aria-hidden` (une grille sans lignes) ; une liste fenêtrée porte `aria-setsize`/`aria-posinset`.
+- **D.9** — `preparePrint()` monte tout, lève les plafonds « +N », restaure le défilement ; `autoPrint`.
+- **G.2/G.3** — `scripts/perf-browser.mjs` (`npm run perf:browser`) sur le playground minifié, budgets dans `perf/browser-budgets.json` (premier rendu, nœuds, mise à jour d'un événement et nombre de layouts).
+
 ### Ajustements après la Phase 11 (détail dans ROADMAP.md)
 
 - **Décisions du propriétaire** : Angular **100 % signaux, 19 et plus** (`peerDependencies` `^19 || ^20 || ^21 || ^22`, chaque version vérifiée par `npm run test:package`) ; composants simples à brancher (`imports: [DZ_CALENDAR]`, aucun fournisseur requis).
@@ -1390,7 +1399,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 - **Dépend de** : P4 minimum (idéalement P8).
 
 ### Phase 12 : virtualisation de toutes les vues
-- **Livrables / fichiers** : `dom/render/pool.ts`, virtualisation de list, multiMonth, timeGrid (colonnes), dayGrid (événements), `preparePrint`.
+- **Livrables / fichiers** : `dom/render/pool.ts`, virtualisation de list, multiMonth, timeGrid (colonnes), dayGrid (événements), `preparePrint` (livré, voir « Ajustements après la Phase 12 »).
 - **Acceptation** : budgets G.2 pour W ; nœuds DOM ≤ borne annoncée ; défilement stable ; `preparePrint()` rend tout puis restaure.
 - **Dépend de** : P10.
 

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — mesures</title>
+    <style>
+      body { margin: 0; padding: 1rem; font: 14px/1.4 system-ui, sans-serif; background: var(--tz-bg); color: var(--tz-fg); }
+      #cal .dz-cal { --dz-height: 85vh; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p id="out" role="status">?view=timeGridWeek&amp;set=W (ou U)&amp;n=10000</p>
+      <div id="cal"></div>
+    </main>
+    <script type="module" src="./perf.ts"></script>
+  </body>
+</html>

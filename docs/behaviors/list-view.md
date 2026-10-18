@@ -40,6 +40,17 @@ to a day, deletes from the keyboard.
   ends, PageUp/PageDown its days, and the arrows stop at the period's edges
   (the toolbar changes period). A clock-change day shows and says each
   event's real length ("3 h réelles") and the offsets of a repeated hour.
+- **Windowed above `virtualizeAbove`** (500 events by default): only the
+  rows in the scroller's view, and a view's height on each side, are
+  mounted; gaps of the right height stand for the rest, so the scrollbar is
+  true. Heights are estimated, then measured as rows appear; a correction
+  above the view moves the scroll by as much, so what is read does not jump.
+  The keyboard goes over the whole period (End reaches the year's last
+  event, mounted and scrolled to); the tab stop is always mounted. Each entry
+  says its place and the count (`aria-posinset` / `aria-setsize`). Below the
+  threshold everything is mounted (a screen reader's browse mode reads it
+  all); `preparePrint()` mounts everything. A year of 10 000 events: first
+  frame ~50 ms and ~250 nodes, against ~290 ms and ~55 000.
 - Each day is a `section` with an `h3` (the toolbar title is the `h2`),
   its events a real list (`ul`/`li`), each event a button named by its title
   and spoken hours. No drag in a list.

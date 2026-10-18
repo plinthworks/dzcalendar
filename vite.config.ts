@@ -41,6 +41,7 @@ export default defineConfig({
         dst: fileURLToPath(new URL('./playground/dst.html', import.meta.url)),
         sources: fileURLToPath(new URL('./playground/sources.html', import.meta.url)),
         angular: fileURLToPath(new URL('./playground/angular.html', import.meta.url)),
+        perf: fileURLToPath(new URL('./playground/perf.html', import.meta.url)),
       },
     },
   },

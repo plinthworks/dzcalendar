@@ -103,6 +103,16 @@ const weekRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTI
 results['timeGrid week model (10k)'] = time(20, () => buildTimeGridModel(weekRange, store.snapshot, { displayZone: 'Europe/Paris' }));
 const monthRange = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.dayGridMonth!, nav);
 results['dayGrid month model (10k)'] = time(20, () => buildDayGridModel(monthRange, store.snapshot, { displayZone: 'Europe/Paris', maxLanes: 4 }));
+// Phase 12: W, the worst case — 10 000 events in one week.
+const wStore = createEventStore();
+wStore.replaceSourceChunk('w', '*', normalizeMany(inputs(10_000).map((e, i) => {
+  const day = Temporal.PlainDate.from('2026-06-08').add({ days: i % 7 });
+  return e.allDay === undefined && typeof e.start === 'string' && e.start.includes('T') ? { ...e, start: `${day}${e.start.slice(10)}` } : { ...e, start: String(day), end: String(day.add({ days: 1 })) };
+}), ctx, 'w').items);
+const wWeek = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.timeGridWeek!, nav);
+results['timeGrid week model (W)'] = time(5, () => buildTimeGridModel(wWeek, wStore.snapshot, { displayZone: 'Europe/Paris' }));
+results['dayGrid month model (W)'] = time(5, () => buildDayGridModel(monthRange, wStore.snapshot, { displayZone: 'Europe/Paris', maxLanes: 4 }));
+
 // Phase 10: a year at once (nothing virtualized yet — Phase 12).
 const yearList = computeViewRange(Temporal.PlainDate.from('2026-06-10'), BUILTIN_VIEWS.listYear!, nav);
 results['list year model (10k)'] = time(10, () => buildListModel(yearList, store.snapshot, { displayZone: 'Europe/Paris' }));

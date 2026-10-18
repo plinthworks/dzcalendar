@@ -51,6 +51,20 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly weekNumbers?: boolean;
   /** Months side by side at most in a multi-month view (1: a stack). Default 3. */
   readonly multiMonthMaxColumns?: number;
+  /**
+   * Above this many events in a view, only what is on screen (and a margin)
+   * is mounted; below, everything (what a screen reader's browse mode reads).
+   * Default 500; `Infinity` never windows.
+   */
+  readonly virtualizeAbove?: number;
+  /** Prepares for printing on `beforeprint` (everything drawn) and restores on `afterprint`. Default false. */
+  readonly autoPrint?: boolean;
+  /**
+   * Overlapping events side by side in a time grid before "+N": a number,
+   * 'auto' (as many as the column's width allows, about 2.5rem each) or null
+   * (all, however thin). Default 'auto'.
+   */
+  readonly eventMaxStack?: number | 'auto' | null;
 }
 
 export interface CalendarUpdate extends Partial<LiveSettings> {
@@ -92,6 +106,11 @@ export interface CalendarInstance {
   redo(): boolean;
   /** Fetches one source again, or all; what is shown stays until the answers replace it. */
   refetch(sourceId?: string): void;
+  /**
+   * Draws everything now, nothing windowed — what `window.print()` should
+   * see — and returns the function that puts the windowing back.
+   */
+  preparePrint(): () => void;
   /** Shows a selection (null clears it), as if a person had made it; `onSelect` is not called. */
   select(selection: Selection | null): void;
   destroy(): void;
@@ -242,6 +261,12 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     epoch: 0,
     snapMinutes: settings.current.snapMinutes ?? 15,
     weekNumbers: options.weekNumbers === true,
+    virtualizeAbove: (() => {
+      const v = options.virtualizeAbove ?? 500;
+      if (!(v >= 0)) throw new RangeError(`virtualizeAbove must be a number ≥ 0 (Infinity: never): ${v}`);
+      return v;
+    })(),
+    printing: false,
     injectStyles: options.injectStyles !== false,
     popoverElement: popover.element,
     openMenu(target, at, returnFocus) {
@@ -390,6 +415,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
         v.scrollTo(Math.max(0, scroll - min));
       }
       if (vm.family === 'dayGrid' || vm.family === 'multiMonth') measureLanes();
+      if (vm.family === 'timeGrid') measureStack();
     }
   }
 
@@ -405,7 +431,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   probe.setAttribute('aria-hidden', 'true');
   root.append(probe);
   function measureLanes(): void {
-    if (!autoLanes) return;
+    if (!autoLanes || ctx.printing) return;
     // A week or a day of the day grid grows to show everything: uncapped at once, from the state (not the mounted view).
     const view = kernel.getState().view;
     if (view.family === 'dayGrid' && view.alignment !== 'month') return kernel.setOptions({ dayGrid: { maxLanes: null } });
@@ -433,9 +459,36 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       },
     });
   }
+  // ── 'auto' stacking in a time grid: as many lanes as fit at ~2.5rem each ──
+  const stack = options.eventMaxStack === undefined ? 'auto' : options.eventMaxStack;
+  if (typeof stack === 'number' && !(Number.isInteger(stack) && stack >= 1)) throw new RangeError(`eventMaxStack must be a whole number ≥ 1, 'auto' or null: ${stack}`);
+  // Until measured, a guess from the host's width (the gutter aside), else four: a
+  // crowded week must not draw ten thousand slivers first, nor draw twice when the guess is right.
+  const guessStack = (): number => {
+    const width = host.getBoundingClientRect().width;
+    const em = win ? parseFloat(win.getComputedStyle(host).fontSize) || 16 : 16;
+    const cols = Math.max(1, kernel.getState().range.dates.length);
+    return width > 0 ? Math.max(2, Math.floor((width - 4 * em) / cols / (2.5 * em))) : 4;
+  };
+  kernel.setOptions({ timeGrid: { maxStack: stack === 'auto' ? guessStack() : stack } });
+  function measureStack(): void {
+    if (stack !== 'auto' || ctx.printing) return;
+    scheduler.schedule({
+      read: (): number | undefined => {
+        if (mountedFamily !== 'timeGrid') return undefined;
+        const col = root.querySelector<HTMLElement>('.dz-tg__col:not(.dz-tg__col--folded)');
+        const width = col?.getBoundingClientRect().width ?? 0;
+        const em = parseFloat(getComputedStyle(root).fontSize) || 16;
+        return width > 0 ? Math.max(2, Math.floor(width / (2.5 * em))) : undefined;
+      },
+      write: (n) => {
+        if (n !== undefined) kernel.setOptions({ timeGrid: { maxStack: n } });
+      },
+    });
+  }
   const RO = (win as (Window & { ResizeObserver?: typeof ResizeObserver }) | null)?.ResizeObserver;
   if (RO) {
-    const ro = new RO(() => measureLanes());
+    const ro = new RO(() => (measureLanes(), measureStack(), view?.relayout?.()));
     ro.observe(root);
     scope.add(() => ro.disconnect());
   }
@@ -471,7 +524,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
         if (e.causes.includes('locale')) root.dir = directionOf(e.state.locale);
       }
       paint();
-      if (e.type === 'state' && (e.causes.includes('view') || e.causes.includes('navigate'))) measureLanes();
+      if (e.type === 'state' && (e.causes.includes('view') || e.causes.includes('navigate'))) (measureLanes(), measureStack());
     }),
   );
 
@@ -495,6 +548,45 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   });
   scope.add(() => clearTimeout(timer));
   startTicking();
+
+  /** Everything mounted, synchronously; the returned function restores the windowing. */
+  function preparePrint(): () => void {
+    // One at a time: a second call while printing restores nothing (the first one's function does).
+    if (ctx.printing || scope.isDisposed) return () => {};
+    // Paper shows everything (the owner's choice): no "+N" in the month nor in a crowded week.
+    const caps = { maxLanes: kernel.getOptions().dayGrid?.maxLanes ?? null, maxStack: kernel.getOptions().timeGrid?.maxStack ?? null };
+    ctx.printing = true;
+    ctx.epoch++;
+    holding = true;
+    try {
+      kernel.batch(() => kernel.setOptions({ dayGrid: { maxLanes: null }, timeGrid: { maxStack: null } }));
+    } finally {
+      holding = false;
+    }
+    paint();
+    let done = false;
+    return () => {
+      if (done || scope.isDisposed) return;
+      done = true;
+      ctx.printing = false;
+      ctx.epoch++;
+      holding = true;
+      try {
+        kernel.batch(() => kernel.setOptions({ dayGrid: { maxLanes: caps.maxLanes }, timeGrid: { maxStack: caps.maxStack } }));
+      } finally {
+        holding = false;
+      }
+      paint();
+    };
+  }
+  if (options.autoPrint && win) {
+    let restore: (() => void) | null = null;
+    scope.on(win, 'beforeprint', () => (restore = preparePrint()));
+    scope.on(win, 'afterprint', () => {
+      restore?.();
+      restore = null;
+    });
+  }
 
   host.append(root);
   paint();
@@ -593,6 +685,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     undo: () => kernel.history.undo(),
     redo: () => kernel.history.redo(),
     refetch: (id) => kernel.sources.refetch(id),
+    preparePrint,
     select: (sel) => interactions?.select(sel),
     destroy() {
       scope.dispose();

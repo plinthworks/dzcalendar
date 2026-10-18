@@ -29,6 +29,25 @@ export interface TimeGridOptions {
   readonly resourceId?: string;
   /** Hours outside are shaded (`offHours` on each column). */
   readonly businessHours?: BusinessHoursInput;
+  /**
+   * Overlapping events side by side, at most: a cluster wider than this keeps
+   * `maxStack - 1` lanes and puts the rest behind "+N" links in the last one
+   * (1: all of a crowded cluster behind one link). Absent, null or not a whole
+   * number ≥ 1: no limit.
+   */
+  readonly maxStack?: number | null;
+}
+
+/** Events a crowded cluster does not draw, standing in its last lane: one "+N" per stretch of time. */
+export interface MoreTimed {
+  readonly key: string;
+  readonly top: number;
+  readonly height: number;
+  /** The lane it stands in and the cluster's drawn lane count (its fraction of the column). */
+  readonly left: number;
+  readonly width: number;
+  /** The hidden events, in order. */
+  readonly events: readonly PlacedTimed[];
 }
 
 /**
@@ -76,6 +95,8 @@ export interface TimeGridColumn {
   readonly events: readonly PlacedTimed[];
   /** `display: 'background'` events: full width, under the others. */
   readonly background: readonly PlacedTimed[];
+  /** "+N" links of clusters wider than `maxStack` (empty without it). */
+  readonly more: readonly MoreTimed[];
   /** Stretches outside business hours, in axis minutes. Empty without `businessHours`. */
   readonly offHours: readonly { readonly top: number; readonly height: number }[];
 }
@@ -141,7 +162,7 @@ function endReadingOf(start: Instant, end: Instant, zone: ZoneId, repeats: reado
  */
 export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: TimeGridOptions, axis: ColumnAxis = axisFor(date, o)): TimeGridColumn {
   const key = date.toString();
-  if (axis.length === 0) return { key, date, axis, folded: true, events: [], background: [], offHours: [] };
+  if (axis.length === 0) return { key, date, axis, folded: true, events: [], background: [], more: [], offHours: [] };
 
   const day = axis.day;
   const instances = snap.queryInstances(viewWindow(date, date.add({ days: 1 }), o.displayZone), queryOpts(o));
@@ -193,9 +214,52 @@ export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: Tim
     { minVisual },
   );
   const byKey = new Map(fg.map((s) => [s.key, s]));
-  const events = placements.map((p) => place(byKey.get(p.key)!, p));
   const background = segs.filter((s) => isBackground(s.instance.event.display)).map((s) => place(s, { left: 0, width: 1, lane: 0, lanes: 1, z: -1 }));
-  return { key, date, axis, folded: false, events, background, offHours: offHoursOf(date, axis, o) };
+  // A bad limit is no limit (a configuration the DOM refuses before it gets here).
+  const max = o.maxStack !== undefined && o.maxStack !== null && Number.isInteger(o.maxStack) && o.maxStack >= 1 ? o.maxStack : null;
+  if (max === null || !placements.some((p) => p.lanes > max)) {
+    const events = placements.map((p) => place(byKey.get(p.key)!, p));
+    return { key, date, axis, folded: false, events, background, more: [], offHours: offHoursOf(date, axis, o) };
+  }
+  // A cluster wider than `max`: its first `max - 1` lanes are drawn, as wide as
+  // `max` lanes allow; the others go behind "+N" in lane `max - 1`, one link per
+  // stretch where hidden events run into one another.
+  // One lane: everything behind a single "+N" across the column.
+  const keep = max - 1;
+  const events: PlacedTimed[] = [];
+  const hidden: PlacedTimed[] = [];
+  for (const p of placements) {
+    if (p.lanes <= max) {
+      events.push(place(byKey.get(p.key)!, p));
+      continue;
+    }
+    const seg = byKey.get(p.key)!;
+    if (p.lane >= keep) {
+      hidden.push(place(seg, { left: keep / max, width: 1 / max, lane: keep, lanes: max, z: p.z }));
+      continue;
+    }
+    const span = Math.round(p.width * p.lanes);
+    events.push(place(seg, { left: p.lane / max, width: (Math.min(p.lane + span, keep) - p.lane) / max, lane: p.lane, lanes: max, z: p.z }));
+  }
+  hidden.sort((a, b) => a.top - b.top || b.visualHeight - a.visualHeight);
+  const more: MoreTimed[] = [];
+  let run: PlacedTimed[] = [];
+  let end = -Infinity;
+  const close = () => {
+    if (run.length === 0) return;
+    const top = run[0]!.top;
+    more.push({ key: `more|${key}|${top}|${more.length}`, top, height: Math.max(minVisual, end - top), left: keep / max, width: 1 / max, events: run });
+  };
+  for (const h of hidden) {
+    if (h.top >= end) {
+      close();
+      run = [];
+    }
+    run.push(h);
+    end = Math.max(end, h.top + h.visualHeight);
+  }
+  close();
+  return { key, date, axis, folded: false, events, background, more, offHours: offHoursOf(date, axis, o) };
 }
 
 /** What is not open, inside the axis's hours, as positions. Read with `toEndPosition` at the ends. */
