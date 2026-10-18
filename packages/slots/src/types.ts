@@ -1,4 +1,4 @@
-import type { Instant, PlainDate, PlainTime, Weekday, ZoneId, ZonedDateTime } from '@dzcalendar/core';
+import type { Instant, PlainDate, PlainTime, Problem, Weekday, ZoneId, ZonedDateTime } from '@dzcalendar/core';
 
 /** A wall time: `'08:30'` or a PlainTime. As an end, `'24:00'` is the next midnight. */
 export type WallTime = PlainTime | string;
@@ -75,6 +75,9 @@ export interface SlotQuery {
   readonly busy?: readonly Busy[];
 }
 
+/** What `checkSlot` takes: a query whose range is optional (default: the slot itself). */
+export type CheckQuery = Omit<SlotQuery, 'from' | 'to'> & { readonly from?: Moment; readonly to?: Moment };
+
 /** A bookable slot, in the provider's zone (`.withTimeZone(client)` shows it in another). */
 export interface Slot {
   readonly start: ZonedDateTime;
@@ -84,4 +87,6 @@ export interface Slot {
 /** Why `checkSlot` refused a start. */
 export type SlotRefusal = 'invalid-query' | 'closed' | 'misaligned' | 'busy' | 'notice' | 'advance' | 'daily-cap' | 'out-of-range';
 
-export type SlotCheck = { readonly ok: true; readonly slot: Slot } | { readonly ok: false; readonly reason: SlotRefusal };
+export type SlotCheck =
+  | { readonly ok: true; readonly slot: Slot }
+  | { readonly ok: false; readonly reason: SlotRefusal; /** With `invalid-query`: why. */ readonly problems?: readonly Problem[] };

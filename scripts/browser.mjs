@@ -918,8 +918,23 @@ try {
       // Booked 11:00–11:30 with 10 minutes after: 11:30 would touch the buffer, and the morning ends at 12:00 — the next is 13:00 in Riyadh, 12:00 in Paris.
       check('slots: a click books it (checked again by the engine); the slot and its buffer are gone', /Réservé/.test(after.log) && after.first === '12:00', JSON.stringify(after));
       await p.selectOption('#zone', 'Asia/Riyadh');
-      await p.waitForFunction(() => document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot')?.textContent === '13:00');
-      check('slots: in the provider’s own zone the same slot reads 13:00', true);
+      const reads = await p
+        .waitForFunction(() => document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot')?.textContent === '13:00', null, { timeout: 3000 })
+        .then(() => '13:00', () => p.evaluate(() => document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot')?.textContent));
+      check('slots: in the provider’s own zone the same slot reads 13:00', reads === '13:00', String(reads));
+      // Without onSlotClick, a slot is free time like any other: a click is a date click, a drag selects.
+      await p.evaluate(() => {
+        window.__got = { dates: 0, selected: null };
+        window.__cal.update({ onSlotClick: undefined, selectable: true, onDateClick: () => window.__got.dates++, onSelect: (s) => (window.__got.selected = String(s.start)) });
+      });
+      const slotBox = await p.locator('.dz-tg__col[data-date="2026-10-22"] .dz-slot').nth(2).boundingBox();
+      await p.mouse.click(slotBox.x + slotBox.width / 2, slotBox.y + 4);
+      await p.mouse.move(slotBox.x + slotBox.width / 2, slotBox.y + 4);
+      await p.mouse.down();
+      await p.mouse.move(slotBox.x + slotBox.width / 2, slotBox.y + 90, { steps: 8 });
+      await p.mouse.up();
+      const inert = await p.evaluate(() => window.__got);
+      check('slots: without onSlotClick a click on one is a date click and a drag from one selects', inert.dates >= 1 && inert.selected !== null, JSON.stringify(inert));
       await p.screenshot({ path: join(root, 'node_modules', '.cache', 'dzcalendar', 'captures', 'slots-week.png'), clip: { x: 0, y: 0, width: 1400, height: 950 } });
       check('slots: no console error', errors.length === 0, errors.join('\n'));
       await p.close();

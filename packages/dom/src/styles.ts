@@ -251,7 +251,8 @@ export const DZ_CSS = `
   cursor: pointer;
   z-index: 0;
 }
-.dz-slot:hover { background: var(--dz-slot-hover-bg, color-mix(in srgb, var(--dz-accent, var(--dzc-accent)) 18%, transparent)); }
+.dz-slot[aria-disabled] { cursor: inherit; }
+.dz-slot:not([aria-disabled]):hover { background: var(--dz-slot-hover-bg, color-mix(in srgb, var(--dz-accent, var(--dzc-accent)) 18%, transparent)); }
 .dz-slot:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: 1px; z-index: 3; }
 
 /* ── time grid: hours outside business hours ────────────────────────────── */

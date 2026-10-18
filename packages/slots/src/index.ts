@@ -7,4 +7,4 @@
 export { findSlots, checkSlot } from './engine.js';
 export { openSpans } from './availability.js';
 export { busyFromEvents } from './busy.js';
-export type { Availability, WeeklyWindow, DateException, RuleWindow, Window, WallTime, Moment, Busy, SlotQuery, Slot, SlotCheck, SlotRefusal } from './types.js';
+export type { Availability, WeeklyWindow, DateException, RuleWindow, Window, WallTime, Moment, Busy, SlotQuery, CheckQuery, Slot, SlotCheck, SlotRefusal } from './types.js';

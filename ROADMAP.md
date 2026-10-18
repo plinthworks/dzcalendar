@@ -4,14 +4,13 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–13, each committed (`git log --oneline`: Phase 13 is
-  `fa32ba0`). Every check green at that commit: `npm test` (938),
+- **Done:** Phases 0–14, each committed (`git log --oneline`: Phase 14 is
+  the commit titled "Phase 14"). Every check green at that commit: `npm test` (1 012),
   `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
-  `test:browser` (123), `perf:browser`, `test:package`.
-- **In progress:** Phase 14 — slots (`@dzcalendar/slots`), see its section
-  at the bottom. Its design decisions are being validated with the owner
-  first; they are recorded there as they are taken.
-- **Left after it:** 15 Pro resources and timeline, 16 Pro print / export /
+  `test:browser` (131), `perf:browser`, `test:package`.
+- **Next:** Phase 15 — Pro resources and timeline (`ARCHITECTURE.md` J);
+  its design decisions are to be validated with the owner first.
+- **Left after it:** 16 Pro print / export /
   editor, 17 animations, 18 ecosystem (Web Component, React/Vue,
   FullCalendar options translator), 19+ native (Swift/Kotlin from
   `conformance/`, then SwiftUI/Compose).
@@ -1205,7 +1204,7 @@ light and dark built in, and a few ready-made looks.
   construction (no `light-dark()` in the theme; `@supports not` for
   `color-mix()`), not on WebKit.
 
-## Phase 14 — slots (in progress)
+## Phase 14 — slots ✅ (2026-10-18)
 
 See `ARCHITECTURE.md` J. Phase 14.
 
@@ -1219,13 +1218,62 @@ See `ARCHITECTURE.md` J. Phase 14.
   - Click in the availability view: the calendar reports the slot
     (`onSlotClick`), the application books; its server re-checks with the
     same engine before saving. Nothing is created optimistically.
-- **Built (before the reviews):** `packages/slots` (`findSlots`, `checkSlot`,
-  `openSpans`, `busyFromEvents`; 2.4 kB gzip, budget 5), 49 conformance cases
-  (`conformance/cases/slots`, written by hand; clock-change dates checked
-  against Python's zoneinfo), `slots 30 days at 15 min` 5.6 ms (budget 25,
-  minified); core `availableSlots` model option → `TimeGridColumn.slots`;
-  DOM `.dz-slot` buttons, `onSlotClick`, the cursor's Enter, `freeSlot`
-  words (5 languages); Angular `[availableSlots]`/`(slotClick)`;
-  `playground/slots.html`; Chrome checks; `docs/slots.md`.
-- **Next:** architect + code reviews, fixes, full checks, ARCHITECTURE block,
-  commit, report.
+- `@dzcalendar/slots` (3.0 kB gzip, budget 5): `findSlots`, `checkSlot`,
+  `openSpans`, `busyFromEvents`. Weekly windows, dated exceptions (replace the
+  windows opening on their date) and RRULE windows in the provider's zone;
+  slots step in real minutes from each opening's start (an opening open for
+  days on end: multiples of the step since the epoch, so the range never
+  moves the grid; openings looked for a week back); bookings get the buffers
+  and count toward `maxPerDay` (by the provider's date), blocks only take
+  their time; `minNotice` and `maxAdvanceDays` from an explicit `now`; a
+  closing time the clocks skip closes at the jump. `checkSlot` needs no
+  range (the slot itself), returns the first rule broken, `problems` when
+  the query is invalid. Nothing throws (bad shapes, out-of-range dates, a
+  step under a minute → problems; last-resort catch); at most 10 000 slots /
+  200 000 starts (`too-many-occurrences`).
+- 55 conformance cases (`conformance/cases/slots`, by hand; clock-change
+  dates checked against Python's zoneinfo; Riyadh, Paris, Chicago, Lord
+  Howe, Kolkata, UTC around the clock). The forum case in ten lines, page and
+  server (`slots.test.ts`, `docs/slots.md`). `slots 30 days at 15 min`
+  6.8 ms minified (budget 25).
+- Core: `availableSlots` model option → `TimeGridColumn.slots` (cut to the
+  axis, de-duplicated, an overlapped slot drawn down to the next start),
+  `slotInstant`. DOM: `.dz-slot` buttons (tokens `--dz-slot-*`), out of the
+  tab order; `onSlotClick` hands back the very object given; without it the
+  slots are disabled and a press acts as on empty time; the keyboard cursor
+  says "Free slot, …" and Enter books; `freeSlot` in en/fr/ar/es/de.
+  Angular `[availableSlots]`/`(slotClick)`. `playground/slots.html`.
+- Checks: 1 012 tests; Chrome 131/131 (slots at their minute in their
+  column, axe, a click books and re-checks, the provider's zone, an inert
+  slot clicks and selects); Angular 19–22 from the tarballs. dom 37.7 kB
+  (budget 38.3).
+
+### Reviews (architect; code review by execution, Chrome included), fixed
+- The slot grid moved with the query's range for openings chained across
+  midnight (24/7): a server checking a narrower range refused slots the page
+  showed. `checkSlot` required a range. The purity test did not read slots.
+- Bad input threw (fractional days, a step of 1/7 minute, dates beyond
+  Temporal's range, `null` entries, non-string times, ISO strings in
+  `availableSlots`); no limit on the work (a tiny step over a year hung).
+- A refetch with the same times kept the old slot objects (a click handed
+  back stale data); a slot swallowed date clicks and selections when the
+  application took no slot clicks; overlapping slots hid each other;
+  slots before `slotMin` were dropped; two slots at one start, one dropped;
+  a closing time in a skipped hour extended the opening; a vacuous Chrome
+  check.
+
+### Not done in Phase 14, on purpose
+- Capacity (several seats): Pro, Phase 16 (owner).
+- Free/busy adapters (Google, Graph, CalDAV): later, apart (owner).
+- Slots in the month and list views; a "next free slot" key (the cursor
+  steps by `snapMinutes`: keep slots on the snap grid); a drag starting on a
+  bookable slot.
+- A `find-slots` command in the serialisable command API: with
+  `commands.schema.json`, Phase 18.
+- `normalize+index 10k` reads 65–76 ms against 70 on this machine at both
+  the Phase 13 and Phase 14 commits (noise around a tight budget, not a
+  regression); the budget is left as it is.
+
+## Next — Phase 15: Pro, resources and timeline
+
+See `ARCHITECTURE.md` J. Phase 15.

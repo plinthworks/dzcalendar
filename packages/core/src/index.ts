@@ -91,7 +91,7 @@ export { computeViewRange } from './views/range.js';
 export { navigate } from './views/nav.js';
 export type { NavDirection } from './views/nav.js';
 export type { ViewSpec, ViewFamily, ViewRange, NavContext } from './views/spec.js';
-export { buildTimeGridModel, buildTimeGridColumn, updateTimeGridModel, locateNow } from './views/timegrid.js';
+export { buildTimeGridModel, buildTimeGridColumn, updateTimeGridModel, locateNow, slotInstant } from './views/timegrid.js';
 export type { TimeGridModel, TimeGridColumn, TimeGridOptions, PlacedTimed, MoreTimed, AllDayBar, Reading, AvailableSlot, PlacedSlot } from './views/timegrid.js';
 export { buildDayGridModel, updateDayGridModel } from './views/daygrid.js';
 export type { DayGridModel, DayGridWeek, DayGridBar, DayGridOptions } from './views/daygrid.js';

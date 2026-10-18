@@ -287,24 +287,39 @@ export function buildTimeGridColumn(date: PlainDate, snap: StoreSnapshot, o: Tim
   return { key, date, axis, folded: false, events, background, more, offHours: offHoursOf(date, axis, o), slots: slotsOf(axis, o) };
 }
 
-const instantOf = (x: Instant | ZonedDateTime): Instant => ('toInstant' in x ? x.toInstant() : x);
+/** A slot's start or end as an Instant; null for anything else (a string, a date): such a slot is not drawn. */
+export const slotInstant = (x: unknown): Instant | null =>
+  x instanceof Temporal.Instant ? x : x instanceof Temporal.ZonedDateTime ? x.toInstant() : null;
 
-/** The slots starting inside the axis, placed; one running past the axis's end is cut there. */
+/**
+ * The slots this axis shows, placed and cut to it (a slot from before
+ * `slotMin`, or from the day before, shows its visible part). A slot drawn
+ * under the next one's start stops there: with a step shorter than the
+ * duration, each start keeps a part of its own to click.
+ */
 function slotsOf(axis: ColumnAxis, o: TimeGridOptions): PlacedSlot[] {
   if (!o.availableSlots?.length) return [];
   const a = axis.start.epochMilliseconds;
   const b = axis.end.epochMilliseconds;
-  const out: PlacedSlot[] = [];
+  const found = new Map<string, PlacedSlot>();
   for (const slot of o.availableSlots) {
-    const start = instantOf(slot.start);
-    const end = instantOf(slot.end);
-    const ms = start.epochMilliseconds;
-    if (ms < a || ms >= b || end.epochMilliseconds <= ms) continue;
-    const top = axis.toPosition(start);
-    const bottom = end.epochMilliseconds >= b ? axis.length : axis.toEndPosition(end);
-    out.push({ key: String(ms), top, height: Math.max(0, bottom - top), start, end, slot });
+    const start = slotInstant(slot?.start);
+    const end = slotInstant(slot?.end);
+    if (!start || !end) continue;
+    const s = start.epochMilliseconds;
+    const e = end.epochMilliseconds;
+    if (e <= s || e <= a || s >= b) continue;
+    const key = `${s}-${e}`;
+    if (found.has(key)) continue;
+    const top = s <= a ? 0 : axis.toPosition(start);
+    const bottom = e >= b ? axis.length : axis.toEndPosition(end);
+    found.set(key, { key, top, height: Math.max(0, bottom - top), start, end, slot });
   }
-  return out.sort((x, y) => x.top - y.top);
+  const out = [...found.values()].sort((x, y) => x.top - y.top || x.height - y.height);
+  return out.map((x, i) => {
+    const next = out.slice(i + 1).find((y) => y.top > x.top);
+    return next && next.top < x.top + x.height ? { ...x, height: next.top - x.top } : x;
+  });
 }
 
 /** What is not open, inside the axis's hours, as positions. Read with `toEndPosition` at the ends. */

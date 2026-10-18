@@ -79,3 +79,50 @@ describe('availableSlots in the week', () => {
     expect(dates).toHaveLength(0);
   });
 });
+
+describe('review fixes (Phase 14)', () => {
+  const zdt = (s: string) => Temporal.ZonedDateTime.from(`${s}[Europe/Paris]`);
+  type Tagged = AvailableSlot & { readonly provider: string };
+
+  it('new slots at the same times: a click hands back the new one (its data, not the old)', () => {
+    const got: string[] = [];
+    const a: Tagged = { start: zdt('2026-10-21T09:00'), end: zdt('2026-10-21T09:30'), provider: 'A' };
+    const b: Tagged = { start: zdt('2026-10-21T09:00'), end: zdt('2026-10-21T09:30'), provider: 'B' };
+    const host = mount({ availableSlots: [a], onSlotClick: (s: Tagged) => got.push(s.provider) });
+    cal!.update({ availableSlots: [b] });
+    host.querySelector<HTMLButtonElement>('.dz-slot')!.click();
+    expect(got).toEqual(['B']);
+  });
+
+  it('overlapping slots (a step shorter than the duration): each keeps a part of its own to click', () => {
+    const slots = ['09:00', '09:30', '10:00'].map((t) => ({ start: zdt(`2026-10-21T${t}`), end: zdt(`2026-10-21T${t}`).add({ hours: 1 }) }));
+    const host = mount({ availableSlots: slots });
+    const h = [...host.querySelectorAll<HTMLElement>('.dz-slot')].map((b) => b.style.getPropertyValue('--h'));
+    expect(h).toEqual(['30', '30', '60']);
+  });
+
+  it('a slot from before slotMin shows its visible part; two slots at one start with different ends are both drawn', () => {
+    const host = mount({
+      timeGrid: { slotMin: { hours: 9 } },
+      availableSlots: [
+        { start: zdt('2026-10-21T08:30'), end: zdt('2026-10-21T09:30') },
+        { start: zdt('2026-10-21T10:00'), end: zdt('2026-10-21T10:30') },
+        { start: zdt('2026-10-21T10:00'), end: zdt('2026-10-21T11:00') },
+      ],
+    });
+    const b = [...host.querySelectorAll<HTMLElement>('.dz-tg__col[data-date="2026-10-21"] .dz-slot')];
+    expect(b.map((x) => [x.style.getPropertyValue('--t'), x.style.getPropertyValue('--h')])).toEqual([['0', '30'], ['60', '30'], ['60', '60']]);
+  });
+
+  it('slots that are not Temporal values (ISO strings) are skipped, not thrown on', () => {
+    expect(() => mount({ availableSlots: [{ start: '2026-10-21T09:00Z', end: '2026-10-21T09:30Z' }] })).not.toThrow();
+    expect(document.querySelectorAll('.dz-slot')).toHaveLength(0);
+  });
+
+  it('without onSlotClick the slots only show free time: marked disabled', () => {
+    const host = mount({ availableSlots: riyadh() });
+    expect(host.querySelector('.dz-slot')!.hasAttribute('aria-disabled')).toBe(true);
+    cal!.update({ onSlotClick: () => undefined, availableSlots: riyadh() });
+    expect(host.querySelector('.dz-slot')!.hasAttribute('aria-disabled')).toBe(false);
+  });
+});

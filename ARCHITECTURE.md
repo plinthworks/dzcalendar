@@ -68,6 +68,15 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 14 (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : disponibilités = plages hebdomadaires dans le fuseau du prestataire + exceptions datées + règles RRULE pour les cas rares ; occupé = intervalles de toute source + événements du calendrier (`busy`), connecteurs Google/Graph/CalDAV plus tard ; **capacité en Pro** (Phase 16, retirée des critères de la Phase 14) ; au clic, le calendrier remonte le créneau (`onSlotClick`), l'application réserve et son serveur revérifie (`checkSlot`) — rien de créé de façon optimiste.
+- **Paquet** : `slots/src/{types,availability,engine,busy,problem,index}` — `candidates` et `constraints` réunis dans `engine.ts`, `convert-zone` abandonné (`slot.start.withTimeZone(client)` suffit). API : `findSlots(query) → {slots, problems}`, `checkSlot(query, start) → {ok, slot} | {ok:false, reason, problems?}` (plage facultative), `openSpans`, `busyFromEvents`. Problèmes `invalid-availability`, `invalid-slot-query` ajoutés au core ; `too-many-occurrences` réutilisé pour le plafond (10 000 créneaux, 200 000 départs).
+- **Sémantique** : pas en minutes réelles depuis le début de chaque ouverture (une ouverture sans fin : multiples du pas depuis l'epoch ; recherche des ouvertures une semaine en arrière) — la plage ne déplace jamais la grille ; une plage appartient à sa date d'ouverture, une exception remplace les plages qui s'ouvrent ce jour-là ; ouverture `compatible`, fermeture dans une heure sautée = au saut ; un `booking` reçoit les battements et compte dans `maxPerDay` (date du prestataire), un `block` non ; `maxAdvanceDays` = `now` + N jours à la même heure murale ; ordre des refus de `checkSlot` : invalid-query, out-of-range, closed, misaligned, notice, advance, daily-cap, busy.
+- **B.13/D.1** — option de modèle `availableSlots` (comparée par identité) → `TimeGridColumn.slots: PlacedSlot[]` (coupés à l'axe, dédoublonnés, un créneau recouvert dessiné jusqu'au départ suivant) ; `slotInstant`. DOM : boutons `.dz-slot` dans `.dz-tg__slots` (entre fond et événements), jetons `--dz-slot-*`, hors de l'ordre de tabulation ; sans `onSlotClick` ils sont désactivés et un appui agit comme sur du temps vide. Mois et liste n'affichent pas de créneaux.
+- **D.6** — le curseur clavier annonce « Créneau libre, … » et Entrée réserve ; message `freeSlot` (5 langues). Angular : `[availableSlots]`, `(slotClick)`.
+- **G** — budget `slots` 5 ko (3,0 mesurés) ; `slots 30 days at 15 min` 25 ms (6,8 mesurés, minifié). Conformance : suite `slots` (55 cas). La commande sérialisable `find-slots` attend `commands.schema.json` (Phase 18).
+
 ### Ajustements après la Phase 13 (détail dans ROADMAP.md)
 
 - **Décisions du propriétaire** : un outil pour tout projet (pas seulement Sehhaty) : CSS de base surchargeable sans effort, mots aussi ; familles `standard`, `slate`, `night`, `pastel`, `frost`, `solar`, `contrast` en clair et sombre, `defineTheme` ; densités ; arabe, espagnol, allemand en imports ; affichage hégirien. Après revue : **la page d'abord** (un `--tz-*` de la page bat la famille) ; plancher **iOS/Safari 15.4** (pas de `light-dark()`) ; **`cssLayers: false`** et `tailwind3.css` pour les remises à zéro hors couche (Tailwind 3, Bootstrap) ; arabe livré tel quel ; budget dom relevé à la mesure + 3 % (38,3 ko), validé par le propriétaire.
@@ -1418,7 +1427,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 
 ### Phase 14 : moteur de créneaux (`@dzcalendar/slots`)
 - **Livrables / fichiers** : `slots/*`, vue « disponibilités » (créneaux en fond cliquables) dans dom.
-- **Acceptation** : 40 cas `slots` ; cas Bubble reproduit en ≤ 10 lignes ; fuseau prestataire ≠ fuseau client, dont un créneau à cheval sur un changement d'heure ; buffer avant/après ; préavis ; plafond journalier ; `capacity` ; 30 jours à 15 min ≤ 25 ms.
+- **Acceptation** : 40 cas `slots` ; cas Bubble reproduit en ≤ 10 lignes ; fuseau prestataire ≠ fuseau client, dont un créneau à cheval sur un changement d'heure ; buffer avant/après ; préavis ; plafond journalier ; ~~`capacity`~~ (Pro, décision du propriétaire) ; 30 jours à 15 min ≤ 25 ms. Livré : 55 cas, voir « Ajustements après la Phase 14 ».
 - **Dépend de** : P5 (disponibilités récurrentes), P2.
 
 ### Phase 15 : Pro, ressources et timeline

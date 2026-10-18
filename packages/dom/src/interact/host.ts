@@ -212,8 +212,10 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       pe.preventDefault();
       return;
     }
-    // Headers, the gutter, links, buttons and the scrollbar are not the calendar's time.
-    if (pe.target.closest('.dz-more, .dz-dg__num, button, a') || !surface.accepts(pe.target)) return;
+    // Headers, the gutter, links, buttons and the scrollbar are not the calendar's time. A free slot is,
+    // when the application takes no slot clicks: a press there clicks, selects and drags as on empty time.
+    const button = pe.target.closest('.dz-more, .dz-dg__num, button, a');
+    if ((button && !(button.classList.contains('dz-slot') && !ctx.live().onSlotClick)) || !surface.accepts(pe.target)) return;
     const node = pe.target.closest<HTMLElement>('.dz-ev, .dz-bar');
     const inst = node ? surface.instanceOf(node) : null;
     const base = { id: pe.pointerId, type, x0: pe.clientX, y0: pe.clientY, at: win.performance.now() };

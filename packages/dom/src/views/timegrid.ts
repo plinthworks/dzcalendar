@@ -245,7 +245,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     );
     p.bands.replaceChildren(...column.axis.bands.map((b) => drawBand(b)));
     p.background.sync(column.background.map(itemOf));
-    p.slots.sync(column.slots.map((placed) => ({ key: placed.key, sig: `${placed.top}|${placed.height}|${placed.end.epochMilliseconds}|${ctx.epoch}`, placed })));
+    // The slot object is in the signature: a new one at the same time (a refetch) is the one a click hands back.
+    const bookable = Boolean(ctx.live().onSlotClick);
+    p.slots.sync(column.slots.map((placed) => ({ key: placed.key, sig: `${placed.top}|${placed.height}|${idOf(placed.slot)}|${bookable}|${ctx.epoch}`, placed })));
     created.push(...p.events.sync(shown(column).map(itemOf)));
     p.more.sync(column.more.map((m) => ({ key: m.key, sig: `${m.top}|${m.height}|${m.left}|${m.width}|${m.events.length}|${ctx.epoch}`, more: m, date: column.date })));
   }
@@ -260,6 +262,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const to = formatTemporal(placed.end.toZonedDateTimeISO(ctx.zone).toPlainTime(), HM, ctx.locale);
     b.textContent = from;
     b.setAttribute('aria-label', ctx.messages.freeSlot({ time: `${from}–${to}` }));
+    // Without onSlotClick the slots only show the free time: not offered as buttons that do nothing.
+    b.toggleAttribute('aria-disabled', !ctx.live().onSlotClick);
   }
 
   // ── "+N": a crowded cluster's hidden events, listed in the panel the month uses ──

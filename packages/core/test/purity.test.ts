@@ -11,6 +11,7 @@ import { join } from 'node:path';
 const SRC = new URL('../src', import.meta.url).pathname;
 const RRULE = new URL('../../rrule/src', import.meta.url).pathname;
 const ICAL = new URL('../../ical/src', import.meta.url).pathname;
+const SLOTS = new URL('../../slots/src', import.meta.url).pathname;
 
 const files = (dir: string): string[] =>
   readdirSync(dir).flatMap((f) => {
@@ -33,7 +34,7 @@ const FORBIDDEN: [string, RegExp][] = [
 ];
 
 describe('core purity', () => {
-  const all = [...files(SRC), ...files(RRULE), ...files(ICAL)];
+  const all = [...files(SRC), ...files(RRULE), ...files(ICAL), ...files(SLOTS)];
 
   it('finds the sources', () => {
     expect(all.length).toBeGreaterThan(5);
@@ -49,5 +50,12 @@ describe('core purity', () => {
   it('only temporal.ts imports @tzslot/core for Temporal itself', () => {
     const importers = all.filter((f) => /import\s*\{[^}]*\bTemporal\b[^}]*\}\s*from\s*['"]@tzslot\/core['"]/.test(readFileSync(f, 'utf8')));
     expect(importers.map((f) => f.replace(SRC, 'core').replace(RRULE, 'rrule'))).toEqual(['core/temporal.ts', 'rrule/temporal.ts']);
+  });
+
+  it('slots reads no clock (now is an input) and stands on core and rrule only, never the DOM', () => {
+    const slots = files(SLOTS).map((f) => [f, code(readFileSync(f, 'utf8'))] as const);
+    expect(slots.filter(([, t]) => /Temporal\.Now\b/.test(t)).map(([f]) => f)).toEqual([]);
+    const imports = slots.flatMap(([, t]) => [...t.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]!)).filter((x) => !x.startsWith('.'));
+    expect([...new Set(imports)].sort()).toEqual(['@dzcalendar/core', '@dzcalendar/rrule']);
   });
 });

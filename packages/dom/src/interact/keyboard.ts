@@ -1,4 +1,4 @@
-import { Temporal, eventHit, formatTemporal, grabStep, heldEvent, intentFor, isUnchanged, resolveWall, selectionBetween, stepHit } from '@dzcalendar/core';
+import { Temporal, eventHit, formatTemporal, grabStep, heldEvent, intentFor, isUnchanged, resolveWall, selectionBetween, slotInstant, stepHit } from '@dzcalendar/core';
 import type { AvailableSlot, CalEvent, Command, EventInstance, Hit, Intent, PlainDate, Proposal, Selection, Step, ZonedDateTime } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
 import { formatMinutes } from '../render/event.js';
@@ -69,15 +69,25 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
   function freeSlotAt(hit: Hit): AvailableSlot | null {
     if (hit.kind !== 'slot') return null;
     const t = hit.instant.epochMilliseconds;
-    const ms = (x: AvailableSlot['start']) => ('toInstant' in x ? x.toInstant() : x).epochMilliseconds;
-    return ctx.kernel.getOptions().availableSlots?.find((x) => ms(x.start) <= t && t < ms(x.end)) ?? null;
+    // The latest start at or before the cursor: where slots overlap, the one drawn there.
+    let best: AvailableSlot | null = null;
+    let bestStart = -Infinity;
+    for (const x of ctx.kernel.getOptions().availableSlots ?? []) {
+      const s = slotInstant(x?.start)?.epochMilliseconds;
+      const e = slotInstant(x?.end)?.epochMilliseconds;
+      if (s !== undefined && e !== undefined && s <= t && t < e && s > bestStart) {
+        best = x;
+        bestStart = s;
+      }
+    }
+    return best;
   }
   function hitLabel(hit: Hit): string {
     if (hit.kind === 'day') return hit.allDayRow ? m().cursorAllDay({ date: dayWords(hit.date) }) : dayWords(hit.date);
     const label = m().cursorSlot({ date: dayWords(hit.date), time: timeWords(hit.instant.toZonedDateTimeISO(zone())) });
     const free = freeSlotAt(hit);
     if (!free) return label;
-    const words = (x: AvailableSlot['start']) => timeWords(('toInstant' in x ? x.toInstant() : x).toZonedDateTimeISO(zone()));
+    const words = (x: AvailableSlot['start']) => timeWords(slotInstant(x)!.toZonedDateTimeISO(zone()));
     return `${label}, ${m().freeSlot({ time: `${words(free.start)}–${words(free.end)}` })}`;
   }
   function spanWords(s: { readonly start: Selection['start']; readonly end: Selection['end']; readonly allDay: boolean }): string {
