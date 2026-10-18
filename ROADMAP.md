@@ -2,6 +2,34 @@
 
 Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
+## Resume here (if a session is lost)
+
+- **Done:** Phases 0–13, each committed (`git log --oneline`: Phase 13 is
+  `fa32ba0`). Every check green at that commit: `npm test` (938),
+  `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
+  `test:browser` (123), `perf:browser`, `test:package`.
+- **In progress:** Phase 14 — slots (`@dzcalendar/slots`), see its section
+  at the bottom. Its design decisions are being validated with the owner
+  first; they are recorded there as they are taken.
+- **Left after it:** 15 Pro resources and timeline, 16 Pro print / export /
+  editor, 17 animations, 18 ecosystem (Web Component, React/Vue,
+  FullCalendar options translator), 19+ native (Swift/Kotlin from
+  `conformance/`, then SwiftUI/Compose).
+- **How a phase is run** (owner's rule): decisions validated with the owner
+  (in French) before coding → implement → two reviews in parallel
+  (`feature-dev:code-architect` against `ARCHITECTURE.md`,
+  `pr-review-toolkit:code-reviewer` by execution, Chrome included) → fix
+  their findings → every check above → this file (phase section, review
+  fixes, "Not done on purpose") and an `ARCHITECTURE.md` block
+  « Ajustements après la Phase N » (newest first, near its top) → commit →
+  report to the owner in French.
+- **Standing rules:** never kill the playground on port 4600; GSAP only in
+  `motion-gsap`; measure performance only minified; budgets are measured
+  + 3 % when a phase grows a package (owner's rule); test expectations by
+  hand; `.claude/` stays out of commits.
+- **First user:** Sehhaty (a Saudi health app: appointments, Arabic, Hijri),
+  but DzCalendar is a generic library for any project.
+
 ## Phase 0 — scaffold, spikes, model ✅ (2026-10-16)
 
 - npm workspaces, strict tsconfig (core: `lib: ES2023`, no DOM), vitest
@@ -1104,7 +1132,7 @@ budgets at the measure + 3 % (core 36, dom 35.1, dom/list 4.8 kB).
   `perf:browser`.
 - An announcement when entering a crowded day ("N events listed").
 
-## Phase 13 — complete theme, i18n, density: done
+## Phase 13 — complete theme, i18n, density ✅ (2026-10-18)
 
 The owner's brief: DzCalendar serves any project, not only Sehhaty — a base
 CSS the client overrides entirely without effort, the same for the words;
@@ -1151,7 +1179,8 @@ light and dark built in, and a few ready-made looks.
   (only a pointer cursor on `role="button"` events differs); the comparison
   is shown to catch Tailwind 3 breaking a layered calendar.
 - Sizes: dom 37.2 kB (budget raised to measured + 3 %: 38.3 kB — themes,
-  calendars, validation, unlayered mode); theme css 2.4 kB.
+  calendars, validation, unlayered mode; the owner approved the raise);
+  theme css 2.4 kB.
 
 ### Reviews (architect; code review by execution in Chrome), fixed
 - Architect: messages lost on a locale switch; `Partial` messages; Hijri
