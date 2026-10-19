@@ -65,12 +65,14 @@ import { TIMELINE_CSS } from '@dzcalendar/pro';
 import { buildTimelineAxis } from '@dzcalendar/pro/model';
 import { openEventEditor } from '@dzcalendar/pro/editor';
 import { findSlots as findSeats } from '@dzcalendar/pro/slots';
+import { exportXLSX } from '@dzcalendar/pro/export';
+import { printPages } from '@dzcalendar/pro/print';
 import { DzEventEditor } from '@dzcalendar/pro-angular';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput, PlainDate, Selection } from '@dzcalendar/core';
 
 const agenda = defineView({ type: 'agenda', duration: { days: 3 }, render: (el, data) => (el.textContent = String(data.instances.length)) });
-void [LIST_CSS, MULTIMONTH_CSS, buildListModel, parseICal, findSlots, CalendarController, TIMELINE_CSS, buildTimelineAxis, openEventEditor, findSeats];
+void [LIST_CSS, MULTIMONTH_CSS, buildListModel, parseICal, findSlots, CalendarController, TIMELINE_CSS, buildTimelineAxis, openEventEditor, findSeats, exportXLSX, printPages];
 
 @Component({
   selector: 'app-root',

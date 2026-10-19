@@ -69,3 +69,29 @@ describe('kernel', () => {
     expect(k.getState().timeZone).toBe('Asia/Tokyo');
   });
 });
+
+describe('another view or date, without changing what is shown (printing, exports)', () => {
+  it('stateAt / modelAt: 25 October 2026 in Paris (25 h: 02:00–03:00 twice, a repeat band on the wall axis); the shown week stays', () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'en-US', now, events: [{ id: 'a', start: '2026-10-25T09:00[Europe/Paris]' }, { id: 'b', start: '2026-12-01T09:00[Europe/Paris]' }] });
+    const shown = k.viewModel();
+    const s = k.stateAt('timeGridDay', Temporal.PlainDate.from('2026-10-25'))!;
+    const m = k.modelAt('timeGridDay', Temporal.PlainDate.from('2026-10-25'))!.model as TimeGridModel;
+    const month = k.modelAt('dayGridMonth', Temporal.PlainDate.from('2026-12-10'))!;
+    const ax = m.columns[0]!.axis;
+    expect([s.title, m.columns.length, ax.day.kind, ax.bands.map((b) => [b.kind, b.from, b.to]), m.columns[0]!.events.map((e) => e.segment.instance.event.id)]).toEqual(['Sunday, October 25, 2026', 1, 'long', [['repeat', 120, 180]], ['a']]);
+    expect([month.family, k.stateAt('dayGridMonth', Temporal.PlainDate.from('2026-12-10'))!.title]).toEqual(['dayGrid', 'December 2026']);
+    expect([k.getState().title, k.viewModel() === shown, k.modelAt('nope', Temporal.PlainDate.from('2026-10-25'))]).toEqual(['Oct 18\u2009–\u200924, 2026', true, null]);
+  });
+});
+
+describe('modelAt after the 16b review: the view as shown, and the caps paper lifts', () => {
+  it('weekends hidden: the week has five columns there too; `over` lifts the month’s cap, the shown one keeps it', () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ id: `e${i}`, start: '2026-10-21', allDay: true }));
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now, events: many, hiddenDays: [6, 7], dayGrid: { maxLanes: 2 } } as never);
+    const week = k.modelAt('timeGridWeek', Temporal.PlainDate.from('2026-10-21'))!.model as TimeGridModel;
+    expect(week.columns.map((c) => c.date.day)).toEqual([19, 20, 21, 22, 23]);
+    const capped = k.modelAt('dayGridMonth', Temporal.PlainDate.from('2026-10-21'))!.model as { maxLanes: number | null };
+    const lifted = k.modelAt('dayGridMonth', Temporal.PlainDate.from('2026-10-21'), { dayGrid: { maxLanes: null } })!.model as { maxLanes: number | null };
+    expect([capped.maxLanes, lifted.maxLanes, k.getOptions().dayGrid?.maxLanes]).toEqual([2, null, 2]);
+  });
+});

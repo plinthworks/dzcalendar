@@ -166,6 +166,12 @@ export interface CalendarInstance {
   select(selection: Selection | null): void;
   /** Runs `fn` when the calendar is destroyed (what an editor opened on it closes with). Returns the way to take it back. */
   onDestroy(fn: () => void): () => void;
+  /**
+   * The options in force: what was given, with every `update` laid over it
+   * (the view and date as now shown). What a copy of this calendar is made
+   * from (paged printing), with `store: cal.kernel.store` to share the events.
+   */
+  getOptions(): CalendarOptions;
   destroy(): void;
 }
 
@@ -734,6 +740,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   }
 
   host.append(root);
+  /** The options given, every update laid over (`getOptions`). */
+  let given: CalendarOptions = options;
   /** What closes with the calendar (an editor's dialog). */
   const destroyHooks = new Set<() => void>();
   paint();
@@ -878,10 +886,20 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       } finally {
         holding = false;
       }
+      // An option set to undefined goes back to its default: dropped, not kept as undefined.
+      const next: Record<string, unknown> = { ...given };
+      for (const [k, v] of Object.entries(changes)) if (v === undefined) delete next[k];
+      else next[k] = v;
+      given = next as CalendarOptions;
       if (dirty) {
         dirty = false;
         paint();
       }
+    },
+    getOptions() {
+      const st = kernel.getState();
+      const { view: _v, date: _d, ...rest } = given as CalendarOptions & CalendarUpdate;
+      return { ...rest, initialView: st.view.type, initialDate: st.date, timeZone: st.timeZone };
     },
     navigate: (dir) => kernel.navigate(dir),
     run: (cmd, opts) => kernel.run(cmd, opts),

@@ -1211,6 +1211,92 @@ try {
       await p.close();
     }
 
+    // ── Phase 16b: paged printing and the exports (timeline and resources pages) ──
+    {
+      const { p, errors } = await page('/timeline.html');
+      await p.waitForSelector('.dz-tl');
+      const files = await p.evaluate(async () => {
+        const { exp, cal } = window.__pro;
+        const m = await exp();
+        cal.update({ view: 'resourceTimelineWeek' });
+        const text = async (b) => new TextDecoder('latin1').decode(new Uint8Array(await b.arrayBuffer()));
+        const pdf = await m.exportPDF(cal, { from: cal.kernel.getState().range.activeStart, to: cal.kernel.getState().range.activeStart.add({ days: 14 }) });
+        const pdfText = pdf.blob ? await text(pdf.blob) : '';
+        const xlsx = await m.exportXLSX(cal);
+        const ics = await m.exportICS(cal);
+        const csv = await m.exportCSV(cal, { separator: ';' });
+        const png = await m.exportPNG(cal);
+        const bad = await m.exportPDF(cal, { view: 'nope' });
+        return {
+          pdf: [pdfText.slice(0, 8), (pdfText.match(/\/Type \/Page /g) ?? []).length, pdf.blob?.type],
+          xlsx: xlsx.blob ? (await text(xlsx.blob)).slice(0, 2) : null,
+          ics: ics.blob ? /BEGIN:VCALENDAR[\s\S]*Garde de nuit[\s\S]*END:VCALENDAR/.test(await ics.blob.text()) : false,
+          // Blob.text() drops a BOM when it decodes: the bytes say it is there.
+          csv: csv.blob ? [...new Uint8Array(await csv.blob.slice(0, 3).arrayBuffer())].join() + '|' + (await csv.blob.text()).split('\r\n')[0] : '',
+          png: [png.blobs.length, png.blobs[0]?.type],
+          bad: [bad.blob, bad.problems.map((x) => x.code)],
+          problems: [...pdf.problems, ...xlsx.problems, ...ics.problems, ...csv.problems, ...png.problems].length,
+        };
+      });
+      check('exports: a PDF of two weeks is two A4 pages, one image each', files.pdf[0] === '%PDF-1.4' && files.pdf[1] === 2 && files.pdf[2] === 'application/pdf', JSON.stringify(files.pdf));
+      check('exports: XLSX is a zip, ICS holds the night shift, CSV its French heads, PNG one sheet', files.xlsx === 'PK' && files.ics && files.csv.startsWith('239,187,191|Titre;Début;Fuseau horaire;Fin;Fuseau de fin') && files.png[0] === 1 && files.png[1] === 'image/png', JSON.stringify(files));
+      check('exports: an unknown view is a problem (no file, nothing thrown); the others none', files.bad[0] === null && files.bad[1][0] === 'invalid-export' && files.problems === 0, JSON.stringify(files.bad));
+      const job = await p.evaluate(async () => {
+        const { prn, cal } = window.__pro;
+        cal.update({ view: 'resourceTimelineDay' });
+        const j = await (await prn()).printPages(cal, { print: false });
+        const out = j.pages.map((page) => {
+          const r = page.getBoundingClientRect();
+          const c = page.querySelector('.dz-cal').getBoundingClientRect();
+          const sc = page.querySelector('.dz-tl__scroll, .dz-tl__body, .dz-tl');
+          return { w: Math.round(r.width), h: Math.round(r.height), calBottom: Math.round(c.bottom - r.top), wide: sc ? sc.scrollWidth - sc.clientWidth : 0, rows: page.querySelectorAll('.dz-tl__row').length };
+        });
+        j.close();
+        return { out, left: Boolean(document.querySelector('.dz-print')) };
+      });
+      check('print: a resource timeline day on A4 landscape sheets (1123 × 794), the rows split between them', job.out.length >= 2 && job.out.every((x) => x.w === 1123 && x.h === 794), JSON.stringify(job.out));
+      check('print: each copy within its sheet, its 25 hours across the sheet’s width (nothing to scroll)', job.out.every((x) => x.calBottom <= 794 - 36 && x.wide <= 1), JSON.stringify(job.out));
+      check('print: close() takes the sheets away', !job.left, '');
+      // The paper the browser will use: the @page rule as Chrome reads it back (an invalid one is dropped whole).
+      const pageSize = await p.evaluate(async () => {
+        const { prn, cal } = window.__pro;
+        const out = [];
+        for (const o of [{}, { paper: 'letter', orientation: 'portrait' }]) {
+          const j = await (await prn()).printPages(cal, { ...o, print: false });
+          const rule = [...document.styleSheets].flatMap((sh) => { try { return [...sh.cssRules]; } catch { return []; } }).find((r) => r instanceof CSSPageRule);
+          out.push(rule?.style.getPropertyValue('size'));
+          j.close();
+        }
+        return out;
+      });
+      check('print: @page is A4 landscape (841.89pt × 595.28pt), Letter portrait (612pt × 792pt)', pageSize[0] === '841.89pt 595.28pt' && pageSize[1] === '612pt 792pt', JSON.stringify(pageSize));
+      check('print/exports (timeline): no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+    {
+      const { p, errors } = await page('/resources.html');
+      await p.waitForSelector('.dz-ev');
+      const day = await p.evaluate(async () => {
+        const { prn, cal } = window.__pro;
+        const j = await (await prn()).printPages(cal, { print: false });
+        const body = j.pages[0].querySelector('.dz-tg__body');
+        const r = { pages: j.pages.length, title: j.pages[0].querySelector('.dz-print__title').textContent, fits: body.scrollHeight - body.clientHeight, now: j.pages[0].querySelectorAll('.dz-now, .dz-tg__now').length, foot: j.pages[0].querySelector('.dz-print__foot').textContent };
+        j.close();
+        return r;
+      });
+      check('print: a resource day on one sheet, its hours 06:00–20:00 all on it, no "now" line, "1 / 1"', day.pages === 1 && day.title === 'mercredi 21 octobre 2026' && day.fits <= 1 && day.now === 0 && day.foot === '1 / 1', JSON.stringify(day));
+      const ar = await p.evaluate(async () => {
+        const { exp, cal } = window.__pro;
+        cal.update({ locale: 'ar', view: 'resourceTimeGridWeek' });
+        const r = await (await exp()).exportPNG(cal);
+        cal.update({ locale: 'fr-FR', view: 'resourceTimeGridDay' });
+        return [r.blobs.length, r.problems.length];
+      });
+      check('exports: an Arabic week as a PNG sheet, no problem', ar[0] === 1 && ar[1] === 0, JSON.stringify(ar));
+      check('print/exports (resources): no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
     // Beside a framework's global reset (the real files: Tailwind 3's preflight, Bootstrap 5's reboot;
     // Tailwind 4's is the same preflight in @layer base). The calendar must look as it does on a bare page:
     // every element's boxes and colours compared with the bare page's, element by element.

@@ -35,6 +35,8 @@ export default defineConfig({
       '@dzcalendar/dom': fileURLToPath(new URL('./packages/dom/src/index.ts', import.meta.url)),
       '@dzcalendar/ical': fileURLToPath(new URL('./packages/ical/src/index.ts', import.meta.url)),
       '@dzcalendar/slots': fileURLToPath(new URL('./packages/slots/src/index.ts', import.meta.url)),
+      '@dzcalendar/pro/export': fileURLToPath(new URL('./packages/pro/src/export-entry.ts', import.meta.url)),
+      '@dzcalendar/pro/print': fileURLToPath(new URL('./packages/pro/src/print-entry.ts', import.meta.url)),
       '@dzcalendar/pro/editor': fileURLToPath(new URL('./packages/pro/src/editor-entry.ts', import.meta.url)),
       '@dzcalendar/pro/slots': fileURLToPath(new URL('./packages/pro/src/slots-entry.ts', import.meta.url)),
       '@dzcalendar/pro/model': fileURLToPath(new URL('./packages/pro/src/model-entry.ts', import.meta.url)),

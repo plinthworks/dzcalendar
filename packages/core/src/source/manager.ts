@@ -59,6 +59,13 @@ export interface SourceManager {
   readonly loading: boolean;
   /** Settles once nothing is fetching, waiting to retry, or saving. */
   idle(): Promise<void>;
+  /**
+   * Fetches `[start, end)` (dates in the shown zone) beside what is shown and
+   * keeps it until released (a print or an export of other dates). `ready`
+   * settles once nothing is fetching or saving, with the held chunks that
+   * could not be loaded (`source:chunk`): what the file lacks.
+   */
+  hold(start: PlainDate, end: PlainDate): { readonly ready: Promise<{ readonly failed: readonly string[] }>; release(): void };
   destroy(): void;
 }
 
@@ -144,6 +151,8 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
   let waiting = 0;
   let tick = 0;
   let range: { start: PlainDate; end: PlainDate; zone: ZoneId } | null = null;
+  /** Ranges held beside the shown one (`hold`). */
+  const holds = new Set<{ start: PlainDate; end: PlainDate }>();
   let loading = false;
   let idlers: (() => void)[] = [];
   let destroyed = false;
@@ -172,8 +181,11 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
   const neededChunks = (src: SourceState): Chunk[] => {
     const { unit, prefetch } = src.spec.chunk;
     if (unit === 'none') return WHOLE;
-    if (!range) return [];
-    return chunksCovering(unit, range.start, range.end, prefetch);
+    const out = range ? chunksCovering(unit, range.start, range.end, prefetch) : [];
+    if (holds.size === 0) return out;
+    const seen = new Set(out.map((c) => c.key));
+    for (const h of holds) for (const c of chunksCovering(unit, h.start, h.end, 0)) if (!seen.has(c.key)) (seen.add(c.key), out.push(c));
+    return out;
   };
 
   /** Drops chunks from the store (and the cache). */
@@ -537,6 +549,35 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
     idle() {
       if (!busy() && !saving()) return Promise.resolve();
       return new Promise<void>((resolve) => idlers.push(resolve));
+    },
+    hold(start, end) {
+      const h = { start, end };
+      holds.add(h);
+      for (const src of sources.values()) sync(src);
+      const idle = !busy() && !saving() ? Promise.resolve() : new Promise<void>((resolve) => idlers.push(resolve));
+      // Loaded or not: a chunk never answered (its retries spent) is missing from what is held.
+      const ready = idle.then(() => {
+        const failed: string[] = [];
+        for (const src of sources.values()) {
+          const { unit } = src.spec.chunk;
+          for (const c of unit === 'none' ? WHOLE : chunksCovering(unit, start, end, 0)) {
+            const e = src.cache.get(c.key);
+            if (!e || e.fetchedAt === undefined) failed.push(`${src.spec.id}:${c.key}`);
+          }
+        }
+        return { failed };
+      });
+      let held = true;
+      return {
+        ready,
+        release() {
+          if (!held || destroyed) return;
+          held = false;
+          holds.delete(h);
+          // What it loaded stays as spare chunks (dropped least recently used first).
+          for (const src of sources.values()) sync(src);
+        },
+      };
     },
     destroy() {
       destroyed = true;

@@ -620,3 +620,44 @@ describe('review fixes', () => {
     await m.idle();
   });
 });
+
+describe('hold: other dates fetched and kept beside the shown ones (printing, exports)', () => {
+  it('fetches December beside October, ready once loaded, kept while held, then a spare chunk', async () => {
+    const { store, m } = setup({ keepChunks: 0 });
+    const s = manual('s');
+    m.add(s.spec);
+    m.setRange(d('2026-10-01'), d('2026-11-01'), PARIS);
+    expect(s.calls.map((c) => span(c.req))).toEqual(['2026-10-01..2026-11-01']);
+    const h = m.hold(d('2026-12-01'), d('2027-01-01'));
+    expect(s.calls.map((c) => span(c.req))).toEqual(['2026-10-01..2026-11-01', '2026-12-01..2027-01-01']);
+    let ready: readonly string[] | null = null;
+    void h.ready.then((r) => (ready = r.failed));
+    s.calls[0]!.answer.resolve([{ id: 'o', title: 'Oct', start: '2026-10-21T09:00[Europe/Paris]' }]);
+    await flush();
+    expect(ready).toBe(null);
+    s.calls[1]!.answer.resolve([{ id: 'x', title: 'Dec', start: '2026-12-21T09:00[Europe/Paris]' }]);
+    await flush();
+    expect([ready, titles(store)]).toEqual([[], ['Oct', 'Dec']]);
+    // Moving the shown range does not drop what is held.
+    m.setRange(d('2026-11-01'), d('2026-12-01'), PARIS);
+    expect(titles(store)).toContain('Dec');
+    h.release();
+    // Released, with no spare chunk kept: gone (October too, no longer shown).
+    expect(titles(store)).toEqual([]);
+  });
+});
+
+describe('hold: what could not be loaded is said', () => {
+  it('December fails: ready names it (source:chunk); what the file lacks is known', async () => {
+    const { m } = setup();
+    const s = manual('s');
+    m.add(s.spec);
+    const h = m.hold(d('2026-12-01'), d('2027-01-01'));
+    s.calls[0]!.answer.reject(new Error('503'));
+    await flush();
+    const r = await h.ready;
+    expect(r.failed.length === 1 && r.failed[0]!.startsWith('s:')).toBe(true);
+    h.release();
+  });
+});
+

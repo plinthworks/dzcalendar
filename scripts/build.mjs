@@ -79,6 +79,9 @@ function typescript(name) {
         // Loaded on demand: the editor (with @tzslot/dom) and seats.
         './editor': { types: './editor-entry.d.ts', default: './editor-entry.js' },
         './slots': { types: './slots-entry.d.ts', default: './slots-entry.js' },
+        // Paged printing and the exports, each loaded on demand.
+        './print': { types: './print-entry.d.ts', default: './print-entry.js' },
+        './export': { types: './export-entry.d.ts', default: './export-entry.js' },
       }),
       './package.json': './package.json',
     },

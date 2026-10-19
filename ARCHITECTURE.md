@@ -68,6 +68,23 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 16b (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (`pro/export` 12,3 ko, `pro/print` 4,4 ko, core 41,5 ko, ical 8,1 ko — les deux derniers dépassaient déjà depuis la 16a) ; papier toujours clair (impression et PDF/PNG) ; une colonne « Fuseau de fin » (11 colonnes : la fin d'un vol dans son fuseau).
+- **B.18 (kernel)** : `stateAt(type, date)` et `modelAt(type, date, over?)` — une autre vue ou date, telle qu'elle serait affichée (jours masqués compris), sans toucher à l'écran ; `over` pose `timeGrid`/`dayGrid`/`timeline` sur les options en vigueur. Vues cherchées en propre (`Object.hasOwn` : `toString` n'est pas une vue).
+- **B.7 (sources)** : `sources.hold(start, end)` charge et garde une période à côté de celle affichée ; `ready` donne les morceaux non chargés (`source:chunk`), signalés en avertissement par les exports.
+- **D (dom)** : `CalendarInstance.getOptions()` — les options en vigueur (données puis mises à jour), d'où se fait une copie (impression). Avec un `kernel` externe, ses options propres n'y sont pas.
+- **Problème** : `invalid-export` (détails courts : `view:toString`, `to:not-after-from`, `cut:60`, `clipped:2`, `sources:…`).
+- **Pro** : `@dzcalendar/pro/export` (`exportPDF`, `exportPNG`, `exportXLSX`, `exportCSV`, `exportICS`, `download` ; dessin pur `paintSheets` → `Pen.ops`, `drawSheet` sur canvas ; `toXLSX`, `toCSV`, `zip`, `pdfFromJpegs`) ; `@dzcalendar/pro/print` (`printPages` : copies du calendrier par période, store partagé, `@page` en longueurs, une impression par document).
+- **Non fait, consigné** : pagination des colonnes d'une vue ressource en grille (beaucoup de ressources tiennent serrées sur une feuille) ; ressources repliées comptées dans le découpage ; plusieurs PNG = plusieurs téléchargements (le `zip` existe) ; limite de 1 048 576 lignes XLSX ; une seule feuille de PDF par image.
+
+### Décisions de la Phase 16b (2026-10-19)
+
+- **PDF en images** : chaque page dessinée sur un canvas (le navigateur met en forme l'arabe), images assemblées dans un PDF écrit par nous ; texte non sélectionnable accepté.
+- **Impression paginée par le navigateur** : `printPages({ paper, orientation, range })`, pages A4/Letter réelles dans le DOM, en-têtes répétés, puis `window.print()`.
+- **Vues** : PDF et PNG dessinent toutes les vues depuis leur modèle, timeline comprise.
+- **XLSX/CSV** : une ligne par occurrence ; heures dans le fuseau de l'événement (avec le fuseau) et dans le fuseau d'affichage, durée réelle ; vraies dates Excel.
+
 ### Ajustements après la Phase 16a (détail dans ROADMAP.md)
 
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (`pro/editor` 10,6 ko, `pro/slots` 1,74 ko, éditeur avec tzslot 37,5 ko) ; `@tzslot/core ^2.2.0` partout (core, rrule : un seul Temporal avec l'éditeur, `TZSLOT_RANGE`).
@@ -1227,7 +1244,7 @@ Pas de `ApplicationRef.tick()` global. Compatible zoneless : la détection est e
 | `@dzcalendar/dom` (dayGrid + timeGrid + list + multiMonth + interactions + a11y) | ≤ 26 ko (30 avant la Phase 6) | |
 | `@dzcalendar/angular` | ≤ 6 ko | hors Angular |
 | `@dzcalendar/theme` (CSS) | ≤ 8 ko | |
-| `@dzcalendar/pro` (timeline + ressources) | ≤ 16 ko | export/éditeur/impression en sous-entrées chargées à la demande ; `pro/editor` 10,6 ko (36,4 ko mesurés avec le widget tzslot, budget 37,5), `pro/slots` 1,74 ko, `pro-angular` 0,8 ko (16a, mesure + 3 %) |
+| `@dzcalendar/pro` (timeline + ressources) | ≤ 16 ko | export/éditeur/impression en sous-entrées chargées à la demande ; `pro/editor` 10,6 ko (36,4 ko mesurés avec le widget tzslot, budget 37,5), `pro/slots` 1,74 ko, `pro-angular` 0,8 ko (16a, mesure + 3 %) ; `pro/export` 12,3 ko, `pro/print` 4,4 ko (16b) |
 | **Total gratuit utile** (core+rrule+dom+theme) | **≤ 66 ko + 20 ko tzslot = ≈ 86 ko** | À comparer à ~95 ko (FullCalendar « all ») rapportés dans le doc d'analyse |
 
 `scripts/size.mjs` calcule le gzip de chaque `dist/` et le compare à `size-budget.json` ; la CI échoue au-delà de +5 %. Chaque module exporte `sideEffects:false` (comme `build.mjs`).

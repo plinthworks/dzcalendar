@@ -207,6 +207,15 @@ export interface CalendarKernel {
   refreshToday(): boolean;
   /** Memoized; after a store change only what changed is rebuilt (where the family can). */
   viewModel(): ViewModel;
+  /**
+   * Another view or date, as it would be shown — its state (range, title) and
+   * its model — without changing what is shown (printing, exports). Null for
+   * an unknown view. Not memoized; its events are whatever the store holds
+   * (`sources.hold` the range first).
+   */
+  stateAt(type: string, date: PlainDate): KernelState | null;
+  /** `over`: the families' own options laid over those in force, key by key (a print lifts the "+N" caps). */
+  modelAt(type: string, date: PlainDate, over?: Pick<ModelOptions, 'timeGrid' | 'dayGrid' | 'timeline'>): ViewModel | null;
   now(): Instant;
   /** What the last `events`/`setEvents` load reported. */
   getProblems(): NormalizationReport | null;
@@ -287,8 +296,10 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   };
   const todayIn = (zone: ZoneId) => now().toZonedDateTimeISO(zone).toPlainDate();
   let date = o.initialDate ?? todayIn(timeZone);
+  /** A view by its type: own entries only (`toString` is not a view). */
+  const ownView = (type: unknown): ViewSpec | undefined => (typeof type === 'string' && Object.hasOwn(views, type) ? views[type] : undefined);
   const viewOf = (type: string) => {
-    const spec = views[type];
+    const spec = ownView(type);
     if (!spec) throw new RangeError(`unknown view: ${type}`);
     return spec;
   };
@@ -388,10 +399,10 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     }
   }
 
-  function computeState(): KernelState {
+  function computeState(at = date, spec = view): KernelState {
     const ctx = nav();
-    const range = computeViewRange(date, view, ctx);
-    return { date, view, range, timeZone, locale, firstDay, title: titleFor(range, view), today: ctx.today };
+    const range = computeViewRange(at, spec, ctx);
+    return { date: at, view: spec, range, timeZone, locale, firstDay, title: titleFor(range, spec), today: ctx.today };
   }
 
   // One subscriber that throws must not starve the others (nor, on a shared
@@ -433,7 +444,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   return {
     store,
     getState: () => state,
-    getViewSpec: (type) => views[type],
+    getViewSpec: (type) => ownView(type),
     setView(type, at) {
       const spec = viewOf(type);
       if (spec === raw && (!at || at.equals(date))) return;
@@ -520,6 +531,29 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       if (todayIn(timeZone).equals(state.today)) return false;
       changeState('today');
       return true;
+    },
+    stateAt(type, at) {
+      const raw = ownView(type);
+      const spec = raw && effectiveOf(raw);
+      return spec ? computeState(at, spec) : null;
+    },
+    modelAt(type, at, over) {
+      // The view as shown would be: hidden days and weekends applied.
+      const raw = ownView(type);
+      const spec = raw && effectiveOf(raw);
+      const family = spec && FAMILIES.get(spec.family);
+      if (!spec || !family) return null;
+      if (over?.timeline) assertTimeline(over.timeline);
+      const range = computeState(at, spec).range;
+      const opts: ModelOptions = !over
+        ? options
+        : {
+            ...options,
+            ...(over.timeGrid && { timeGrid: { ...options.timeGrid, ...over.timeGrid } }),
+            ...(over.dayGrid && { dayGrid: { ...options.dayGrid, ...over.dayGrid } }),
+            ...(over.timeline && { timeline: { ...options.timeline, ...over.timeline } }),
+          };
+      return { family: spec.family, model: family.build(range, store.snapshot, { displayZone: timeZone, view: spec, options: opts, resources: resourceTree, columns }) };
     },
     viewModel() {
       if (model) return model;

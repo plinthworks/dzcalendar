@@ -38,7 +38,9 @@ export type ProblemCode =
   | 'invalid-resource'
   | 'resource-cycle'
   | 'invalid-availability'
-  | 'invalid-slot-query';
+  | 'invalid-slot-query'
+  /** A print or an export asked for what cannot be put on paper or in a file (an unknown view, a range ending before it starts). */
+  | 'invalid-export';
 
 export type Severity = 'error' | 'warning';
 

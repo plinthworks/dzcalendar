@@ -2,6 +2,7 @@ import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput, ResourceInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
+import { exportControls } from './export-controls.js';
 import '@dzcalendar/pro';
 
 const resources: ResourceInput[] = [
@@ -51,3 +52,4 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
 document.querySelector<HTMLSelectElement>('#view')!.addEventListener('change', (e) => cal.update({ view: (e.target as HTMLSelectElement).value }));
 document.querySelector<HTMLInputElement>('#unassigned')!.addEventListener('change', (e) => cal.update({ showUnassigned: (e.target as HTMLInputElement).checked }));
 (window as unknown as { __cal: typeof cal }).__cal = cal;
+exportControls(cal, document.querySelector<HTMLElement>('#exports')!);

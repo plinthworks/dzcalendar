@@ -2,6 +2,7 @@ import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput, ResourceInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
+import { exportControls } from './export-controls.js';
 import { editorHandlers } from '@dzcalendar/pro/editor';
 
 const resources: ResourceInput[] = [
@@ -43,3 +44,4 @@ document.querySelector<HTMLInputElement>('#group')!.addEventListener('change', (
 // The Pro's editor: "Open" and "New event here" (context menu) open it.
 cal.update(editorHandlers(cal));
 (window as unknown as { __cal: typeof cal }).__cal = cal;
+exportControls(cal, document.querySelector<HTMLElement>('#exports')!);

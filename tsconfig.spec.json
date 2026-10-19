@@ -54,6 +54,12 @@
       "@dzcalendar/pro/editor": [
         "./packages/pro/src/editor-entry.ts"
       ],
+      "@dzcalendar/pro/export": [
+        "./packages/pro/src/export-entry.ts"
+      ],
+      "@dzcalendar/pro/print": [
+        "./packages/pro/src/print-entry.ts"
+      ],
       "@dzcalendar/pro/slots": [
         "./packages/pro/src/slots-entry.ts"
       ],

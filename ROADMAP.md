@@ -4,16 +4,16 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–15 and 16a, each committed (`git log --oneline`: the
-  last is titled "Phase 16a"). Every check green at that commit: `npm test`
-  (1 174), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
-  `test:browser` (172), `perf:browser`, `test:package`.
-- **Now: Phase 16b** — paged printing and exports (PDF, PNG, XLSX, ICS),
-  without dependencies (owner's decision, below). Next step: present 16b's
-  open questions to the owner (in French) before coding.
+- **Done:** Phases 0–16, each committed (`git log --oneline`: the last is
+  titled "Phase 16b"). Every check green at that commit: `npm test`
+  (1 197), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
+  `test:browser` (183), `perf:browser`, `test:package`.
+- **Now: Phase 17** (animations) — Phase 16 is done (commits "Phase 16a",
+  "Phase 16b"). Next step: present Phase 17's open questions to the owner
+  (in French) before coding.
 - **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
   that URL; the owner authorised pushing on 2026-10-18).
-- **Left after it:** 16b print / export, 17 animations, 18 ecosystem (Web Component, React/Vue,
+- **Left after it:** 17 animations, 18 ecosystem (Web Component, React/Vue,
   FullCalendar options translator), 19+ native (Swift/Kotlin from
   `conformance/`, then SwiftUI/Compose).
 - **How a phase is run** (owner's rule): decisions validated with the owner
@@ -1453,7 +1453,7 @@ See `ARCHITECTURE.md` J. Phase 15.
 - Owner's budget raises (measured + 3 %): pro 14.1 kB, locales ar 2.3, es
   1.9, de 1.9 kB. ical (7.9 against 7.5) is still as it was before Phase 15.
 
-## Phase 16 — Pro: editor, capacity, printing, exports (16a ✅ 2026-10-19; 16b next)
+## Phase 16 — Pro: editor, capacity, printing, exports ✅ (2026-10-19)
 
 See `ARCHITECTURE.md` J. Phase 16.
 
@@ -1474,6 +1474,106 @@ See `ARCHITECTURE.md` J. Phase 16.
   booking takes 1 seat (or its `seats`); a slot is offered while seats
   remain; the view says how many ("2 seats"); `checkSlot` refuses with
   `full`. Rotas and advanced constraints are not in it.
+
+## Phase 16b — paged printing and exports ✅ (2026-10-19)
+
+### Owner's decisions (2026-10-19)
+
+- **PDF = pages as images:** each page drawn on a canvas (the browser shapes
+  Arabic and Hebrew), the images put in a PDF we write ourselves. No
+  dependency; text not selectable; ~150–300 kB a page accepted.
+- **Paged printing by the browser:** `printPages({ paper, orientation,
+  range })` builds real A4/Letter pages in the DOM — a week, a day or N
+  resource rows per page, headers (hours, resources, dates) repeated — then
+  `window.print()` ("Save as PDF" works too, text selectable).
+- **Views:** PDF and PNG draw every view from its model — time grid (day,
+  week, resources), month, list, and the timeline; days of 23 h and 25 h at
+  their real size.
+- **XLSX (and CSV):** one row per occurrence over the asked range; title,
+  start and end in the event's zone + the zone, start and end in the
+  display zone, real duration, all-day, resources, status; real Excel dates.
+- (Phase 16) Exports without dependencies, loaded on demand from a
+  sub-entry; ICS through `@dzcalendar/ical`'s `serializeICal`.
+- **After the reviews (owner):** budgets measured + 3 % (export 12.3 kB,
+  print 4.4 kB, core 41.5 kB, ical 8.1 kB — core 39.9 and ical 7.9 were
+  already over at 16a, tolerated by the 5 % margin and missed in that
+  report); paper always light (print and PDF/PNG); an "end time zone"
+  column (a flight's end in its own zone: 11 columns).
+
+### Built
+
+- **Core:** `kernel.stateAt(type, date)`, `kernel.modelAt(type, date,
+  over?)` (another view or date as it would be shown, hidden days applied,
+  nothing shown changed; `over` lays family options on: paper lifts the
+  "+N" caps); views looked up as own keys; `sources.hold(start, end)`
+  (fetched and kept beside the shown range; `ready` names the chunks that
+  failed); problem code `invalid-export`.
+- **Dom:** `CalendarInstance.getOptions()`.
+- **`@dzcalendar/pro/export`:** `occurrenceRows` (both zones, the real
+  duration, series expanded once), `toCSV` (BOM, CRLF, formula guard),
+  `toXLSX` (a stored zip of SpreadsheetML: real Excel dates with the 1900
+  leap bug, frozen and filtered head, right to left in Arabic), `zip`,
+  `crc32`, `pdfFromJpegs` (PDF 1.4, a JPEG a page, UTF-16 title),
+  `periodsFor`, `paintSheets` (pure drawing operations for the time grid,
+  month, list and timeline, mirrored right to left), `drawSheet` (canvas,
+  per-text direction, "…" fitting), `exportPDF`, `exportPNG`, `exportXLSX`,
+  `exportCSV`, `exportICS` (series whole, overrides kept), `download`;
+  words in five languages (`exportMessagesFor`, `defineExportLocale`).
+- **`@dzcalendar/pro/print`:** `printPages(cal, { view, from, to, paper,
+  orientation, rowsPerPage, print })` — a copy of the calendar per period
+  in A4/Letter/A3 sheets, store shared, sized to the sheet (hours to its
+  height, weeks to its height, a timeline's slot to its width and coarse
+  enough to label), a resource timeline split by whole top-level
+  resources, no "now" line, light paper; `PrintJob { pages, problems,
+  close }`.
+- **Playground:** print and export buttons on `timeline.html` and
+  `resources.html` (`playground/export-controls.ts`).
+- **Measured:** `pro/export` 11.9 kB, `pro/print` 4.3 kB; a two-week
+  timeline PDF ~260 kB; Chrome checks 183 (PDF page count, XLSX/ICS/CSV
+  bytes, @page size as Chrome reads it, print sheets 1123 × 794 with the
+  25-hour day across, Arabic export, cleanup).
+
+### Reviews (architect; code review by execution in Chrome), fixed
+
+- **Paper:** `@page` mixed lengths and an orientation keyword (invalid:
+  Chrome printed on its default paper) — lengths alone now, checked as
+  Chrome reads them back. A month's "+N" was drawn below the grid (the
+  week's lane count, not the day's drawn lanes), the sheet lanes reserved
+  one too many; 15-minute events had no text; RTL "+N" read "27+"; Arabic
+  timeline labels were cut; the last gutter label hung below the grid.
+- **Copies:** they took the calendar's motion adapter (closing a print
+  destroyed the live one) and every handler (a 20-sheet print would call
+  the application 20 times): stripped. No cleanup when a copy failed to be
+  made, no `onDestroy`, two jobs printing together, `afterprint` left
+  attached — one job per document, closed on failure, on destroy, on a new
+  print. A sheet that cannot hold its copy now says `clipped:n`.
+- **Bad input:** `toString` as a view, `null` options, a string date, a
+  bad separator, orientation or scale: problems or warnings now, never a
+  throw; every public function wrapped (a refused canvas, a destroyed
+  calendar). Problem details are short codes, not sentences.
+- **Data:** the ICS of a range dropped a series' moved occurrences; PDF/PNG
+  ignored hidden days and weekends; the default range of another view was
+  the shown one's; a false "cut at 60" warning; the PDF's title was the
+  shown period's; U+FFFE/U+FFFF and lone surrogates made the XLSX
+  unreadable; Excel serials before 1 March 1900 were a day off.
+- **Memory:** every sheet's canvas was held at once (~14 MB each at scale
+  2): one canvas, each sheet encoded before the next; at most 300 sheets.
+- **Sources:** a failed fetch gave a file silently missing events: `hold`
+  reports the failed chunks, the exports and the print say them.
+- **Packaging:** `pro/print` no longer pulls the painters (`periods.ts`,
+  `paper.ts`).
+
+### Not done in Phase 16b, on purpose
+
+- Column paging of a resource time grid or month with many resources
+  (they are drawn narrow on one sheet); collapsed resources still count in
+  a timeline's split; "Unassigned" repeated on every sheet.
+- PNG of several sheets as several downloads (the `zip` is there for an
+  application that wants one file); the XLSX row limit (1 048 576).
+- A PDF with selectable text (owner's decision: images; the browser's
+  "Save as PDF" of `printPages` has it).
+- With an external `kernel`, `getOptions()` lacks the kernel's own options:
+  a print copy may then differ.
 
 ## Phase 16a — the editor, seats, pro-angular ✅ (2026-10-19)
 
@@ -1558,4 +1658,3 @@ See `ARCHITECTURE.md` J. Phase 16.
 - The Angular directive is tested zoneless only: zone.js in jsdom breaks
   inside tzslot (`addEventListener` with `signal`, a jsdom realm issue);
   `test:package` builds it on Angular 19–22.
-

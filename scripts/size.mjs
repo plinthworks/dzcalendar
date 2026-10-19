@@ -41,6 +41,8 @@ const results = {
   'dom (without core)': await bundle(src('dom'), ['@dzcalendar/core', ...poly]),
   'pro (without core, dom)': await bundle(src('pro'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
   'pro/editor (without core, dom, tzslot dom)': await bundle(join(root, 'packages/pro/src/editor-entry.ts'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', '@tzslot/dom', '@tzslot/core', ...poly]),
+  'pro/export (without core, dom, ical)': await bundle(join(root, 'packages/pro/src/export-entry.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/ical', ...poly]),
+  'pro/print (without core, dom)': await bundle(join(root, 'packages/pro/src/print-entry.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', ...poly]),
   'pro/slots (without core, slots)': await bundle(join(root, 'packages/pro/src/slots-entry.ts'), ['@dzcalendar/core', '@dzcalendar/slots', ...poly]),
   // The view models share core's modules: what they add beyond it.
   'core/views (beyond core)':
