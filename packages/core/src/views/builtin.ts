@@ -21,3 +21,16 @@ export const BUILTIN_VIEWS: Readonly<Record<string, ViewSpec>> = Object.freeze({
   resourceDayGridWeek: { ...base, type: 'resourceDayGridWeek', family: 'dayGrid', duration: { weeks: 1 }, alignment: 'week', resources: true },
   resourceDayGridMonth: { ...base, type: 'resourceDayGridMonth', family: 'dayGrid', duration: { months: 1 }, alignment: 'month', resources: true },
 });
+
+const REGISTERED: Record<string, ViewSpec> = {};
+
+/**
+ * Views a plugin brings (the Pro's timelines): every kernel created after
+ * knows them, beside the built-in ones; an application's own `views` win.
+ */
+export function registerViewSpec(spec: ViewSpec): void {
+  REGISTERED[spec.type] = spec;
+}
+
+/** The plugins' views, as registered so far. */
+export const registeredViewSpecs = (): Readonly<Record<string, ViewSpec>> => REGISTERED;

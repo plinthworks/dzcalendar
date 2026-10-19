@@ -87,6 +87,12 @@ export interface ViewCtx {
   virtualizeAbove: number;
   /** `preparePrint()` is in force: everything is mounted, nothing is windowed. */
   printing: boolean;
+  /**
+   * Options a plugin's view family reads, by family (`viewOptions.timeline`:
+   * the Pro's resource area). Replaced by `update({ viewOptions })`, which
+   * moves `epoch`.
+   */
+  viewOptions: Readonly<Record<string, unknown>>;
   /** The "+N" panel: views attach their menu triggers to it too. */
   readonly popoverElement: HTMLElement;
   /**

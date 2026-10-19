@@ -4,6 +4,7 @@ import type { EventInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import '@dzcalendar/dom/list';
 import '@dzcalendar/dom/multimonth';
+import '@dzcalendar/pro';
 
 /**
  * The measuring page (ARCHITECTURE G.2/G.3): U = n events over twelve months,
@@ -16,6 +17,8 @@ const set = q.get('set') ?? 'W';
 const n = Number(q.get('n') ?? 10000);
 // `stack=none`: every overlapping event side by side; `minute=3`: a taller grid (what windowing is for).
 const stack = q.get('stack') === 'none' ? null : 'auto';
+// `res=500`: that many resources, the events spread over them (a timeline's G.2 case).
+const res = Number(q.get('res') ?? 0);
 if (q.get('minute')) document.documentElement.style.setProperty('--dz-minute', `${Number(q.get('minute'))}px`);
 
 function events(): EventInput[] {
@@ -32,7 +35,7 @@ function events(): EventInput[] {
       out.push({ id: `e${i}`, title: `Événement ${i}`, start: `${date}T${h}:${r() < 0.5 ? '00' : '30'}[Europe/Paris]`, duration: { minutes: 30 + 30 * Math.floor(r() * 4) } });
     }
   }
-  return out;
+  return res > 0 ? out.map((e, i) => ({ ...e, resourceId: `r${i % res}` })) : out;
 }
 
 const data = events();
@@ -50,6 +53,7 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   store,
   editable: true,
   eventMaxStack: stack,
+  ...(res > 0 && { resources: Array.from({ length: res }, (_, i) => ({ id: `r${i}`, title: `Resource ${i}` })) }),
 });
 const sync = performance.now() - t0;
 let frame1 = 0;
@@ -58,7 +62,7 @@ requestAnimationFrame(() => {
   requestAnimationFrame(() => {
     const total = performance.now() - t0;
     const nodes = document.querySelectorAll('#cal *').length;
-    const events = document.querySelectorAll('#cal .dz-ev, #cal .dz-bar, #cal .dz-list__ev').length;
+    const events = document.querySelectorAll('#cal .dz-ev, #cal .dz-bar, #cal .dz-list__ev, #cal .dz-tl__ev').length;
     const perf = { view, set, n, load, sync: Math.round(sync), frame1, firstFrame: Math.round(total), nodes, events };
     (window as unknown as { __perf: unknown; __dz: unknown }).__perf = perf;
     (window as unknown as { __dz: unknown }).__dz = cal;

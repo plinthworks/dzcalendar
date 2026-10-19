@@ -1035,6 +1035,119 @@ try {
       await p.close();
     }
 
+    // ── Phase 15b: the timeline (doctors in a tree, two services, a room; elapsed time) ──
+    {
+      const { p, errors } = await page('/timeline.html');
+      await p.waitForSelector('.dz-tl__ev');
+      const geo = await p.evaluate(() => {
+        const box = (el) => el.getBoundingClientRect();
+        const heads = [...document.querySelectorAll('.dz-tl__colhead')];
+        const cells = [...document.querySelector('.dz-tl__row[data-resource="benali"]').querySelectorAll('.dz-tl__cell')];
+        const lane = document.querySelector('.dz-tl__row[data-resource="benali"] .dz-tl__lane');
+        const slots = [...document.querySelectorAll('.dz-tl__slot')];
+        const s0900 = slots.find((x) => x.textContent === '09:00');
+        const ev = document.querySelector('.dz-tl__row[data-resource="benali"] .dz-tl__ev[data-event-id="a"]');
+        const lines = [...document.querySelectorAll('.dz-tl__line')];
+        const line0900 = lines.find((l) => Math.abs(box(l).left - box(s0900).left) < 1);
+        return {
+          colDrift: Math.max(...heads.map((h, i) => Math.abs(box(h).left - box(cells[i]).left) + Math.abs(box(h).width - box(cells[i]).width))),
+          // The event starts on the 09:00 head and is 45 minutes long: 1.5 half-hour slots.
+          evDrift: Math.abs(box(ev).left - box(s0900).left),
+          evSlots: box(ev).width / box(s0900).width,
+          lineAt0900: Boolean(line0900),
+          laneLeftOfArea: box(lane).left - box(cells[cells.length - 1]).right,
+        };
+      });
+      check('timeline: the area’s heads over their cells (≤ 2 px)', geo.colDrift <= 2, JSON.stringify(geo));
+      check('timeline: an event starts on its slot’s head and is as long as it lasts (45 min = 1.5 slots)', geo.evDrift <= 1.5 && Math.abs(geo.evSlots - 1.5) < 0.05 && geo.lineAt0900, JSON.stringify(geo));
+      const v = await axeViolations(p, '.dz-cal');
+      check('axe: the resource timeline (tree, groups) has no violation', v.length === 0, v.join('\n'));
+      // Scrolled along and down: the area stays at the left, the heads at the top.
+      await p.evaluate(() => { const sc = document.querySelector('.dz-tl__scroller'); sc.scrollLeft += 600; sc.scrollTop += 120; });
+      await p.waitForTimeout(120);
+      const sticky = await p.evaluate(() => {
+        const sc = document.querySelector('.dz-tl__scroller').getBoundingClientRect();
+        const area = document.querySelector('.dz-tl__row .dz-tl__area').getBoundingClientRect();
+        const head = document.querySelector('.dz-tl__head').getBoundingClientRect();
+        return { area: Math.round(area.left - sc.left), head: Math.round(head.top - sc.top) };
+      });
+      check('timeline: scrolled along and down, the area sticks to the left and the heads to the top', Math.abs(sticky.area) <= 1 && Math.abs(sticky.head) <= 1, JSON.stringify(sticky));
+      await p.evaluate(() => window.__cal.update({ view: 'resourceTimelineDay' }));
+      // A drag from one row to another, an hour later.
+      await p.evaluate(() => document.querySelector('.dz-tl__row[data-resource="benali"]').scrollIntoView({ block: 'center' }));
+      await p.evaluate(() => { const sc = document.querySelector('.dz-tl__scroller'); sc.scrollLeft = 0; });
+      await p.evaluate(() => window.__cal.update({ view: 'resourceTimelineWeek' }));
+      await p.evaluate(() => window.__cal.update({ view: 'resourceTimelineDay' }));
+      await p.waitForTimeout(150);
+      const b = await p.locator('.dz-tl__row[data-resource="benali"] .dz-tl__ev[data-event-id="a"]').boundingBox();
+      const to = await p.locator('.dz-tl__row[data-resource="martin"] .dz-tl__lane').boundingBox();
+      const slotW = (await p.locator('.dz-tl__slot').first().boundingBox()).width;
+      await p.mouse.move(b.x + 6, b.y + 6);
+      await p.mouse.down();
+      await p.mouse.move(b.x + 20, b.y + 20, { steps: 4 });
+      await p.mouse.move(b.x + 6 + 2 * slotW, to.y + 12, { steps: 10 });
+      await p.mouse.up();
+      await p.waitForTimeout(200);
+      const moved = await p.evaluate(() => { const e = window.__cal.kernel.store.snapshot.getEvent('a'); return `${e.resourceIds.join()} ${String(e.start).slice(11, 16)}`; });
+      check('timeline: a drag moves the event to the other row, an hour later', moved === 'martin 10:00', moved);
+      // The keyboard: down is the next resource.
+      await p.locator('.dz-tl__cursor').first().focus();
+      // Home is the first resource's row (Cardiologie): down is Dre Benali's.
+      await p.keyboard.press('ArrowDown');
+      const label = await p.evaluate(() => document.activeElement.getAttribute('aria-label'));
+      check('timeline: down goes to the next resource’s row, and says so', label.startsWith('Dre Benali, '), label);
+      // "+N" in the room's row: its hidden examinations in the panel.
+      await p.evaluate(() => document.querySelector('.dz-tl__row[data-resource="irm"]').scrollIntoView({ block: 'center' }));
+      await p.locator('.dz-more--tl').first().click();
+      const listed = await p.locator('.dz-pop .dz-bar').count();
+      check('timeline: "+N" opens the hidden events', listed >= 1, String(listed));
+      await p.keyboard.press('Escape');
+      await p.screenshot({ path: join(root, 'node_modules', '.cache', 'dzcalendar', 'captures', 'timeline-day.png'), clip: { x: 0, y: 0, width: 1400, height: 950 } });
+      // The week: Sunday 25 October is 25 hours wide, the Monday 24; 02:00 twice, the second marked.
+      await p.evaluate(() => window.__cal.update({ view: 'resourceTimelineWeek' }));
+      await p.waitForTimeout(150);
+      const week = await p.evaluate(() => {
+        const sc = document.querySelector('.dz-tl__scroller');
+        const len = Number(getComputedStyle(document.querySelector('.dz-tl')).getPropertyValue('--dz-tl-len'));
+        const groups = [...document.querySelectorAll('.dz-tl__group')].map((g) => Number(g.style.getPropertyValue('--w')));
+        sc.scrollLeft = sc.scrollWidth;
+        return { len, groups };
+      });
+      await p.waitForTimeout(150);
+      const twice = await p.evaluate(() => [...document.querySelectorAll('.dz-tl__slot')].filter((x) => x.title.startsWith('02:00 (')).map((x) => `${x.firstChild.textContent} ${x.title}`));
+      check('timeline: the week is 169 hours wide, its last day 25', week.len === 169 && week.groups.includes(25), JSON.stringify(week));
+      check('timeline: on 25 October, 02:00 twice — the second marked, each with its offset', twice.join(' | ') === '02:00 02:00 (+02:00) | 02:00* 02:00 (+01:00)', twice.join(' | '));
+      const vw = await axeViolations(p, '.dz-cal');
+      check('axe: the resource timeline week has no violation', vw.length === 0, vw.join('\n'));
+      await p.evaluate(() => window.__cal.update({ view: 'resourceTimelineMonth' }));
+      await p.waitForSelector('.dz-tl--days');
+      const vm = await axeViolations(p, '.dz-cal');
+      check('axe: the resource timeline month has no violation', vm.length === 0, vm.join('\n'));
+      // A year counted in days opens on today (21 October), two days before it.
+      await p.evaluate(() => window.__cal.update({ view: 'resourceTimelineYear' }));
+      await p.waitForTimeout(200);
+      const year = await p.evaluate(() => {
+        const sc = document.querySelector('.dz-tl__scroller');
+        const len = Number(getComputedStyle(document.querySelector('.dz-tl')).getPropertyValue('--dz-tl-len'));
+        const slotPx = (document.querySelector('.dz-tl__sheet').getBoundingClientRect().width - document.querySelector('.dz-tl__corner').getBoundingClientRect().width) / len;
+        return Math.round(sc.scrollLeft / slotPx);
+      });
+      // 21 October is day 294 of 2026 (index 293); two before: 291 (the 29 March day is an hour short, so a little less).
+      check('timeline: a year opens on today', year >= 290 && year <= 291, String(year));
+      // Right to left: the area on the right, time running leftwards.
+      await p.evaluate(() => window.__cal.update({ view: 'resourceTimelineDay', locale: 'ar' }));
+      await p.waitForTimeout(200);
+      const rtl = await p.evaluate(() => {
+        const box = (el) => el.getBoundingClientRect();
+        const area = box(document.querySelector('.dz-tl__row .dz-tl__area'));
+        const lane = box(document.querySelector('.dz-tl__row .dz-tl__lane'));
+        return { areaRight: area.left > lane.left };
+      });
+      check('timeline: right to left, the area is on the right of the time', rtl.areaRight, JSON.stringify(rtl));
+      check('timeline: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
     // Beside a framework's global reset (the real files: Tailwind 3's preflight, Bootstrap 5's reboot;
     // Tailwind 4's is the same preflight in @layer base). The calendar must look as it does on a bare page:
     // every element's boxes and colours compared with the bare page's, element by element.

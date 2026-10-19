@@ -4,19 +4,14 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–14 and 15a, each committed (`git log --oneline`: the
-  last is titled "Phase 15a"). Every check green at that commit: `npm test`
-  (1 072), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
-  `test:browser` (147), `perf:browser`, `test:package`.
-- **Now:** Phase 15, split in two by the owner (2026-10-18): **15a**
-  resource model + resource columns (timeGrid/dayGrid by resource), then
-  **15b** timeline + 2D windowing. Decisions validated: see
-  "Phase 15 — owner's decisions" below.
-- **15a done** (commit titled "Phase 15a"). **Next: 15b** — the timeline
-  (with and without resources, `elapsed` axis, two labelled 02:00s, the
-  resource area with tree, groups and field columns, 2D windowing, budget
-  G.2 500 × 10 000, `treegrid`) in a new `@dzcalendar/pro`; its design
-  decisions are to be validated with the owner first.
+- **Done:** Phases 0–15, each committed (`git log --oneline`: the last is
+  titled "Phase 15b"). Every check green at that commit: `npm test`
+  (1 125), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
+  `test:browser` (161), `perf:browser`, `test:package`.
+- **15a and 15b done** (commits titled "Phase 15a", "Phase 15b"): Phase
+  15 complete. **Next: Phase 16** — Pro print / export / editor, slot
+  capacity, pro-angular (`ARCHITECTURE.md` J); its design decisions are to
+  be validated with the owner first.
 - **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
   that URL; the owner authorised pushing on 2026-10-18).
 - **Left after it:** 16 Pro print / export /
@@ -1283,7 +1278,7 @@ See `ARCHITECTURE.md` J. Phase 14.
   the Phase 13 and Phase 14 commits (noise around a tight budget, not a
   regression); the budget is left as it is.
 
-## Phase 15 — Pro, resources and timeline (in progress)
+## Phase 15 — Pro, resources and timeline ✅ (2026-10-19)
 
 See `ARCHITECTURE.md` J. Phase 15.
 
@@ -1315,6 +1310,15 @@ See `ARCHITECTURE.md` J. Phase 15.
   + 3 % (core 39.4 kB, dom 41.7 kB, locales/ar 2.2 kB); Chrome's first
   `timeGridWeek:U` frame 27 ms (26 measured; 25–27 at the Phase 14 commit,
   a budget at its edge).
+
+- **15b decisions (2026-10-19):** eight timeline views — day, week, month,
+  year, each with resources (`resourceTimelineDay`…) and without
+  (`timelineDay`…); default slots: day 30 min, week 1 h (horizontal scroll,
+  days above the hours), month and year 1 day (configurable); rows of a
+  **fixed height with "+N"** past N lanes (not growing rows); an optional
+  "Unassigned" row (`showUnassigned`, off by default) for events on no
+  resource or an unknown one — dropping there removes the resource,
+  dragging out assigns one — also offered to the column views.
 
 ### 15a — resource columns ✅ (2026-10-18)
 
@@ -1368,14 +1372,79 @@ See `ARCHITECTURE.md` J. Phase 15.
 **Not done on purpose**
 - Dates above resources; per-column zones (K.6); horizontal scrolling of
   many resource columns (use the day view or the timeline).
-- An "unassigned" column; `unknown-resource` for events (resources may
-  arrive after events).
+- `unknown-resource` for events (resources may arrive after events). (The
+  "Unassigned" column came in 15b, `showUnassigned`.)
 - `resource.set` as an undoable command (`setResources` is data, like
   `setEvents`).
-- Row state (expanded, collapsed groups) in the kernel, windowed
-  per-resource rows, an overlap check indexed by resource, `didMount` /
-  `willUnmount` for resource heads, a resource click: with the timeline
-  (15b).
+- Windowed per-resource rows, an overlap check indexed by resource,
+  `didMount` / `willUnmount` for resource heads, a resource click: see 15b's
+  "Not done on purpose" (row state in the kernel came in 15b).
 - Slots stay instants: a resource's zone is not given to `findSlots`.
 - ical's size (7.9 kB against 7.5) was already over before this phase:
   left for the owner.
+
+### 15b — the timeline ✅ (2026-10-19)
+
+**Built**
+- `@dzcalendar/pro` (MIT for now): `timeline/axis.ts` (elapsed axis cut on
+  the wall clock: 23/24/25-hour days at their width, 02:00 twice on a
+  fall-back night), `model.ts` (rows: resources, groups, "Unassigned", or one
+  row without resources; fixed height with "+N"; shading per resource zone,
+  memoised; row bodies reused across folds; fine update by touched
+  resource), `family.ts` (the eight views, registered with every kernel),
+  `view.ts` (one scroller, sticky area and heads, windowing on both axes,
+  treegrid, area columns with resizers, gestures, keyboard, menu, "+N"
+  panel), `styles.ts`; `@dzcalendar/pro/model` without a DOM.
+- Core: `UNASSIGNED` and `instancesOf`, `showUnassigned` (column views too),
+  `collapsedResources` / `collapsedGroups`, `timeline` options with
+  `assertTimeline`, `registerViewSpec`, keymap grid `'timeline'`,
+  `keepAllDay`.
+- DOM: horizontal scroll in gestures (scrollX, autoscroll past the sticky
+  area, period change only at the scroll's end), `viewOptions`,
+  `onResourceToggle`, `update({ timeline, collapsedResources,
+  collapsedGroups, showUnassigned })`, shared event-node selectors; words
+  `unassigned`, `resource`, the timeline views' names (5 languages).
+- Tests: `pro/test/timeline.test.ts` (axis, model, kernel),
+  `pro/test/dom/timeline-dom.test.ts`, conformance `timeline-axis` (11 hand
+  cases from the zones' published rules), 14 Chrome checks
+  (`playground/timeline.html`, capture `timeline-day.png`), browser perf
+  `resourceTimelineWeek:U:500`, `:W:500`, `resourceTimelineMonth:U:500`,
+  `timelineDay:U` (first frame, script per frame, longest frame), bench
+  `timeline week model (500 × 10k W)`.
+- Docs: `docs/timeline.md`, `docs/behaviors/timeline.md`.
+
+**Reviews fixed**
+- The "Unassigned" sentinel reached `onDateClick` and `onSelect`.
+- An all-day event dragged in an hourly timeline became timed (data loss):
+  `keepAllDay`.
+- Treegrid: levels under groups, `aria-colcount`/`aria-colindex`, header
+  row index, a named first column head, the repeated 02:00 said with its
+  offset (not by a tooltip), the separators one tab stop.
+- Right to left, dragging to the edge never changed period.
+- Month and year opened on the 1st, not today.
+- The cursor vanished when its row was folded, and kept the old scale's
+  place after a scale change.
+- A dragged width stuck to the column's index, not its field; an area
+  wider than the scroller left no time (40–480 px per column).
+- A day the zone skipped was blank: said now.
+- Autoscroll zones over the sticky area and heads; bad `slot`/`maxLanes`
+  silently guessed (now a RangeError); the fold rebuilt every row; shading
+  computed per row; the scroll measure averaged away spikes (longest frame
+  measured); `update()` could not change the timeline keys; no fold
+  callback; ↑/↓ did nothing on a focused event.
+
+**Not done on purpose**
+- A row builder windowed by resource (rows are all built, reused across
+  folds; 500 × 10 000 is 38 ms worst in Chrome).
+- An overlap check indexed by resource during a drag; a drag-validation
+  bench; month/year benches with business hours.
+- `didMount`/`willUnmount` and a click for resource heads; area widths kept
+  beyond the view's life (no `onAreaResize`); Shift+↑/↓ selection across
+  rows.
+- `visible2D` (the view windows itself), a split of `view.ts` into area /
+  windowing modules.
+- `perf:browser`'s "update" lines are one sample (not a median): one run
+  read `timeGridWeek:U update` 20 ms, three reruns 2–3 ms — a spike, not a
+  regression; a median there is left for later.
+- Owner's budget raises (measured + 3 %): pro 14.1 kB, locales ar 2.3, es
+  1.9, de 1.9 kB. ical (7.9 against 7.5) is still as it was before Phase 15.

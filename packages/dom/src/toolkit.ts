@@ -18,3 +18,6 @@ export { createDayGridView } from './views/daygrid.js';
 export { RowWindow, onScrollFrame } from './render/window.js';
 export { NodePool } from './render/pool.js';
 export { altDate } from './render/alt.js';
+export { resourceName, noResourcesNote } from './render/resource-heads.js';
+export { handles } from './interact/handles.js';
+export type { ResourceContentCtx, ResourceHooks } from './host.js';

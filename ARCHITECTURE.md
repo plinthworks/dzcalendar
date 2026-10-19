@@ -68,6 +68,16 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 15b (détail dans ROADMAP.md)
+
+- **Paquet** : `@dzcalendar/pro` = `model-entry.ts` (axe, modèle, famille, vues ; pur, sous-entrée `@dzcalendar/pro/model`) + `timeline/view.ts` + `styles.ts` (`TIMELINE_CSS`). L'import enregistre la famille `timeline` et ses huit vues : registre `registerViewSpec` dans core (les noyaux créés après les connaissent). 13,7 ko (budget 14,1, mesure + 3 %).
+- **C.3 réalisé** : axe toujours `elapsed` (position = temps réel ; jours de 23/24/25 h à leur largeur), créneaux coupés à l'heure murale (`resolveWall` les jours de changement) ; une graduation répétée est vue « 02:00* » et dite « 02:00 (+01:00) » (texte masqué + `title`), conformément à D.6 ; un créneau horaire peut couvrir 90 min à Lord Howe (largeur vraie). Suite de conformité `timeline-axis` (11 cas : Paris, Lord Howe, São Paulo 2018, La Havane, Dublin, Kolkata, Apia 2011).
+- **B.15** : pas de `Hit` `time` : la timeline donne des `slot` (instant) ou des `day` (échelle en jours) ; `stepHit` lit les `slots` d'un `day` comme des jours ; `KeyContext.grid` = `'timeline'` (←/→ le temps, ↑/↓ intention `across` : la ressource voisine ; sur un événement, ↑/↓ = l'événement voisin) ; `InteractionContext.keepAllDay` (pas de rangée « journée ») : un événement journée reste journée, déplacé par jours ; « Non assigné » (`UNASSIGNED`, sentinelle `\u0000…`) : y déposer retire la ressource saisie, en sortir attribue ; il n'atteint jamais l'application (`DateClick`, `Selection`, hooks).
+- **B.18** : `ModelOptions.timeline` (`slot`, `maxLanes`, `fillLanes` ; `assertTimeline` refuse une valeur illisible), `showUnassigned`, `collapsedResources`, `collapsedGroups` (l'état de l'arbre vit dans le kernel) ; `update()` les accepte ; `onResourceToggle` rapporte l'état ; `RowState.collapsed`. Modèle : lignes `resource | group | all`, hauteur fixe + « +N » (décision), ombrage par (heures, zone) mémorisé, corps de lignes réutilisés d'un pli à l'autre (même instantané, même échelle).
+- **D** : `InteractionSurface.family` `'timeline'`, `hitAt`/`boxesFor(…, scrollX)`, `insets()`, `KeyboardSurface.hitGrid()` ; `EVENT_NODE`/`BACKGROUND_NODE` partagés ; défilement horizontal suivi, autoscroll horizontal, navigation de bord seulement au bout du défilement (900 ms, comme le mois) ; `CalendarOptions.viewOptions` (options d'une famille de plugin : `viewOptions.timeline.areaColumns`) ; `treegrid` (`aria-level` décalé sous un groupe, `aria-rowindex`, `aria-colcount`/`aria-colindex`), deux arrêts de tabulation (têtes de lignes, curseur) + un pour les séparateurs de colonnes (↑/↓ entre eux), largeur 40–480 px par champ ; jour sauté : `dayDoesNotExist`.
+- **G.2** : 500 × 10 000, premier rendu 19 ms réparti sur l'année / 38 ms tout dans la semaine (≤ 80), défilement ≤ 1,1 ms de script par frame, plus longue frame ≤ 25 ms ; rien n'est monté avant la mesure de l'échelle.
+- **Non fait, consigné** : constructeur de lignes fenêtré (le modèle construit toutes les lignes, réutilisées d'un pli à l'autre) ; vérification de chevauchement indexée par ressource pendant un glisser ; `didMount`/`willUnmount` et clic de ressource ; Maj+↑/↓ entre lignes ; bancs mois/année avec heures d'ouverture et glisser.
+
 ### Ajustements après la Phase 15a (détail dans ROADMAP.md)
 
 - **Décisions du propriétaire (15a)** : vue ressource sans ressource → message « Aucune ressource » (`noResources`) ; événements sans ressource ou sur une ressource inconnue → absents des vues ressource (colonne « non assigné » à rediscuter avec la timeline) ; clavier : ←/→ restent dans les jours d'une ressource, **Alt+←/→** passent à la ressource voisine au même jour et à la même heure (curseur et événement tenu) — nouvelle intention `across` dans `intentFor` ; budgets relevés (mesure + 3 %) : core 39,4 ko, dom 41,7 ko, locales/ar 2,2 ko, premier rendu `timeGridWeek:U` 27 ms (25–27 déjà mesurés à la Phase 14).
@@ -86,6 +96,7 @@ Ils priment sur les sections citées.
 - **Zone des ressources (15b)** : arbre, groupes par champ, plusieurs colonnes de champs à largeur réglable.
 - **K.5 tranché** : les colonnes de ressources (resource-timeGrid, resource-dayGrid) sont dans core et dom, à côté des grilles qu'elles étendent ; `@dzcalendar/pro` naît en 15b avec la timeline.
 - **K.9** : toujours tout en MIT, pas de `license.ts`.
+- **15b (2026-10-19)** : huit vues timeline (jour, semaine, mois, année, avec et sans ressources) ; graduations par défaut jour 30 min, semaine 1 h (défilement horizontal, jours au-dessus des heures), mois et année 1 jour, réglables ; rangées de **hauteur fixe avec « +N »** au-delà de N niveaux ; rangée « Non assigné » en option (`showUnassigned`, désactivée par défaut), aussi pour les vues en colonnes.
 
 ### Ajustements après la Phase 14 (détail dans ROADMAP.md)
 
@@ -957,7 +968,7 @@ Principe : **ne rendre que ce qui intersecte la fenêtre visible** (plus un over
 | multiMonth | mois (lignes de la pile ou de la grille) | Un mois hors fenêtre n'est qu'un conteneur vide à hauteur connue. |
 | timeGrid | colonnes de jours (si > N) et événements hors de la fenêtre verticale | La fenêtre verticale (heures) est petite (24 h) : on ne virtualise que si `slotMin..slotMax` est étendu. Les segments hors du viewport d'axe ne sont pas montés. |
 | custom | selon la famille | Contrat : un `ViewController` fournit `visibleWindow()`. |
-| timeline, vues ressource (Pro) | lignes ET colonnes (2D) | `visible2D`. L'en-tête de ressources et l'en-tête de temps restent synchronisés. |
+| timeline, vues ressource (Pro) | lignes ET colonnes (2D) | Réalisé en 15b par la vue elle-même (fenêtre de lignes par `PrefixSums`, fenêtre de temps en positions, par demi-écran), pas par `visible2D`. Un seul conteneur défilant : zone et en-têtes collants (`position: sticky`), donc synchronisés sans script. |
 
 L'impression désactive la virtualisation (D.9).
 
@@ -970,7 +981,7 @@ L'impression désactive la virtualisation (D.9).
   - Souris et stylet : le drag démarre au seuil, immédiatement.
   - Tactile : un tap **sélectionne** un événement (poignées de redimensionnement visibles, `aria-pressed`). Sur un événement sélectionné, le drag démarre immédiatement au doigt (`touch-action: none` posé *seulement* sur l'événement sélectionné et ses poignées). Un événement non sélectionné laisse défiler (`touch-action: pan-x pan-y`).
   - Création d'une sélection de plage au tactile : un tap pose un créneau d'une unité, avec deux poignées ajustables. Option `selectLongPress` (défaut 0, désactivé) pour ceux qui préfèrent le geste de FullCalendar.
-- **Autoscroll** (`interact/autoscroll.ts`) : boucle rAF, vitesse proportionnelle à la proximité du bord (zone de 40 px), sur le conteneur vertical du timeGrid et horizontal de la timeline.
+- **Autoscroll** (dans `interact/host.ts`, 15b) : boucle rAF, à partir du bord des rangées (la zone collante exclue, `surface.insets`),  vitesse proportionnelle à la proximité du bord (zone de 40 px), sur le conteneur vertical du timeGrid et horizontal de la timeline.
 - **Navigation par le bord** : tenir un événement près du bord gauche/droit d'un calendrier pendant 600 ms (`dragEdgeNavigate`) passe à la période suivante/précédente.
 - **Hit-testing** (`interact/hit-test.ts`) : à la première `pointermove`, une phase `read` met en cache les rectangles de colonnes/lignes visibles ; chaque `move` suivant résout un `Hit` par arithmétique (division/recherche binaire), sans `elementFromPoint` ni lecture de layout pendant le geste.
 - **Prévisualisation** : un événement « fantôme » (`ghost.ts`), positionné par variables CSS, et le surlignage de la cible. Les violations (`Proposal.valid:false`) donnent la classe `dz-event--invalid`.
@@ -1347,7 +1358,7 @@ dzcalendar/
 │  ├─ theme/
 │  │  ├─ package.json · dzcalendar.scss · dzcalendar.css (généré) · contrast.css · tailwind.css · tailwind3.css
 │  ├─ motion-gsap/          src/index.ts · flip.ts · view-transition.ts
-│  ├─ pro/                  (Phase 15+)  src/{index.ts, timeline/, resource-area/, virtual2d/, print/, export/, editor/, slots-pro/}  (resource-views : dans core/dom, K.5 ; pas de license.ts, K.9)
+│  ├─ pro/                  (Phase 15+)  src/{index.ts, model-entry.ts, timeline/{axis,model,family,view,styles}.ts, print/, export/, editor/, slots-pro/}  (resource-views : dans core/dom, K.5 ; zone des ressources et fenêtrage 2D dans timeline/view.ts, 15b ; pas de license.ts, K.9)
 │  └─ pro-angular/          (Phase 16)
 ├─ playground/
 │  ├─ index.html (Angular) · vanilla.html · tailwind.html · dst.html (4 zones côte à côte) · perf.html · a11y.html
@@ -1450,7 +1461,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 - **Dépend de** : P5 (disponibilités récurrentes), P2.
 
 ### Phase 15 : Pro, ressources et timeline
-- **Livrables / fichiers** : 15a `core/resource/*` + colonnes de ressources dans `core/views` et `dom/views` (K.5) ; 15b `pro/{timeline,resource-area,virtual2d}`.
+- **Livrables / fichiers** : 15a `core/resource/*` + colonnes de ressources dans `core/views` et `dom/views` (K.5) ; 15b `pro/{model-entry,timeline/{axis,model,family,view,styles}}` (zone et fenêtrage 2D dans la vue).
 - **Acceptation** : timeline avec et sans ressources ; arbre et groupes ; axe `elapsed` : colonnes de largeur 23/24/25 h exactes ; deux « 02:00 » étiquetés ; budget timeline G.2 (500×10 000) ; resource-timeGrid et resource-dayGrid ; accessibilité `treegrid`.
 - **Dépend de** : P12, P7.
 

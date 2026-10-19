@@ -18,7 +18,7 @@ import { createEventStore } from './store/store.js';
 import type { EventStore, StoreSnapshot } from './store/store.js';
 import { Temporal } from './temporal.js';
 import type { Instant, PlainDate, Weekday, ZoneId } from './temporal.js';
-import { BUILTIN_VIEWS } from './views/builtin.js';
+import { BUILTIN_VIEWS, registeredViewSpecs } from './views/builtin.js';
 import { buildDayGridModel, updateDayGridModel } from './views/daygrid.js';
 import type { DayGridModel, DayGridOptions } from './views/daygrid.js';
 import { navigate } from './views/nav.js';
@@ -33,15 +33,30 @@ import { buildResourceTree } from './resource/tree.js';
 import { columnResources } from './resource/rows.js';
 import type { ColumnResources } from './resource/rows.js';
 import type { ResourceInput, ResourceOrder, ResourceTree } from './resource/types.js';
+import { UNASSIGNED_RESOURCE } from './resource/owners.js';
 
 /** Options that shape the models; changeable at any time with `setOptions`. */
 export interface ModelOptions {
   readonly timeGrid?: Omit<TimeGridOptions, 'displayZone' | 'businessHours' | 'availableSlots' | 'resources' | 'resourceGroups'>;
   readonly dayGrid?: Omit<DayGridOptions, 'displayZone' | 'businessHours' | 'showNonCurrentDates' | 'resources' | 'resourceGroups'>;
+  /** A timeline's scale and rows (the Pro's family reads them). */
+  readonly timeline?: {
+    /** Minutes per slot (dividing a day) or 'day'. Default: 30 for a day, 60 up to a week, days beyond. */
+    readonly slot?: number | 'day';
+    /** Lanes a resource row shows before "+N". Default 3. */
+    readonly maxLanes?: number;
+    /** Lanes of a timeline without resources (its one row fills the view: the DOM measures it). Default 12. */
+    readonly fillLanes?: number;
+  };
   /** How sibling resources are ordered after their `order`: field names (`'-title'` descending) or a comparison. */
   readonly resourceOrder?: ResourceOrder | undefined;
   /** Resource views group their columns (a timeline its rows) by this field: a head over each run. */
   readonly resourceGroupField?: string | undefined;
+  /** Resource views add an "Unassigned" column (a timeline a row) first, for events on no known resource. Default false. */
+  readonly showUnassigned?: boolean;
+  /** A timeline's rows: resources whose children are hidden, groups shut. Default: everything open. */
+  readonly collapsedResources?: readonly string[];
+  readonly collapsedGroups?: readonly string[];
   readonly businessHours?: BusinessHoursInput;
   /** Bookable slots drawn in the time grid (compared by identity: a new array redraws). */
   readonly availableSlots?: readonly AvailableSlot[] | null;
@@ -115,8 +130,12 @@ export function registerModelFamily<M>(family: string, f: ModelFamily<M>): void 
   FAMILIES.set(family, f as ModelFamily);
 }
 
-/** A resource view's columns, for the families that draw them. */
-const resourceOpts = (view: ViewSpec, columns: ColumnResources) => (view.resources ? { resources: columns.resources, resourceGroups: columns.groups } : {});
+/** A resource view's columns, for the families that draw them ("Unassigned" first when asked: the groups move one along). */
+function resourceOpts(view: ViewSpec, columns: ColumnResources, options: ModelOptions) {
+  if (!view.resources) return {};
+  if (!options.showUnassigned) return { resources: columns.resources, resourceGroups: columns.groups };
+  return { resources: [UNASSIGNED_RESOURCE, ...columns.resources], resourceGroups: columns.groups.map((g) => ({ ...g, from: g.from + 1 })) };
+}
 
 registerModelFamily<TimeGridModel>('timeGrid', {
   build: (range, snap, { displayZone, view, options, columns }) =>
@@ -125,7 +144,7 @@ registerModelFamily<TimeGridModel>('timeGrid', {
       displayZone,
       ...(options.businessHours !== undefined && { businessHours: options.businessHours }),
       ...(options.availableSlots && { availableSlots: options.availableSlots }),
-      ...resourceOpts(view, columns),
+      ...resourceOpts(view, columns, options),
     }),
   update: updateTimeGridModel,
 });
@@ -136,7 +155,7 @@ registerModelFamily<DayGridModel>('dayGrid', {
       displayZone,
       showNonCurrentDates: view.showNonCurrentDates,
       ...(options.businessHours !== undefined && { businessHours: options.businessHours }),
-      ...resourceOpts(view, columns),
+      ...resourceOpts(view, columns, options),
     }),
   update: updateDayGridModel,
 });
@@ -219,6 +238,19 @@ export interface CalendarKernel {
 
 const systemNow = (): Instant => Temporal.Now.instant();
 
+/** A timeline's scale and lanes that cannot be taken are a configuration error, said before anything changes. */
+export function assertTimeline(t: NonNullable<ModelOptions['timeline']>): void {
+  const s = t.slot;
+  if (s !== undefined && s !== 'day' && !(Number.isInteger(s) && s >= 1 && 1440 % s === 0)) throw new RangeError(`timeline.slot must be whole minutes dividing a day (5, 15, 30, 60…) or 'day': ${String(s)}`);
+  for (const k of ['maxLanes', 'fillLanes'] as const) {
+    const v = t[k];
+    if (v !== undefined && !(Number.isInteger(v) && v >= 1)) throw new RangeError(`timeline.${k} must be a whole number ≥ 1: ${String(v)}`);
+  }
+}
+
+/** Two id lists are the same set. */
+const sameIds = (a: readonly string[] | undefined, b: readonly string[] | undefined) => [...(a ?? [])].sort().join('\u0000') === [...(b ?? [])].sort().join('\u0000');
+
 /** Two orders are the same when they are the same function, or the same fields. */
 const sameOrder = (a: ResourceOrder | undefined, b: ResourceOrder | undefined) =>
   a === b || (typeof a !== 'function' && typeof b !== 'function' && a !== undefined && b !== undefined && [a].flat().join() === [b].flat().join());
@@ -231,7 +263,8 @@ const sameOrder = (a: ResourceOrder | undefined, b: ResourceOrder | undefined) =
 export function createKernel(o: KernelOptions): CalendarKernel {
   if (!isValidZone(o.timeZone)) throw new RangeError(`timeZone is not a time zone: ${o.timeZone}`);
   if (o.businessHours !== undefined) assertBusinessHours(o.businessHours);
-  const views = { ...BUILTIN_VIEWS, ...o.views };
+  if (o.timeline) assertTimeline(o.timeline);
+  const views = { ...BUILTIN_VIEWS, ...registeredViewSpecs(), ...o.views };
   const now = o.now ?? systemNow;
   const store = o.store ?? createEventStore();
   const listeners = new Set<(e: KernelEvent) => void>();
@@ -242,11 +275,15 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   let options: ModelOptions = {
     ...(o.timeGrid && { timeGrid: o.timeGrid }),
     ...(o.dayGrid && { dayGrid: o.dayGrid }),
+    ...(o.timeline && { timeline: o.timeline }),
     ...(o.businessHours !== undefined && { businessHours: o.businessHours }),
     ...(o.hiddenDays && { hiddenDays: o.hiddenDays }),
     ...(o.availableSlots && { availableSlots: o.availableSlots }),
     ...(o.resourceOrder !== undefined && { resourceOrder: o.resourceOrder }),
     ...(o.resourceGroupField !== undefined && { resourceGroupField: o.resourceGroupField }),
+    ...(o.showUnassigned !== undefined && { showUnassigned: o.showUnassigned }),
+    ...(o.collapsedResources && { collapsedResources: o.collapsedResources }),
+    ...(o.collapsedGroups && { collapsedGroups: o.collapsedGroups }),
   };
   const todayIn = (zone: ZoneId) => now().toZonedDateTimeISO(zone).toPlainDate();
   let date = o.initialDate ?? todayIn(timeZone);
@@ -428,17 +465,22 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     },
     setOptions(next) {
       if (next.businessHours !== undefined) assertBusinessHours(next.businessHours);
+      if (next.timeline) assertTimeline(next.timeline);
       // Equal values (per key, one level deep) change nothing and say nothing.
       const same = (a: object | undefined, b: object | undefined) =>
         a === b || (a !== undefined && b !== undefined && Object.entries(b).every(([k, v]) => (a as Record<string, unknown>)[k] === v));
       if (
         (!next.timeGrid || same(options.timeGrid, next.timeGrid)) &&
         (!next.dayGrid || same(options.dayGrid, next.dayGrid)) &&
+        (!next.timeline || same(options.timeline, next.timeline)) &&
         (!('businessHours' in next) || next.businessHours === options.businessHours) &&
         (!('availableSlots' in next) || next.availableSlots === options.availableSlots) &&
         (!('hiddenDays' in next) || [...(next.hiddenDays ?? [])].sort().join() === [...(options.hiddenDays ?? [])].sort().join()) &&
         (!('resourceOrder' in next) || sameOrder(next.resourceOrder, options.resourceOrder)) &&
-        (!('resourceGroupField' in next) || next.resourceGroupField === options.resourceGroupField)
+        (!('resourceGroupField' in next) || next.resourceGroupField === options.resourceGroupField) &&
+        (!('showUnassigned' in next) || next.showUnassigned === options.showUnassigned) &&
+        (!('collapsedResources' in next) || sameIds(next.collapsedResources, options.collapsedResources)) &&
+        (!('collapsedGroups' in next) || sameIds(next.collapsedGroups, options.collapsedGroups))
       ) {
         return;
       }
@@ -447,11 +489,15 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         ...options,
         ...(next.timeGrid && { timeGrid: { ...options.timeGrid, ...next.timeGrid } }),
         ...(next.dayGrid && { dayGrid: { ...options.dayGrid, ...next.dayGrid } }),
+        ...(next.timeline && { timeline: { ...options.timeline, ...next.timeline } }),
         ...('businessHours' in next && { businessHours: next.businessHours }),
         ...('hiddenDays' in next && { hiddenDays: next.hiddenDays }),
         ...('availableSlots' in next && { availableSlots: next.availableSlots }),
         ...('resourceOrder' in next && { resourceOrder: next.resourceOrder }),
         ...('resourceGroupField' in next && { resourceGroupField: next.resourceGroupField }),
+        ...('showUnassigned' in next && { showUnassigned: next.showUnassigned }),
+        ...('collapsedResources' in next && { collapsedResources: next.collapsedResources }),
+        ...('collapsedGroups' in next && { collapsedGroups: next.collapsedGroups }),
       } as ModelOptions;
       if ('resourceOrder' in next || 'resourceGroupField' in next) buildResources();
       view = effectiveOf(raw);

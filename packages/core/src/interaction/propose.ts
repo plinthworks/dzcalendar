@@ -1,6 +1,7 @@
 import { DEFAULT_TIMED_DURATION } from '../event/defaults.js';
 import type { CalEvent, ResourceId } from '../event/types.js';
 import { validateProposal } from '../rules/validate.js';
+import { UNASSIGNED } from '../resource/owners.js';
 import type { Placement, RulesContext, Violation } from '../rules/validate.js';
 import type { EventInstance, StoreSnapshot } from '../store/store.js';
 import type { Command } from '../commands/types.js';
@@ -38,6 +39,11 @@ export interface InteractionContext {
   readonly defaultTimedDuration?: Duration;
   /** A series moving as a whole does not collide with itself (scope chosen beforehand). */
   readonly movingSeries?: string;
+  /**
+   * The view has no all-day row (a timeline): an all-day event dropped on a
+   * moment stays all-day and moves by whole days, rather than becoming timed.
+   */
+  readonly keepAllDay?: boolean;
 }
 
 /** Where an event would go, and whether it may. The same for every input device. */
@@ -91,6 +97,9 @@ function resourcesFor(ev: CalEvent, grab: Hit, over: Hit): readonly ResourceId[]
   const to = over.resourceId;
   if (to === undefined || to === grab.resourceId) return ev.resourceIds;
   const from = grab.resourceId;
+  // Onto "Unassigned": the resource it was taken from goes (the others stay). Out of it: onto the one it is dropped on.
+  if (to === UNASSIGNED) return from === undefined ? [] : ev.resourceIds.filter((r) => r !== from);
+  if (from === UNASSIGNED) return [to];
   if (from === undefined || !ev.resourceIds.includes(from)) return [to];
   const out = ev.resourceIds.map((r) => (r === from ? to : r));
   return out.filter((r, i) => out.indexOf(r) === i);
@@ -106,6 +115,11 @@ function resourcesFor(ev: CalEvent, grab: Hit, over: Hit): readonly ResourceId[]
  * time grid, a day event becomes timed.
  */
 export function proposeMove(ctx: InteractionContext, ev: CalEvent, grab: Hit, over: Hit): Proposal {
+  if (ev.allDay && ctx.keepAllDay && over.kind === 'slot') {
+    // No all-day row to drop it on: the day under the pointer, as in a month.
+    const day = (h: Hit): Hit => (h.kind === 'slot' ? { kind: 'day', date: h.date, ...(h.resourceId !== undefined && { resourceId: h.resourceId }) } : h);
+    return proposeMove(ctx, ev, day(grab), day(over));
+  }
   const resourceIds = resourcesFor(ev, grab, over);
   if (over.kind === 'slot') {
     if (ev.allDay) {
@@ -216,7 +230,8 @@ export interface Selection {
 
 /** The stretch between two hits, in either order: whole days over days, snapped moments over slots. */
 export function selectionBetween(ctx: InteractionContext, a: Hit, b: Hit): Selection {
-  const resource = a.resourceId !== undefined ? { resourceId: a.resourceId } : {};
+  // "Unassigned" is the view's, not a resource: a selection there is on none.
+  const resource = a.resourceId !== undefined && a.resourceId !== UNASSIGNED ? { resourceId: a.resourceId } : {};
   if (a.kind === 'day' || b.kind === 'day') {
     const [d1, d2] = Temporal.PlainDate.compare(a.date, b.date) <= 0 ? [a.date, b.date] : [b.date, a.date];
     return { start: d1, end: d2.add({ days: 1 }), allDay: true, ...resource };

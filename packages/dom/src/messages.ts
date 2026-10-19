@@ -100,6 +100,10 @@ export interface DzMessages {
   readonly noEvents: string;
   /** A resource view without any resource (none given, or not loaded yet). */
   readonly noResources: string;
+  /** The column (or timeline row) of events on no known resource (`showUnassigned`). */
+  readonly unassigned: string;
+  /** The head of a timeline's resource column, when the application names none. */
+  readonly resource: string;
   /** A week number, short (in a cell) and spoken. */
   weekShort(parts: { week: number }): string;
   weekLabel(parts: { week: number }): string;
@@ -133,7 +137,7 @@ export const EN: DzMessages = {
   moreLink: ({ count }) => `+${count} more`,
   moreLabel: ({ count, date }) => `${count} more ${count === 1 ? 'event' : 'events'}, ${date}`,
   closePopover: 'Close',
-  views: { dayGridMonth: 'Month', dayGridWeek: 'Week', dayGridDay: 'Day', timeGridWeek: 'Week', timeGridDay: 'Day', listDay: 'List', listWeek: 'List', listMonth: 'List', listYear: 'List', multiMonthYear: 'Year', resourceTimeGridDay: 'Day', resourceTimeGridWeek: 'Week', resourceDayGridDay: 'Day', resourceDayGridWeek: 'Week', resourceDayGridMonth: 'Month' },
+  views: { dayGridMonth: 'Month', dayGridWeek: 'Week', dayGridDay: 'Day', timeGridWeek: 'Week', timeGridDay: 'Day', listDay: 'List', listWeek: 'List', listMonth: 'List', listYear: 'List', multiMonthYear: 'Year', resourceTimeGridDay: 'Day', resourceTimeGridWeek: 'Week', resourceDayGridDay: 'Day', resourceDayGridWeek: 'Week', resourceDayGridMonth: 'Month', timelineDay: 'Day', timelineWeek: 'Week', timelineMonth: 'Month', timelineYear: 'Year', resourceTimelineDay: 'Day', resourceTimelineWeek: 'Week', resourceTimelineMonth: 'Month', resourceTimelineYear: 'Year' },
   newEventAt: ({ time }) => `New event at ${time}`,
   newEventOn: ({ date }) => `New all-day event on ${date}`,
   dayLabel: ({ date, count }) => (count === 0 ? date : `${date}, ${count} ${count === 1 ? 'event' : 'events'}`),
@@ -177,6 +181,8 @@ export const EN: DzMessages = {
   loadFailed: 'Some events could not be loaded.',
   noEvents: 'No events to show',
   noResources: 'No resources to show',
+  unassigned: 'Unassigned',
+  resource: 'Resource',
   weekShort: ({ week }) => `W${week}`,
   weekLabel: ({ week }) => `Week ${week}`,
   goToMonth: 'Go to this month',
@@ -205,7 +211,7 @@ export const FR: DzMessages = {
   moreLink: ({ count }) => `+${count} autre${count > 1 ? 's' : ''}`,
   moreLabel: ({ count, date }) => `${count} autre${count > 1 ? 's' : ''} événement${count > 1 ? 's' : ''}, ${date}`,
   closePopover: 'Fermer',
-  views: { dayGridMonth: 'Mois', dayGridWeek: 'Semaine', dayGridDay: 'Jour', timeGridWeek: 'Semaine', timeGridDay: 'Jour', listDay: 'Liste', listWeek: 'Liste', listMonth: 'Liste', listYear: 'Liste', multiMonthYear: 'Année', resourceTimeGridDay: 'Jour', resourceTimeGridWeek: 'Semaine', resourceDayGridDay: 'Jour', resourceDayGridWeek: 'Semaine', resourceDayGridMonth: 'Mois' },
+  views: { dayGridMonth: 'Mois', dayGridWeek: 'Semaine', dayGridDay: 'Jour', timeGridWeek: 'Semaine', timeGridDay: 'Jour', listDay: 'Liste', listWeek: 'Liste', listMonth: 'Liste', listYear: 'Liste', multiMonthYear: 'Année', resourceTimeGridDay: 'Jour', resourceTimeGridWeek: 'Semaine', resourceDayGridDay: 'Jour', resourceDayGridWeek: 'Semaine', resourceDayGridMonth: 'Mois', timelineDay: 'Jour', timelineWeek: 'Semaine', timelineMonth: 'Mois', timelineYear: 'Année', resourceTimelineDay: 'Jour', resourceTimelineWeek: 'Semaine', resourceTimelineMonth: 'Mois', resourceTimelineYear: 'Année' },
   newEventAt: ({ time }) => `Nouvel événement à ${time}`,
   newEventOn: ({ date }) => `Nouvel événement le ${date}`,
   dayLabel: ({ date, count }) => (count === 0 ? date : `${date}, ${count} événement${count > 1 ? 's' : ''}`),
@@ -249,6 +255,8 @@ export const FR: DzMessages = {
   loadFailed: 'Des événements n’ont pas pu être chargés.',
   noEvents: 'Aucun événement à afficher',
   noResources: 'Aucune ressource à afficher',
+  unassigned: 'Non assigné',
+  resource: 'Ressource',
   weekShort: ({ week }) => `S${week}`,
   weekLabel: ({ week }) => `Semaine ${week}`,
   goToMonth: 'Aller à ce mois',

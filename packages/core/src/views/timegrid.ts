@@ -11,9 +11,10 @@ import { dateIndex, segmentAllDay, segmentTimed } from '../project/segment.js';
 import type { Segment, TimedSegment } from '../project/segment.js';
 import type { StoreChange } from '../store/changes.js';
 import { viewWindow } from '../store/store.js';
-import type { StoreSnapshot } from '../store/store.js';
+import type { StoreSnapshot, ViewWindow } from '../store/store.js';
 import type { DurationLike, Instant, PlainDate, ZoneId, ZonedDateTime } from '../temporal.js';
 import type { Resource } from '../resource/types.js';
+import { instancesOf } from '../resource/owners.js';
 import type { Transition } from '../zone.js';
 import { isBackground } from './daygrid.js';
 import type { ViewRange } from './spec.js';
@@ -184,8 +185,10 @@ function axisFor(date: PlainDate, o: TimeGridOptions): ColumnAxis {
   });
 }
 
-function queryOpts(o: TimeGridOptions, resource: Resource | null = null) {
-  return resource ? { resourceId: resource.id } : o.resourceId !== undefined ? { resourceId: o.resourceId } : {};
+/** What a column shows in a window: its resource's events ("Unassigned": those on no known resource), else all (or `resourceId`'s). */
+function query(snap: StoreSnapshot, w: ViewWindow, o: TimeGridOptions, resource: Resource | null = null) {
+  if (resource) return instancesOf(snap, w, resource, o.resources ?? []);
+  return snap.queryInstances(w, o.resourceId !== undefined ? { resourceId: o.resourceId } : {});
 }
 
 /** A column's key: its date, and its resource in a resource view. */
@@ -233,7 +236,7 @@ export function buildTimeGridColumn(
   if (axis.length === 0) return { key, date, resource, axis, folded: true, events: [], background: [], more: [], offHours: [], slots: [] };
 
   const day = axis.day;
-  const instances = snap.queryInstances(viewWindow(date, date.add({ days: 1 }), o.displayZone), queryOpts(o, resource));
+  const instances = query(snap, viewWindow(date, date.add({ days: 1 }), o.displayZone), o, resource);
   const order = new Map(instances.map((inst, i) => [inst.key, i]));
   const mode = o.axis ?? 'wall';
 
@@ -395,7 +398,7 @@ function buildAllDay(range: ViewRange, snap: StoreSnapshot, o: TimeGridOptions):
   // A resource view: each resource's days are its own columns, its bars its own keys.
   const owners: (Resource | null)[] = o.resources ? [...o.resources] : [null];
   owners.forEach((resource, r) => {
-    const instances = snap.queryInstances(viewWindow(range.start, range.end, o.displayZone), queryOpts(o, resource)).filter((i) => i.event.allDay);
+    const instances = query(snap, viewWindow(range.start, range.end, o.displayZone), o, resource).filter((i) => i.event.allDay);
     instances.forEach((inst, i) => order.set(inst.key, i));
     for (const inst of instances) {
       for (const seg of segmentAllDay(inst, view)) {

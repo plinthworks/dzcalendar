@@ -37,6 +37,44 @@ try {
     const ok = m.firstFrame <= budget.firstFrame && m.nodes <= budget.nodes;
     if (!ok) over++;
     console.log(`${ok ? '✓' : '✗'} ${name.padEnd(18)} ${String(m.firstFrame).padStart(5)} ms (≤ ${budget.firstFrame})  ${String(m.nodes).padStart(6)} nodes (≤ ${budget.nodes})`);
+    if (budget.scroll) {
+      // Scrolling (G.2: script ≤ 8 ms a frame): 60 frames, down and along, the script time CDP counts.
+      const p = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+      await p.goto(new URL(`perf.html?view=${view}&set=${set}${query}`, base).href);
+      await p.waitForFunction(() => window.__perf, null, { timeout: 120000 });
+      await p.waitForTimeout(300);
+      const cdp = await p.context().newCDPSession(p);
+      await cdp.send('Performance.enable');
+      const script = async () => (await cdp.send('Performance.getMetrics')).metrics.find((x) => x.name === 'ScriptDuration').value;
+      const before = await script();
+      // The longest frame too: a window mounted every half screen must not hide in the average.
+      const longest = await p.evaluate(
+        () =>
+          new Promise((resolve) => {
+            const sc = document.querySelector('.dz-tl__scroller, .dz-tg__body, .dz-dg__body, .dz-list');
+            let n = 0;
+            let last = performance.now();
+            let max = 0;
+            const step = (t) => {
+              max = Math.max(max, t - last);
+              last = t;
+              sc.scrollTop += 140;
+              sc.scrollLeft += 90;
+              if (++n < 60) requestAnimationFrame(step);
+              else requestAnimationFrame(() => resolve(Math.round(max)));
+            };
+            requestAnimationFrame((t) => {
+              last = t;
+              requestAnimationFrame(step);
+            });
+          }),
+      );
+      const perFrame = Math.round((((await script()) - before) * 1000) / 60 * 10) / 10;
+      const fine = perFrame <= budget.scroll && longest <= (budget.scrollFrame ?? Infinity);
+      if (!fine) over++;
+      console.log(`${fine ? '✓' : '✗'} ${(name + ' scroll').padEnd(18)} ${String(perFrame).padStart(5)} ms script a frame (≤ ${budget.scroll}), longest frame ${longest} ms (≤ ${budget.scrollFrame ?? '—'})`);
+      await p.close();
+    }
     if (budget.update) {
       // One event changed (G.2): the time to the next frame, and the layouts it forced (G.3: ≤ 1).
       const p = await browser.newPage({ viewport: { width: 1400, height: 950 } });

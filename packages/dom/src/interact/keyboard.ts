@@ -1,4 +1,5 @@
-import { Temporal, eventHit, formatTemporal, grabStep, heldEvent, intentFor, isUnchanged, resolveWall, selectionBetween, slotInstant, stepHit } from '@dzcalendar/core';
+import { Temporal, UNASSIGNED, eventHit, formatTemporal, grabStep, heldEvent, intentFor, isUnchanged, resolveWall, selectionBetween, slotInstant, stepHit } from '@dzcalendar/core';
+import { EVENT_NODE } from './handles.js';
 import type { AvailableSlot, CalEvent, Command, EventInstance, Hit, Intent, PlainDate, Proposal, Selection, Step, ZonedDateTime } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
 import { formatMinutes } from '../render/event.js';
@@ -53,7 +54,10 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
   if (!keys) return { grab() {}, refocus() {} };
   const root = surface.root;
   const doc = ctx.doc;
-  const grid = surface.family === 'timeGrid' ? 'time' : 'day';
+  /** How keys read here (a timeline: left/right along time, up/down the resources). */
+  const grid = surface.family === 'timeGrid' ? 'time' : surface.family === 'timeline' ? 'timeline' : 'day';
+  /** What an event's edges are as hits: moments, or days (a month, a timeline counted in days). */
+  const hits = (): 'time' | 'day' => keys.hitGrid?.() ?? (grid === 'day' ? 'day' : 'time');
   const m = () => ctx.messages;
   const rtl = () => root.closest('[dir]')?.getAttribute('dir') === 'rtl';
   const zone = () => ctx.kernel.getState().timeZone;
@@ -88,7 +92,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     return best;
   }
   /** In a resource view, whose column the cursor is in: said first ("Dr Ali, Wednesday…"). */
-  const titleOf = (id: string) => ctx.kernel.getResources().byId.get(id)?.resource.title || id;
+  const titleOf = (id: string) => (id === UNASSIGNED ? m().unassigned : ctx.kernel.getResources().byId.get(id)?.resource.title || id);
   function hitLabel(hit: Hit): string {
     const place = placeLabel(hit);
     return hit.resourceId === undefined ? place : m().ofResource({ resource: titleOf(hit.resourceId), place });
@@ -196,7 +200,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       live.onSlotClick!(free);
       return true;
     }
-    const resource = at.resourceId !== undefined ? { resourceId: at.resourceId } : {};
+    const resource = at.resourceId !== undefined && at.resourceId !== UNASSIGNED ? { resourceId: at.resourceId } : {};
     live.onDateClick?.(at.kind === 'slot' ? { allDay: false, date: at.date, instant: at.instant, ...resource } : { allDay: true, date: at.date, ...resource });
     // The keyboard's tap: the slot is selected, for "new event here" through `onSelect`.
     if (live.selectable) {
@@ -326,7 +330,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     ctx.announce(`${m().grabbed({ title })} ${kind === 'resize' ? m().grabHelpResize : m().grabHelp}${start}`);
   }
 
-  const sourcesOf = (id: string) => [...root.querySelectorAll<HTMLElement>(':is(.dz-ev, .dz-bar)[data-event-id]')].filter((n) => n.dataset['eventId'] === id);
+  const sourcesOf = (id: string) => [...root.querySelectorAll<HTMLElement>(`:is(${EVENT_NODE})[data-event-id]`)].filter((n) => n.dataset['eventId'] === id);
 
   function drawHeld(h: Held): void {
     const ev = h.event;
@@ -334,7 +338,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     for (const n of h.sources) n.classList.remove('dz-ev--source');
     h.sources = sourcesOf(h.instance.event.id);
     for (const n of h.sources) n.classList.add('dz-ev--source');
-    const edgeHit = eventHit(ev, h.kind === 'resize' ? h.edge : 'start', { displayZone: zone(), grid });
+    const edgeHit = eventHit(ev, h.kind === 'resize' ? h.edge : 'start', { displayZone: zone(), grid: hits() });
     keys!.reveal(h.resourceId !== undefined ? { ...edgeHit, resourceId: h.resourceId } : edgeHit);
     const geo = surface.measure(shared.layerOrigin());
     const span = { start: ev.start, end: ev.end, allDay: ev.allDay, resourceIds: ev.resourceIds };
@@ -350,7 +354,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     const h = held!;
     const ic = shared.interaction(h.instance);
     let landed: Hit | null | undefined = null;
-    const p = grabStep(ic, grid, h.event, { kind: 'move', step: { days: 0, slots: 0 } }, (_to, from) => (landed = keys!.stepAcross?.(from, delta)) ?? null, h.resourceId);
+    const p = grabStep(ic, hits(), h.event, { kind: 'move', step: { days: 0, slots: 0 } }, (_to, from) => (landed = keys!.stepAcross?.(from, delta)) ?? null, h.resourceId);
     if (!p) return ctx.announce(m().noFurther);
     const to = landed as Hit | null | undefined;
     if (to?.resourceId !== undefined) h.resourceId = to.resourceId;
@@ -367,12 +371,12 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     if (kind === 'move' && !ev.perms.start) return ctx.announce(m().cannotMove);
     if (kind === 'resize') {
       // A timed event in a month only moves (its hours are not drawn there), as under the pointer.
-      const resizable = ev.perms.duration && (edge === 'end' || ctx.live().eventResizableFromStart === true) && (grid === 'time' || h.event.allDay);
+      const resizable = ev.perms.duration && (edge === 'end' || ctx.live().eventResizableFromStart === true) && (hits() === 'time' || h.event.allDay);
       if (!resizable) return ctx.announce(m().cannotResize);
     }
     const ic = shared.interaction(h.instance);
     let landed: Hit | null = null;
-    const p = grabStep(ic, grid, h.event, kind === 'move' ? { kind, step: by } : { kind, edge, step: by }, (to, from) => (landed = land(from, to, by)), h.resourceId);
+    const p = grabStep(ic, hits(), h.event, kind === 'move' ? { kind, step: by } : { kind, edge, step: by }, (to, from) => (landed = land(from, to, by)), h.resourceId);
     if (!p) return ctx.announce(m().noFurther);
     // Set in the callback: TypeScript cannot see it, hence the cast.
     const to = landed as Hit | null;
@@ -526,7 +530,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       const h = held;
       const ic = shared.interaction(h.instance);
       const ev = h.event;
-      const p = h.kind === 'resize' ? grabStep(ic, grid, ev, { kind: 'resize', edge: h.edge, step: { days: 0, slots: 0 } }, () => hit, h.resourceId) : grabStep(ic, grid, ev, { kind: 'move', step: { days: 0, slots: 0 } }, () => hit, h.resourceId);
+      const p = h.kind === 'resize' ? grabStep(ic, hits(), ev, { kind: 'resize', edge: h.edge, step: { days: 0, slots: 0 } }, () => hit, h.resourceId) : grabStep(ic, hits(), ev, { kind: 'move', step: { days: 0, slots: 0 } }, () => hit, h.resourceId);
       if (!p) return;
       if (hit.resourceId !== undefined && h.kind === 'move') h.resourceId = hit.resourceId;
       h.event = heldEvent(p);

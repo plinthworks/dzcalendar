@@ -1,4 +1,4 @@
-import { actionsFor, assertBusinessHours, createKernel, formatTemporal, intentFor, isValidZone, Temporal } from '@dzcalendar/core';
+import { actionsFor, assertBusinessHours, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, Temporal } from '@dzcalendar/core';
 import type { Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
 import { attachInteractions } from './interact/host.js';
@@ -85,6 +85,8 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
    * Default 500; `Infinity` never windows.
    */
   readonly virtualizeAbove?: number;
+  /** Options of a plugin's views, by family (`{ timeline: { areaColumns, … } }` for the Pro's timeline). */
+  readonly viewOptions?: Readonly<Record<string, unknown>>;
   /** Prepares for printing on `beforeprint` (everything drawn) and restores on `afterprint`. Default false. */
   readonly autoPrint?: boolean;
   /**
@@ -115,6 +117,13 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly resources?: KernelOptions['resources'];
   readonly resourceOrder?: KernelOptions['resourceOrder'];
   readonly resourceGroupField?: KernelOptions['resourceGroupField'];
+  /** An "Unassigned" column (a timeline row) first, for events on no known resource. */
+  readonly showUnassigned?: boolean;
+  /** A timeline's scale and lanes, merged key by key (`slot: undefined` back to the default). */
+  readonly timeline?: KernelOptions['timeline'];
+  /** A timeline's folded resources and groups (what `onResourceToggle` reports). */
+  readonly collapsedResources?: readonly string[];
+  readonly collapsedGroups?: readonly string[];
   /** Merged key by key over the current ones (`axis`, `slotMinutes`, `slotMin`…); equal values change nothing. */
   readonly timeGrid?: KernelOptions['timeGrid'];
   readonly weekends?: boolean;
@@ -127,6 +136,8 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly density?: 'compact' | 'comfortable' | 'spacious';
   readonly displayCalendar?: string | null;
   readonly secondaryCalendar?: string | null;
+  /** Options of a plugin's views, by family; compared family by family (a new object for one redraws it). */
+  readonly viewOptions?: Readonly<Record<string, unknown>>;
 }
 
 export interface CalendarInstance {
@@ -387,6 +398,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       return v;
     })(),
     printing: false,
+    viewOptions: options.viewOptions ?? {},
     injectStyles: options.injectStyles !== false,
     cssLayers,
     popoverElement: popover.element,
@@ -529,7 +541,10 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     pendingDir = undefined;
     if (firstPaint) {
       firstPaint = false;
-      if (vm.family === 'timeGrid' && v.scrollTo) {
+      if (vm.family === 'timeline' && v.scrollTo) {
+        // A timeline scrolls along time: to that hour of today when shown, else of its first day.
+        v.scrollTo(Temporal.Duration.from(options.scrollTime ?? 'PT8H').total({ unit: 'minutes' }));
+      } else if (vm.family === 'timeGrid' && v.scrollTo) {
         const scroll = Temporal.Duration.from(options.scrollTime ?? 'PT8H').total({ unit: 'minutes' });
         const slotMin = (vm.model as { options: { slotMin?: DurationLike } }).options.slotMin;
         const min = slotMin ? Temporal.Duration.from(slotMin).total({ unit: 'minutes' }) : 0;
@@ -738,6 +753,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       }
       if (changes.timeZone && changes.timeZone !== state.timeZone && !isZone(changes.timeZone)) throw new RangeError(`not a time zone: ${changes.timeZone}`);
       if ('businessHours' in changes && changes.businessHours !== undefined) assertBusinessHours(changes.businessHours);
+      if (changes.timeline) assertTimeline(changes.timeline);
       if (changes.multiMonthMaxColumns !== undefined && !(Number.isInteger(changes.multiMonthMaxColumns) && changes.multiMonthMaxColumns >= 1)) {
         throw new RangeError(`multiMonthMaxColumns must be a whole number ≥ 1: ${changes.multiMonthMaxColumns}`);
       }
@@ -816,11 +832,16 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             const problems = kernel.setResources(changes.resources);
             if (problems.length > 0) settings.current.onResourceProblems?.(problems);
           }
-          if ('resourceOrder' in changes || 'resourceGroupField' in changes) {
+          if ('resourceOrder' in changes || 'resourceGroupField' in changes || 'showUnassigned' in changes) {
             kernel.setOptions({
               ...('resourceOrder' in changes && { resourceOrder: changes.resourceOrder }),
               ...('resourceGroupField' in changes && { resourceGroupField: changes.resourceGroupField }),
+              ...(changes.showUnassigned !== undefined && { showUnassigned: changes.showUnassigned }),
             });
+          }
+          if (changes.timeline) kernel.setOptions({ timeline: changes.timeline });
+          if (changes.collapsedResources || changes.collapsedGroups) {
+            kernel.setOptions({ ...(changes.collapsedResources && { collapsedResources: changes.collapsedResources }), ...(changes.collapsedGroups && { collapsedGroups: changes.collapsedGroups }) });
           }
           if ('hiddenDays' in changes || 'weekends' in changes) {
             hidden = { days: 'hiddenDays' in changes ? changes.hiddenDays : hidden.days, weekends: 'weekends' in changes ? changes.weekends : hidden.weekends };
@@ -832,6 +853,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             dirty = true;
           }
           if (changes.multiMonthMaxColumns !== undefined) columns(changes.multiMonthMaxColumns);
+          if (changes.viewOptions && !shallowSame(changes.viewOptions, ctx.viewOptions)) {
+            ctx.viewOptions = changes.viewOptions;
+            ctx.epoch++;
+            dirty = true;
+          }
           if (changes.headerViews && changes.headerViews.join() !== (headerAsked ?? []).join()) {
             headerAsked = changes.headerViews;
             toolbar.setViews(tabsOf(headerAsked));

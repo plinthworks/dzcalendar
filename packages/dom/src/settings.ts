@@ -52,6 +52,8 @@ export interface LiveSettings {
   readonly onProposalRefused?: (proposal: Proposal) => void;
   /** Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo inside the calendar. Default true. */
   readonly keyboardUndo?: boolean;
+  /** A person folded or unfolded a resource or a group (a timeline's tree): the state to keep, if the application wants it back. */
+  readonly onResourceToggle?: (state: { readonly collapsedResources: readonly string[]; readonly collapsedGroups: readonly string[] }) => void;
   /** What the resources given (option or `update`) could not be read as: refused entries, dropped fields. Called only when there are some. */
   readonly onResourceProblems?: (problems: readonly Problem[]) => void;
 }
@@ -74,6 +76,7 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   onEventClick: {},
   onSlotClick: {},
   onResourceProblems: {},
+  onResourceToggle: {},
   chooseScope: {},
   dragEdgeNavigate: {},
   eventResizableFromStart: {},

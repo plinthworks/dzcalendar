@@ -64,8 +64,12 @@ export interface KeyContext {
   readonly mode: KeyMode;
   /** Right to left: the horizontal arrows swap (the next day is on the left). */
   readonly rtl: boolean;
-  /** A time grid's columns are days and its rows slots; a day grid's rows are weeks. */
-  readonly grid: 'time' | 'day';
+  /**
+   * A time grid's columns are days and its rows slots; a day grid's rows are
+   * weeks; a timeline runs along time (left/right: a slot) with a resource
+   * per row (up/down: the next resource, as Alt+arrows elsewhere).
+   */
+  readonly grid: 'time' | 'day' | 'timeline';
 }
 
 const NONE: Step = { days: 0, slots: 0 };
@@ -73,6 +77,7 @@ const NONE: Step = { days: 0, slots: 0 };
 /** The step of an arrow key in this grid, reading direction applied. */
 function arrow(key: string, ctx: KeyContext): Step | null {
   const ahead = ctx.rtl ? -1 : 1;
+  if (ctx.grid === 'timeline') return key === 'ArrowLeft' ? { ...NONE, slots: -ahead } : key === 'ArrowRight' ? { ...NONE, slots: ahead } : null;
   switch (key) {
     case 'ArrowLeft':
       return { ...NONE, days: -ahead };
@@ -104,6 +109,9 @@ export function intentFor(k: KeyLike, ctx: KeyContext): Intent | null {
   const step = arrow(key, ctx);
 
   const across = (): Intent | null => (step && step.days !== 0 ? { kind: 'across', delta: step.days > 0 ? 1 : -1 } : null);
+  // A timeline: up and down are the resources (in grab mode too: the event goes to the next row).
+  const vertical = key === 'ArrowUp' ? -1 : key === 'ArrowDown' ? 1 : 0;
+  if (ctx.grid === 'timeline' && vertical !== 0 && !k.altKey && !k.shiftKey && ctx.mode !== 'event') return { kind: 'across', delta: vertical as 1 | -1 };
   if (ctx.mode === 'grab') {
     if (step) {
       if (k.shiftKey) return { kind: 'resize', edge: k.altKey ? 'start' : 'end', step };
@@ -123,6 +131,8 @@ export function intentFor(k: KeyLike, ctx: KeyContext): Intent | null {
     if (key === 'Delete' || key === 'Backspace') return { kind: 'delete' };
     if (key === 'Escape') return { kind: 'cancel' };
     if (step) return { kind: 'item', delta: step.days + step.slots > 0 ? 1 : -1 };
+    // A timeline's vertical arrows on an event: the previous or next one, as the horizontal ones.
+    if (ctx.grid === 'timeline' && vertical !== 0) return { kind: 'item', delta: vertical as 1 | -1 };
     return null;
   }
 
@@ -144,7 +154,8 @@ export function intentFor(k: KeyLike, ctx: KeyContext): Intent | null {
  * A slot hit keeps its column's date: the view keeps it inside its hours.
  */
 export function stepHit(ctx: Pick<InteractionContext, 'displayZone' | 'snapMinutes'>, hit: Hit, step: Step): Hit {
-  if (hit.kind === 'day') return step.days === 0 ? hit : { ...hit, date: hit.date.add({ days: step.days }) };
+  // A day hit takes slots as days: a timeline counted in days steps along them.
+  if (hit.kind === 'day') return step.days + step.slots === 0 ? hit : { ...hit, date: hit.date.add({ days: step.days + step.slots }) };
   let { instant, date } = hit;
   let gap = false;
   if (step.days !== 0) {

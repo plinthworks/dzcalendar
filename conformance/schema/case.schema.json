@@ -31,7 +31,8 @@
         "ical-parse",
         "slots",
         "resource-tree",
-        "resource-rules"
+        "resource-rules",
+        "timeline-axis"
       ]
     },
     "description": {

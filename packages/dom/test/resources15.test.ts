@@ -247,6 +247,22 @@ describe('resource time grid', () => {
     expect([...host.querySelectorAll<HTMLElement>('.dz-tg__col')].map((c) => c.dataset['resource'])).toEqual(['c', 'b', 'a']);
   });
 
+  it('showUnassigned: an "Unassigned" column first; a drop there takes the event off the resource it was taken from', async () => {
+    const host = mount([{ id: 'n', title: 'N', start: '2026-10-21T08:00[Europe/Paris]' }, { id: 'm', title: 'RDV', start: '2026-10-21T09:00[Europe/Paris]', resourceIds: ['a', 'b'] }], { showUnassigned: true, editable: true });
+    const cols = [...host.querySelectorAll<HTMLElement>('.dz-tg__col')];
+    expect([cols.length, cols[0]!.getAttribute('aria-label'), host.querySelector('.dz-tg__resource')!.textContent]).toEqual([4, 'Non assigné, mercredi 21 octobre', 'Non assigné']);
+    expect([...cols[0]!.querySelectorAll<HTMLElement>('.dz-ev')].map((e) => e.dataset['eventId'])).toEqual(['n']);
+    host.querySelector<HTMLElement>('.dz-tg__col[data-resource="a"] .dz-ev[data-event-id="m"]')!.focus();
+    press('m');
+    press('ArrowLeft', { altKey: true });
+    press('Enter');
+    await said();
+    // Taken from Dre A's column, put on "Unassigned": off Dre A, still on Dr B.
+    expect(cal!.kernel.store.snapshot.getEvent('m')!.resourceIds).toEqual(['b']);
+    cal!.update({ showUnassigned: false });
+    expect(host.querySelectorAll('.dz-tg__col').length).toBe(3);
+  });
+
   it('the view switcher names resource views in the locale', () => {
     const host = mount([], { headerViews: ['resourceTimeGridDay', 'resourceTimeGridWeek', 'resourceDayGridMonth'] });
     expect(texts(host.querySelectorAll('.dz-toolbar__views button'))).toEqual(['Jour', 'Semaine', 'Mois']);

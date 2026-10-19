@@ -86,7 +86,7 @@ export { segmentTimed, segmentAllDay, splitByWeek, dateIndex } from './project/s
 export type { Segment, TimedSegment, SegmentTimedOptions, DateIndex } from './project/segment.js';
 export { buildColumnAxis } from './project/time-axis.js';
 export type { AxisMode, AxisTick, AxisBand, ColumnAxis, ColumnAxisOptions, FromPosition } from './project/time-axis.js';
-export { BUILTIN_VIEWS } from './views/builtin.js';
+export { BUILTIN_VIEWS, registerViewSpec, registeredViewSpecs } from './views/builtin.js';
 export { computeViewRange } from './views/range.js';
 export { navigate } from './views/nav.js';
 export type { NavDirection } from './views/nav.js';
@@ -95,6 +95,7 @@ export { buildTimeGridModel, buildTimeGridColumn, updateTimeGridModel, locateNow
 export type { TimeGridModel, TimeGridColumn, TimeGridOptions, PlacedTimed, MoreTimed, AllDayBar, Reading, AvailableSlot, PlacedSlot, ResourceHead, ResourceGroupHead } from './views/timegrid.js';
 export { buildResourceTree, fieldOf, EMPTY_TREE } from './resource/tree.js';
 export { flattenRows, columnResources, groupValue } from './resource/rows.js';
+export { UNASSIGNED, UNASSIGNED_RESOURCE, instancesOf } from './resource/owners.js';
 export type { ResourceRow, RowState, ColumnResources } from './resource/rows.js';
 export type { Resource, ResourceInput, ResourceNode, ResourceTree, ResourceOrder } from './resource/types.js';
 export { buildDayGridModel, updateDayGridModel } from './views/daygrid.js';
@@ -103,7 +104,7 @@ export { formatTemporal, formatToPartsTemporal, formatRangeTitle, weekdayNames, 
 export type { Fmt, Formattable } from './format/intl.js';
 export { weekNumber, weekRulesFor } from './format/week.js';
 export type { WeekRules } from './format/week.js';
-export { createKernel, registerModelFamily } from './kernel.js';
+export { createKernel, registerModelFamily, assertTimeline } from './kernel.js';
 export type { CalendarKernel, KernelOptions, KernelState, KernelEvent, ViewModel, ModelFamily, ModelOptions, StateCause } from './kernel.js';
 export { businessIntervals, assertBusinessHours } from './rules/business-hours.js';
 export type { BusinessHoursRule, BusinessHoursInput } from './rules/business-hours.js';

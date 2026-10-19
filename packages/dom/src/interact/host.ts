@@ -1,4 +1,5 @@
-import { Temporal, isUnchanged, proposeMove, proposeResize, selectionBetween } from '@dzcalendar/core';
+import { Temporal, UNASSIGNED, isUnchanged, proposeMove, proposeResize, selectionBetween } from '@dzcalendar/core';
+import { BACKGROUND_NODE, EVENT_NODE } from './handles.js';
 import type { EventInstance, Hit, InteractionContext, PlainDate, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
 import { h } from '../render/reconcile.js';
@@ -17,7 +18,7 @@ const TAP_MS = 500;
 const EDGE = 40;
 const MAX_SPEED = 18;
 /** Holding an event at the calendar's side this long goes to the previous or next period (longer in a month, where the side columns are real targets). */
-const EDGE_NAV_MS = { timeGrid: 600, dayGrid: 900 } as const;
+const EDGE_NAV_MS = { timeGrid: 600, dayGrid: 900, timeline: 900 } as const;
 const EDGE_NAV_BAND = 24;
 
 type Mode = { readonly kind: 'move' } | { readonly kind: 'resize'; readonly edge: 'start' | 'end' } | { readonly kind: 'select' };
@@ -41,6 +42,9 @@ interface Gesture<G> {
   origin: { x: number; y: number };
   scroll0: number;
   scrollY: number;
+  /** Horizontal, for a scroller that scrolls both ways (a timeline). */
+  scrollX: number;
+  scroll0x: number;
   grab: Hit;
   x: number;
   y: number;
@@ -54,8 +58,18 @@ interface Gesture<G> {
   edgeSince: number;
   edgeSide: 'prev' | 'next' | null;
   /** The scroller's box and the layer's width, read with the geometry. */
-  scrollBox: { top: number; bottom: number } | null;
+  scrollBox: ScrollBox | null;
   width: number;
+}
+
+/** The scroller's box in the viewport, and how far it can scroll along (a timeline's autoscroll and edge). */
+interface ScrollBox {
+  readonly top: number;
+  readonly bottom: number;
+  readonly left: number;
+  readonly right: number;
+  readonly scrollWidth: number;
+  readonly clientWidth: number;
 }
 
 const hitKey = (hit: Hit | null) =>
@@ -147,6 +161,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
         ...(rules && { rules }),
         // A series may move as a whole (the scope is asked on the drop): its own occurrences are not in the way of the preview.
         ...(inst?.event.ref && { movingSeries: inst.event.ref.seriesId }),
+        // A timeline has no all-day row: an all-day event stays one, moved by days.
+        ...(surface.family === 'timeline' && { keepAllDay: true }),
       };
     },
     layerOrigin() {
@@ -184,14 +200,14 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     }
   };
 
-  const editableNode = (node: HTMLElement, inst: EventInstance) => ctx.live().editable === true && (inst.event.perms.start || inst.event.perms.duration) && !node.matches('.dz-ev--bg, .dz-bar--bg');
+  const editableNode = (node: HTMLElement, inst: EventInstance) => ctx.live().editable === true && (inst.event.perms.start || inst.event.perms.duration) && !node.matches(BACKGROUND_NODE);
 
   /** Which edge a press on an event grabbed: the end strip (or the start one), else the body. */
   function modeAt(node: HTMLElement, inst: EventInstance, x: number, y: number, type: Press['type']): Mode {
     if (!inst.event.perms.duration) return { kind: 'move' };
     const r = node.getBoundingClientRect();
     const band = Math.min(HANDLE[type], r.height / 3, r.width / 3);
-    const horizontal = surface.family === 'dayGrid' || inst.event.allDay;
+    const horizontal = surface.family !== 'timeGrid' || inst.event.allDay;
     const rtl = root.closest('[dir]')?.getAttribute('dir') === 'rtl';
     const nearEnd = horizontal ? (rtl ? x - r.left < band : r.right - x < band) : r.bottom - y < band;
     const nearStart = horizontal ? (rtl ? r.right - x < band : x - r.left < band) : y - r.top < band;
@@ -216,7 +232,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     // when the application takes no slot clicks: a press there clicks, selects and drags as on empty time.
     const button = pe.target.closest('.dz-more, .dz-dg__num, button, a');
     if ((button && !(button.classList.contains('dz-slot') && !ctx.live().onSlotClick)) || !surface.accepts(pe.target)) return;
-    const node = pe.target.closest<HTMLElement>('.dz-ev, .dz-bar');
+    const node = pe.target.closest<HTMLElement>(EVENT_NODE);
     const inst = node ? surface.instanceOf(node) : null;
     const base = { id: pe.pointerId, type, x0: pe.clientX, y0: pe.clientY, at: win.performance.now() };
     if (node && inst) {
@@ -298,6 +314,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
         queueSelection();
         if (!gesture) return;
         gesture.scrollY = sc.scrollTop - gesture.scroll0;
+        gesture.scrollX = sc.scrollLeft - gesture.scroll0x;
         queue();
       },
       { passive: true },
@@ -335,7 +352,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     const hit = surface.hitAt(geo, pe.clientX, pe.clientY, 0);
     if (!hit) return;
     const live = ctx.live();
-    const resource = hit.resourceId !== undefined ? { resourceId: hit.resourceId } : {};
+    // "Unassigned" is the view's own row, not a resource: the application hears none.
+    const resource = hit.resourceId !== undefined && hit.resourceId !== UNASSIGNED ? { resourceId: hit.resourceId } : {};
     live.onDateClick?.(hit.kind === 'slot' ? { allDay: false, date: hit.date, instant: hit.instant, ...resource } : { allDay: true, date: hit.date, ...resource });
     // A tap on a touch screen selects one slot, with two handles to pull its ends.
     if (p.type === 'touch' && live.selectable) {
@@ -346,9 +364,19 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
   }
 
   /** The scroller's box and the layer's width: read when the geometry is. */
-  function boxesRead(): { scrollBox: { top: number; bottom: number } | null; width: number } {
-    const r = surface.scroller?.getBoundingClientRect();
-    return { scrollBox: r ? { top: r.top, bottom: r.bottom } : null, width: layer.clientWidth };
+  function boxesRead(): { scrollBox: ScrollBox | null; width: number } {
+    const sc = surface.scroller;
+    const r = sc?.getBoundingClientRect();
+    // What sticks inside the scroller (a timeline's resource area, its heads) is not its edge: the edge zones start past it.
+    const inset = surface.insets?.() ?? { start: 0, top: 0 };
+    const rtl = root.closest('[dir]')?.getAttribute('dir') === 'rtl';
+    return {
+      scrollBox:
+        sc && r
+          ? { top: r.top + inset.top, bottom: r.bottom, left: r.left + (rtl ? 0 : inset.start), right: r.right - (rtl ? inset.start : 0), scrollWidth: sc.scrollWidth, clientWidth: sc.clientWidth }
+          : null,
+      width: layer.clientWidth,
+    };
   }
 
   function remeasure(g: Gesture<G>): void {
@@ -357,6 +385,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     Object.assign(g, boxesRead());
     g.scroll0 = surface.scroller?.scrollTop ?? 0;
     g.scrollY = 0;
+    g.scroll0x = surface.scroller?.scrollLeft ?? 0;
+    g.scrollX = 0;
     g.hitKey = '';
     queue();
   }
@@ -375,6 +405,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       origin,
       scroll0: surface.scroller?.scrollTop ?? 0,
       scrollY: 0,
+      scroll0x: surface.scroller?.scrollLeft ?? 0,
+      scrollX: 0,
       grab,
       x: pe.clientX,
       y: pe.clientY,
@@ -383,7 +415,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       selection: null,
       ghosts: [],
       // Every piece of the event dims, not only the one pressed.
-      sources: id ? [...root.querySelectorAll<HTMLElement>(`:is(.dz-ev, .dz-bar)[data-event-id="${cssEscape(id)}"]`)] : [],
+      sources: id ? [...root.querySelectorAll<HTMLElement>(`:is(${EVENT_NODE})[data-event-id="${cssEscape(id)}"]`)] : [],
       frame: 0,
       edgeSince: 0,
       edgeSide: null,
@@ -415,7 +447,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
 
   /** The proposal (or selection) for the pointer's place. False when the hit did not change. No side effect. */
   function compute(g: Gesture<G>): boolean {
-    const hit = surface.hitAt(g.geo, g.x, g.y, g.scrollY);
+    const hit = surface.hitAt(g.geo, g.x, g.y, g.scrollY, g.scrollX);
     const key = hitKey(hit);
     if (key === g.hitKey && key !== '') return false;
     g.hitKey = key;
@@ -436,7 +468,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
 
   function draw(g: Gesture<G>): void {
     const span = g.press.mode.kind === 'select' ? g.selection : g.proposal;
-    const boxes: Box[] = span ? surface.boxesFor(g.geo, span, g.scrollY) : [];
+    const boxes: Box[] = span ? surface.boxesFor(g.geo, span, g.scrollY, g.scrollX) : [];
     const time = g.proposal ? timeOf(ctx, g.press.mode.kind === 'resize' && g.press.mode.edge === 'end' ? g.proposal.end : g.proposal.start, g.proposal) : '';
     const look = g.press.mode.kind === 'select'
       ? { kind: 'select' as const, handles: g.press.type === 'touch' }
@@ -453,9 +485,15 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     let v = 0;
     if (g.y < b.top + EDGE) v = -MAX_SPEED * ((b.top + EDGE - g.y) / EDGE);
     else if (g.y > b.bottom - EDGE) v = MAX_SPEED * ((g.y - (b.bottom - EDGE)) / EDGE);
-    if (v === 0) return;
+    // A timeline scrolls along time too, near its left and right edges.
+    let vx = 0;
+    if (surface.family === 'timeline') {
+      if (g.x < b.left + EDGE) vx = -MAX_SPEED * Math.min(1, (b.left + EDGE - g.x) / EDGE);
+      else if (g.x > b.right - EDGE) vx = MAX_SPEED * Math.min(1, (g.x - (b.right - EDGE)) / EDGE);
+    }
+    if (v === 0 && vx === 0) return;
     // scrollBy writes without reading layout first.
-    sc.scrollBy(0, v);
+    sc.scrollBy(vx, v);
     queue();
   }
 
@@ -464,7 +502,15 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     const left = g.origin.x;
     const right = left + g.width;
     const rtl = root.closest('[dir]')?.getAttribute('dir') === 'rtl';
-    const side = g.x < left + EDGE_NAV_BAND ? (rtl ? 'next' : 'prev') : g.x > right - EDGE_NAV_BAND ? (rtl ? 'prev' : 'next') : null;
+    let side: 'prev' | 'next' | null = g.x < left + EDGE_NAV_BAND ? (rtl ? 'next' : 'prev') : g.x > right - EDGE_NAV_BAND ? (rtl ? 'prev' : 'next') : null;
+    // A timeline changes period only once it has scrolled to that end (autoscroll goes first).
+    const box = g.scrollBox;
+    if (side && surface.family === 'timeline' && box) {
+      const at = g.scroll0x + g.scrollX;
+      // |scrollLeft| is the distance from the start of time in either direction: 'prev' is at 0.
+      const toStart = side === 'prev';
+      if (toStart ? Math.abs(at) > 1 : Math.abs(at) < box.scrollWidth - box.clientWidth - 1) side = null;
+    }
     if (side !== g.edgeSide) {
       g.edgeSide = side;
       g.edgeSince = win.performance.now();

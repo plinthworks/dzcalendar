@@ -1,4 +1,5 @@
-import type { ResourceGroupHead, ResourceHead } from '@dzcalendar/core';
+import { UNASSIGNED } from '@dzcalendar/core';
+import type { Resource, ResourceGroupHead, ResourceHead } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
 import { KeyedList, h } from './reconcile.js';
 
@@ -26,6 +27,9 @@ interface GroupItem {
  * the header's grid by `grid-row` / `grid-column`; `offset` is the first
  * grid column of the cells (2 after a time grid's gutter).
  */
+/** What a resource is called on screen: its title, else its id; "Unassigned" in the locale's words. */
+export const resourceName = (ctx: ViewCtx, r: Resource): string => (r.id === UNASSIGNED ? ctx.messages.unassigned : r.title || r.id);
+
 /**
  * A resource view without resources: a sentence in place of the columns
  * (`noResources`), in `host`; gone as soon as there are some.
@@ -71,7 +75,7 @@ export function drawResourceHeads(ctx: ViewCtx, groupsHost: HTMLElement, resourc
       el.dataset['resource'] = r.id;
       el.className = [`${block}__resource`, ...r.classNames].join(' ');
       const own = ctx.hooks.resource?.content?.({ resource: r }, el);
-      if (own === null || own === undefined) el.replaceChildren(h(doc, 'span', `${block}__resource-title`, r.title || r.id));
+      if (own === null || own === undefined) el.replaceChildren(h(doc, 'span', `${block}__resource-title`, resourceName(ctx, r)));
       else el.replaceChildren(typeof own === 'string' ? doc.createTextNode(own) : own);
     },
   );

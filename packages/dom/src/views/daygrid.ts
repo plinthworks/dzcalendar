@@ -15,7 +15,7 @@ import { KeyedList, contentsHost, h } from '../render/reconcile.js';
 import { onScrollFrame } from '../render/window.js';
 import { altDate } from '../render/alt.js';
 import { NodePool } from '../render/pool.js';
-import { drawResourceHeads, noResourcesNote } from '../render/resource-heads.js';
+import { drawResourceHeads, noResourcesNote, resourceName } from '../render/resource-heads.js';
 
 /** A cell's key: its date, and its resource in a resource view (the same date shows once per resource). */
 const cellKey = (date: PlainDate, resourceId: string | undefined) => (resourceId === undefined ? date.toString() : `${date.toString()}|${resourceId}`);
@@ -378,7 +378,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
           sig: `${i}|${today}|${outside}|${closed}|${items}|${wk}|${resourceStart}|${ctx.epoch}`,
           date,
           resourceId: res?.id,
-          resourceTitle: res ? res.title || res.id : '',
+          resourceTitle: res ? resourceName(ctx, res) : '',
           resourceStart,
           col: i,
           today,

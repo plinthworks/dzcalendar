@@ -10,7 +10,7 @@ import { KeyedList, contentsHost, h } from '../render/reconcile.js';
 import { onScrollFrame } from '../render/window.js';
 import { NodePool } from '../render/pool.js';
 import { altDate } from '../render/alt.js';
-import { drawResourceHeads, noResourcesNote } from '../render/resource-heads.js';
+import { drawResourceHeads, noResourcesNote, resourceName } from '../render/resource-heads.js';
 
 const HM = { hour: '2-digit', minute: '2-digit' } as const;
 
@@ -242,7 +242,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     else delete el.dataset['resource'];
     const day = formatTemporal(column.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale) + (ctx.altLocale ? ` (${altDate(column.date, ctx.altLocale).long})` : '');
     // In a resource view the column says whose it is first: "Dr Ali, Wednesday 21 October".
-    const name = column.resource ? ctx.messages.ofResource({ resource: column.resource.title || column.resource.id, place: day }) : day;
+    const name = column.resource ? ctx.messages.ofResource({ resource: resourceName(ctx, column.resource), place: day }) : day;
     const length = column.axis.day.lengthMinutes;
     el.setAttribute('aria-label', length === 1440 ? name : length === 0 ? `${name}, ${ctx.messages.dayDoesNotExist}` : `${name}, ${formatMinutes(length, ctx.locale)}`);
     el.classList.toggle('dz-tg__col--today', it.today);

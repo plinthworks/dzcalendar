@@ -24,6 +24,8 @@ export type ResourceRow =
 export interface RowState {
   /** Resources whose children are shown; 'all' (the default) shows every one. */
   readonly expanded?: ReadonlySet<ResourceId> | 'all';
+  /** Or the other way: resources whose children are hidden (the rest shown). Wins over `expanded`. */
+  readonly collapsed?: ReadonlySet<ResourceId>;
   /** Groups the roots by this field; each root's subtree stays in its root's group. */
   readonly groupBy?: string;
   /** Groups shut (by value). */
@@ -43,7 +45,8 @@ export const groupValue = (r: Resource, field: string): string => {
  * subtree.
  */
 export function flattenRows(tree: ResourceTree, state: RowState = {}, filter?: (r: Resource) => boolean): ResourceRow[] {
-  const open = (id: ResourceId) => state.expanded === undefined || state.expanded === 'all' || state.expanded.has(id);
+  const open = (id: ResourceId) =>
+    state.collapsed ? !state.collapsed.has(id) : state.expanded === undefined || state.expanded === 'all' || state.expanded.has(id);
   const walk = (node: ResourceNode, out: ResourceRow[]) => {
     if (filter && !filter(node.resource)) return;
     const has = node.children.length > 0;

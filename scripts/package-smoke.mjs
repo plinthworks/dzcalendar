@@ -35,7 +35,7 @@ write('package.json', JSON.stringify({
   dependencies: {
     '@angular/common': angular, '@angular/compiler': angular, '@angular/core': angular, '@angular/platform-browser': angular,
     '@dzcalendar/angular': tgz('angular'), '@dzcalendar/core': tgz('core'), '@dzcalendar/dom': tgz('dom'), '@dzcalendar/rrule': tgz('rrule'),
-    '@dzcalendar/ical': tgz('ical'), '@dzcalendar/slots': tgz('slots'), '@dzcalendar/theme': tgz('theme'), rxjs: '~7.8.0', tslib: '^2.6.0',
+    '@dzcalendar/ical': tgz('ical'), '@dzcalendar/slots': tgz('slots'), '@dzcalendar/pro': tgz('pro'), '@dzcalendar/theme': tgz('theme'), rxjs: '~7.8.0', tslib: '^2.6.0',
   },
   devDependencies: { '@angular/build': angular, '@angular/cli': angular, '@angular/compiler-cli': angular, typescript },
 }, null, 2));
@@ -61,11 +61,13 @@ import { defineView } from '@dzcalendar/dom/custom';
 import { buildListModel } from '@dzcalendar/core/views';
 import { parseICal } from '@dzcalendar/ical';
 import { findSlots } from '@dzcalendar/slots';
+import { TIMELINE_CSS } from '@dzcalendar/pro';
+import { buildTimelineAxis } from '@dzcalendar/pro/model';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput, PlainDate, Selection } from '@dzcalendar/core';
 
 const agenda = defineView({ type: 'agenda', duration: { days: 3 }, render: (el, data) => (el.textContent = String(data.instances.length)) });
-void [LIST_CSS, MULTIMONTH_CSS, buildListModel, parseICal, findSlots, CalendarController];
+void [LIST_CSS, MULTIMONTH_CSS, buildListModel, parseICal, findSlots, CalendarController, TIMELINE_CSS, buildTimelineAxis];
 
 @Component({
   selector: 'app-root',
@@ -82,7 +84,7 @@ class App {
   readonly view = signal<string | undefined>('listWeek');
   readonly date = signal<PlainDate | undefined>(Temporal.PlainDate.from('2026-10-21'));
   readonly selection = signal<Selection | null>(null);
-  readonly options: DzCalendarOptions = { headerViews: ['listWeek', 'agenda', 'multiMonthYear'], weekNumbers: true };
+  readonly options: DzCalendarOptions = { headerViews: ['listWeek', 'agenda', 'multiMonthYear', 'resourceTimelineDay'], weekNumbers: true, resources: [{ id: 'r', title: 'Salle' }], viewOptions: { timeline: { areaColumns: [{ field: 'title' }] } } };
 }
 
 // Angular 19 names it experimental; 20.2 and later, stable.

@@ -27,6 +27,7 @@ import type { EventInput, Mutation } from '../packages/core/src/index.js';
 import { expandZoned, parseRRule } from '../packages/rrule/src/index.js';
 import { buildListModel, buildMultiMonthModel } from '../packages/core/src/views.js';
 import { findSlots } from '../packages/slots/src/index.js';
+import { buildTimelineModel, TIMELINE_VIEWS } from '../packages/pro/src/model-entry.js';
 import type { Busy } from '../packages/slots/src/index.js';
 
 // Run by node with --expose-gc; `gc` is not in @types/node's globals.
@@ -118,6 +119,17 @@ results['resource month model (20 × 10k)'] = time(10, () => buildDayGridModel(r
 // The timeline's (15b) baseline: 500 resources in 25 departments, built and flattened, grouped.
 const many = Array.from({ length: 500 }, (_, i) => (i % 20 === 0 ? { id: `dep${i}`, title: `Department ${i}`, unit: `U${i % 3}` } : { id: `r${i}`, title: `Resource ${i}`, parentId: `dep${i - (i % 20)}` }));
 results['resource tree 500 + rows'] = time(20, () => flattenRows(buildResourceTree(many, { orderBy: 'title' }).tree, { groupBy: 'unit' }));
+// Phase 15b: the timeline's model, 500 resources, 10 000 events in their week (W) and over the year (U).
+const tlTree = buildResourceTree(Array.from({ length: 500 }, (_, i) => ({ id: `t${i}` }))).tree;
+const tlRows = flattenRows(tlTree);
+const tlW = createEventStore();
+tlW.replaceSourceChunk('w', '*', normalizeMany(inputs(10_000).map((e, i) => {
+  const day = Temporal.PlainDate.from('2026-06-08').add({ days: i % 7 });
+  const moved = e.allDay === undefined && typeof e.start === 'string' && e.start.includes('T') ? { ...e, start: `${day}${e.start.slice(10)}` } : { ...e, start: String(day), end: String(day.add({ days: 1 })) };
+  return { ...moved, resourceId: `t${i % 500}` };
+}), ctx, 'w').items);
+const tlWeek = computeViewRange(Temporal.PlainDate.from('2026-06-10'), TIMELINE_VIEWS.resourceTimelineWeek!, nav);
+results['timeline week model (500 × 10k W)'] = time(5, () => buildTimelineModel(tlWeek, tlW.snapshot, { displayZone: 'Europe/Paris', rows: tlRows, resources: tlTree.order }));
 // Phase 12: W, the worst case — 10 000 events in one week.
 const wStore = createEventStore();
 wStore.replaceSourceChunk('w', '*', normalizeMany(inputs(10_000).map((e, i) => {

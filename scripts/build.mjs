@@ -18,7 +18,7 @@ const pkg = (name) => join(root, 'packages', name);
 const read = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const run = (cmd, args, cwd = root) => execFileSync(cmd, args, { cwd, stdio: 'inherit' });
 
-const PACKAGES = ['rrule', 'core', 'ical', 'slots', 'dom', 'motion-gsap'];
+const PACKAGES = ['rrule', 'core', 'ical', 'slots', 'dom', 'pro', 'motion-gsap'];
 const TZSLOT_RANGE = '^2.1.0';
 
 const shared = (name) => ({
@@ -55,7 +55,9 @@ function typescript(name) {
     ...shared(name),
     type: 'module',
     // The DOM's built-in views register themselves on import: a bundler must keep those modules.
-    sideEffects: name === 'dom' ? ['./views/*.js', './calendar.js', './list.js', './multimonth.js', './custom.js', './locales/*.js'] : false,
+    // The Pro registers its family and views on import: kept too.
+    sideEffects:
+      name === 'dom' ? ['./views/*.js', './calendar.js', './list.js', './multimonth.js', './custom.js', './locales/*.js'] : name === 'pro' ? ['./index.js', './model-entry.js', './timeline/family.js', './timeline/view.js'] : false,
     main: './index.js',
     module: './index.js',
     types: './index.d.ts',
@@ -71,6 +73,8 @@ function typescript(name) {
         ...Object.fromEntries(['ar', 'es', 'de'].map((l) => [`./locales/${l}`, { types: `./locales/${l}.d.ts`, default: `./locales/${l}.js` }])),
       }),
       ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' } }),
+      // The timeline without a screen (a server, a worker): `@dzcalendar/pro/model`.
+      ...(name === 'pro' && { './model': { types: './model-entry.d.ts', default: './model-entry.js' } }),
       './package.json': './package.json',
     },
     ...(source.dependencies && { dependencies: internal(source.dependencies) }),
@@ -82,8 +86,7 @@ function typescript(name) {
 
 for (const name of PACKAGES) typescript(name);
 // The structural CSS as it ships: comments and spaces out.
-const styles = join(pkg('dom'), 'dist', 'styles.js');
-writeFileSync(styles, await minifyCssLiteral(readFileSync(styles, 'utf8')));
+for (const file of [join(pkg('dom'), 'dist', 'styles.js'), join(pkg('pro'), 'dist', 'timeline', 'styles.js')]) writeFileSync(file, await minifyCssLiteral(readFileSync(file, 'utf8')));
 theme();
 angular();
 

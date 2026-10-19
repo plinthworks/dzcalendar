@@ -1,4 +1,5 @@
 import { commandFor } from '@dzcalendar/core';
+import { BACKGROUND_NODE, EVENT_NODE } from './handles.js';
 import type { EditScope, EventInstance, Proposal, ZonedDateTime } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
 import { formatMinutes } from '../render/event.js';
@@ -65,7 +66,7 @@ export async function commitProposal(ctx: ViewCtx, req: CommitRequest): Promise<
   }
 
   const command = commandFor(instance, chosen, scope);
-  const others = [...req.root.querySelectorAll<HTMLElement>('.dz-ev:not(.dz-ev--bg), .dz-bar:not(.dz-bar--bg)')].filter((n) => n.dataset['eventId'] !== instance.event.id);
+  const others = [...req.root.querySelectorAll<HTMLElement>(`:is(${EVENT_NODE}):not(${BACKGROUND_NODE})`)].filter((n) => n.dataset['eventId'] !== instance.event.id);
   const layout = ctx.motion.captureLayout?.(others);
   const result = ctx.kernel.run(command, { validate: true });
   if (!result.ok) {
@@ -86,7 +87,7 @@ export async function commitProposal(ctx: ViewCtx, req: CommitRequest): Promise<
   const ids = result.mutations.filter((m) => m.kind === 'event' && m.after).map((m) => m.after!.id);
   const eventId = ids[ids.length - 1] ?? instance.event.id;
   // What is drawn (not a month cell's hidden item for the keyboard).
-  const landed = req.root.querySelector<HTMLElement>(`:is(.dz-ev, .dz-bar)[data-event-id="${cssEscape(eventId)}"]`);
+  const landed = req.root.querySelector<HTMLElement>(`:is(${EVENT_NODE})[data-event-id="${cssEscape(eventId)}"]`);
   if (landed && req.from) ctx.motion.dropSettle?.(landed, req.from);
   return { done: true, eventId, landed };
 }

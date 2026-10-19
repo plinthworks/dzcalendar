@@ -11,7 +11,7 @@ import { minifyCssLiteral } from './css-literal.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const src = (p) => join(root, 'packages', p, 'src', 'index.ts');
-const alias = { '@dzcalendar/core': src('core'), '@dzcalendar/dom': src('dom'), '@dzcalendar/rrule': src('rrule'), '@dzcalendar/ical': src('ical'), '@dzcalendar/slots': src('slots') };
+const alias = { '@dzcalendar/core': src('core'), '@dzcalendar/dom': src('dom'), '@dzcalendar/rrule': src('rrule'), '@dzcalendar/ical': src('ical'), '@dzcalendar/slots': src('slots'), '@dzcalendar/pro': src('pro') };
 /** What `npm run build` ships: the structural CSS minified. */
 const shippedCss = {
   name: 'shipped-css',
@@ -39,6 +39,7 @@ const results = {
   'ical (without core)': await bundle(src('ical'), ['@dzcalendar/core', '@dzcalendar/rrule', ...poly]),
   'slots (without core)': await bundle(src('slots'), ['@dzcalendar/core', '@dzcalendar/rrule', ...poly]),
   'dom (without core)': await bundle(src('dom'), ['@dzcalendar/core', ...poly]),
+  'pro (without core, dom)': await bundle(src('pro'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
   // The view models share core's modules: what they add beyond it.
   'core/views (beyond core)':
     (await bundle({ code: `export * from './packages/core/src/index.ts'; export * from './packages/core/src/views.ts';` }, ['@dzcalendar/rrule', ...poly])) -

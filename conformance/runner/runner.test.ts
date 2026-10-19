@@ -27,6 +27,7 @@ import {
 import { expandZoned, expandDates, parseRRule, serializeRRule } from '../../packages/rrule/src/index.js';
 import { parseICal } from '../../packages/ical/src/index.js';
 import { findSlots, checkSlot } from '../../packages/slots/src/index.js';
+import { buildTimelineAxis, TIMELINE_VIEWS } from '../../packages/pro/src/model-entry.js';
 import type { Slot } from '../../packages/slots/src/index.js';
 import type { EventInput, WallPolicy } from '../../packages/core/src/index.js';
 
@@ -51,6 +52,16 @@ const str = (x: { toString(): string } | null) => (x === null ? null : x.toStrin
 const slotText = (x: Slot) => `${x.start.toString({ smallestUnit: 'minute', timeZoneName: 'never' })}/${x.end.toString({ smallestUnit: 'minute', timeZoneName: 'never' })}`;
 
 const adapters: Record<string, (input: any) => unknown> = {
+  'timeline-axis': ({ date, span, zone, slot }) => {
+    const at = Temporal.PlainDate.from(date);
+    const spec = TIMELINE_VIEWS[`timeline${span[0].toUpperCase()}${span.slice(1)}`]!;
+    const axis = buildTimelineAxis(computeViewRange(at, spec, { firstDay: 1, today: at }), zone, { slot });
+    return {
+      slots: axis.slots.map((x) => (x.time ? `${x.time.toString().slice(0, 5)}${x.pass === 'second' ? '*' : ''}${x.offset}` : x.date.toString())),
+      groups: axis.groups.map((g) => Math.round(g.lengthMinutes)),
+      lengthMinutes: Math.round(axis.length * axis.slotMinutes),
+    };
+  },
   'resource-tree': ({ resources, orderBy, groupBy, expanded }) => {
     const { tree, problems } = buildResourceTree(resources, orderBy !== undefined ? { orderBy } : {});
     const rows = flattenRows(tree, { ...(groupBy && { groupBy }), ...(expanded && { expanded: new Set<string>(expanded) }) });

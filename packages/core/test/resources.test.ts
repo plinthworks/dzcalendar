@@ -15,6 +15,7 @@ import {
   columnResources,
   updateTimeGridModel,
   validateProposal,
+  UNASSIGNED,
 } from '../src/index.js';
 import type { CalEvent, EventInput, KernelEvent, ResourceInput, TimeGridModel, DayGridModel, ZonedDateTime } from '../src/index.js';
 
@@ -301,6 +302,56 @@ describe('rules on resources', () => {
     // The calendar refuses overlaps: r2 allows its own, r3 does not.
     expect(codes(at('mover', '10:30', ['r2']), { overlap: false })).toEqual([]);
     expect(codes(at('mover', '10:30', ['r3']), { overlap: false })).toEqual([['overlap', 'x3']]);
+  });
+});
+
+describe('"Unassigned"', () => {
+  it('onto it: the resource taken from goes; out of it: onto the one dropped on', () => {
+    const store = storeWith([{ id: 'e', start: '2026-10-21T10:00[Europe/Paris]', resourceIds: ['a', 'b'] }, { id: 'f', start: '2026-10-21T11:00[Europe/Paris]' }]);
+    const ctx = { snap: store.snapshot, displayZone: PARIS, snapMinutes: 15 };
+    const at = (id: string, resourceId?: string) => {
+      const e = store.snapshot.getEvent(id)!;
+      return { kind: 'slot' as const, date: d('2026-10-21'), instant: (e.start as ZonedDateTime).toInstant(), ...(resourceId && { resourceId }) };
+    };
+    expect(proposeMove(ctx, store.snapshot.getEvent('e')!, at('e', 'a'), at('e', UNASSIGNED)).resourceIds).toEqual(['b']);
+    expect(proposeMove(ctx, store.snapshot.getEvent('f')!, at('f', UNASSIGNED), at('f', 'a')).resourceIds).toEqual(['a']);
+    expect(proposeMove(ctx, store.snapshot.getEvent('f')!, at('f', UNASSIGNED), at('f', UNASSIGNED)).resourceIds).toEqual([]);
+  });
+
+  it('keepAllDay (a view without an all-day row): an all-day event dropped on a moment stays all-day, moved by days', () => {
+    const store = storeWith([{ id: 'L', start: '2026-10-21', end: '2026-10-23', allDay: true }]);
+    const ev = store.snapshot.getEvent('L')!;
+    const slot = (iso: string) => {
+      const z = Temporal.ZonedDateTime.from(iso);
+      return { kind: 'slot' as const, date: z.toPlainDate(), instant: z.toInstant() };
+    };
+    const p = proposeMove({ snap: store.snapshot, displayZone: PARIS, snapMinutes: 15, keepAllDay: true }, ev, slot('2026-10-21T09:00[Europe/Paris]'), slot('2026-10-24T15:00[Europe/Paris]'));
+    expect([p.allDay, String(p.start), String(p.end)]).toEqual([true, '2026-10-24', '2026-10-26']);
+    // Without it (a time grid's hours), it becomes timed: the grid has an all-day row for days.
+    expect(proposeMove({ snap: store.snapshot, displayZone: PARIS, snapMinutes: 15 }, ev, slot('2026-10-21T09:00[Europe/Paris]'), slot('2026-10-24T15:00[Europe/Paris]')).allDay).toBe(false);
+  });
+
+  it('showUnassigned puts the column first in resource views; it shows events on no known resource', () => {
+    const k = createKernel({
+      timeZone: PARIS,
+      locale: 'en-GB',
+      now: () => Temporal.Instant.from('2026-10-21T08:00:00Z'),
+      initialView: 'resourceTimeGridDay',
+      resources: [{ id: 'a', g: 'x' }],
+      resourceGroupField: 'g',
+      showUnassigned: true,
+      events: [
+        { id: 'n', start: '2026-10-21T09:00[Europe/Paris]' },
+        { id: 'z', start: '2026-10-21T10:00[Europe/Paris]', resourceId: 'zz' },
+        { id: 'y', start: '2026-10-21T11:00[Europe/Paris]', resourceId: 'a' },
+      ],
+    });
+    const m = k.viewModel().model as TimeGridModel;
+    expect([m.columns.map((c) => c.resource?.id === UNASSIGNED), m.columns[0]!.events.map((e) => e.segment.instance.key), m.groupHeads]).toEqual([
+      [true, false],
+      ['n', 'z'],
+      [{ value: 'x', from: 1, count: 1 }],
+    ]);
   });
 });
 

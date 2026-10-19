@@ -51,6 +51,12 @@
       "@dzcalendar/slots": [
         "./packages/slots/src/index.ts"
       ],
+      "@dzcalendar/pro/model": [
+        "./packages/pro/src/model-entry.ts"
+      ],
+      "@dzcalendar/pro": [
+        "./packages/pro/src/index.ts"
+      ],
       "@dzcalendar/motion-gsap": [
         "./packages/motion-gsap/src/index.ts"
       ]

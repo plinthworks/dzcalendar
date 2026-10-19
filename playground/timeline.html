@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — timeline</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: #52525b; max-width: 80ch; }
+      .controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+      #log { min-height: 1.4em; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Planning par médecin</h1>
+      <p>Deux services, leurs médecins en arbre, une salle. Le temps est réel : le dimanche 25 octobre, Paris recule d'une heure et la journée fait 25 heures de large, avec deux « 02:00 ». Le Dr Haddad consulte depuis Riyad. Glisser un rendez-vous d'une rangée à l'autre ; au clavier, haut et bas changent de ressource.</p>
+      <div class="controls">
+        <label>Vue <select id="view">
+          <option value="resourceTimelineDay">Jour</option>
+          <option value="resourceTimelineWeek">Semaine</option>
+          <option value="resourceTimelineMonth">Mois</option>
+          <option value="resourceTimelineYear">Année</option>
+          <option value="timelineDay">Jour, sans ressources</option>
+        </select></label>
+        <label><input type="checkbox" id="unassigned" /> Rangée « Non assigné »</label>
+        <span id="log" role="status"></span>
+      </div>
+      <div id="cal"></div>
+    </main>
+    <script type="module" src="./timeline.ts"></script>
+  </body>
+</html>

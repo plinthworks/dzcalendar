@@ -12,6 +12,7 @@ const SRC = new URL('../src', import.meta.url).pathname;
 const RRULE = new URL('../../rrule/src', import.meta.url).pathname;
 const ICAL = new URL('../../ical/src', import.meta.url).pathname;
 const SLOTS = new URL('../../slots/src', import.meta.url).pathname;
+const PRO = new URL('../../pro/src', import.meta.url).pathname;
 
 const files = (dir: string): string[] =>
   readdirSync(dir).flatMap((f) => {
@@ -57,5 +58,12 @@ describe('core purity', () => {
     expect(slots.filter(([, t]) => /Temporal\.Now\b/.test(t)).map(([f]) => f)).toEqual([]);
     const imports = slots.flatMap(([, t]) => [...t.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]!)).filter((x) => !x.startsWith('.'));
     expect([...new Set(imports)].sort()).toEqual(['@dzcalendar/core', '@dzcalendar/rrule']);
+  });
+
+  it("the timeline's model (pro/model) reads no clock, no Date, no DOM, and stands on core only", () => {
+    const model = ['model-entry.ts', 'timeline/axis.ts', 'timeline/model.ts', 'timeline/family.ts'].map((f) => [f, code(readFileSync(`${PRO}/${f}`, 'utf8'))] as const);
+    expect(model.filter(([, t]) => /Temporal\.Now\b|\bnew Date\b|\bDate\.now\b|\bdocument\b|\bwindow\b|HTMLElement/.test(t)).map(([f]) => f)).toEqual([]);
+    const imports = model.flatMap(([, t]) => [...t.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]!)).filter((x) => !x.startsWith('.'));
+    expect([...new Set(imports)]).toEqual(['@dzcalendar/core']);
   });
 });

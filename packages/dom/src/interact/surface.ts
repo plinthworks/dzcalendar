@@ -22,8 +22,8 @@ export interface InteractionSurface<G = unknown> {
   readonly scroller: HTMLElement | null;
   /** Reads the geometry the gesture works on. `origin` is the ghost layer's top-left in the viewport. */
   measure(origin: { readonly x: number; readonly y: number }): G;
-  /** The calendar point at a viewport point; `scrollY` is how far the scroller moved since `measure`. */
-  hitAt(geo: G, x: number, y: number, scrollY: number): Hit | null;
+  /** The calendar point at a viewport point; `scrollY` (and `scrollX`) how far the scroller moved since `measure`. */
+  hitAt(geo: G, x: number, y: number, scrollY: number, scrollX?: number): Hit | null;
   /** Where an event spanning `[start, end)` shows, in ghost-layer boxes. */
   boxesFor(
     geo: G,
@@ -36,15 +36,18 @@ export interface InteractionSurface<G = unknown> {
       readonly resourceId?: string;
     },
     scrollY: number,
+    scrollX?: number,
   ): Box[];
   /** Whether a press on this element is on the calendar's time (columns, cells, the all-day row) — not a header, the gutter or a scrollbar. */
   accepts(target: Element): boolean;
   /** Which occurrence an event node shows. */
   instanceOf(node: HTMLElement): EventInstance | null;
   /** The day or moment an empty spot stands for (a click with no drag). */
-  readonly family: 'timeGrid' | 'dayGrid';
+  readonly family: 'timeGrid' | 'dayGrid' | 'timeline';
   /** The keyboard's side of the view (Phase 8): its cursor, its lines, its events by day. */
   readonly keys?: KeyboardSurface;
+  /** What sticks inside the scroller (a timeline's resource area, its heads), in px: autoscroll starts past it. */
+  insets?(): { readonly start: number; readonly top: number };
   /** The node that takes the focus for an event node a pointer pressed (a month gives its cell's item). */
   focusTarget?(node: HTMLElement): HTMLElement;
 }
@@ -91,4 +94,6 @@ export interface KeyboardSurface {
   stepAcross?(hit: Hit, delta: number): Hit | null | undefined;
   /** Scrolls so that `hit` is in view (a held event's edge going below the fold). */
   reveal(hit: Hit): void;
+  /** Which hits an event's edges are, when the family does not say it (a timeline in days: 'day'). Default: by the family. */
+  hitGrid?(): 'time' | 'day';
 }

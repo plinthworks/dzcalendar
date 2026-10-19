@@ -25,5 +25,6 @@
   "slots 30 days at 15 min": 25,
   "resource week model (20 × 10k)": 25,
   "resource month model (20 × 10k)": 50,
-  "resource tree 500 + rows": 5
+  "resource tree 500 + rows": 5,
+  "timeline week model (500 × 10k W)": 60
 }

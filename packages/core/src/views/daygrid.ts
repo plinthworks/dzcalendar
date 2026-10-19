@@ -14,6 +14,7 @@ import { dayInfo } from '../zone.js';
 import type { ViewRange } from './spec.js';
 import type { EventDisplay } from '../event/types.js';
 import type { Resource } from '../resource/types.js';
+import { instancesOf } from '../resource/owners.js';
 import type { ResourceGroupHead, ResourceHead } from './timegrid.js';
 
 /** Inverse background is drawn by the DOM as the complement; neither takes a lane. */
@@ -117,8 +118,8 @@ export function buildDayGridModel(range: ViewRange, snap: StoreSnapshot, o: DayG
   const bgRows: Segment[][] = range.weeks.map(() => []);
   const rank = new Map<string, readonly number[]>();
   owners.forEach((resource, k) => {
-    const filter = resource ? { resourceId: resource.id } : o.resourceId !== undefined ? { resourceId: o.resourceId } : {};
-    const instances = snap.queryInstances(viewWindow(range.start, range.end, o.displayZone), filter);
+    const w = viewWindow(range.start, range.end, o.displayZone);
+    const instances = resource ? instancesOf(snap, w, resource, o.resources ?? []) : snap.queryInstances(w, o.resourceId !== undefined ? { resourceId: o.resourceId } : {});
     const segs: Segment[] = [];
     const bgSegs: Segment[] = [];
     instances.forEach((inst, i) => {
