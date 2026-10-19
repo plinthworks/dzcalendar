@@ -33,9 +33,9 @@ import type {
   ZoneId,
 } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DzMessages } from '@dzcalendar/dom';
+import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DzMessages, MotionAdapter } from '@dzcalendar/dom';
 import { CalendarController } from './controller.js';
-import { DZ_CALENDAR_DEFAULTS } from './providers.js';
+import { DZ_CALENDAR_DEFAULTS, DZ_MOTION } from './providers.js';
 import { DzEventContent } from './templates.js';
 import type { EventContentContext } from './templates.js';
 
@@ -72,6 +72,16 @@ export class DzCalendar implements OnDestroy {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly zone = inject(NgZone);
   private readonly defaults = inject(DZ_CALENDAR_DEFAULTS);
+  private readonly makeMotion = inject(DZ_MOTION);
+  /** The application's motion for this calendar; a factory that fails (gsap missing) is reported, the calendar drawn still. */
+  private ownMotion(): { motion?: MotionAdapter } {
+    try {
+      return { motion: this.makeMotion!() };
+    } catch (err) {
+      this.errors.handleError(err);
+      return {};
+    }
+  }
   private readonly errors = inject(ErrorHandler);
   private readonly vcr = inject(ViewContainerRef);
   /** The calendar as signals: `inject(CalendarController)` in a child, or `#cal` then `cal.controller`. */
@@ -182,6 +192,8 @@ export class DzCalendar implements OnDestroy {
   private readonly calendar: CalendarInstance = this.zone.runOutsideAngular(() =>
     createCalendar(this.host, {
       ...this.defaults,
+      // The application's motion, made for this calendar, unless one is given here or in the defaults.
+      ...(this.makeMotion && this.defaults.motion === undefined && (untracked(this.settings) as CalendarOptions).motion === undefined && this.ownMotion()),
       ...(untracked(this.settings) as CalendarOptions),
       onDateClick: (c) => this.emit(() => this.dateClick.emit(c)),
       onSlotClick: (x) => this.emit(() => this.slotClick.emit(x)),

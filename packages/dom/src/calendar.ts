@@ -23,6 +23,7 @@ import { createToolbar } from './toolbar.js';
 // Built-in views register themselves.
 import './views/timegrid.js';
 import './views/daygrid.js';
+import { activeIn } from './focus.js';
 
 export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   /** A kernel built elsewhere (shared store, tests). Otherwise one is made from the options. */
@@ -364,11 +365,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     const intent = intentFor(ke, { mode: 'cursor', rtl: root.dir === 'rtl', grid: 'day' });
     if (intent?.kind !== 'undo' && intent?.kind !== 'redo') return;
     ke.preventDefault();
-    const focused = (doc.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-event-id]')?.dataset['eventId'] ?? null;
+    const focused = (activeIn(root) as HTMLElement | null)?.closest<HTMLElement>('[data-event-id]')?.dataset['eventId'] ?? null;
     const done = intent.kind === 'undo' ? kernel.history.undo() : kernel.history.redo();
     if (done) ctx.announce(intent.kind === 'undo' ? ctx.messages.undone : ctx.messages.redone);
     // The focused node may have gone with the change: the event where it now is, else the cursor.
-    if (done && !root.contains(doc.activeElement)) interactions?.refocus(focused);
+    if (done && !root.contains(activeIn(root))) interactions?.refocus(focused);
   });
   /** A short menu at a point: resolves with the value chosen, or null when it closes without one. */
   function choose<T>(label: string, choices: readonly { id: string; label: string; value: T }[], at: { x: number; y: number }): Promise<T | null> {
@@ -382,7 +383,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       menu.open(
         choices.map((c) => ({ id: c.id, label: c.label, enabled: true, run: () => finish(c.value) })),
         at,
-        doc.activeElement as HTMLElement | null,
+        activeIn(root) as HTMLElement | null,
         label,
         () => finish(null),
       );

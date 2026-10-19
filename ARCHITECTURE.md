@@ -82,6 +82,18 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18a (détail dans ROADMAP.md)
+
+- **Angular** : `provideDzMotion` (un adaptateur par calendrier) ; `ng add @dzcalendar/angular` (schéma CommonJS dans `dist/schematics`, versions par paquet, idempotent) ; `DzExport` dans `pro-angular` (`@dzcalendar/angular` en pair).
+- **Web Component** `@dzcalendar/element` : page ou shadow root (`shadow`), attributs vivants, propriétés, événements `dz-*` composés, rappels « qui offrent » (ouvrir, créer, créneaux) seulement si écoutés ; code de problème `invalid-option` (détails courts).
+- **D (dom)** : `activeIn` / `targetOf` pour le focus et les cibles dans un shadow root ; la sonde de mesure placée physiquement.
+- **Décision du propriétaire (après revue)** : budgets à la mesure + 3 % (pro-angular 1,5 ko, element 3,0 ko).
+
+### Décisions de la Phase 18 (2026-10-19, en cours)
+
+- **Découpage** : 18a compléments Angular + Web Component ; 18b traducteur FullCalendar + codemod (analyseur de code en dépendance de l'outil seul) ; 18c React, Vue, `llms.txt`, `commands.schema.json`, benchmark public.
+- **Benchmark** contre FullCalendar en boîte noire (installé dans `bench-public/` seulement, API publique, code jamais lu ni copié).
+
 ### Décisions de la Phase 17 (2026-10-19, en cours)
 
 - **Effets GSAP** : fuseaux et DST (glissement des événements au changement de fuseau, heure répétée qui se déplie, « maintenant » vivant), navigation (morphing mois → jour, titre en odomètre, retour à aujourd'hui, profondeur), événements (glisser physique, dépôt, suppression/annulation, création, vague), surcouches et timeline (ouverture depuis l'origine, accordéon des rangées, défilement amorti, compteur de places).
@@ -1529,6 +1541,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 
 ### Phase 18 : écosystème
 - **Livrables / fichiers** : `compat-fullcalendar` (traducteur d'options, codemod), `element` (Web Component), React/Vue, `llms.txt`, `commands.schema.json`, benchmark public.
+- **Ajout du propriétaire (2026-10-19)** : compléments Angular — impression et exports depuis un service ou une directive, mouvement GSAP fourni une fois pour l'application (`provideDzCalendar({ motion })`), schéma `ng add @dzcalendar/angular`, exemples Angular dans la documentation.
 - **Dépend de** : P11.
 
 ### Phase 19+ : natif

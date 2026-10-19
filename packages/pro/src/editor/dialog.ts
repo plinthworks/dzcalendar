@@ -1,6 +1,7 @@
 import { Temporal, UNASSIGNED, formatTemporal, serializeRRule } from '@dzcalendar/core';
 import type { CalEvent, Command, CommandResult, CreateRequest, EditScope, EventInput, EventInstance, EventPatch, PlainDate, RRuleWeekday as Weekday, ZoneId } from '@dzcalendar/core';
 import { ensureStyles, messagesForLocale } from '@dzcalendar/dom';
+import { activeIn, targetOf } from '@dzcalendar/dom/toolkit';
 import type { CalendarInstance } from '@dzcalendar/dom';
 import { createDateTimeRange, EN as TZ_EN, FR as TZ_FR, AR as TZ_AR } from '@tzslot/dom';
 import type { DateTimeRangeInstance } from '@tzslot/dom';
@@ -468,7 +469,7 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
   }
 
   return new Promise<EditorOutcome>((resolve) => {
-    const before = doc.activeElement as HTMLElement | null;
+    const before = activeIn(host) as HTMLElement | null;
     let done = false;
     let dirty = false;
     form.addEventListener('input', () => (dirty = true));
@@ -550,17 +551,18 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
       if (focusable.length === 0) return;
       const first = focusable[0]!;
       const last = focusable[focusable.length - 1]!;
-      if (e.shiftKey && doc.activeElement === first) {
+      if (e.shiftKey && activeIn(dialog) === first) {
         e.preventDefault();
         last.focus();
-      } else if (!e.shiftKey && doc.activeElement === last) {
+      } else if (!e.shiftKey && activeIn(dialog) === last) {
         e.preventDefault();
         first.focus();
       }
     }
     // The focus never leaves for the page behind (a click on dead space, a script): back to the title.
     function onFocus(e: FocusEvent): void {
-      const t = e.target as Node | null;
+      // The node really focused (inside a shadow root too, not its host).
+      const t = targetOf(e) as Node | null;
       // tzslot's pickers open on the page's body, outside the dialog: they are part of it.
       const inPicker = t instanceof Element && t.closest('.tz-field__panel, [class^="tz-"], [class*=" tz-"]') !== null;
       if (t && !dialog.contains(t) && !inPicker) title.focus();

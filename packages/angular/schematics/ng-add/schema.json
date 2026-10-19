@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "$id": "dzcalendar-ng-add",
+  "title": "DzCalendar ng-add",
+  "type": "object",
+  "properties": {
+    "project": { "type": "string", "description": "The application to add DzCalendar to.", "$default": { "$source": "projectName" } },
+    "gsap": { "type": "boolean", "default": false, "description": "GSAP motion (@dzcalendar/motion-gsap and gsap), provided once with provideDzMotion.", "x-prompt": "Add GSAP motion (zone glides, drag tilt, the title odometer…)?" },
+    "pro": { "type": "boolean", "default": false, "description": "The Pro: the timeline, the event editor, printing and the exports (@dzcalendar/pro, @dzcalendar/pro-angular, @tzslot/dom).", "x-prompt": "Add the Pro (timeline, event editor, printing and exports)?" },
+    "example": { "type": "boolean", "default": true, "description": "An example component with a <dz-calendar>.", "x-prompt": "Add an example component (src/app/agenda.ts)?" },
+    "skipInstall": { "type": "boolean", "default": false, "description": "Do not run the package manager." }
+  },
+  "required": []
+}

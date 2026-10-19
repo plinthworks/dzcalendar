@@ -4,6 +4,7 @@ import { buildListModel } from '@dzcalendar/core/views';
 import type { ListDay, ListEntry, ListModel } from '@dzcalendar/core/views';
 import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, ensureStyles, fillEvent, formatMinutes, h, registerView, startReadingOf, timeLabels, unmountEvent } from '@dzcalendar/dom/toolkit';
 import type { ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
+import { activeIn } from '../focus.js';
 
 /** Layout only; the look comes with the CSS pass. */
 export const LIST_CSS = `
@@ -519,7 +520,7 @@ export function createListView(ctx: ViewCtx): ViewController {
       model = m;
       created = [];
       root.setAttribute('aria-label', s.title);
-      const focused = root.contains(doc.activeElement);
+      const focused = root.contains(activeIn(root));
       // Printing mounts every row; the window comes back where the reader was.
       if (ctx.printing && printedAt === null) printedAt = root.scrollTop;
       byKey.clear();
@@ -556,7 +557,7 @@ export function createListView(ctx: ViewCtx): ViewController {
         empty.textContent = ctx.messages.noEvents;
         if (!empty.isConnected) root.append(empty);
       } else empty.remove();
-      const lost = focused && !root.contains(doc.activeElement);
+      const lost = focused && !root.contains(activeIn(root));
       rove(cursorKey, refocus || lost);
       // Nothing left to focus: the empty message holds it, so it does not fall to the page.
       if (lost && !cursorKey) {

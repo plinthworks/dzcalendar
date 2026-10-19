@@ -11,6 +11,7 @@ import { onScrollFrame } from '../render/window.js';
 import { NodePool } from '../render/pool.js';
 import { altDate } from '../render/alt.js';
 import { drawResourceHeads, noResourcesNote, resourceName } from '../render/resource-heads.js';
+import { activeIn } from '../focus.js';
 
 const HM = { hour: '2-digit', minute: '2-digit' } as const;
 
@@ -858,7 +859,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       // any more. A fresh one waits in the all-day row; focused, the keyboard puts it at home with its words.
       const at = cursorHits.get(cursorNode);
       if (at && !m.columns.some((c) => c.date.equals(at.date) && c.resource?.id === at.resourceId)) {
-        const focused = doc.activeElement === cursorNode;
+        const focused = activeIn(cursorNode) === cursorNode;
         const fresh = h(doc, 'div', 'dz-cursor');
         fresh.tabIndex = 0;
         fresh.setAttribute('role', 'button');

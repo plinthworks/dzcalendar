@@ -7,6 +7,7 @@ import { commitProposal, timeOf } from './commit.js';
 import { clearGhosts, syncGhosts } from './ghosts.js';
 import { attachKeyboard } from './keyboard.js';
 import type { Box, InteractionSurface } from './surface.js';
+import { activeIn } from '../focus.js';
 
 /** Pixels a pointer travels before a press becomes a drag: a finger wobbles more than a mouse. */
 const THRESHOLD = { mouse: 4, pen: 4, touch: 8 } as const;
@@ -583,7 +584,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       // On a touch screen the event stays selected where it landed, ready for the next drag.
       if (outcome.done && g.press.type === 'touch' && outcome.landed) select(outcome.landed);
       // The pressed node went with the old place (another column, another week): the focus follows the event.
-      if (outcome.done && outcome.eventId && g.press.type !== 'touch' && !root.contains(doc.activeElement)) keyboard.refocus(outcome.eventId);
+      if (outcome.done && outcome.eventId && g.press.type !== 'touch' && !root.contains(activeIn(root))) keyboard.refocus(outcome.eventId);
     } catch (err) {
       // An application callback (chooseScope, a hook) failed: the gesture still ends, the error stays visible.
       void Promise.reject(err);

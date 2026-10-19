@@ -16,6 +16,7 @@ import { onScrollFrame } from '../render/window.js';
 import { altDate } from '../render/alt.js';
 import { NodePool } from '../render/pool.js';
 import { drawResourceHeads, noResourcesNote, resourceName } from '../render/resource-heads.js';
+import { activeIn } from '../focus.js';
 
 /** A cell's key: its date, and its resource in a resource view (the same date shows once per resource). */
 const cellKey = (date: PlainDate, resourceId: string | undefined) => (resourceId === undefined ? date.toString() : `${date.toString()}|${resourceId}`);
@@ -326,7 +327,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
         sections.forEach((x, i) => {
           const el = months.get(x.key);
           if (!el) return;
-          const keep = !crowded || monthHeight === 0 || near[i] || el.contains(doc.activeElement);
+          const keep = !crowded || monthHeight === 0 || near[i] || el.contains(activeIn(el));
           if (keep && asleep.delete(x.key)) fill(x.key, x, true);
           else if (!keep && !asleep.has(x.key)) {
             asleep.add(x.key);
@@ -861,7 +862,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
         : [{ key: '', model: next as DayGridModel, month: null }];
       state = s;
       created = [];
-      const focused = root.contains(doc.activeElement);
+      const focused = root.contains(activeIn(root));
       root.setAttribute('aria-label', s.title);
       // The cursor stays on its day while it is shown; otherwise today, or the period's first day.
       if (!cursorDate || !shownDates().some((d) => d.equals(cursorDate!))) {
@@ -912,7 +913,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       // A cell whose content did not change was not redrawn: the tab stop is set on all of them.
       rove(cursorDate, cursorResource);
       // The focused day went away (hidden days changed): the focus goes to the cursor's day, not to the page.
-      if (focused && !root.contains(doc.activeElement) && cursorDate) cellOf(cursorDate, cursorResource)?.focus();
+      if (focused && !root.contains(activeIn(root)) && cursorDate) cellOf(cursorDate, cursorResource)?.focus();
       return created;
     },
     tick() {

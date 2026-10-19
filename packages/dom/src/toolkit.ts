@@ -21,3 +21,4 @@ export { altDate } from './render/alt.js';
 export { resourceName, noResourcesNote } from './render/resource-heads.js';
 export { handles } from './interact/handles.js';
 export type { ResourceContentCtx, ResourceHooks } from './host.js';
+export { activeIn, targetOf } from './focus.js';

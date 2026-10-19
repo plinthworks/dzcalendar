@@ -1,4 +1,5 @@
 import { h } from './render/reconcile.js';
+import { activeIn, targetOf } from './focus.js';
 
 let popoverIds = 0;
 
@@ -51,7 +52,8 @@ export function createPopover(doc: Document, container: HTMLElement): PopoverHos
     if (focusBack && back?.isConnected) back.focus();
   };
   const outside = (e: Event) => {
-    if (!(e.target instanceof Node) || !panel.contains(e.target)) close();
+    const t = targetOf(e);
+    if (!(t instanceof Node) || !panel.contains(t)) close();
   };
   closeBtn.addEventListener('click', () => close());
   panel.addEventListener('keydown', (e) => {
@@ -62,7 +64,7 @@ export function createPopover(doc: Document, container: HTMLElement): PopoverHos
     } else if (e.key === 'Tab') {
       const all = focusables();
       if (all.length === 0) return;
-      const i = all.indexOf(doc.activeElement as HTMLElement);
+      const i = all.indexOf(activeIn(panel) as HTMLElement);
       const next = e.shiftKey ? (i <= 0 ? all.length - 1 : i - 1) : (i + 1) % all.length;
       all[next]!.focus();
       e.preventDefault();

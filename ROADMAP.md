@@ -4,15 +4,14 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–17, each committed (`git log --oneline`: the last is
-  titled "Phase 17b"). Every check green at that commit: `npm test`
-  (1 213), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
-  `test:browser` (212), `perf:browser`, `test:package`.
-- **Now: Phase 18** (ecosystem: FullCalendar options translator, Web
-  Component, React/Vue, `llms.txt`, `commands.schema.json`, public
-  benchmark) — Phase 17 is done (commits "Phase 17a", "Phase 17b"). Next
-  step: present Phase 18's open questions to the owner (in French) before
-  coding.
+- **Done:** Phases 0–17 and 18a, each committed (`git log --oneline`: the
+  last is titled "Phase 18a"). Every check green at that commit: `npm test`
+  (1 229), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
+  `test:browser` (221), `perf:browser`, `test:package` (with `ng add` on
+  Angular 19 and 22).
+- **Now: Phase 18b** (the FullCalendar translator and its codemod) — 18a
+  is committed ("Phase 18a": Angular complements and the Web Component).
+  Next step: 18b's open questions to the owner (in French), then code.
 - **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
   that URL; the owner authorised pushing on 2026-10-18).
 - **Left after it:** 18 ecosystem (Web Component, React/Vue,
@@ -1819,4 +1818,103 @@ See `ARCHITECTURE.md` J. Phase 17.
 - One adapter's drag state is shared by calendars that share it (one drag
   at a time).
 - The focus after creating from a selection (earlier than 17b).
+
+## Phase 18 — ecosystem (in progress)
+
+### Owner's decisions (2026-10-19)
+
+- **Split:** 18a — Angular complements (print and exports from a service
+  or directive, GSAP motion provided once, `ng add @dzcalendar/angular`,
+  Angular examples in the docs) and the Web Component; 18b — the
+  FullCalendar translator and its codemod; 18c — React, Vue, `llms.txt`,
+  `commands.schema.json`, the public benchmark. Reviews and a commit per
+  sub-phase.
+- **Translator + codemod:** `fromFullCalendar(options)` at run time (what
+  has no equivalent is a warning), and a command-line codemod rewriting the
+  source; its code parser is a dependency of the tool only, never of the
+  calendar.
+- **React and Vue**, both at Angular's level (component, two-way view,
+  date and selection, event templates, the Pro editor), tested by a real
+  application built.
+- **Benchmark against FullCalendar as a black box:** installed only in
+  `bench-public/`, used through its public API on the same scenarios;
+  results and protocol published; its code never read nor copied
+  (CLEANROOM).
+- **18a (owner, 2026-10-19):** the Web Component in both modes — light DOM
+  by default (the page's CSS, themes and Tailwind apply), a `shadow`
+  attribute to isolate it (styled then by the `--tz-*`/`--dz-*` palette
+  and `::part`); Angular print and exports as an injectable service
+  `DzExport` (`print`, `pdf`, `xlsx`, `csv`, `ics`, `png`, with the
+  calendar's `CalendarController`, the Pro loaded on demand);
+  `ng add @dzcalendar/angular` installs the packages, adds the theme CSS
+  and `provideDzCalendar()`, offers GSAP motion, offers the Pro, and adds
+  an example component.
+
+## Phase 18a — Angular complements, the Web Component ✅ (2026-10-19)
+
+### Built
+
+- **`@dzcalendar/angular`:** `provideDzMotion(() => adapter)` (one adapter
+  per calendar; a `motion` in `provideDzCalendar` or on a calendar wins; a
+  factory that throws is reported to the `ErrorHandler`, the calendar drawn
+  without motion); `ng add @dzcalendar/angular` (packages at their own
+  versions from `schematics/versions.json`, the theme in `angular.json`'s
+  styles, `provideDzCalendar({})`; prompts for GSAP motion —
+  `provideDzMotion(() => createGsapMotion())` —, the Pro and an example
+  `src/app/agenda.ts`; idempotent; the first application with a build;
+  existing `gsap` / `@tzslot/dom` kept; CommonJS `.cjs` in
+  `dist/schematics`).
+- **`@dzcalendar/pro-angular`:** `DzExport` — `print`, `pdf`, `png`,
+  `xlsx`, `csv`, `ics`, `download` (PNG sheets zipped), with the component,
+  its `CalendarController` or the DOM calendar; the Pro fetched on first
+  use; outside the zone, settled inside; never rejects. `@dzcalendar/angular`
+  is a peer.
+- **`@dzcalendar/element`:** `<dz-calendar>` (`DzCalendarElement`,
+  `defineDzCalendar(name)`, `@dzcalendar/element/define`) — light DOM by
+  default, `shadow` isolates it (`:host` a block, the theme by
+  `stylesheet`, `::part(calendar | toolbar)`); live attributes; `events`,
+  `resources`, `sources`, `options` (live keys in place, else remade on
+  its store, `dz-remade`); composed `dz-*` events; the offering callbacks
+  only when listened to; `problems`; server-safe import.
+- **`@dzcalendar/dom`:** `activeIn` / `targetOf` (toolkit) — focus and
+  event targets read in a shadow root (menus, "+N", focus after undo, the
+  editor's trap); the measuring probe placed physically (no page-wide
+  scroll right to left).
+- **Core:** problem code `invalid-option`.
+- **Docs:** `docs/angular.md` (install, a calendar, defaults, motion, the
+  Pro), `docs/element.md`; playground `element.html` (both modes).
+- **Measured:** pro-angular 1.46 kB (budget 1.5), element 2.9 kB (3.0),
+  dom 43.6 kB (44.9), angular 4.0 kB (6.0).
+- **Bench noise:** `normalize+index 10k` read 70–79 ms (budget 70); the
+  17b commit, benched alternately in a worktree beside it, read the same
+  75 ms on this machine at that time. 18a does not touch that path (a type
+  only). Not raised; to watch (it has been at the line since 16a).
+
+### Reviews (architect; code review by execution in Chrome), fixed
+
+- In a shadow root, menus closed on the press (the event retargeted to the
+  host), "+N" lost its focus order, the editor yanked the focus at each
+  move, focus after undo jumped: `activeIn` / `targetOf`. Importing the
+  element threw on a server. A bad zone or view at mount left a blank
+  element, and the problem was said before anyone listened. `options`
+  remade the calendar for any new object (losing edits and undo); `events`,
+  `sources` could throw, bad events were never said, one bad source left no
+  calendar for good. Every callback was passed, so "Open", "New event
+  here" and slot buttons showed with nobody listening. Booleans taken away
+  hid the weekends; swapping `shadow` emptied it; no default `display`;
+  `dz-command-refused` lost its command; details were sentences. The
+  schematic doubled the providers when run twice, replaced the
+  application's `gsap`, could pick a library, wrote one version for every
+  package. `DzExport` relied on `instanceof` (two copies of the Angular
+  package) and could reject; no PNG download. Right to left, a probe gave
+  the page 10 000 px of horizontal scroll.
+
+### Not done in Phase 18a, on purpose
+
+- A page listening on `document` (not on the element) for `dz-event-open`,
+  `dz-create-request` or `dz-slot-click` does not turn those offers on:
+  listen on the element, or give the callback in `options`.
+- The schematic's NgModule application path is handled by
+  `addRootProvider` but not in `test:package` (standalone only).
+- Remade on new options: the undo history starts again.
 

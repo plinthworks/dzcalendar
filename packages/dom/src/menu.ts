@@ -1,6 +1,7 @@
 import type { ActionItem, ActionTarget } from '@dzcalendar/core';
 import type { ViewCtx } from './host.js';
 import { h } from './render/reconcile.js';
+import { activeIn, targetOf } from './focus.js';
 
 /** `focus`: where the focus returns when the menu closes (default: the anchor if focusable, else what had it). */
 export type ResolveTarget = (el: Element, point: { x: number; y: number } | null) => { target: ActionTarget; anchor: HTMLElement; focus?: HTMLElement } | null;
@@ -17,7 +18,7 @@ export function attachMenuTriggers(ctx: ViewCtx, root: HTMLElement, resolve: Res
   const open = (el: Element, point: { x: number; y: number } | null): boolean => {
     const hit = resolve(el, point);
     if (!hit) return false;
-    const focus = hit.focus ?? ((hit.anchor.matches('[tabindex]') ? hit.anchor : ctx.doc.activeElement) as HTMLElement | null);
+    const focus = hit.focus ?? ((hit.anchor.matches('[tabindex]') ? hit.anchor : activeIn(hit.anchor)) as HTMLElement | null);
     return ctx.openMenu(hit.target, point ?? hit.anchor, focus);
   };
 
@@ -124,10 +125,12 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
   };
   // A fixed menu would float away from what it was opened on.
   const onScroll = (e: Event) => {
-    if (!(e.target instanceof Node) || !menu.contains(e.target)) close(false);
+    const t = targetOf(e);
+    if (!(t instanceof Node) || !menu.contains(t)) close(false);
   };
   const outside = (e: Event) => {
-    if (!(e.target instanceof Node) || !menu.contains(e.target)) close();
+    const t = targetOf(e);
+    if (!(t instanceof Node) || !menu.contains(t)) close();
   };
 
   /** Opens the sub-menu of `entry` (built on demand), its first entry focused when asked. */
@@ -187,7 +190,7 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
   }
 
   menu.addEventListener('keydown', (e) => {
-    const active = doc.activeElement as HTMLElement | null;
+    const active = activeIn(menu) as HTMLElement | null;
     const level = levelOf(active);
     const all = itemsOf(level);
     const i = active ? all.indexOf(active) : -1;

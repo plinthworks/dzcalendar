@@ -17,6 +17,7 @@ import {
   timeLabels,
   unmountEvent,
   scrollEased,
+  activeIn,
 } from '@dzcalendar/dom/toolkit';
 import type { Box, InteractionSurface, KeyboardSurface, ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
 import type { TimelineBar, TimelineModel, TimelineMore, TimelineRow } from './model.js';
@@ -1220,7 +1221,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       // thrown away, would cost more than the whole window): the measure that follows mounts the window.
       if (!windowed(m)) win = null;
       else if (px <= 0 || win === null) win = { ...EMPTY_WINDOW };
-      const hadCursor = doc.activeElement === cursorNode;
+      const hadCursor = activeIn(scroller) === cursorNode;
       syncRows(m);
       // The cursor's row folded away, or another scale (its place means another moment): it starts again,
       // without a place; focused, the keyboard puts it at home and names it.
@@ -1230,7 +1231,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         cursorNode = fresh;
         old.remove();
         keptRows.clear();
-        if (hadCursor || (doc.activeElement === doc.body && cursorWasFocused)) fresh.focus({ preventScroll: true });
+        if (hadCursor || ((activeIn(scroller) ?? doc.body) === doc.body && cursorWasFocused)) fresh.focus({ preventScroll: true });
         cursorWasFocused = false;
       }
       // A day the zone skipped (Apia, 30 December 2011) has no time to draw: said, as in the time grid.

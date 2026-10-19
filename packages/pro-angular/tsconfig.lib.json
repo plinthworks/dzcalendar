@@ -24,6 +24,12 @@
       "@dzcalendar/pro/editor": [
         "../pro/dist/editor-entry.d.ts"
       ],
+      "@dzcalendar/pro/export": [
+        "../pro/dist/export-entry.d.ts"
+      ],
+      "@dzcalendar/pro/print": [
+        "../pro/dist/print-entry.d.ts"
+      ],
       "@dzcalendar/angular": [
         "../angular/dist/index.d.ts"
       ],

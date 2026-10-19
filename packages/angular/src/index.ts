@@ -15,5 +15,5 @@ export type { DzCalendarOptions } from './calendar.js';
 export { CalendarController } from './controller.js';
 export { DzEventContent } from './templates.js';
 export type { EventContentContext } from './templates.js';
-export { DZ_CALENDAR_DEFAULTS, provideDzCalendar } from './providers.js';
+export { DZ_CALENDAR_DEFAULTS, DZ_MOTION, provideDzCalendar, provideDzMotion } from './providers.js';
 export type { DzCalendarDefaults } from './providers.js';

@@ -1307,6 +1307,57 @@ try {
       await p.close();
     }
 
+    // ── Phase 18a: the Web Component, in the page and in a shadow root ──
+    {
+      const { p, errors } = await page('/element.html');
+      await p.waitForFunction(() => document.querySelector('#isolated')?.shadowRoot?.querySelector('.dz-ev'));
+      const look = await p.evaluate(() => {
+        const light = document.querySelector('#page .dz-ev');
+        const iso = document.querySelector('#isolated').shadowRoot;
+        const shadow = iso.querySelector('.dz-ev');
+        return {
+          lightOutline: getComputedStyle(light).outlineStyle,
+          shadowOutline: getComputedStyle(shadow).outlineStyle,
+          shadowStyled: getComputedStyle(iso.querySelector('.dz-tg__heads') ?? iso.querySelector('.dz-cal')).display !== 'inline',
+          part: getComputedStyle(iso.querySelector('[part="toolbar"]')).backgroundColor,
+          zone: document.querySelector('#isolated').calendar.kernel.getState().timeZone,
+        };
+      });
+      check('element: in the page, the page’s CSS reaches it; in a shadow root, it does not', look.lightOutline === 'solid' && look.shadowOutline === 'none', JSON.stringify(look));
+      check('element: the isolated one is styled inside (its sheets, the theme linked in) and by ::part(toolbar)', look.shadowStyled && look.part === 'rgb(240, 253, 250)' && look.zone === 'Asia/Tokyo', JSON.stringify(look));
+      const clicked = await p.evaluate(() => new Promise((resolve) => {
+        document.addEventListener('dz-event-click', (e) => resolve(e.detail.event.title), { once: true });
+        document.querySelector('#isolated').shadowRoot.querySelector('.dz-ev').click();
+      }));
+      check('element: a click inside the shadow root is a dz-event-click on the page (composed)', typeof clicked === 'string' && clicked.length > 0, String(clicked));
+      await p.evaluate(() => document.querySelector('#page').setAttribute('view', 'dayGridMonth'));
+      const viewNow = await p.evaluate(() => document.querySelector('#page').calendar.kernel.getState().view.type);
+      check('element: an attribute changed is the calendar updated', viewNow === 'dayGridMonth', viewNow);
+      const v = await axeViolations(p, '#page');
+      check('axe: the Web Component in the page has no violation', v.length === 0, v.join('\n'));
+      const vi = await axeViolations(p, '#isolated');
+      check('axe: the Web Component in a shadow root has no violation', vi.length === 0, vi.join('\n'));
+      // In the shadow root: a real pointer on the context menu (it used to close on the press, retargeted to the host).
+      const ev = p.locator('#isolated .dz-ev').first();
+      await ev.click({ button: 'right' });
+      const opened = await p.evaluate(() => Boolean(document.querySelector('#isolated').shadowRoot.querySelector('.dz-menu:not([hidden])')));
+      const item = p.locator('#isolated .dz-menu [data-action]:not([aria-disabled="true"])').first();
+      const action = await item.getAttribute('data-action');
+      await item.hover();
+      await p.mouse.down();
+      const stillOpen = await p.evaluate(() => Boolean(document.querySelector('#isolated').shadowRoot.querySelector('.dz-menu:not([hidden])')));
+      await p.mouse.up();
+      await p.keyboard.press('Escape');
+      check('element (shadow): the context menu opens, and pressing on an item does not close it before it runs', opened && stillOpen, `${action} ${opened} ${stillOpen}`);
+      // Right to left: no page-wide horizontal scroll (a measuring probe once stood 10 000 px away).
+      await p.evaluate(() => { for (const el of document.querySelectorAll('dz-calendar')) el.setAttribute('locale', 'ar'); });
+      await p.waitForTimeout(200);
+      const wide = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      check('element: right to left, the page gets no horizontal scroll', wide <= 1, String(wide));
+      check('element: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
     // ── Phase 17b: events, overlays, timeline (GSAP, sober) ──
     {
       const { p, errors } = await page('/', { reducedMotion: 'no-preference' });

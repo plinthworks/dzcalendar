@@ -40,7 +40,9 @@ export type ProblemCode =
   | 'invalid-availability'
   | 'invalid-slot-query'
   /** A print or an export asked for what cannot be put on paper or in a file (an unknown view, a range ending before it starts). */
-  | 'invalid-export';
+  | 'invalid-export'
+  /** An option given by an attribute or a property that cannot be read (the Web Component). */
+  | 'invalid-option';
 
 export type Severity = 'error' | 'warning';
 

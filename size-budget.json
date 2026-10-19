@@ -16,11 +16,12 @@
   "dom/locales/es (without dom)": 1900,
   "dom/locales/de (without dom)": 1900,
   "angular (without Angular, core, dom)": 6000,
-  "pro-angular (without Angular, core, dom, pro)": 800,
+  "pro-angular (without Angular, core, dom, pro)": 1500,
   "theme css": 8000,
   "motion-gsap (without gsap)": 5400,
   "temporal polyfill": 24000,
   "pro/editor with tzslot dom (without core, dom)": 37500,
   "pro/export (without core, dom, ical)": 12300,
-  "pro/print (without core, dom)": 4400
+  "pro/print (without core, dom)": 4400,
+  "element (without core, dom)": 3000
 }

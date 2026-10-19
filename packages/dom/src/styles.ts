@@ -417,7 +417,7 @@ export const DZ_CSS = `
 
 /* Long press opens the context menu: no iOS callout or text selection in the way. */
 .dz-tg__body, .dz-dg__body { -webkit-touch-callout: none; user-select: none; }
-.dz-probe { position: absolute; visibility: hidden; pointer-events: none; inset-inline-start: -9999px; height: var(--dz-bar-height, 1.375rem); width: 1px; }
+.dz-probe { position: absolute; visibility: hidden; pointer-events: none; left: -9999px; height: var(--dz-bar-height, 1.375rem); width: 1px; }
 .dz-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* ── gestures: ghosts, handles, the selected event on touch ─────────────── */
 .dz-tg, .dz-dg { position: relative; }

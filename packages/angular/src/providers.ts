@@ -1,5 +1,5 @@
 import { InjectionToken } from '@angular/core';
-import type { CalendarOptions } from '@dzcalendar/dom';
+import type { CalendarOptions, MotionAdapter } from '@dzcalendar/dom';
 
 /**
  * What an application settles once: the zone, the locale, the words, any
@@ -16,3 +16,20 @@ export const DZ_CALENDAR_DEFAULTS = new InjectionToken<DzCalendarDefaults>('dzca
 export function provideDzCalendar(defaults: DzCalendarDefaults) {
   return [{ provide: DZ_CALENDAR_DEFAULTS, useValue: defaults }];
 }
+
+/** Makes each calendar's motion adapter (one per calendar: a drag's state is the adapter's). */
+export const DZ_MOTION = new InjectionToken<(() => MotionAdapter) | null>('dzcalendar.motion', {
+  providedIn: 'root',
+  factory: () => null,
+});
+
+/**
+ * The motion of every `<dz-calendar>` of the application, settled once:
+ * `provideDzMotion(() => createGsapMotion({ preset: 'sober' }))`. One adapter
+ * is made per calendar. A `motion` given to `provideDzCalendar` or to a
+ * calendar still wins.
+ */
+export function provideDzMotion(make: () => MotionAdapter) {
+  return [{ provide: DZ_MOTION, useValue: make }];
+}
+
