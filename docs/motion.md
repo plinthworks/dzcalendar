@@ -32,8 +32,8 @@ createCalendar(el, { motion: createGsapMotion({ preset: 'expressive', zone: 0.9,
 | month → day | 0.42 s | 0.55 s |
 
 Any value of `MotionPreset` (`view`, `enter`, `drop`, `zone`, `morph`,
-`odometer`, `dst`, `slide`, `ease`, `move`, `settle`, `pop`, `stagger`) can
-be given over the preset.
+`odometer`, `dst`, `slide`, `ease`, `move`, `settle`, `pop`, `stagger`,
+`tilt`, `leave`) can be given over the preset.
 
 ## Effects (each on by default, `effects: { name: false }` turns one off)
 
@@ -60,10 +60,33 @@ be given over the preset.
 - **`depth`** — the day heads travel half the body's way when a period
   slides.
 
-Phase 17b adds the events (drag, drop, delete and undo, creation), the
-overlays and the timeline; its GSAP plugins are given by the application
-(`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`, owner's
-decision), each effect simpler without its plugin.
+- **`drag`** — a moved event leans with the gesture's speed (3° sober, 9°
+  expressive) and glides from slot to slot instead of snapping; a resize
+  does not lean. Dropped, it settles; thrown (with `InertiaPlugin`), it
+  lands with the speed it was let go with. Refused, it says "no", turns
+  upright and goes back.
+- **`leave`** — a deleted event (or occurrence) dissolves: the calendar
+  hands the motion a copy of it as it was (`.dz-leave` layer, no ids,
+  `aria-hidden`). Undone within a minute, it gathers back.
+- **`enter`** — an event made from a selection pours out of it; new events
+  otherwise arrive as a wave (a third of a second at most).
+- **`overlay`** — a context menu grows out of the point it was opened at, a
+  "+N" panel out of its link (its events cascading in), the editor out of
+  the event (or the selection) — and closes back into it.
+- **`seats`** — a slot's seats left roll and pop when a booking changes
+  them.
+- **`scroll`** — "today" from another date scrolls the hours (or the
+  timeline) to now: eased, and stopped by the person's own wheel, touch or
+  key. The scroll itself happens without motion too (a behaviour of the
+  calendar since 17b).
+- **`rows`** — a timeline's group or parent folding or unfolding: the rows
+  that stay slide, the rows that open unroll (the rows that close go at
+  once).
+
+Plugins are the application's (owner's decision): `createGsapMotion({ plugins:
+{ InertiaPlugin, ScrollToPlugin } })`. Without `InertiaPlugin` a drop simply
+settles; without `ScrollToPlugin` the scroll properties are tweened
+directly.
 
 ## Writing an adapter
 
@@ -71,7 +94,14 @@ decision), each effect simpler without its plugin.
 still drawn, return what you need of it — then `afterChange(state, change,
 body)` once redrawn (return `true` when you animated the change yourself:
 `viewChange` and `eventsEnter` are then not called for it);
-`titleChange(title, from, to, change)`; `nowTick(nodes)`; `viewChange`,
+`titleChange(title, from, to, change)`; `nowTick(nodes)`;
+`eventsEnter(nodes, { cause, from? })`; `eventsLeave(copies, info)` (return
+a promise: the copies are removed when it settles, or after 2 s) with
+`wantsLeave()` (false: nothing is captured); `seatsChange(nodes)`;
+`scroll(el, { top, left })` (true: you move it; views use the toolkit's
+`scrollEased`); `overlayOpen(el, origin?)`, `overlayClose(el, origin?)`
+(the editor waits for it); `dragStart(ghosts, kind)` (the live array;
+places in `--gx` / `--gy`); `viewChange`,
 `eventsEnter`, `dragStart`, `dropRejected`, `captureLayout` /
 `animateLayout` (FLIP), `dropSettle`, `overlayOpen`, `destroy`.
 `MotionChange` says the causes (`navigate`, `view`, `zone`, `locale`…), the

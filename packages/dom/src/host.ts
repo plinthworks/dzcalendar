@@ -68,6 +68,8 @@ export interface ViewCtx {
   locale: string;
   zone: ZoneId;
   motion: MotionAdapter;
+  /** A view's scroll after this paint may be eased (a change, not the calendar's first paint). */
+  easeScroll: boolean;
   hooks: CalendarHooks;
   epoch: number;
   /** Minutes a context-menu moment snaps to in a time grid. */
@@ -153,3 +155,24 @@ export function viewFactory(family: string): ViewFactory | undefined {
 }
 
 export type MenuHook = (ctx: ContextMenuCtx, defaults: readonly ActionItem[]) => readonly ActionItem[] | null;
+
+/**
+ * Scrolls `el` as `apply` does, eased by the motion adapter when the view
+ * may (`ctx.easeScroll`): `apply` sets the place (any direction, any
+ * writing mode), which is read, put back, and handed to the adapter.
+ */
+export function scrollEased(ctx: Pick<ViewCtx, 'motion' | 'easeScroll'>, el: HTMLElement, apply: () => void): void {
+  if (!ctx.easeScroll || !ctx.motion.scroll) return apply();
+  const top = el.scrollTop;
+  const left = el.scrollLeft;
+  apply();
+  const to = { top: el.scrollTop, left: el.scrollLeft };
+  if (to.top === top && to.left === left) return;
+  el.scrollTop = top;
+  el.scrollLeft = left;
+  if (!ctx.motion.scroll(el, to)) {
+    el.scrollTop = to.top;
+    el.scrollLeft = to.left;
+  }
+}
+

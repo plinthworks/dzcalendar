@@ -68,6 +68,14 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 17b (détail dans ROADMAP.md)
+
+- **D.10 (dom)** : `eventsEnter(nodes, { cause, from? })` (`MotionEnter` : commande, annulation, rétablissement ; la sélection d'origine) ; `eventsLeave(copies, info)` → `Promise` (copies faites **avant** le dessin, des seuls événements touchés — `removed`, `updated`, `seriesChanged` —, dans une couche `.dz-leave`, sans ids ni clé ; `EVENT_NODE` les exclut) et `wantsLeave()` ; `seatsChange` ; `scroll(el, to)` + `ViewCtx.easeScroll` et `scrollEased` (boîte à outils) ; `overlayOpen(el, origine)`, `overlayClose` ; `dragStart(ghosts, kind)` ; `CalendarInstance.motion`. « Aujourd'hui » depuis une autre date fait défiler vers maintenant (comportement du calendrier, amorti s'il y a du mouvement).
+- **motion-gsap** : effets `drag`, `leave`, `enter`, `overlay`, `seats`, `scroll`, `rows` ; `plugins` (InertiaPlugin pour un dépôt lancé, ScrollToPlugin pour le défilement) ; préréglages + `tilt`, `leave`.
+- **Éditeur** : s'ouvre depuis l'événement ou la sélection, se referme vers lui (fond `inert` pendant la fermeture).
+- **Décision du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 44,9 ko, motion-gsap 5,4 ko) ; pas de découpage de motion-gsap tant qu'il reste sous ~6 ko.
+- **Non fait, consigné** : la liste ne dissout pas (ses entrées ne sont pas des nœuds d'événement de grille) ; les rangées qui se replient disparaissent sans copie ; le focus après une création depuis une sélection (antérieur à la 17b).
+
 ### Ajustements après la Phase 17a (détail dans ROADMAP.md)
 
 - **D.10 (dom)** : `MotionAdapter` gagne `beforeChange(change)` (l'ancien écran encore dessiné) et `afterChange(état, change, body)` (renvoie `true` s'il a animé le changement : `viewChange`/`eventsEnter` ne sont alors pas appelés), `titleChange`, `nowTick` ; `MotionChange { causes, direction, from, to, days, root, rtl }`, `MotionSide { view, family, date, zone, title, days }`. Plusieurs changements avant un même dessin n'en font qu'un (le premier « from », toutes les causes, le dernier « to »). Par défaut `WAAPI_MOTION` (glissement, entrées, surcouches ; coupé sous mouvement réduit et sans `Element.animate`) ; `NO_MOTION` pour rien. Les copies d'impression ont `NO_MOTION`.
@@ -77,7 +85,7 @@ Ils priment sur les sections citées.
 ### Décisions de la Phase 17 (2026-10-19, en cours)
 
 - **Effets GSAP** : fuseaux et DST (glissement des événements au changement de fuseau, heure répétée qui se déplie, « maintenant » vivant), navigation (morphing mois → jour, titre en odomètre, retour à aujourd'hui, profondeur), événements (glisser physique, dépôt, suppression/annulation, création, vague), surcouches et timeline (ouverture depuis l'origine, accordéon des rangées, défilement amorti, compteur de places).
-- **Préréglages** « sobre » (défaut) et « expressif », tout réglable ; **base WAAPI** dans `dom` sans GSAP (< 1 ko) ; **plugins** Flip, CustomEase, InertiaPlugin, ScrollToPlugin, chargés à la demande ; `prefers-reduced-motion` coupe tout.
+- **Préréglages** « sobre » (défaut) et « expressif », tout réglable ; **base WAAPI** dans `dom` sans GSAP (< 1 ko) ; **plugins** InertiaPlugin, ScrollToPlugin fournis par l'application (décision après 17a ; Flip reste importé par l'adaptateur) ; `prefers-reduced-motion` coupe tout.
 - **Découpage** : 17a fondations + fuseaux/DST + navigation ; 17b événements + surcouches + timeline.
 
 ### Ajustements après la Phase 16b (détail dans ROADMAP.md)

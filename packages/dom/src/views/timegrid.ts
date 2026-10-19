@@ -3,7 +3,7 @@ import type { AllDayBar, AxisBand, Hit, MoreTimed, PlacedSlot, PlacedTimed, Plai
 import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
 import { handles } from '../interact/handles.js';
 import type { ViewController, ViewCtx } from '../host.js';
-import { registerView } from '../host.js';
+import { registerView, scrollEased } from '../host.js';
 import { attachMenuTriggers } from '../menu.js';
 import { applyEventLook, fillEvent, formatMinutes, timeLabels, timedContent, unmountEvent } from '../render/event.js';
 import { KeyedList, contentsHost, h } from '../render/reconcile.js';
@@ -280,6 +280,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
 
   // ── free slots (availableSlots) ──
   const slotOf = new WeakMap<HTMLElement, PlacedSlot>();
+  /** Slots whose seats changed in the last render. */
+  const seatsChanged: HTMLElement[] = [];
   function drawSlot(b: HTMLElement, placed: PlacedSlot): void {
     slotOf.set(b, placed);
     b.style.setProperty('--t', String(placed.top));
@@ -289,6 +291,10 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     b.textContent = from;
     // With seats (a class, a group session): how many are left, seen and said.
     const seats = typeof placed.slot.seats === 'number' && Number.isInteger(placed.slot.seats) && placed.slot.seats >= 1 ? ctx.messages.seatsLeft({ count: placed.slot.seats }) : '';
+    // Another count than this node showed (a booking): told to the motion, after the paint.
+    const count = seats ? String(placed.slot.seats) : '';
+    if (b.dataset['seats'] !== undefined && b.dataset['seats'] !== count && count) seatsChanged.push(b);
+    b.dataset['seats'] = count;
     if (seats) b.textContent = `${from} · ${seats}`;
     b.setAttribute('aria-label', seats ? `${ctx.messages.freeSlot({ time: `${from}–${to}` })}, ${seats}` : ctx.messages.freeSlot({ time: `${from}–${to}` }));
     // Without onSlotClick the slots only show the free time: not offered as buttons that do nothing.
@@ -866,6 +872,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       }
       for (const key of parts.keys()) if (!cols.some((c) => c.key === key)) parts.delete(key);
       if (crowded && !known) measureWindow();
+      if (seatsChanged.length > 0) ctx.motion.seatsChange?.(seatsChanged.splice(0));
       return created;
     },
 
@@ -889,7 +896,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const col = model.columns.find((c) => !c.folded);
       const el = col ? columns.get(col.key) : undefined;
       const px = el && col && col.axis.length > 0 ? el.getBoundingClientRect().height / col.axis.length : 0;
-      body.scrollTop = minutes * (px || 0.8);
+      scrollEased(ctx, body, () => (body.scrollTop = minutes * (px || 0.8)));
       rewindow();
     },
 

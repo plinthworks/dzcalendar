@@ -5,10 +5,12 @@ import '@dzcalendar/dom/list';
 import '@dzcalendar/dom/multimonth';
 import { createGsapMotion } from '@dzcalendar/motion-gsap';
 import { gsap } from 'gsap';
+import { InertiaPlugin } from 'gsap/InertiaPlugin';
+import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
 import { WAAPI_MOTION } from '@dzcalendar/dom';
 
 /** The motion picked on the page. */
-const motionOf = (v: string) => (v === 'none' ? NO_MOTION : v === 'waapi' ? WAAPI_MOTION : createGsapMotion({ preset: v === 'expressive' ? 'expressive' : 'sober' }));
+const motionOf = (v: string) => (v === 'none' ? NO_MOTION : v === 'waapi' ? WAAPI_MOTION : createGsapMotion({ preset: v === 'expressive' ? 'expressive' : 'sober', plugins: { InertiaPlugin, ScrollToPlugin } }));
 import { DEMO_EVENTS } from './demo-events';
 
 const zones = ['Europe/Paris', 'America/Chicago', 'Asia/Tokyo', 'Australia/Lord_Howe', 'UTC'];

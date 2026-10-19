@@ -473,21 +473,37 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
     let dirty = false;
     form.addEventListener('input', () => (dirty = true));
     form.addEventListener('change', () => (dirty = true));
-    const close = (outcome: EditorOutcome) => {
+    // What the dialog opens from and closes back into: the event's node, else the selection, else what had the focus.
+    const fromNode = (ev && (before?.closest<HTMLElement>(`[data-event-id="${cssEscape(ev.id)}"]`) ?? cal.element.querySelector<HTMLElement>(`[data-event-id="${cssEscape(ev.id)}"]`))) || cal.element.querySelector<HTMLElement>('.dz-ghost--armed') || (before && cal.element.contains(before) ? before : null);
+    const origin = fromNode?.getBoundingClientRect();
+    const close = (outcome: EditorOutcome, now = false) => {
       if (done) return;
       done = true;
-      dtr?.destroy();
-      backdrop.remove();
+      // Back into where it came from (the motion's), then gone — at once when the calendar itself is.
+      // Where it came from now (the event may have moved, the calendar scrolled), else where it was.
+      const into = (ev && cal.element.querySelector<HTMLElement>(`[data-event-id="${cssEscape(ev.id)}"]`)?.getBoundingClientRect()) || origin;
+      const shut = now ? undefined : cal.motion.overlayClose?.(dialog, into && into.width > 0 ? into : undefined);
+      if (shut) {
+        // Closing: nothing in it reachable any more (the keyboard, assistive tech), only seen leaving.
+        backdrop.inert = true;
+        backdrop.setAttribute('aria-hidden', 'true');
+        backdrop.style.pointerEvents = 'none';
+        // tzslot's widget goes with the dialog, once it is gone (not emptied while it closes).
+        void Promise.race([shut, new Promise<void>((r) => setTimeout(r, 800))]).then(() => (dtr?.destroy(), backdrop.remove()));
+      } else {
+        dtr?.destroy();
+        backdrop.remove();
+      }
       doc.removeEventListener('keydown', onKey, true);
       doc.removeEventListener('focusin', onFocus, true);
       untrack();
       // Back where it was; from the context menu (gone now), to the event's node, else the calendar's tab stop.
-      const back = before?.isConnected && !before.closest('.dz-menu') ? before : ev ? cal.element.querySelector<HTMLElement>(`[data-event-id="${CSS.escape(ev.id)}"][tabindex]`) : cal.element.querySelector<HTMLElement>('.dz-cursor, [tabindex="0"]');
+      const back = before?.isConnected && !before.closest('.dz-menu') ? before : ev ? cal.element.querySelector<HTMLElement>(`[data-event-id="${cssEscape(ev.id)}"][tabindex]`) : cal.element.querySelector<HTMLElement>('.dz-cursor, [tabindex="0"]');
       back?.focus();
       resolve(outcome);
     };
     // The calendar destroyed while the editor is open: it closes with it.
-    const untrack = cal.onDestroy(() => close('cancelled'));
+    const untrack = cal.onDestroy(() => close('cancelled', true));
     const run = (cmd: Command | null, outcome: EditorOutcome) => {
       const bad = outcome === 'saved' ? invalid() : null;
       if (bad || !cmd) {
@@ -552,6 +568,7 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
     doc.addEventListener('keydown', onKey, true);
     doc.addEventListener('focusin', onFocus, true);
     backdrop.hidden = false;
+    cal.motion.overlayOpen?.(dialog, origin && origin.width > 0 ? origin : undefined);
     title.focus();
   });
 }
@@ -588,3 +605,6 @@ function supportedZones(): string[] {
     return [];
   }
 }
+
+/** `CSS.escape` where there is one (not in jsdom). */
+const cssEscape = (s: string) => (typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(s) : s.replace(/["\\]/g, '\\$&'));

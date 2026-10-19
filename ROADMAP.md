@@ -4,17 +4,18 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–16 and 17a, each committed (`git log --oneline`: the
-  last is titled "Phase 17a"). Every check green at that commit: `npm test`
-  (1 208), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
-  `test:browser` (195), `perf:browser`, `test:package`.
-- **Now: Phase 17b** (animations: events, overlays, timeline) — 17a is
-  committed ("Phase 17a"). Plugins come from the application (owner,
-  after 17a). Next step: the 17b hooks (an event leaving, the selection's
-  rectangle, an overlay's origin), then the effects.
+- **Done:** Phases 0–17, each committed (`git log --oneline`: the last is
+  titled "Phase 17b"). Every check green at that commit: `npm test`
+  (1 213), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
+  `test:browser` (212), `perf:browser`, `test:package`.
+- **Now: Phase 18** (ecosystem: FullCalendar options translator, Web
+  Component, React/Vue, `llms.txt`, `commands.schema.json`, public
+  benchmark) — Phase 17 is done (commits "Phase 17a", "Phase 17b"). Next
+  step: present Phase 18's open questions to the owner (in French) before
+  coding.
 - **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
   that URL; the owner authorised pushing on 2026-10-18).
-- **Left after it:** 17 animations, 18 ecosystem (Web Component, React/Vue,
+- **Left after it:** 18 ecosystem (Web Component, React/Vue,
   FullCalendar options translator), 19+ native (Swift/Kotlin from
   `conformance/`, then SwiftUI/Compose).
 - **How a phase is run** (owner's rule): decisions validated with the owner
@@ -1660,7 +1661,7 @@ See `ARCHITECTURE.md` J. Phase 16.
   inside tzslot (`addEventListener` with `signal`, a jsdom realm issue);
   `test:package` builds it on Angular 19–22.
 
-## Phase 17 — animations (in progress)
+## Phase 17 — animations ✅ (2026-10-19)
 
 See `ARCHITECTURE.md` J. Phase 17.
 
@@ -1751,4 +1752,71 @@ See `ARCHITECTURE.md` J. Phase 17.
 - Week → day morph (a time grid has no day cells to open from).
 - A long glide for a zone change in a big month is capped at 150 nodes;
   the "now" glide starts from the second minute after a paint.
+
+## Phase 17b — events, overlays, timeline ✅ (2026-10-19)
+
+### Built
+
+- **`@dzcalendar/dom`:** `eventsEnter(nodes, { cause, from? })` (a
+  person's change; the selection it was made from); `eventsLeave(copies,
+  info)` → promise, with `wantsLeave()` — copies made **before** the redraw
+  of the nodes of the events the change touches (`removed`, `updated`,
+  `seriesChanged`; an occurrence's node by its series), kept only if
+  neither the piece nor the occurrence is drawn after, in a `.dz-leave`
+  layer, without ids or keys, cut to their scroller, placed in any
+  direction; `EVENT_NODE` skips them; `seatsChange`; `scroll(el, to)` with
+  `ViewCtx.easeScroll` and the toolkit's `scrollEased` (the time grid, the
+  timeline); `overlayOpen(el, origin)` (menus from the pointer, "+N" from
+  its link), `overlayClose`; `dragStart(ghosts, kind)`;
+  `CalendarInstance.motion`; "today" from another date scrolls to now
+  (an hour before; elapsed minutes on a timeline).
+- **`@dzcalendar/pro/editor`:** opens out of the event (or the selection)
+  and closes back into it (the backdrop inert meanwhile; tzslot's widget
+  destroyed once it is gone).
+- **`@dzcalendar/motion-gsap`:** effects `drag` (lean from `--gx`/`--gy`
+  speed, 3° sober / 9° expressive, magnetic glide, a resize does not lean;
+  a thrown drop with InertiaPlugin), `leave` (dissolve; gathered back on
+  undo within a minute, per calendar), `enter` (pour from the selection;
+  the wave a third of a second at most), `overlay`, `seats` (roll and
+  pop), `scroll` (ScrollToPlugin or the scroll properties; stopped by the
+  person's wheel, touch, pointer or key; never kills a slide), `rows`
+  (only on a fold or an unfold); `plugins` given by the application.
+- **Playground:** plugins on `/`; GSAP on the timeline (with the editor)
+  and the slots pages.
+- **Tests:** dom (copies with their words and no ids, in the layer; undo
+  enters with its cause; no copy for a move or with `wantsLeave` false;
+  `scrollEased`), the adapter (dissolve then gather back, reduced motion);
+  Chrome (copy where the event was in French and Arabic, an occurrence
+  dissolving, undo gathering from 0.86, menu origin, eased scroll leaving
+  the slide whole, editor in and out, accordion, drag lean, seats pop,
+  reduced motion).
+- **Measured:** dom 43.5 kB (budget 44.9), motion-gsap 5.2 kB (5.4);
+  `timeGridWeek:U` 26 ms (27).
+
+### Reviews (architect; code review by execution in Chrome), fixed
+
+- Copies were cloned after the redraw, from nodes the pool had already
+  emptied (blank copies; undo never gathered back) — now before it, only
+  of the events touched; a deleted occurrence was missed (its node carries
+  `series@key`, the change names the series in `seriesChanged`). Copies
+  sat at the wrong place (logical insets undid their `left`; right to left
+  too), drew over the heads when scrolled half out, kept their ids
+  (queries found them). The eased scroll killed the period slide (an
+  overwrite skipped its clearProps). "Today" scrolled on view changes and
+  an hour off on a timeline's DST day. The drag loop read layout and its
+  own rotation each frame, died when the hit was lost, tilted resizes,
+  piled tweens; a refused drop flew back tilted; a thrown drop kept a
+  killed entrance's scale. The accordion fired on lane measures and used
+  two eases. The wave could last seconds. The dissolved-ids map grew
+  forever, across calendars. The editor emptied its "when" field while
+  closing and stayed tabbable. Every capture ran under reduced motion; a
+  deferred paint kept a stale "from"; a cleanup closure per delete stayed
+  in the calendar's scope.
+
+### Not done in Phase 17b, on purpose
+
+- No dissolve in the list view; rows folding away have no copy.
+- One adapter's drag state is shared by calendars that share it (one drag
+  at a time).
+- The focus after creating from a selection (earlier than 17b).
 

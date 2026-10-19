@@ -11,7 +11,8 @@ import { createMenu } from './menu.js';
 import { messagesForLocale } from './messages.js';
 import type { DzMessages } from './messages.js';
 import { WAAPI_MOTION } from './motion-waapi.js';
-import type { MotionAdapter, MotionChange } from './motion.js';
+import type { MotionAdapter, MotionChange, MotionEnter } from './motion.js';
+import { EVENT_NODE } from './interact/handles.js';
 import { createPopover } from './popover.js';
 import { FrameScheduler } from './render/frame.js';
 import { h } from './render/reconcile.js';
@@ -166,6 +167,8 @@ export interface CalendarInstance {
   select(selection: Selection | null): void;
   /** Runs `fn` when the calendar is destroyed (what an editor opened on it closes with). Returns the way to take it back. */
   onDestroy(fn: () => void): () => void;
+  /** The motion in force (what an editor's dialog opens and closes with). */
+  readonly motion: MotionAdapter;
   /**
    * The options in force: what was given, with every `update` laid over it
    * (the view and date as now shown). What a copy of this calendar is made
@@ -395,6 +398,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     locale: kernel.getState().locale,
     zone: kernel.getState().timeZone,
     motion: options.motion ?? WAAPI_MOTION,
+    easeScroll: false,
     hooks: options.hooks ?? {},
     epoch: 0,
     snapMinutes: settings.current.snapMinutes ?? 15,
@@ -442,7 +446,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       const items: readonly ActionItem[] | null = live.contextMenu ? live.contextMenu({ target, state }, defaults) : defaults;
       if (!items || items.length === 0) return false;
       menu.open(items, at, returnFocus, ctx.messages.actions);
-      ctx.motion.overlayOpen?.(menu.element);
+      ctx.motion.overlayOpen?.(menu.element, originOf(at));
       return true;
     },
     live: () => settings.current,
@@ -485,7 +489,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     },
     openMore(anchor, title, nodes, onClose) {
       popover.open(anchor, title, nodes, ctx.messages.closePopover, onClose);
-      ctx.motion.overlayOpen?.(popover.element);
+      ctx.motion.overlayOpen?.(popover.element, anchor.getBoundingClientRect());
     },
   };
 
@@ -510,6 +514,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   let holding = false;
   let dirty = false;
   let pendingDir: 'prev' | 'next' | 'other' | undefined;
+  /** What made the event nodes of the next paint appear: a person's change (and the selection it was made from). */
+  let enter: MotionEnter | null = null;
   /** The calendar has been drawn once: what comes next is a change. */
   let painted = false;
   /** What was last drawn: the "from" of the next change. */
@@ -535,11 +541,14 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     return view;
   }
 
-  function paint(): void {
+  /** Draws what the kernel says; false when deferred (inside an update). */
+  function paint(): boolean {
     if (holding) {
       dirty = true;
-      return;
+      return false;
     }
+    // Drawn before: a scroll after this paint is a change's (eased), not the calendar's first.
+    const again = painted;
     const state = kernel.getState();
     ctx.zone = state.timeZone;
     toolbar.draw(state, ctx.messages, root.dir === 'rtl');
@@ -563,11 +572,13 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     // A change animates from the second paint of the calendar on (a view of another family mounting is a change too).
     const handled = painted && change !== null && ctx.motion.afterChange?.(change.token, change.change, v.body) === true;
     if (!handled && !firstPaint && pendingDir) ctx.motion.viewChange?.(v.body, pendingDir);
-    else if (!handled && !firstPaint && created.length > 0) ctx.motion.eventsEnter?.(created);
+    else if (!handled && !firstPaint && created.length > 0) ctx.motion.eventsEnter?.(created, ...(enter ? [enter] : []));
+    enter = null;
     if (painted && change && change.change.from.title !== state.title) ctx.motion.titleChange?.(toolbar.title, change.change.from.title, state.title, change.change);
     painted = true;
     pendingDir = undefined;
     shown = state;
+    ctx.easeScroll = again;
     if (firstPaint) {
       firstPaint = false;
       if (vm.family === 'timeline' && v.scrollTo) {
@@ -581,7 +592,122 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       }
       if (vm.family === 'dayGrid' || vm.family === 'multiMonth') measureLanes();
       if (vm.family === 'timeGrid') measureStack();
+    } else if (
+      again &&
+      change &&
+      // A jump to today from another date (the "today" button), not a change of view or zone on today.
+      change.change.causes.includes('navigate') &&
+      !change.change.causes.includes('view') &&
+      change.change.direction === 'other' &&
+      !change.change.from.date.equals(state.today) &&
+      state.date.equals(state.today) &&
+      v.scrollTo &&
+      (vm.family === 'timeGrid' || vm.family === 'timeline')
+    ) {
+      // Back to today: to now (an hour before it), eased by the motion when it can.
+      const t = kernel.now().toZonedDateTimeISO(state.timeZone);
+      const slotMin = vm.family === 'timeGrid' ? (vm.model as { options: { slotMin?: DurationLike } }).options.slotMin : undefined;
+      const min = slotMin ? Temporal.Duration.from(slotMin).total({ unit: 'minutes' }) : 0;
+      // A time grid's axis is the wall clock; a timeline's is elapsed time (a 25-hour day's 09:00 is 600 minutes in).
+      const minutes = vm.family === 'timeline' ? t.since(t.startOfDay()).total({ unit: 'minutes' }) : t.hour * 60 + t.minute;
+      v.scrollTo(Math.max(0, minutes - 60 - min));
     }
+    ctx.easeScroll = false;
+    return true;
+  }
+
+  /** A point (the pointer's) or an anchor's place, as a rectangle. */
+  const originOf = (at: unknown): DOMRect | undefined =>
+    at && typeof at === 'object' && 'x' in at && 'y' in at ? new DOMRect(Number((at as { x: number }).x), Number((at as { y: number }).y), 0, 0) : undefined;
+
+  /** A node a person's change may take away, copied before the redraw (the pool empties a released node). */
+  interface Leaving {
+    readonly key: string;
+    readonly instance: string;
+    readonly id: string;
+    readonly copy: HTMLElement;
+    readonly rect: DOMRect;
+    /** What of it was seen: its scroller's visible box (the heads and the gutter are not drawn over). */
+    readonly clip: DOMRect | null;
+  }
+
+  /** The nodes of the events the change touches (removed, updated, a series'), copied with their places. */
+  function capture(change: { readonly removed: readonly string[]; readonly updated: readonly string[]; readonly seriesChanged: readonly string[] }): Leaving[] {
+    // seriesChanged, not seriesTouched: an occurrence deleted is an EXDATE, which only the former names.
+    const ids = new Set([...change.removed, ...change.updated, ...change.seriesChanged]);
+    if (ids.size === 0) return [];
+    const out: Leaving[] = [];
+    for (const node of root.querySelectorAll<HTMLElement>(EVENT_NODE)) {
+      const id = node.dataset['eventId'];
+      // An occurrence's node carries its own id (`series@key`): its series is what a change touches.
+      if (!id || !(ids.has(id) || ids.has(id.split('@')[0]!))) continue;
+      const rect = node.getBoundingClientRect();
+      const key = node.dataset['key'] ?? id;
+      const scroller = node.closest<HTMLElement>('.dz-tg__body, .dz-dg__body, .dz-tl__scroller, .dz-mm, .dz-list');
+      out.push({ key, instance: key.split('|')[0]!, id, copy: node.cloneNode(true) as HTMLElement, rect, clip: scroller ? scroller.getBoundingClientRect() : null });
+    }
+    return out;
+  }
+
+  /** The layer copies of leaving events are drawn in: inside the calendar, above it, never in the way. */
+  let leaveLayer: HTMLElement | null = null;
+  /** The copies' last-resort removals, cleared with the calendar. */
+  const leaveTimers = new Set<ReturnType<typeof setTimeout>>();
+  scope.add(() => leaveTimers.forEach((t) => clearTimeout(t)));
+
+  /**
+   * What left (neither its piece nor its occurrence is drawn any more), as
+   * copies where it was, for the motion to take away: removed when its
+   * promise settles, or after 2 s.
+   */
+  function leave(candidates: readonly Leaving[], info: MotionEnter): void {
+    const keys = new Set<string>();
+    const instances = new Set<string>();
+    for (const n of root.querySelectorAll<HTMLElement>(EVENT_NODE)) {
+      const k = n.dataset['key'] ?? n.dataset['eventId'] ?? '';
+      keys.add(k);
+      instances.add(k.split('|')[0]!);
+    }
+    const gone = candidates.filter((c) => !keys.has(c.key) && !instances.has(c.instance));
+    if (gone.length === 0) return;
+    if (!leaveLayer?.isConnected) {
+      leaveLayer = h(doc, 'div', 'dz-leave');
+      leaveLayer.setAttribute('aria-hidden', 'true');
+      Object.assign(leaveLayer.style, { position: 'absolute', inset: '0', pointerEvents: 'none', zIndex: '20', overflow: 'hidden' });
+      if (doc.defaultView?.getComputedStyle(root).position === 'static') root.style.position = 'relative';
+      root.append(leaveLayer);
+    }
+    const layer = leaveLayer;
+    const box = layer.getBoundingClientRect();
+    const seen = gone.filter(({ rect, clip }) => !clip || clip.width === 0 || (rect.right > clip.left && rect.left < clip.right && rect.bottom > clip.top && rect.top < clip.bottom));
+    if (seen.length === 0) return;
+    const copies = seen.map(({ copy: c, rect, id, clip }) => {
+      // Not an event any more for anything that looks for one: no id, no key, no focus.
+      c.dataset['dzGone'] = id;
+      for (const a of ['data-event-id', 'data-key', 'tabindex', 'id', 'aria-pressed', 'role']) c.removeAttribute(a);
+      for (const x of c.querySelectorAll('[id], [tabindex]')) (x.removeAttribute('id'), x.removeAttribute('tabindex'));
+      c.classList.add('dz-leaving');
+      c.setAttribute('aria-hidden', 'true');
+      // Every inset undone first, then placed by its left and top edges, whatever the direction (in that order: the
+      // logical properties would undo the physical ones written before them).
+      c.style.inset = 'auto';
+      Object.assign(c.style, { position: 'absolute', left: `${rect.left - box.left}px`, top: `${rect.top - box.top}px`, width: `${rect.width}px`, height: `${rect.height}px`, margin: '0', boxSizing: 'border-box' });
+      // Cut to what its scroller showed of it.
+      if (clip && clip.width > 0) c.style.clipPath = `inset(${Math.max(0, clip.top - rect.top)}px ${Math.max(0, rect.right - clip.right)}px ${Math.max(0, rect.bottom - clip.bottom)}px ${Math.max(0, clip.left - rect.left)}px)`;
+      layer.append(c);
+      return c;
+    });
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const clear = () => {
+      copies.forEach((c) => c.remove());
+      if (t === undefined) return;
+      clearTimeout(t);
+      leaveTimers.delete(t);
+    };
+    const settled = ctx.motion.eventsLeave?.(copies, info);
+    if (settled && typeof (settled as Promise<void>).then === 'function') void (settled as Promise<void>).then(clear, clear);
+    t = setTimeout(clear, 2000);
+    leaveTimers.add(t);
   }
 
   // ── 'auto' lanes: measured once per size, never during a render ───────────
@@ -677,6 +803,14 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   scope.add(
     kernel.subscribe((e) => {
       if (e.type === 'source') return sourceNotice(e.notice);
+      // A person's change (a command, undo, redo): what it makes appear, and what it takes away.
+      let before: Leaving[] | null = null;
+      if (e.type === 'store' && view && painted && (e.change.cause === 'command' || e.change.cause === 'undo' || e.change.cause === 'redo')) {
+        const sel = root.querySelector<HTMLElement>('.dz-ghost--armed')?.getBoundingClientRect();
+        enter = { cause: e.change.cause, ...(sel && sel.width > 0 && sel.height > 0 && { from: sel }) };
+        // Only when the motion will take them away (not under reduced motion, not with the effect off).
+        if (ctx.motion.eventsLeave && ctx.motion.wantsLeave?.() !== false) before = capture(e.change);
+      }
       // A menu or a "+N" panel describes the screen as it was: any change closes it.
       menu.close(false);
       popover.close(false);
@@ -719,7 +853,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           if (e.state.locale !== withCalendar(baseLocale, displayCalendar)) baseLocale = withoutCalendar(e.state.locale);
         }
       }
-      paint();
+      // What the change is (paint consumes `enter` for what appears; what leaves needs it after).
+      const info = enter;
+      // Deferred (inside an update): the change is drawn later with others — no copies, no "from" kept for it.
+      if (!paint()) enter = null;
+      else if (before && info) leave(before, info);
       // Another number of columns (a period, a view, resources): lanes and stacks measured again.
       if (e.type === 'state' && (e.causes.includes('view') || e.causes.includes('navigate') || e.causes.includes('resources'))) (measureLanes(), measureStack());
     }),
@@ -959,6 +1097,9 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     refetch: (id) => kernel.sources.refetch(id),
     preparePrint,
     select: (sel) => interactions?.select(sel),
+    get motion() {
+      return ctx.motion;
+    },
     onDestroy(fn) {
       destroyHooks.add(fn);
       return () => destroyHooks.delete(fn);

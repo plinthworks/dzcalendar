@@ -93,3 +93,28 @@ describe('after the 17a review', () => {
     expect(seen).toEqual([false]);
   });
 });
+
+describe('17b', () => {
+  it('a delete dissolves its copy (a promise the calendar removes it on); undone, it gathers back (not the wave)', async () => {
+    reduce = false;
+    const c = mount();
+    c.run({ type: 'event.delete', id: 'a' });
+    const copies = [...c.element.querySelectorAll<HTMLElement>('.dz-leaving')];
+    expect(copies.length).toBe(1);
+    gsap.globalTimeline.progress(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(c.element.querySelectorAll('.dz-leaving').length).toBe(0);
+    c.undo();
+    const back = c.element.querySelector<HTMLElement>('[data-event-id="a"]')!;
+    expect(gsap.getProperty(back, 'scale')).toBeCloseTo(0.86, 2);
+  });
+
+  it('reduced motion: no copy; the scroll is not eased (the view sets it itself)', () => {
+    reduce = true;
+    const m = createGsapMotion();
+    const c = mount();
+    c.run({ type: 'event.delete', id: 'a' });
+    expect([c.element.querySelectorAll('.dz-leaving').length, m.wantsLeave?.(), m.scroll?.(document.createElement('div'), { top: 10, left: 0 })]).toEqual([0, false, false]);
+    reduce = false;
+  });
+});

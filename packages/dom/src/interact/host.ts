@@ -430,7 +430,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     for (const n of gesture.sources) n.classList.add('dz-ev--source');
     compute(gesture);
     draw(gesture);
-    if (p.mode.kind !== 'select') ctx.motion.dragStart?.(gesture.ghosts);
+    if (p.mode.kind !== 'select') ctx.motion.dragStart?.(gesture.ghosts, p.mode.kind);
   }
 
   function queue(): void {

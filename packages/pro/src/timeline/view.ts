@@ -16,6 +16,7 @@ import {
   resourceName,
   timeLabels,
   unmountEvent,
+  scrollEased,
 } from '@dzcalendar/dom/toolkit';
 import type { Box, InteractionSurface, KeyboardSurface, ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
 import type { TimelineBar, TimelineModel, TimelineMore, TimelineRow } from './model.js';
@@ -1286,6 +1287,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   function scrollToMinutes(minutes: number): void {
     const m = model;
     if (!m) return;
+    // Eased or not as decided now: the place is written a frame later.
+    const eased = { motion: ctx.motion, easeScroll: ctx.easeScroll };
     {
       ctx.scheduler.schedule({
         read: () => {
@@ -1300,7 +1303,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
           const todaySlot = m.axis.slots.find((x) => x.date.equals(today));
           if (!day) return;
           const at = m.axis.unit === 'day' ? (todaySlot?.start ?? m.axis.start) : Temporal.Instant.fromEpochMilliseconds(day.start.epochMilliseconds + minutes * 60_000);
-          scrollAlong(Math.max(0, m.axis.toPosition(at) * scale - (m.axis.unit === 'day' ? scale * 2 : 0)));
+          scrollEased(eased, scroller, () => scrollAlong(Math.max(0, m.axis.toPosition(at) * scale - (m.axis.unit === 'day' ? scale * 2 : 0))));
           measureWindow();
         },
       });

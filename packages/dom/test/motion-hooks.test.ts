@@ -43,3 +43,43 @@ describe('motion hooks (Phase 17a)', () => {
     expect(() => (c.navigate('next'), c.update({ view: 'timeGridWeek' }))).not.toThrow();
   });
 });
+
+describe('motion hooks (Phase 17b)', () => {
+  const week = (motion: MotionAdapter) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    cal = createCalendar(host, { timeZone: 'Europe/Paris', locale: 'en-GB', now: () => Temporal.Instant.from('2026-10-21T08:00:00Z'), initialView: 'timeGridWeek', initialDate: Temporal.PlainDate.from('2026-10-21'), events: [{ id: 'a', title: 'Garde', start: '2026-10-21T09:00[Europe/Paris]' }, { id: 'b', title: 'Autre', start: '2026-10-22T09:00[Europe/Paris]' }], motion });
+    return cal;
+  };
+
+  it('a delete: a copy of the event as it was (its title), without ids, in the leave layer; undone, it enters with cause "undo"', () => {
+    const seen: string[] = [];
+    const c = week({
+      eventsLeave: (copies, info) => void seen.push(`leave ${info.cause} ${copies.map((x) => `${x.dataset['dzGone']}:${x.textContent?.includes('Garde')}:${x.hasAttribute('data-event-id')}:${x.parentElement?.className}`).join()}`),
+      eventsEnter: (nodes, info) => void seen.push(`enter ${info?.cause} ${nodes.length}`),
+    });
+    c.run({ type: 'event.delete', id: 'a' });
+    c.undo();
+    expect(seen).toEqual(['leave command a:true:false:dz-leave', 'enter undo 1']);
+  });
+
+  it('a move is not a leave; no hook, or wantsLeave() false: no copy is made', () => {
+    const seen: string[] = [];
+    const c = week({ wantsLeave: () => false, eventsLeave: () => void seen.push('leave') });
+    c.run({ type: 'event.delete', id: 'a' });
+    expect([seen, document.querySelectorAll('.dz-leaving').length]).toEqual([[], 0]);
+    cal!.destroy();
+    const d = week({ eventsLeave: () => void seen.push('leave') });
+    d.run({ type: 'event.update', id: 'b', patch: { start: '2026-10-22T11:00[Europe/Paris]' } });
+    expect(seen).toEqual([]);
+  });
+
+  it('an eased scroll: the place is set as the view would, then handed to the adapter (or set when it declines)', async () => {
+    const { scrollEased } = await import('../src/host.js');
+    const el = document.createElement('div');
+    const asked: number[] = [];
+    scrollEased({ easeScroll: true, motion: { scroll: (_e, to) => (asked.push(to.top), true) } }, el, () => (el.scrollTop = 0));
+    scrollEased({ easeScroll: false, motion: { scroll: () => true } }, el, () => (el.scrollTop = 0));
+    expect(asked).toEqual([]);
+  });
+});

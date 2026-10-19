@@ -1307,6 +1307,144 @@ try {
       await p.close();
     }
 
+    // ── Phase 17b: events, overlays, timeline (GSAP, sober) ──
+    {
+      const { p, errors } = await page('/', { reducedMotion: 'no-preference' });
+      await p.waitForSelector('.dz-tg .dz-ev');
+      const slow = (x) => p.evaluate((x) => void window.__gsap.globalTimeline.timeScale(x), x);
+      const done = () => p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      await slow(0.1);
+      // A single event (an occurrence's id, series@key, is no event of its own to delete).
+      const id = await p.evaluate(() => [...document.querySelectorAll('.dz-tg .dz-ev')].map((n) => n.dataset.eventId).find((x) => x && !x.includes('@')));
+      const title = await p.evaluate((id) => document.querySelector(`[data-event-id="${id}"]`)?.textContent ?? '', id);
+      void title;
+      await p.evaluate((id) => window.__cal().run({ type: 'event.delete', id }), id);
+      await p.waitForTimeout(200);
+      const leaving = await p.evaluate(() => [...document.querySelectorAll('.dz-leaving')].map((c) => [c.getAttribute('aria-hidden'), Number(getComputedStyle(c).opacity), c.textContent, c.hasAttribute('data-event-id')]));
+      check('motion 17b: a deleted event dissolves (a copy of it — its words — without its ids, hidden from assistive tech, fading)', leaving.length > 0 && leaving.every(([h, o, t, ided]) => h === 'true' && o < 1 && t.length > 0 && !ided), JSON.stringify(leaving));
+      await done();
+      await p.waitForTimeout(50);
+      check('motion 17b: the dissolved copy is gone afterwards', await p.evaluate(() => !document.querySelector('.dz-leaving')), '');
+      await p.evaluate(() => void window.__gsap.globalTimeline.timeScale(0.02));
+      await p.evaluate(() => window.__cal().undo());
+      await p.waitForTimeout(30);
+      const back = await p.evaluate((id) => { const n = document.querySelector(`[data-event-id="${id}"]`); return n ? new DOMMatrix(getComputedStyle(n).transform).a : null; }, id);
+      check('motion 17b: undone, it gathers back (from 0.86, not the entrance wave’s 0.96)', back !== null && back < 0.9, String(back));
+      await slow(0.1);
+      await done();
+      // The copy is where the event was, left to right and right to left (logical insets once undid its left).
+      for (const locale of ['fr-FR', 'ar']) {
+        await p.evaluate((l) => window.__cal().update({ locale: l }), locale);
+        await done();
+        const placed = await p.evaluate(() => {
+          const n = [...document.querySelectorAll('.dz-tg .dz-ev')].find((x) => x.dataset.eventId && !x.dataset.eventId.includes('@') && x.getBoundingClientRect().height > 20);
+          if (!n) return null;
+          const r = n.getBoundingClientRect();
+          window.__cal().run({ type: 'event.delete', id: n.dataset.eventId });
+          const c = document.querySelector('.dz-leaving')?.getBoundingClientRect();
+          window.__cal().undo();
+          return c ? [Math.round(r.left), Math.round(c.left), Math.round(r.top), Math.round(c.top)] : null;
+        });
+        check(`motion 17b: a dissolving copy stands where the event was (${locale})`, placed !== null && Math.abs(placed[0] - placed[1]) <= 6 && Math.abs(placed[2] - placed[3]) <= 6, JSON.stringify(placed));
+        await done();
+      }
+      await p.evaluate(() => window.__cal().update({ locale: 'fr-FR' }));
+      await done();
+      // One occurrence of a series deleted ("this event"): its node (series@key) dissolves too.
+      const occ = await p.evaluate(() => {
+        const n = [...document.querySelectorAll('.dz-tg .dz-ev')].find((x) => x.dataset.eventId?.includes('@'));
+        if (!n) return null;
+        const [series, key] = n.dataset.eventId.split('@');
+        window.__cal().run({ type: 'event.delete', id: series, key, scope: 'this' });
+        return document.querySelectorAll('.dz-leaving').length;
+      });
+      check('motion 17b: one occurrence deleted dissolves as well', occ !== null && occ > 0, String(occ));
+      await done();
+      const ev = p.locator('.dz-tg .dz-ev').first();
+      await ev.click({ button: 'right' });
+      await p.waitForTimeout(60);
+      const menu = await p.evaluate(() => { const m = document.querySelector('.dz-menu'); return m ? [m.style.transformOrigin !== '', new DOMMatrix(getComputedStyle(m).transform).a] : null; });
+      check('motion 17b: the context menu grows out of the point it was opened at', menu !== null && menu[0] && menu[1] < 1, JSON.stringify(menu));
+      await p.keyboard.press('Escape');
+      await done();
+      // Back to today from far: the hours scroll to now, eased (not there at once).
+      await p.evaluate(() => { const c = window.__cal(); c.update({ view: 'timeGridWeek', date: c.kernel.getState().today.add({ months: 3 }) }); });
+      await done();
+      await p.evaluate(() => { document.querySelector('.dz-tg__body').scrollTop = 0; });
+      await p.click('.dz-toolbar__today');
+      await p.waitForTimeout(120);
+      const mid = await p.evaluate(() => document.querySelector('.dz-tg__body').scrollTop);
+      await done();
+      const end = await p.evaluate(() => document.querySelector('.dz-tg__body').scrollTop);
+      check('motion 17b: back to today, the hours scroll to now, eased', end > 0 && mid < end, `${mid} → ${end}`);
+      const body = await p.evaluate(() => { const b = document.querySelector('.dz-tg__body'); return [getComputedStyle(b).opacity, b.style.transform]; });
+      check('motion 17b: the eased scroll leaves the period slide alone (the body whole again, nothing left inline)', body[0] === '1' && body[1] === '', JSON.stringify(body));
+      check('motion 17b (index): no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+    {
+      const { p, errors } = await page('/timeline.html', { reducedMotion: 'no-preference' });
+      await p.waitForSelector('.dz-tl__ev');
+      await p.waitForTimeout(400);
+      // The editor opens out of the event, and closes back into it.
+      await p.locator('.dz-tl__ev').first().focus();
+      await p.keyboard.press('Shift+F10');
+      await p.locator('.dz-menu [data-action="event.open"]').click();
+      await p.waitForTimeout(40);
+      const open = await p.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector('.dz-editor')).transform).a);
+      await p.waitForTimeout(900);
+      await p.keyboard.press('Escape');
+      await p.waitForTimeout(60);
+      const closing = await p.evaluate(() => { const d = document.querySelector('.dz-editor'); return d ? new DOMMatrix(getComputedStyle(d).transform).a : 0; });
+      await p.waitForTimeout(1000);
+      const gone = await p.evaluate(() => !document.querySelector('.dz-editor'));
+      check('motion 17b: the editor opens out of the event and closes back into it, then is gone', open < 1 && closing < 1 && gone, `${open} ${closing} ${gone}`);
+      // A group folds: the rows below slide up; unfolds: its rows unroll.
+      await p.locator('.dz-tl__expander').first().click();
+      await p.waitForTimeout(40);
+      const folded = await p.evaluate(() => [...document.querySelectorAll('.dz-tl__row')].filter((r) => r.style.transform).length);
+      await p.waitForTimeout(900);
+      await p.locator('.dz-tl__expander').first().click();
+      await p.waitForTimeout(40);
+      const unfolded = await p.evaluate(() => [...document.querySelectorAll('.dz-tl__row')].filter((r) => r.style.transform).length);
+      check('motion 17b: resource rows fold and unfold as an accordion', folded > 0 && unfolded > 0, `${folded} ${unfolded}`);
+      await p.waitForTimeout(900);
+      // A drag: the ghost leans with the gesture's speed.
+      const box = await p.locator('.dz-tl__ev').first().boundingBox();
+      await p.mouse.move(box.x + 10, box.y + box.height / 2);
+      await p.mouse.down();
+      let lean = 0;
+      for (let i = 0; i < 10; i++) {
+        await p.mouse.move(box.x + 10 + i * 30, box.y + box.height / 2, { steps: 2 });
+        lean = Math.max(lean, await p.evaluate(() => { const g = document.querySelector('.dz-ghost'); return g ? Math.abs(new DOMMatrix(getComputedStyle(g).transform).b) : 0; }));
+      }
+      await p.keyboard.press('Escape');
+      await p.mouse.up();
+      check('motion 17b: a dragged event leans with its speed (3° at most, sober)', lean > 0.005 && lean < 0.06, String(lean));
+      check('motion 17b (timeline): no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+    {
+      const { p, errors } = await page('/slots.html?seats=2', { reducedMotion: 'no-preference' });
+      await p.waitForSelector('.dz-slot');
+      await p.click('.dz-tg__col[data-date="2026-10-21"] .dz-slot');
+      await p.waitForTimeout(50);
+      const pop = await p.evaluate(() => { const s = document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot'); return s ? new DOMMatrix(getComputedStyle(s).transform).a : 1; });
+      check('motion 17b: a booked slot’s seats pop', pop > 1, String(pop));
+      check('motion 17b (slots): no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+    {
+      const ctx3 = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1300, height: 900 } });
+      const p = await ctx3.newPage();
+      await p.goto(new URL('/', base).href, { waitUntil: 'networkidle' });
+      await p.waitForSelector('.dz-tg .dz-ev');
+      await p.evaluate(() => { const id = document.querySelector('.dz-tg .dz-ev').dataset.eventId; window.__cal().run({ type: 'event.delete', id }); });
+      const copies = await p.evaluate(() => document.querySelectorAll('.dz-leaving').length);
+      check('motion 17b: reduced motion — a delete leaves no copy behind', copies === 0, String(copies));
+      await ctx3.close();
+    }
+
     // ── Phase 16b: paged printing and the exports (timeline and resources pages) ──
     {
       const { p, errors } = await page('/timeline.html');

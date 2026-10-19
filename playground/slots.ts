@@ -2,6 +2,7 @@ import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import type { AvailableSlot, EventInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
+import { createGsapMotion } from '@dzcalendar/motion-gsap';
 import { checkSlot as checkFree, findSlots as findFree } from '@dzcalendar/slots';
 import { checkSlot as checkSeats, findSlots as findSeats } from '@dzcalendar/pro/slots';
 import type { Busy, SlotQuery } from '@dzcalendar/slots';
@@ -37,6 +38,7 @@ const query = (): SlotQuery => ({
 
 const log = document.querySelector<HTMLElement>('#log')!;
 const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
+  motion: createGsapMotion(),
   timeZone: 'Europe/Paris',
   locale: 'fr-FR',
   initialView: 'timeGridWeek',

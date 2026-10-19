@@ -15,6 +15,7 @@ export function handles(el: HTMLElement, seg: Segment, bg: boolean): void {
 }
 
 /** An event's node, in any family (the time grid's, the day grid's bars, a timeline's): what gestures grab. */
-export const EVENT_NODE = '.dz-ev, .dz-bar, .dz-tl__ev';
+/** An event's node — never a leaving copy (the motion's, on its way out). */
+export const EVENT_NODE = '.dz-ev:not(.dz-leaving), .dz-bar:not(.dz-leaving), .dz-tl__ev:not(.dz-leaving)';
 /** A background event's node: drawn, never grabbed. */
 export const BACKGROUND_NODE = '.dz-ev--bg, .dz-bar--bg, .dz-tl__ev--bg';

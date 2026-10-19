@@ -1,7 +1,7 @@
 {
   "name": "@dzcalendar/motion-gsap",
   "version": "0.0.0",
-  "description": "Optional GSAP motion for DzCalendar: view transitions and event entrances, reduced-motion aware.",
+  "description": "Optional GSAP motion for DzCalendar: presets sober and expressive; zone glides, DST unfolding, the title odometer, month → day morph, drag tilt and magnetic slots, dissolving deletes, overlays from their origin, timeline accordion — reduced-motion aware; plugins given by the application.",
   "type": "module",
   "license": "MIT",
   "peerDependencies": {
@@ -11,6 +11,9 @@
     "@dzcalendar/dom": "0.0.0"
   },
   "exports": {
-    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
   }
 }

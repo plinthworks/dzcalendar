@@ -325,7 +325,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     anchor = null;
     root.classList.add('dz-grabbing');
     drawHeld(held);
-    ctx.motion.dragStart?.(held.ghosts);
+    ctx.motion.dragStart?.(held.ghosts, kind);
     const title = inst.event.title || m().untitled;
     const start = ctx.live().eventResizableFromStart === true && inst.event.perms.duration ? ` ${m().grabHelpStart}` : '';
     ctx.announce(`${m().grabbed({ title })} ${kind === 'resize' ? m().grabHelpResize : m().grabHelp}${start}`);

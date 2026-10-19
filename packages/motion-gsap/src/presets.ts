@@ -21,6 +21,10 @@ export interface MotionPreset {
   readonly pop: string;
   /** Seconds between two items of a wave. */
   readonly stagger: number;
+  /** Degrees a dragged event leans at full speed. */
+  readonly tilt: number;
+  /** A deleted event dissolving. */
+  readonly leave: number;
 }
 
 /** Soft curves, 200–350 ms, no bounce: a health app's calm. */
@@ -38,6 +42,8 @@ export const SOBER: MotionPreset = {
   settle: 'power3.out',
   pop: 'power2.out',
   stagger: 0.012,
+  tilt: 3,
+  leave: 0.28,
 };
 
 /** Springs, a little squash, bounces: alive. */
@@ -55,6 +61,8 @@ export const EXPRESSIVE: MotionPreset = {
   settle: 'elastic.out(1, 0.6)',
   pop: 'back.out(2.2)',
   stagger: 0.022,
+  tilt: 9,
+  leave: 0.42,
 };
 
 export const PRESETS = { sober: SOBER, expressive: EXPRESSIVE } as const;

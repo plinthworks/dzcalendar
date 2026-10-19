@@ -1,5 +1,12 @@
 import type { PlainDate, StateCause, ZoneId } from '@dzcalendar/core';
 
+/** What made event nodes appear or go. */
+export interface MotionEnter {
+  readonly cause: 'command' | 'undo' | 'redo';
+  /** The selection the new event was made from (on screen), when there was one. */
+  readonly from?: DOMRect;
+}
+
 /** One side of a change. */
 export interface MotionSide {
   readonly view: string;
@@ -56,10 +63,36 @@ export interface MotionAdapter {
   nowTick?(nodes: readonly HTMLElement[]): void;
   /** The body after navigating: `dir` says which way the dates moved. */
   viewChange?(body: HTMLElement, dir: 'prev' | 'next' | 'other'): void;
-  /** Event nodes that just appeared (not on the first paint). */
-  eventsEnter?(nodes: readonly HTMLElement[]): void;
-  /** A drag began: the ghosts that follow the pointer (lift them). */
-  dragStart?(ghosts: readonly HTMLElement[]): void;
+  /**
+   * Event nodes that just appeared (not on the first paint). `info.cause`:
+   * what made them (`undo` brings back what was deleted); `info.from`: the
+   * selection they were made from, on screen when they were.
+   */
+  eventsEnter?(nodes: readonly HTMLElement[], info?: MotionEnter): void;
+  /**
+   * Event nodes a person's change took away (a delete, an undo): copies of
+   * them as they were, where they were (in a `.dz-leave` layer, marked
+   * `aria-hidden`, without ids: `data-dz-gone` says whose). The adapter
+   * animates them; the calendar removes them when the returned promise
+   * settles, or after 2 s. Without this hook (or with `wantsLeave()` false)
+   * no copy is made.
+   */
+  eventsLeave?(copies: readonly HTMLElement[], info: MotionEnter): Promise<void> | void;
+  /** False when `eventsLeave` would do nothing now (reduced motion, the effect off): nothing is captured. */
+  wantsLeave?(): boolean;
+  /** The seats left of a bookable slot changed (its text already says the new count). */
+  seatsChange?(nodes: readonly HTMLElement[]): void;
+  /**
+   * A view scrolls to a place after a change (back to today: to now). The
+   * element is still where it was; `true` when the adapter moves it there.
+   */
+  scroll?(el: HTMLElement, to: { readonly top: number; readonly left: number }): boolean;
+  /**
+   * A drag began: the ghosts that follow the pointer (lift them). The array
+   * is the live one (ghosts come and go as the drag crosses weeks); their
+   * place is in `--gx` / `--gy`. `kind`: a move or a resize.
+   */
+  dragStart?(ghosts: readonly HTMLElement[], kind?: 'move' | 'resize'): void;
   /** A drop the rules refused: take the ghosts back to `to` (the event's place), then the calendar removes them. */
   dropRejected?(ghosts: readonly HTMLElement[], to: DOMRect | null): Promise<void>;
   /** Before a committed change redraws: the event nodes' places (FLIP: first). */
@@ -68,8 +101,10 @@ export interface MotionAdapter {
   animateLayout?(state: unknown): void;
   /** The event just dropped, now at its place: land it from where the ghost was. */
   dropSettle?(node: HTMLElement, from: DOMRect): void;
-  /** A menu or a "+N" panel opened. */
-  overlayOpen?(el: HTMLElement): void;
+  /** A menu, a "+N" panel or a dialog opened; `origin`: what it was opened from (the clicked element, the pointer's point). */
+  overlayOpen?(el: HTMLElement, origin?: DOMRect): void;
+  /** A dialog closes back into `origin` (resolved when it may be removed). Menus and panels close at once. */
+  overlayClose?(el: HTMLElement, origin?: DOMRect): Promise<void>;
   destroy?(): void;
 }
 

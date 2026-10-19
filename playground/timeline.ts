@@ -2,6 +2,8 @@ import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput, ResourceInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
+import { createGsapMotion } from '@dzcalendar/motion-gsap';
+import { editorHandlers } from '@dzcalendar/pro/editor';
 import { exportControls } from './export-controls.js';
 import '@dzcalendar/pro';
 
@@ -33,6 +35,7 @@ const events: EventInput[] = [
 
 const log = document.querySelector<HTMLElement>('#log')!;
 const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
+  motion: createGsapMotion(),
   timeZone: 'Europe/Paris',
   locale: 'fr-FR',
   initialView: 'resourceTimelineDay',
@@ -53,3 +56,4 @@ document.querySelector<HTMLSelectElement>('#view')!.addEventListener('change', (
 document.querySelector<HTMLInputElement>('#unassigned')!.addEventListener('change', (e) => cal.update({ showUnassigned: (e.target as HTMLInputElement).checked }));
 (window as unknown as { __cal: typeof cal }).__cal = cal;
 exportControls(cal, document.querySelector<HTMLElement>('#exports')!);
+cal.update(editorHandlers(cal));
