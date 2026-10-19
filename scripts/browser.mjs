@@ -13,9 +13,9 @@ import { fileURLToPath } from 'node:url';
 
 const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 /** axe-core's violations inside `selector`: the WCAG 2.0–2.2 A and AA rules and axe's best practices. */
-async function axeViolations(p, selector = 'body') {
+async function axeViolations(p, selector = 'body', outside = null) {
   if (!(await p.evaluate(() => 'axe' in window))) await p.addScriptTag({ content: AXE });
-  return p.evaluate(async (sel) => {
+  return p.evaluate(async ([sel, out]) => {
     const r = await window.axe.run(document.querySelector(sel), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'] } });
     // WCAG 2.5.8's "essential" exception: an event's height and width are its duration and its share of
     // the column; narrow ones have the keyboard and the context menu as alternatives (see the ACR).
@@ -23,9 +23,11 @@ async function axeViolations(p, selector = 'body') {
     const isEvent = (n) => document.querySelector(String(n.target[n.target.length - 1]))?.matches('.dz-ev, .dz-bar') === true;
     return r.violations
       .map((v) => (v.id === 'target-size' ? { ...v, nodes: v.nodes.filter((n) => !isEvent(n)) } : v))
+      // Another library's widget, checked in its own repository (`outside`): left out here, said apart.
+      .map((v) => (out ? { ...v, nodes: v.nodes.filter((n) => !document.querySelector(String(n.target[n.target.length - 1]))?.closest(out)) } : v))
       .filter((v) => v.nodes.length > 0)
       .map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).slice(0, 3).join(', ')}`);
-  }, selector);
+  }, [selector, outside]);
 }
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -1145,6 +1147,67 @@ try {
       });
       check('timeline: right to left, the area is on the right of the time', rtl.areaRight, JSON.stringify(rtl));
       check('timeline: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
+    // ── Phase 16a: the editor (resources page) and seats (slots page, ?seats=2) ──
+    {
+      const { p, errors } = await page('/resources.html');
+      await p.waitForSelector('.dz-ev[data-event-id="a"]');
+      await p.locator('.dz-ev[data-event-id="a"]').first().focus();
+      await p.keyboard.press('Shift+F10');
+      await p.locator('.dz-menu [data-action="event.open"]').click();
+      await p.waitForSelector('.dz-editor');
+      const box = await p.evaluate(() => {
+        const r = document.querySelector('.dz-editor').getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, vw: innerWidth, vh: innerHeight, focus: document.activeElement?.classList.contains('dz-editor__input'), title: document.activeElement?.value };
+      });
+      check('editor: a dialog inside the window, the title focused with the event’s', box.top >= 0 && box.bottom <= box.vh && box.left > 0 && box.right < box.vw && box.focus && box.title === 'Consultation', JSON.stringify(box));
+      // tzslot's range widget (`.tz-dtr`) is tzslot's to fix: its date fields carry aria-haspopup on a textbox
+      // (known, reported upstream in ROADMAP). Everything else in the dialog is ours, checked in full.
+      const v = await axeViolations(p, '.dz-editor', '.tz-dtr');
+      check('axe: the event editor (its own fields) has no violation', v.length === 0, v.join('\n'));
+      // tzslot's widget styled (its styles go in once it is in the document): the all-day switch is drawn.
+      const sw = await p.evaluate(() => {
+        const r = document.querySelector('.dz-editor .tz-dtr__allday-box')?.getBoundingClientRect();
+        return { w: r?.width, h: r?.height, css: [...document.querySelectorAll('style')].some((x) => x.textContent.includes('tz-dtr__allday-box')) };
+      });
+      check('editor: tzslot’s range is styled (its all-day switch is a switch, not an empty box)', sw.css && sw.w >= 24 && sw.h >= 14, JSON.stringify(sw));
+      // Its date picker, from the keyboard: the focus goes into it and stays there (the dialog's trap lets it).
+      await p.locator('.dz-editor .tz-dtr input').first().focus();
+      await p.keyboard.press('ArrowDown');
+      await p.waitForSelector('.tz-field__panel', { state: 'visible', timeout: 3000 }).catch(() => {});
+      await p.keyboard.press('ArrowDown');
+      await p.waitForTimeout(100);
+      const inPanel = await p.evaluate(() => ({ inside: Boolean(document.activeElement?.closest('.tz-field__panel')), what: `${document.activeElement?.tagName}.${document.activeElement?.className}` }));
+      check('editor: the date picker keeps the focus (the dialog does not pull it back)', inPanel.inside, JSON.stringify(inPanel));
+      const sel = await p.evaluate(() => {
+        const d = document.querySelector('.tz-field__panel .tz-cal__day--selected');
+        const cs = d && getComputedStyle(d);
+        return { fg: cs?.color, bg: cs?.backgroundColor };
+      });
+      check('editor: the picker’s chosen day is seen (its text and its background differ)', Boolean(sel.fg) && sel.fg !== sel.bg, JSON.stringify(sel));
+      await p.keyboard.press('Escape');
+      await p.waitForTimeout(100);
+      const still = await p.evaluate(() => ({ editor: Boolean(document.querySelector('.dz-editor')), panel: Boolean(document.querySelector('.tz-field__panel:not([hidden])')?.offsetParent) }));
+      check('editor: Escape in the picker closes the picker only', still.editor && !still.panel, JSON.stringify(still));
+      await p.screenshot({ path: join(root, 'node_modules', '.cache', 'dzcalendar', 'editor-fr.png'), clip: { x: 0, y: 0, width: 1400, height: 950 } }).catch(() => {});
+      await p.keyboard.press('Escape');
+      const back = await p.evaluate(() => ({ open: Boolean(document.querySelector('.dz-editor')), focus: document.activeElement?.dataset?.eventId }));
+      check('editor: Escape closes it and gives the focus back to the event', !back.open && back.focus === 'a', JSON.stringify(back));
+      check('editor: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+    {
+      const { p, errors } = await page('/slots.html?seats=2');
+      await p.waitForSelector('.dz-slot');
+      const first = await p.evaluate(() => ({ text: document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot')?.textContent, label: document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot')?.getAttribute('aria-label') }));
+      check('seats: a slot of a two-seat session says how many are free', /· 2 places$/.test(first.text ?? '') && /2 places$/.test(first.label ?? ''), JSON.stringify(first));
+      await p.click('.dz-tg__col[data-date="2026-10-21"] .dz-slot');
+      await p.waitForFunction(() => /· 1 place$/.test(document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot')?.textContent ?? ''), null, { timeout: 3000 }).catch(() => {});
+      const after = await p.evaluate(() => document.querySelector('.dz-tg__col[data-date="2026-10-21"] .dz-slot')?.textContent);
+      check('seats: booked once, the same slot is still offered, with one place left', /· 1 place$/.test(after ?? ''), String(after));
+      check('seats: no console error', errors.length === 0, errors.join('\n'));
       await p.close();
     }
 

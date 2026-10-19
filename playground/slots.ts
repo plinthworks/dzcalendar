@@ -2,10 +2,15 @@ import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import type { AvailableSlot, EventInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import { checkSlot, findSlots } from '@dzcalendar/slots';
+import { checkSlot as checkFree, findSlots as findFree } from '@dzcalendar/slots';
+import { checkSlot as checkSeats, findSlots as findSeats } from '@dzcalendar/pro/slots';
 import type { Busy, SlotQuery } from '@dzcalendar/slots';
 
 const PROVIDER = 'Asia/Riyadh';
+// `?seats=2`: a group session with two seats (the Pro's capacity), each booking taking one.
+const seats = Number(new URLSearchParams(location.search).get('seats') ?? 0);
+const findSlots = (q: SlotQuery) => (seats > 0 ? findSeats({ ...q, capacity: seats }) : findFree(q));
+const checkSlot = (q: SlotQuery, start: Parameters<typeof checkFree>[1]) => (seats > 0 ? checkSeats({ ...q, capacity: seats }, start) : checkFree(q, start));
 const now = Temporal.Instant.from('2026-10-21T06:00:00Z'); // 09:00 in Riyadh, the demo's "now"
 const bookings: EventInput[] = [
   { id: 'b1', title: 'Consultation', start: '2026-10-21T10:00[Asia/Riyadh]', end: '2026-10-21T10:30[Asia/Riyadh]' },

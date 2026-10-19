@@ -28,6 +28,7 @@ import { expandZoned, parseRRule } from '../packages/rrule/src/index.js';
 import { buildListModel, buildMultiMonthModel } from '../packages/core/src/views.js';
 import { findSlots } from '../packages/slots/src/index.js';
 import { buildTimelineModel, TIMELINE_VIEWS } from '../packages/pro/src/model-entry.js';
+import { findSlots as findSeats } from '../packages/pro/src/slots-entry.js';
 import type { Busy } from '../packages/slots/src/index.js';
 
 // Run by node with --expose-gc; `gc` is not in @types/node's globals.
@@ -227,6 +228,22 @@ results['slots 30 days at 15 min'] = time(20, () =>
     minNotice: 120,
     maxPerDay: 40,
     busy: slotBusy,
+  }),
+);
+// Phase 16a: the same 30 days with eight seats a slot and 2 000 bookings (group sessions): the seat count per slot.
+const seatBusy = Array.from({ length: 2000 }, (_, i) => {
+  const start = Temporal.ZonedDateTime.from('2026-11-01T08:00[Asia/Riyadh]').add({ days: i % 30, minutes: 15 * (Math.floor(i / 30) % 48) });
+  return { start, end: start.add({ minutes: 30 }), seats: 1 + (i % 3) };
+});
+results['seats 30 days at 15 min (2000 bookings)'] = time(10, () =>
+  findSeats({
+    availability: { timeZone: 'Asia/Riyadh', weekly: [{ days: [1, 2, 3, 4, 5, 6, 7], from: '08:00', to: '20:00' }] },
+    from: '2026-11-01T00:00[Asia/Riyadh]',
+    to: '2026-12-01T00:00[Asia/Riyadh]',
+    duration: 15,
+    bufferAfter: 5,
+    capacity: 8,
+    busy: seatBusy,
   }),
 );
 process.stdout.write(JSON.stringify(results));

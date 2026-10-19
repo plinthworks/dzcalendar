@@ -287,7 +287,10 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const from = formatTemporal(placed.start.toZonedDateTimeISO(ctx.zone).toPlainTime(), HM, ctx.locale);
     const to = formatTemporal(placed.end.toZonedDateTimeISO(ctx.zone).toPlainTime(), HM, ctx.locale);
     b.textContent = from;
-    b.setAttribute('aria-label', ctx.messages.freeSlot({ time: `${from}–${to}` }));
+    // With seats (a class, a group session): how many are left, seen and said.
+    const seats = typeof placed.slot.seats === 'number' && Number.isInteger(placed.slot.seats) && placed.slot.seats >= 1 ? ctx.messages.seatsLeft({ count: placed.slot.seats }) : '';
+    if (seats) b.textContent = `${from} · ${seats}`;
+    b.setAttribute('aria-label', seats ? `${ctx.messages.freeSlot({ time: `${from}–${to}` })}, ${seats}` : ctx.messages.freeSlot({ time: `${from}–${to}` }));
     // Without onSlotClick the slots only show the free time: not offered as buttons that do nothing.
     b.toggleAttribute('aria-disabled', !ctx.live().onSlotClick);
   }

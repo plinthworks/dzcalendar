@@ -19,7 +19,7 @@ const read = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const run = (cmd, args, cwd = root) => execFileSync(cmd, args, { cwd, stdio: 'inherit' });
 
 const PACKAGES = ['rrule', 'core', 'ical', 'slots', 'dom', 'pro', 'motion-gsap'];
-const TZSLOT_RANGE = '^2.1.0';
+const TZSLOT_RANGE = '^2.2.0';
 
 const shared = (name) => ({
   license: read(join(pkg(name), 'package.json')).license,
@@ -74,7 +74,12 @@ function typescript(name) {
       }),
       ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' } }),
       // The timeline without a screen (a server, a worker): `@dzcalendar/pro/model`.
-      ...(name === 'pro' && { './model': { types: './model-entry.d.ts', default: './model-entry.js' } }),
+      ...(name === 'pro' && {
+        './model': { types: './model-entry.d.ts', default: './model-entry.js' },
+        // Loaded on demand: the editor (with @tzslot/dom) and seats.
+        './editor': { types: './editor-entry.d.ts', default: './editor-entry.js' },
+        './slots': { types: './slots-entry.d.ts', default: './slots-entry.js' },
+      }),
       './package.json': './package.json',
     },
     ...(source.dependencies && { dependencies: internal(source.dependencies) }),
@@ -89,13 +94,14 @@ for (const name of PACKAGES) typescript(name);
 for (const file of [join(pkg('dom'), 'dist', 'styles.js'), join(pkg('pro'), 'dist', 'timeline', 'styles.js')]) writeFileSync(file, await minifyCssLiteral(readFileSync(file, 'utf8')));
 theme();
 angular();
+angular('pro-angular');
 
 /**
  * ng-packagr compiles the Angular package against core's and dom's built
  * declarations (`tsconfig.lib.json` paths), so it comes after them.
  */
-function angular() {
-  const dir = pkg('angular');
+function angular(name = 'angular') {
+  const dir = pkg(name);
   rmSync(join(dir, 'dist'), { recursive: true, force: true });
   run('npx', ['ng-packagr', '-p', 'ng-package.json', '-c', 'tsconfig.lib.json'], dir);
   // ng-packagr writes its own manifest from the source one: take out what only
@@ -104,10 +110,10 @@ function angular() {
   const manifest = read(file);
   delete manifest.main;
   delete manifest.types;
-  Object.assign(manifest, shared('angular'));
+  Object.assign(manifest, shared(name));
   manifest.dependencies = internal(manifest.dependencies);
   writeFileSync(file, JSON.stringify(manifest, null, 2) + '\n');
-  extras('angular');
+  extras(name);
 }
 
 /** The theme ships its CSS and SCSS as they are, compiled first. */
@@ -123,7 +129,7 @@ function theme() {
   extras('theme');
 }
 
-for (const name of [...PACKAGES, 'angular']) {
+for (const name of [...PACKAGES, 'angular', 'pro-angular']) {
   const manifest = read(join(pkg(name), 'dist', 'package.json'));
   // A published manifest that points at src/ points at a file npm never received.
   // Only the entry points are checked: a description may well say "src/".

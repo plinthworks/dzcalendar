@@ -4,18 +4,16 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–15, each committed (`git log --oneline`: the last is
-  titled "Phase 15b"). Every check green at that commit: `npm test`
-  (1 125), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
-  `test:browser` (161), `perf:browser`, `test:package`.
-- **15a and 15b done** (commits titled "Phase 15a", "Phase 15b"): Phase
-  15 complete. **Next: Phase 16** — Pro print / export / editor, slot
-  capacity, pro-angular (`ARCHITECTURE.md` J); its design decisions are to
-  be validated with the owner first.
+- **Done:** Phases 0–15 and 16a, each committed (`git log --oneline`: the
+  last is titled "Phase 16a"). Every check green at that commit: `npm test`
+  (1 174), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
+  `test:browser` (172), `perf:browser`, `test:package`.
+- **Now: Phase 16b** — paged printing and exports (PDF, PNG, XLSX, ICS),
+  without dependencies (owner's decision, below). Next step: present 16b's
+  open questions to the owner (in French) before coding.
 - **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
   that URL; the owner authorised pushing on 2026-10-18).
-- **Left after it:** 16 Pro print / export /
-  editor, 17 animations, 18 ecosystem (Web Component, React/Vue,
+- **Left after it:** 16b print / export, 17 animations, 18 ecosystem (Web Component, React/Vue,
   FullCalendar options translator), 19+ native (Swift/Kotlin from
   `conformance/`, then SwiftUI/Compose).
 - **How a phase is run** (owner's rule): decisions validated with the owner
@@ -114,6 +112,12 @@ Both reports were checked by running each scenario before fixing.
   while the tzslot repository's source already says `/full`. Until a release
   carries it, non-ISO calendars (`[u-ca=buddhist]`, Hijri) fail to parse here:
   rejected as `invalid-start`, never mis-read.
+- **`@tzslot/dom` 2.2.0's date fields carry `aria-haspopup` on a textbox**
+  (axe `aria-allowed-attr`, Phase 16a): the editor's browser check leaves
+  `.tz-dtr` out (`axeViolations(p, '.dz-editor', '.tz-dtr')`) and checks the
+  rest of the dialog in full. Also: its words exist in English, French and
+  Arabic only; `createDateTimeRange` injects its styles only once connected
+  (the editor mounts its dialog hidden first).
 
 ### Other deviations, accepted
 
@@ -1448,3 +1452,110 @@ See `ARCHITECTURE.md` J. Phase 15.
   regression; a median there is left for later.
 - Owner's budget raises (measured + 3 %): pro 14.1 kB, locales ar 2.3, es
   1.9, de 1.9 kB. ical (7.9 against 7.5) is still as it was before Phase 15.
+
+## Phase 16 — Pro: editor, capacity, printing, exports (16a ✅ 2026-10-19; 16b next)
+
+See `ARCHITECTURE.md` J. Phase 16.
+
+### Owner's decisions (2026-10-19)
+
+- **Split:** 16a — the event and recurrence editor, slot capacity,
+  `pro-angular`; 16b — paged printing and the PDF / PNG / XLSX / ICS exports.
+  Reviews and a commit per sub-phase.
+- **Exports without dependencies:** XLSX (a zip of XML) and ICS written by
+  us; PNG and PDF drawn from the view's model (a canvas for PNG, a simple
+  vector PDF); loaded on demand from a sub-entry. No third-party library.
+- **Editor:** an accessible modal dialog — title, start and end with the
+  zone, all-day, resources, colour; usual recurrence (every N days / weeks /
+  months / years, weekdays, "2nd Tuesday", ending never / on a date / after
+  N); a rule beyond that is shown and kept as it is. The application can
+  replace the editor.
+- **Capacity:** simple seats — `capacity: N` per query or per resource; a
+  booking takes 1 seat (or its `seats`); a slot is offered while seats
+  remain; the view says how many ("2 seats"); `checkSlot` refuses with
+  `full`. Rotas and advanced constraints are not in it.
+
+## Phase 16a — the editor, seats, pro-angular ✅ (2026-10-19)
+
+### Built
+
+- **Core commands:** `series.rule { id, rrule }` (another rule for a whole
+  series; its excluded dates, moved occurrences and WKST kept; HOURLY and
+  finer refused on an all-day series; `null` stops it: the first occurrence
+  becomes the event, moved ones stand alone) and `event.repeat { id, rrule }`
+  (a single event becomes a series: same id, every field, its source). With
+  `rules` (a person's change), `event.create`, `event.repeat` and
+  `series.rule` check a series on its occurrences (a year, 500 at most); a
+  rule with no occurrence is a warning.
+- **`@dzcalendar/pro/editor`:** `openEventEditor(cal, target, o)` →
+  `'saved' | 'deleted' | 'cancelled'`, `editorHandlers(cal)` (context menu
+  "Open" / "New event here"). Modal dialog on tzslot's `createDateTimeRange`;
+  title, when, zone, resources, colour, repeat (`readRepeat` / `writeRepeat`:
+  every N days/weeks/months/years, weekdays, n-th or last weekday, ends
+  never / on a date / after N; anything else "custom", kept); "this / this
+  and following / all events" for an occurrence. Words in EN, FR, AR, ES, DE
+  (`editorMessagesFor`, `defineEditorLocale`), `EDITOR_CSS`.
+- **`@dzcalendar/pro/slots`:** seats over `@dzcalendar/slots` — `capacity`,
+  a booking's `seats`, refusal `full`, `seatedBusyFromEvents`,
+  `resourceSeats` (a resource's `extendedProps.capacity`, its own bookings).
+  The time grid shows "10:00 · 2 places" (`AvailableSlot.seats`, message
+  `seatsLeft` in five languages).
+- **`@dzcalendar/pro-angular`:** `<dz-calendar dzEventEditor
+  (editorClosed)>`, the editor fetched on its first opening; Angular 19–22
+  in `test:package`.
+- **`@dzcalendar/dom`:** `CalendarInstance.onDestroy(fn)`.
+- **Measured:** `pro/editor` 10.3 kB (budget 10.6), with tzslot's widget
+  36.4 kB (37.5), `pro/slots` 1.69 kB (1.74), `pro-angular` 0.76 kB (0.8);
+  bench `seats 30 days at 15 min (2000 bookings)` 13 ms (budget 25, as the
+  free engine's line). `@tzslot/core ^2.2.0` everywhere (owner, after the
+  reviews).
+- **Noise noted:** `normalize+index 10k` read 66–78 ms (budget 70) on a
+  loaded machine (a VM, Xcode, another vitest run); the Phase 15b commit,
+  benched in a worktree beside it, read the same 72–75 ms. Unchanged code
+  path; 68 ms once the machine was quieter. Not raised.
+
+### Reviews (architect; code review by execution in Chrome), fixed
+
+- **Data:** a save compared the rule as text (another spelling or its own
+  WKST was rewritten — an UNTIL before the event's hour added an
+  occurrence): compared as forms now, nothing written when nothing changed.
+  "Does not repeat" deleted and recreated the series, and a single event made
+  to repeat was deleted and recreated (fields lost): `series.rule null`,
+  `event.repeat`. A flight's end zone was replaced by the start's. Moving a
+  series and changing its rule together put it back on the old weekday: the
+  rule goes first, the move rebases it.
+- **Checks:** until empty or before the start, no weekday, a bad count or
+  interval: said, marked `aria-invalid`, focused. A series made or changed by
+  a person was checked on its first occurrence only: all of them now.
+- **Focus and lifecycle:** Escape closed the dialog while a tzslot picker was
+  open; the focus trap pulled the focus out of tzslot's picker (opened on
+  the body); a click outside lost what was typed; the focus was lost when
+  opened from the context menu; the calendar destroyed left the dialog open;
+  a second opening made a second dialog. All fixed, the Chrome checks added.
+- **Look:** tzslot's styles were never injected (the widget was made before
+  the dialog was in the document: an empty 16×6 switch); the picker's chosen
+  day was white on white (no `--tz-*` outside `.dz-cal`): the palette is
+  resolved on the backdrop and handed to tzslot.
+- **Markup and words:** inline inputs taken out of their radio's label, a
+  frequency label distinct from its group, a "custom rule" option, problem
+  codes said in words.
+- **Seats:** `maxPerDay` and the buffers read as nothing when invalid (now
+  refused, as the free engine does); a `busy` not a list hidden from the
+  engine; an unreadable booking reported at the wrong index; seats shown
+  only when a whole number ≥ 1; the seat count by binary search (bench
+  line); property tests (capacity 1 against the free engine; `checkSlot`
+  against `findSlots`, nine zones, DST days).
+- **Packaging:** `@tzslot/dom` an optional peer dependency of `pro`;
+  `pro-angular` no longer imports the timeline, fetches the editor lazily,
+  and reports a failed fetch (`editorClosed` 'cancelled').
+
+### Not done in Phase 16a, on purpose
+
+- "This and following" with another rule (the repeat shows with "all
+  events" only).
+- Rotas and advanced capacity constraints (owner's decision).
+- tzslot's words in Spanish and German; its `aria-haspopup` (upstream).
+- The Angular directive is tested zoneless only: zone.js in jsdom breaks
+  inside tzslot (`addEventListener` with `signal`, a jsdom realm issue);
+  `test:package` builds it on Angular 19–22.
+

@@ -164,6 +164,8 @@ export interface CalendarInstance {
   preparePrint(): () => void;
   /** Shows a selection (null clears it), as if a person had made it; `onSelect` is not called. */
   select(selection: Selection | null): void;
+  /** Runs `fn` when the calendar is destroyed (what an editor opened on it closes with). Returns the way to take it back. */
+  onDestroy(fn: () => void): () => void;
   destroy(): void;
 }
 
@@ -732,6 +734,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   }
 
   host.append(root);
+  /** What closes with the calendar (an editor's dialog). */
+  const destroyHooks = new Set<() => void>();
   paint();
   // What the initial resources could not be read as: said once, after the first paint.
   const firstProblems = kernel.getResourceProblems();
@@ -886,7 +890,19 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     refetch: (id) => kernel.sources.refetch(id),
     preparePrint,
     select: (sel) => interactions?.select(sel),
+    onDestroy(fn) {
+      destroyHooks.add(fn);
+      return () => destroyHooks.delete(fn);
+    },
     destroy() {
+      for (const fn of [...destroyHooks]) {
+        try {
+          fn();
+        } catch (err) {
+          void Promise.reject(err);
+        }
+      }
+      destroyHooks.clear();
       scope.dispose();
       viewScope?.dispose();
       ctx.motion.destroy?.();

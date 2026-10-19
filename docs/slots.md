@@ -81,7 +81,37 @@ availability: {
 | `maxPerDay` | At most this many bookings starting on one of the provider's dates; a full date offers nothing (a whole number). |
 | `now` | Needed by `minNotice` and `maxAdvanceDays`: the engine never reads a clock. |
 
-Capacity (several seats per slot) is Pro (Phase 16).
+Capacity (several seats per slot) is in `@dzcalendar/pro/slots` (Phase 16a,
+owner's decision: simple seats):
+
+```ts
+import { findSlots, checkSlot } from '@dzcalendar/pro/slots';
+findSlots({ ...rules, capacity: 8, busy: bookings }); // slots with `seats` left
+checkSlot({ ...rules, capacity: 8, busy: bookings }, start); // … or { ok: false, reason: 'full' }
+```
+
+- A booking takes 1 seat, or its `seats` (a whole number ≥ 1; another value
+  is a warning and counts 1). A `block` takes the whole slot.
+- A slot is offered while a seat remains: the most seats taken at once in it
+  (with the buffers, as here) is below `capacity`. Back-to-back bookings
+  share a seat.
+- `maxPerDay` counts bookings, not seats. Refusals keep this engine's order
+  (`notice`, `advance`, `daily-cap`, `busy` for a block), then `full`.
+- With `capacity: 1` and no `seats`, the same answer as this package.
+- The calendar shows the seats left beside a slot's time ("10:00 · 2 places")
+  and says them; a slot's `seats` field is what it reads.
+
+- Bad input is a Problem as in this package: `capacity`, `maxPerDay`, the
+  buffers and a `busy` that is not a list refuse the query; an unreadable
+  booking is a warning at its own place (`busy[3]`).
+
+Seats from calendar events and resources:
+
+```ts
+import { resourceSeats, seatedBusyFromEvents } from '@dzcalendar/pro/slots';
+seatedBusyFromEvents(events, zone); // a timed event's extendedProps.seats is its seats
+findSlots({ ...rules, ...resourceSeats(room, events, zone) }); // the room's extendedProps.capacity, its own bookings
+```
 
 `busyFromEvents(events, zone)` turns calendar events into busy time: events
 with `busy` (the default unless `status: 'cancelled'`); timed ones are

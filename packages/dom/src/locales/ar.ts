@@ -89,6 +89,7 @@ return {
   cursorSlot: ({ date, time }) => `${date}، ${iso(time)}`,
   cursorAllDay: ({ date }) => `${date}، طوال اليوم`,
   freeSlot: ({ time }) => `موعد متاح، ${iso(time)}`,
+  seatsLeft: ({ count }) => (count === 1 ? 'مقعد واحد' : count === 2 ? 'مقعدان' : count <= 10 ? `${n(count)} مقاعد` : `${n(count)} مقعدًا`),
   ofResource: ({ resource, place }) => `${resource}، ${place}`,
   timeSlots: 'الفترات الزمنية',
   range: ({ from, to }) => `من ${iso(from)} إلى ${iso(to)}`,

@@ -35,7 +35,7 @@ export default defineConfig({
           globals: true,
           environment: 'jsdom',
           setupFiles: ['packages/angular/test/setup.ts'],
-          include: ['packages/angular/test/**/*.test.ts'],
+          include: ['packages/angular/test/**/*.test.ts', 'packages/pro-angular/test/**/*.test.ts'],
         },
       },
       {

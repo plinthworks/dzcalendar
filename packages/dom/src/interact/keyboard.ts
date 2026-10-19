@@ -103,7 +103,8 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     const free = freeSlotAt(hit);
     if (!free) return label;
     const words = (x: AvailableSlot['start']) => timeWords(slotInstant(x)!.toZonedDateTimeISO(zone()));
-    return `${label}, ${m().freeSlot({ time: `${words(free.start)}–${words(free.end)}` })}`;
+    const seats = typeof free.seats === 'number' && Number.isInteger(free.seats) && free.seats >= 1 ? `, ${m().seatsLeft({ count: free.seats })}` : '';
+    return `${label}, ${m().freeSlot({ time: `${words(free.start)}–${words(free.end)}` })}${seats}`;
   }
   function spanWords(s: { readonly start: Selection['start']; readonly end: Selection['end']; readonly allDay: boolean }): string {
     if (s.allDay) {

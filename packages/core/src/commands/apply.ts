@@ -5,12 +5,16 @@ import type { CalEvent, EventInput } from '../event/types.js';
 import { deleteOccurrence, deleteSeries, editOccurrence, editedOccurrence, firstKey, startOfKey } from '../recurrence/edit.js';
 import type { EditScope, OccurrenceRef } from '../recurrence/edit.js';
 import { materialize, parseInstanceKey } from '../recurrence/series.js';
+import type { Series } from '../recurrence/series.js';
+import { expandSeries } from '../recurrence/expand.js';
+import { viewWindow } from '../store/store.js';
 import { validateProposal } from '../rules/validate.js';
 import type { Violation } from '../rules/validate.js';
 import type { Mutation } from '../store/changes.js';
 import type { StoreSnapshot } from '../store/store.js';
 import type { Command, CommandContext, CommandResult, EventPatch, Reach } from './types.js';
-import { patchEvent } from './patch.js';
+import { patchEvent, toInput } from './patch.js';
+import { parseRRule } from '@dzcalendar/rrule';
 
 const WKST = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
 
@@ -97,6 +101,33 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
     return found.length === 0;
   }
 
+  /**
+   * A series a person makes or changes (a new one, a single event made to
+   * repeat, another rule) meets the rules on its occurrences — a year of them,
+   * 500 at most — as a moved event does; its own occurrences are not in the way.
+   */
+  function seriesAllowed(sr: Series): boolean {
+    if (!ctx.rules) return true;
+    const zone = ctx.rules.displayZone;
+    const d0 = sr.base.allDay ? sr.base.start : sr.base.start.withTimeZone(zone).toPlainDate();
+    const { occurrences } = expandSeries(sr, viewWindow(d0, d0.add({ days: 366 }), zone), { limit: 500 });
+    for (const occ of occurrences) {
+      const found = validateProposal(current, { event: occ, start: occ.start, end: occ.end, resourceIds: occ.resourceIds }, ctx.rules, { movingSeries: sr.id });
+      if (found.length > 0) {
+        violations.push(...found);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /** A rule that can never give an occurrence (an UNTIL before the start…): said, as a warning. */
+  function warnIfEmpty(sr: Series, path: string): void {
+    const zone = ctx.normalize.displayZone;
+    const d0 = sr.base.allDay ? sr.base.start : sr.base.start.withTimeZone(zone).toPlainDate();
+    if (expandSeries(sr, viewWindow(d0, d0.add({ years: 10 }), zone), { limit: 1 }).occurrences.length === 0) problems.push(problem('invalid-rrule', 'warning', `${path}.rrule`, 'no occurrence'));
+  }
+
   function edit(id: string, patch: EventPatch, reach: Reach, path: string): boolean {
     const t = target(id, reach, path);
     if (!t) return false;
@@ -118,6 +149,17 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
         if (!r.ok) return false;
         const item = r.value;
         const id = item.kind === 'event' ? item.event.id : item.series.id;
+        // A person's new event (the editor) meets the rules too; the application's own creations do not ask.
+        if (item.kind === 'series') {
+          if (!seriesAllowed(item.series)) return false;
+        } else if (ctx.rules) {
+          const ev = item.event;
+          const found = validateProposal(current, { event: ev, start: ev.start, end: ev.end, resourceIds: ev.resourceIds }, ctx.rules);
+          if (found.length > 0) {
+            violations.push(...found);
+            return false;
+          }
+        }
         // The store keeps events and series apart, but a command refuses an id
         // used by either: `event.update('x')` must never be ambiguous.
         if (current.getEvent(id) || current.getSeries(id)) {
@@ -163,6 +205,67 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
         }
         const r = editOccurrence(current, { seriesId: c.id, key: c.at }, c.patch ?? {}, 'following', ctx.normalize, path, problems, {}, true);
         return r.ok && pushAll(r.mutations);
+      }
+      case 'event.repeat': {
+        const ev = current.getEvent(c.id);
+        if (!ev || ev.ref) {
+          problems.push(problem('unknown-event', 'error', `${path}.id`, c.id));
+          return false;
+        }
+        const r = normalizeEvent(withWeekStart({ ...toInput(ev), rrule: c.rrule } as EventInput, ctx), ctx.normalize, path);
+        problems.push(...r.problems);
+        if (!r.ok || r.value.kind !== 'series') return false;
+        const series = ev.sourceId !== undefined ? { ...r.value.series, sourceId: ev.sourceId } : r.value.series;
+        push({ kind: 'event', before: ev });
+        // Checked once the single event is gone: it is not in the way of its own occurrences.
+        if (!seriesAllowed(series)) return false;
+        warnIfEmpty(series, path);
+        return push({ kind: 'series', after: series });
+      }
+      case 'series.rule': {
+        const sr = current.getSeries(c.id);
+        if (!sr) {
+          problems.push(problem('unknown-event', 'error', `${path}.id`, c.id));
+          return false;
+        }
+        if (c.rrule === null || (Array.isArray(c.rrule) && c.rrule.length === 0)) {
+          // It stops repeating: the first occurrence is the event, a moved one an event of its own.
+          for (const oid of sr.overrides.values()) {
+            const o = current.getEvent(oid);
+            if (!o) continue;
+            const { ref: _ref, ...own } = o;
+            push({ kind: 'event', before: o, after: Object.freeze(own) as CalEvent });
+          }
+          push({ kind: 'series', before: sr });
+          const { ref: _r, ...base } = sr.base;
+          return push({ kind: 'event', after: Object.freeze({ ...base, ...(sr.sourceId !== undefined && { sourceId: sr.sourceId }) }) as CalEvent });
+        }
+        // A rule given without WKST keeps the series' own (not the reader's locale).
+        const own = sr.set.rules[0]?.wkst;
+        const written = withWeekStart({ start: sr.base.start, rrule: c.rrule } as EventInput, own !== undefined ? { ...ctx, weekStart: own } : ctx).rrule;
+        const texts = typeof written === 'string' ? [written] : Array.isArray(written) ? written : [];
+        const rules = [];
+        for (const [i, text] of texts.entries()) {
+          const r = typeof text === 'string' ? parseRRule(text) : null;
+          const sub = texts.length > 1 ? `${path}.rrule[${i}]` : `${path}.rrule`;
+          if (!r || !r.ok) {
+            problems.push(problem('invalid-rrule', 'error', sub, r && !r.ok ? r.problem.detail : String(text)));
+            return false;
+          }
+          if (sr.base.allDay && (r.rule.freq === 'HOURLY' || r.rule.freq === 'MINUTELY' || r.rule.freq === 'SECONDLY')) {
+            problems.push(problem('invalid-rrule', 'error', sub, `FREQ=${r.rule.freq}`));
+            return false;
+          }
+          rules.push(r.rule);
+        }
+        if (rules.length === 0) {
+          problems.push(problem('invalid-rrule', 'error', `${path}.rrule`, String(c.rrule)));
+          return false;
+        }
+        const next = { ...sr, set: { ...sr.set, rules } };
+        if (!seriesAllowed(next)) return false;
+        warnIfEmpty(next, path);
+        return push({ kind: 'series', before: sr, after: next });
       }
       case 'batch':
         return c.commands.every((sub, i) => run(sub, `${path}.commands[${i}]`));

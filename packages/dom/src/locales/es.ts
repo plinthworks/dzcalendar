@@ -48,6 +48,7 @@ return {
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, todo el día`,
   freeSlot: ({ time }) => `Hueco libre, ${time}`,
+  seatsLeft: ({ count }) => (count === 1 ? '1 plaza' : `${n(count)} plazas`),
   ofResource: ({ resource, place }) => `${resource}, ${place}`,
   timeSlots: 'Franjas horarias',
   range: ({ from, to }) => `${from} a ${to}`,

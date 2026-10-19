@@ -29,6 +29,7 @@ const SAMPLES: Record<string, unknown> = {
   cursorAllDay: { date: 'D' },
   freeSlot: { time: 'T' },
   ofResource: { resource: 'R', place: 'P' },
+  seatsLeft: { count: 3 },
   range: { from: 'A', to: 'B' },
   selected: { span: 'S' },
   violation: 'overlap',

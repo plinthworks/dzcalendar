@@ -70,6 +70,8 @@ export interface DzMessages {
   freeSlot(parts: { time: string }): string;
   /** In a resource view, whose column or cell: "Dr Ali, Wednesday 21 October". */
   ofResource(parts: { resource: string; place: string }): string;
+  /** Seats still free in a bookable slot (`@dzcalendar/pro/slots`): "2 seats". */
+  seatsLeft(parts: { count: number }): string;
   /** The time grid's cursor before it has a place: what it is. */
   readonly timeSlots: string;
   /** From one moment or day to another. */
@@ -161,6 +163,7 @@ export const EN: DzMessages = {
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, all day`,
   freeSlot: ({ time }) => `Free slot, ${time}`,
+  seatsLeft: ({ count }) => (count === 1 ? '1 seat' : `${count} seats`),
   ofResource: ({ resource, place }) => `${resource}, ${place}`,
   timeSlots: 'Time slots',
   range: ({ from, to }) => `${from} to ${to}`,
@@ -235,6 +238,7 @@ export const FR: DzMessages = {
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, journée`,
   freeSlot: ({ time }) => `Créneau libre, ${time}`,
+  seatsLeft: ({ count }) => (count === 1 ? '1 place' : `${count} places`),
   ofResource: ({ resource, place }) => `${resource}, ${place}`,
   timeSlots: 'Créneaux horaires',
   range: ({ from, to }) => `${from} à ${to}`,

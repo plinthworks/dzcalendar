@@ -106,6 +106,8 @@ export interface AvailableSlot {
   readonly end: Instant | ZonedDateTime;
   /** In a resource view, only that resource's columns show it; without, every column does. */
   readonly resourceId?: string;
+  /** Seats still free (`@dzcalendar/pro/slots`): said and shown beside its time. */
+  readonly seats?: number;
 }
 
 /** A slot placed in a column, in axis minutes. */

@@ -1,5 +1,16 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "noEmit": false, "types": ["vitest/globals"] },
-  "include": ["src/**/*.ts", "test/**/*.ts", "test-zone/**/*.ts"]
+  "compilerOptions": {
+    "noEmit": false,
+    "types": [
+      "vitest/globals"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "test-zone/**/*.ts",
+    "../pro-angular/src/**/*.ts",
+    "../pro-angular/test/**/*.ts"
+  ]
 }

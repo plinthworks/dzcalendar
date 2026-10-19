@@ -37,6 +37,19 @@ export type Command =
   | { readonly type: 'series.delete'; readonly id: SeriesId }
   /** "This and following" without the drag: the series is cut at `at`, the patch applied from there. */
   | { readonly type: 'series.split'; readonly id: SeriesId; readonly at: RecurrenceKey; readonly patch?: EventPatch }
+  /**
+   * A new rule for the whole series (the editor's "repeats"): its excluded and
+   * added dates and its overridden occurrences are kept; a rule given without
+   * WKST keeps the series' own. `null`: it stops repeating — its first
+   * occurrence becomes the event (same id, every field, its source), each
+   * moved occurrence an event of its own; the excluded dates go with the rule.
+   */
+  | { readonly type: 'series.rule'; readonly id: SeriesId; readonly rrule: string | readonly string[] | null }
+  /**
+   * A single event made to repeat: the same id, every field kept (its
+   * source too), now a series. WKST as for a rule created here.
+   */
+  | { readonly type: 'event.repeat'; readonly id: EventId; readonly rrule: string | readonly string[] }
   | { readonly type: 'batch'; readonly label?: string; readonly commands: readonly Command[] };
 
 export interface CommandContext {

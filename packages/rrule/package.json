@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "dependencies": {
-    "@tzslot/core": "^2.1.0"
+    "@tzslot/core": "^2.2.0"
   },
   "exports": {
     ".": { "types": "./src/index.ts", "default": "./src/index.ts" }

@@ -1,0 +1,55 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "strict": true,
+    "declaration": true,
+    "skipLibCheck": true,
+    "useDefineForClassFields": false,
+    "paths": {
+      "@dzcalendar/core": [
+        "../core/dist/index.d.ts"
+      ],
+      "@dzcalendar/dom": [
+        "../dom/dist/index.d.ts"
+      ],
+      "@dzcalendar/pro": [
+        "../pro/dist/index.d.ts"
+      ],
+      "@dzcalendar/pro/editor": [
+        "../pro/dist/editor-entry.d.ts"
+      ],
+      "@dzcalendar/angular": [
+        "../angular/dist/index.d.ts"
+      ],
+      "@dzcalendar/dom/toolkit": [
+        "../dom/dist/toolkit.d.ts"
+      ],
+      "@dzcalendar/pro/model": [
+        "../pro/dist/model-entry.d.ts"
+      ],
+      "@dzcalendar/pro/slots": [
+        "../pro/dist/slots-entry.d.ts"
+      ],
+      "@dzcalendar/slots": [
+        "../slots/dist/index.d.ts"
+      ],
+      "@dzcalendar/rrule": [
+        "../rrule/dist/index.d.ts"
+      ]
+    },
+    "types": []
+  },
+  "angularCompilerOptions": {
+    "compilationMode": "partial",
+    "strictTemplates": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

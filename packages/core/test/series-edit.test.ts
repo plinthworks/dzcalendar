@@ -456,3 +456,147 @@ describe('fixed after the Phase 6 reviews (expectations by hand)', () => {
     k.destroy();
   });
 });
+
+describe('series.rule: a new rule for the whole series (the editor)', () => {
+  const starts = (store: EventStore, from = '2026-10-01', to = '2026-11-30') => store.snapshot.queryInstances(win(from, to)).map((i) => String(i.event.start).slice(0, 10));
+
+  it('every day, three times: the old Mondays go, the excluded date and the moved occurrence stay; undo brings the rule back', () => {
+    const { store, h } = weekly('FREQ=WEEKLY;COUNT=6', { exdate: [`2026-10-06T09:00${P}`] });
+    // 6 October is excluded (a Tuesday: under the weekly rule it is no occurrence anyway).
+    const r = h.run({ type: 'series.rule', id: 'w', rrule: 'FREQ=DAILY;COUNT=3' });
+    expect(r.ok).toBe(true);
+    // DTSTART 5 October, every day, three occurrences counted: 5, (6 excluded but counted by COUNT), 7.
+    expect(starts(store)).toEqual(['2026-10-05', '2026-10-07']);
+    expect(store.snapshot.getSeries('w')!.set.exdates.map(String)).toEqual(['2026-10-06T07:00:00Z']);
+    h.undo();
+    expect(starts(store)).toEqual(['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26', '2026-11-02', '2026-11-09']);
+  });
+
+  it('WKST as for a rule created here; a rule that cannot be read, or hours on an all-day series, is refused', () => {
+    const { store, h } = weekly();
+    const store2 = createEventStore();
+    createHistory(store2, ctx({ weekStart: 7 })).run({ type: 'event.create', event: { id: 's', start: `2026-10-05T09:00${P}`, rrule: 'FREQ=WEEKLY' } });
+    expect(applyCommand(store2.snapshot, { type: 'series.rule', id: 's', rrule: 'FREQ=WEEKLY;INTERVAL=2' }, ctx({ weekStart: 7 })).ok).toBe(true);
+    const bad = h.run({ type: 'series.rule', id: 'w', rrule: 'FREQ=NEVER' });
+    expect([bad.ok, !bad.ok && bad.problems.map((p) => [p.code, p.path])]).toEqual([false, [['invalid-rrule', 'command.rrule']]]);
+    expect(h.run({ type: 'series.rule', id: 'nope', rrule: 'FREQ=DAILY' }).ok).toBe(false);
+    const day = createEventStore();
+    const hd = createHistory(day, ctx());
+    hd.run({ type: 'event.create', event: { id: 'd', start: '2026-10-05', allDay: true, rrule: 'FREQ=DAILY;COUNT=2' } });
+    const hourly = hd.run({ type: 'series.rule', id: 'd', rrule: 'FREQ=HOURLY' });
+    expect(!hourly.ok && hourly.problems.map((p) => p.code)).toEqual(['invalid-rrule']);
+    expect(store.snapshot.getSeries('w')!.set.rules[0]!.freq).toBe('WEEKLY');
+  });
+});
+
+describe('after the 16a reviews: repeat, stop, WKST, a person’s creation', () => {
+  it('event.repeat: the same id, every field kept, its source too; undo brings the single event back', () => {
+    const store = createEventStore();
+    store.replaceSourceChunk('feed', 'all', normalizeMany([{ id: 'e', title: 'E', start: `2026-10-05T09:00${P}`, url: 'https://x.test', extendedProps: { room: 'B12' }, status: 'tentative', startEditable: false }], ctx().normalize, 'feed').items);
+    const h = createHistory(store, ctx({ weekStart: 1 }));
+    expect(h.run({ type: 'event.repeat', id: 'e', rrule: 'FREQ=DAILY;COUNT=3' }).ok).toBe(true);
+    const s = store.snapshot.getSeries('e')!;
+    expect([store.snapshot.getEvent('e'), s.sourceId, s.base.title, s.base.url, s.base.props, s.base.status, s.base.perms.start, s.set.rules[0]!.wkst]).toEqual([undefined, 'feed', 'E', 'https://x.test', { room: 'B12' }, 'tentative', false, 1]);
+    h.undo();
+    expect([store.snapshot.getSeries('e'), store.snapshot.getEvent('e')!.title]).toEqual([undefined, 'E']);
+  });
+
+  it('series.rule null: it stops — the first occurrence is the event, a moved one stands alone; nothing else lost', () => {
+    const { store, h } = weekly('FREQ=WEEKLY;COUNT=6', { url: 'https://y.test' });
+    h.run({ type: 'event.update', id: 'w', key: `2026-10-12T09:00:00+02:00${P}`, scope: 'this', patch: { title: 'Moved' } });
+    expect(h.run({ type: 'series.rule', id: 'w', rrule: null }).ok).toBe(true);
+    const events = [...store.snapshot.allEvents()].map((e) => [e.id === 'w' ? 'w' : 'override', e.title, String(e.start).slice(0, 16), e.ref ?? null, e.url ?? null]);
+    expect(events.sort()).toEqual([
+      ['override', 'Moved', '2026-10-12T09:00', null, 'https://y.test'],
+      ['w', 'Weekly', '2026-10-05T09:00', null, 'https://y.test'],
+    ]);
+    expect(store.snapshot.getSeries('w')).toBeUndefined();
+  });
+
+  it('series.rule keeps the series’ own WKST when the new rule says none (not the locale’s)', () => {
+    const store = createEventStore();
+    const h = createHistory(store, ctx({ weekStart: 1 }));
+    h.run({ type: 'event.create', event: { id: 's', start: `2026-10-06T09:00${P}`, rrule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH;WKST=SU' } });
+    h.run({ type: 'series.rule', id: 's', rrule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH;COUNT=4' });
+    expect(store.snapshot.getSeries('s')!.set.rules[0]!.wkst).toBe(7);
+  });
+
+  it('a creation checked against the rules (a person’s): an overlap is refused; without rules, the application’s own goes', () => {
+    const store = createEventStore();
+    createHistory(store, ctx()).run({ type: 'event.create', event: { id: 'a', start: `2026-10-21T09:00${P}` } });
+    const create = { type: 'event.create' as const, event: { id: 'b', start: `2026-10-21T09:30${P}` } };
+    const refused = applyCommand(store.snapshot, create, ctx({ rules: { displayZone: 'Europe/Paris', overlap: false } }));
+    expect([refused.ok, !refused.ok && refused.violations?.map((v) => v.code)]).toEqual([false, ['overlap']]);
+    expect(applyCommand(store.snapshot, create, ctx()).ok).toBe(true);
+  });
+});
+
+describe('after the 16a code review: a series meets the rules on all its occurrences', () => {
+  // A on Wednesday 21 October 09:00–10:00 Paris, B on Thursday 22 October 09:00–10:00.
+  const setup = () => {
+    const store = createEventStore();
+    const h = createHistory(store, ctx());
+    h.run({ type: 'event.create', event: { id: 'a', start: `2026-10-21T09:00${P}`, end: `2026-10-21T10:00${P}` } });
+    h.run({ type: 'event.create', event: { id: 'b', start: `2026-10-22T09:00${P}`, end: `2026-10-22T10:00${P}` } });
+    return store;
+  };
+  const rules = ctx({ rules: { displayZone: 'Europe/Paris', overlap: false } });
+  const codes = (r: ReturnType<typeof applyCommand>) => (r.ok ? 'ok' : r.violations?.map((v) => v.code));
+
+  it('A made daily: its second day is on B — refused; made weekly — it goes (its own first day is not in its way)', () => {
+    const store = setup();
+    expect(codes(applyCommand(store.snapshot, { type: 'event.repeat', id: 'a', rrule: 'FREQ=DAILY;COUNT=3' }, rules))).toEqual(['overlap']);
+    expect(codes(applyCommand(store.snapshot, { type: 'event.repeat', id: 'a', rrule: 'FREQ=WEEKLY;COUNT=3' }, rules))).toBe('ok');
+  });
+
+  it('a new series whose second occurrence is on B, or a rule lengthened onto B: refused', () => {
+    const store = setup();
+    const create = { type: 'event.create' as const, event: { id: 's', start: `2026-10-21T09:30${P}`, end: `2026-10-21T09:45${P}`, rrule: 'FREQ=DAILY;COUNT=2' } };
+    // 21 October 09:30 is on A already: the first occurrence is refused too.
+    expect(codes(applyCommand(store.snapshot, create, rules))).toEqual(['overlap']);
+    createHistory(store, ctx()).run({ type: 'event.create', event: { id: 'w', start: `2026-10-20T09:00${P}`, end: `2026-10-20T10:00${P}`, rrule: 'FREQ=DAILY;COUNT=1' } });
+    expect(codes(applyCommand(store.snapshot, { type: 'series.rule', id: 'w', rrule: 'FREQ=DAILY;COUNT=3' }, rules))).toEqual(['overlap']);
+    // Without rules (the application's own change), it goes.
+    expect(applyCommand(store.snapshot, { type: 'series.rule', id: 'w', rrule: 'FREQ=DAILY;COUNT=3' }, ctx()).ok).toBe(true);
+  });
+
+  it('a rule that can never give an occurrence (UNTIL before the start): kept, and said as a warning', () => {
+    const { store, h } = weekly();
+    const r = h.run({ type: 'series.rule', id: 'w', rrule: 'FREQ=DAILY;UNTIL=20200101T000000Z' });
+    expect([r.ok, r.problems.map((p) => [p.code, p.severity])]).toEqual([true, [['invalid-rrule', 'warning']]]);
+    expect(store.snapshot.getSeries('w')).toBeDefined();
+  });
+});
+
+describe('the editor’s batch: the new rule first, then the move rebases it', () => {
+  const dates = (store: EventStore) => store.snapshot.queryInstances(win('2026-10-01', '2027-01-01')).map((i) => String(i.event.start).slice(0, 10));
+  it('Wednesdays (4) moved a day later with five of them: Thursdays 15 October to 12 November', () => {
+    const store = createEventStore();
+    const h = createHistory(store, ctx());
+    h.run({ type: 'event.create', event: { id: 'w', start: `2026-10-14T13:00${P}`, end: `2026-10-14T13:30${P}`, rrule: 'FREQ=WEEKLY;COUNT=4' } });
+    const r = h.run({
+      type: 'batch',
+      commands: [
+        { type: 'series.rule', id: 'w', rrule: 'FREQ=WEEKLY;BYDAY=WE;COUNT=5' },
+        { type: 'event.update', id: 'w', key: `2026-10-21T13:00:00+02:00${P}`, scope: 'all', patch: { start: `2026-10-22T13:00${P}`, end: `2026-10-22T13:30${P}` } },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    expect(dates(store)).toEqual(['2026-10-15', '2026-10-22', '2026-10-29', '2026-11-05', '2026-11-12']);
+  });
+
+  it('the 3rd Wednesday monthly, moved to the next day: that day is the 4th Thursday, and so is the rule', () => {
+    const store = createEventStore();
+    const h = createHistory(store, ctx());
+    h.run({ type: 'event.create', event: { id: 'm', start: `2026-10-21T13:00${P}`, end: `2026-10-21T13:30${P}`, rrule: 'FREQ=MONTHLY;COUNT=2' } });
+    h.run({
+      type: 'batch',
+      commands: [
+        { type: 'series.rule', id: 'm', rrule: 'FREQ=MONTHLY;BYDAY=3WE;COUNT=3' },
+        { type: 'event.update', id: 'm', key: `2026-10-21T13:00:00+02:00${P}`, scope: 'all', patch: { start: `2026-10-22T13:00${P}`, end: `2026-10-22T13:30${P}` } },
+      ],
+    });
+    // Thursdays of October 2026: 1, 8, 15, 22 — the 22nd is the 4th; then 26 November (5, 12, 19, 26), 24 December (3, 10, 17, 24).
+    expect(dates(store)).toEqual(['2026-10-22', '2026-11-26', '2026-12-24']);
+  });
+});

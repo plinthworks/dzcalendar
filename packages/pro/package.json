@@ -1,15 +1,41 @@
 {
   "name": "@dzcalendar/pro",
   "version": "0.0.0",
-  "description": "DzCalendar's timeline: resources in rows along an elapsed time axis (a 25-hour day is 25 hours wide), a resource area with tree, groups and field columns, windowed in two dimensions. MIT for now (owner's decision).",
+  "description": "DzCalendar Pro: the timeline (resources in rows along an elapsed time axis, a resource area with tree, groups and field columns, windowed in two dimensions), slot capacity, the event and recurrence editor. MIT for now (owner's decision).",
   "type": "module",
   "license": "MIT",
   "dependencies": {
     "@dzcalendar/core": "0.0.0",
-    "@dzcalendar/dom": "0.0.0"
+    "@dzcalendar/dom": "0.0.0",
+    "@dzcalendar/slots": "0.0.0"
   },
   "exports": {
-    ".": { "types": "./src/index.ts", "default": "./src/index.ts" },
-    "./model": { "types": "./src/model-entry.ts", "default": "./src/model-entry.ts" }
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./model": {
+      "types": "./src/model-entry.ts",
+      "default": "./src/model-entry.ts"
+    },
+    "./slots": {
+      "types": "./src/slots-entry.ts",
+      "default": "./src/slots-entry.ts"
+    },
+    "./editor": {
+      "types": "./src/editor-entry.ts",
+      "default": "./src/editor-entry.ts"
+    }
+  },
+  "peerDependencies": {
+    "@tzslot/dom": "^2.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@tzslot/dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@tzslot/dom": "^2.2.0"
   }
 }

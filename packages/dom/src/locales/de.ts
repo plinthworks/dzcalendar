@@ -48,6 +48,7 @@ return {
   cursorSlot: ({ date, time }) => `${date}, ${time}`,
   cursorAllDay: ({ date }) => `${date}, ganztägig`,
   freeSlot: ({ time }) => `Freier Termin, ${time}`,
+  seatsLeft: ({ count }) => (count === 1 ? '1 Platz' : `${n(count)} Plätze`),
   ofResource: ({ resource, place }) => `${resource}, ${place}`,
   timeSlots: 'Zeitfenster',
   range: ({ from, to }) => `${from} bis ${to}`,

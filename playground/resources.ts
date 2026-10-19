@@ -2,6 +2,7 @@ import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput, ResourceInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
+import { editorHandlers } from '@dzcalendar/pro/editor';
 
 const resources: ResourceInput[] = [
   { id: 'benali', title: 'Dre Benali', service: 'Cardiologie', eventOverlap: false },
@@ -39,4 +40,6 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
 });
 document.querySelector<HTMLSelectElement>('#view')!.addEventListener('change', (e) => cal.update({ view: (e.target as HTMLSelectElement).value }));
 document.querySelector<HTMLInputElement>('#group')!.addEventListener('change', (e) => cal.update({ resourceGroupField: (e.target as HTMLInputElement).checked ? 'service' : undefined }));
+// The Pro's editor: "Open" and "New event here" (context menu) open it.
+cal.update(editorHandlers(cal));
 (window as unknown as { __cal: typeof cal }).__cal = cal;

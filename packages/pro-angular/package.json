@@ -1,0 +1,19 @@
+{
+  "name": "@dzcalendar/pro-angular",
+  "version": "0.0.0",
+  "description": "DzCalendar Pro for Angular 19+: a dzEventEditor directive on <dz-calendar> that opens the event and recurrence editor (loaded on its first opening). The timeline views come with `import '@dzcalendar/pro'`. MIT for now (owner's decision).",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@dzcalendar/angular": "0.0.0",
+    "@dzcalendar/core": "0.0.0",
+    "@dzcalendar/dom": "0.0.0",
+    "@dzcalendar/pro": "0.0.0"
+  },
+  "peerDependencies": {
+    "@angular/core": "^19.0.0 || ^20.0.0 || ^21.0.0 || ^22.0.0",
+    "@tzslot/dom": "^2.2.0"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts"
+}

@@ -40,6 +40,8 @@ const results = {
   'slots (without core)': await bundle(src('slots'), ['@dzcalendar/core', '@dzcalendar/rrule', ...poly]),
   'dom (without core)': await bundle(src('dom'), ['@dzcalendar/core', ...poly]),
   'pro (without core, dom)': await bundle(src('pro'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
+  'pro/editor (without core, dom, tzslot dom)': await bundle(join(root, 'packages/pro/src/editor-entry.ts'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', '@tzslot/dom', '@tzslot/core', ...poly]),
+  'pro/slots (without core, slots)': await bundle(join(root, 'packages/pro/src/slots-entry.ts'), ['@dzcalendar/core', '@dzcalendar/slots', ...poly]),
   // The view models share core's modules: what they add beyond it.
   'core/views (beyond core)':
     (await bundle({ code: `export * from './packages/core/src/index.ts'; export * from './packages/core/src/views.ts';` }, ['@dzcalendar/rrule', ...poly])) -
@@ -52,6 +54,9 @@ const results = {
   'dom/locales/de (without dom)': await bundle(join(root, 'packages/dom/src/locales/de.ts'), ['@dzcalendar/core', '@dzcalendar/dom', ...poly]),
   // ng-packagr's bundle: run `npm run build` first.
   'angular (without Angular, core, dom)': await bundle(join(root, 'packages/angular/dist/fesm2022/dzcalendar-angular.mjs'), ['@angular/core', '@dzcalendar/core', '@dzcalendar/dom', ...poly]),
+  'pro-angular (without Angular, core, dom, pro)': await bundle(join(root, 'packages/pro-angular/dist/fesm2022/dzcalendar-pro-angular.mjs'), ['@angular/core', '@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/angular', '@dzcalendar/pro', '@dzcalendar/pro/editor', ...poly]),
+  // What opening the editor costs, tzslot's widget included (fetched on demand).
+  'pro/editor with tzslot dom (without core, dom)': await bundle(join(root, 'packages/pro/src/editor-entry.ts'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', '@tzslot/core', ...poly]),
   'theme css': gzipSync(readFileSync(join(root, 'packages/theme/dzcalendar.css')), { level: 9 }).length,
   'motion-gsap (without gsap)': await bundle(src('motion-gsap'), ['gsap', '@dzcalendar/dom']),
   'temporal polyfill': (await bundle(src('core'), ['@dzcalendar/rrule'])) - (await bundle(src('core'), ['@dzcalendar/rrule', ...poly])),

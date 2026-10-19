@@ -68,6 +68,21 @@ Ils priment sur les sections citées.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
 
+### Ajustements après la Phase 16a (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (`pro/editor` 10,6 ko, `pro/slots` 1,74 ko, éditeur avec tzslot 37,5 ko) ; `@tzslot/core ^2.2.0` partout (core, rrule : un seul Temporal avec l'éditeur, `TZSLOT_RANGE`).
+- **B.16 (commandes)** : `series.rule { id, rrule: string | string[] | null }` (règle refusée si illisible ou horaire sur une série journée ; WKST de la série gardé ; `null` arrête la série : sa première occurrence devient l'événement, les occurrences déplacées deviennent autonomes) ; `event.repeat { id, rrule }` (un événement devient série, même id, tous ses champs et sa source) ; avec `rules` (une personne), `event.create`, `event.repeat` et `series.rule` vérifient les règles sur les occurrences (un an, 500 au plus) ; une règle sans occurrence est un avertissement `invalid-rrule`.
+- **D (dom)** : `CalendarInstance.onDestroy(fn)` ; `AvailableSlot.seats` dessiné « 10:00 · 2 places » et dit (message `seatsLeft`).
+- **Pro** : `@dzcalendar/pro/editor` (dialogue modal sur `createDateTimeRange` de `@tzslot/dom`, dépendance pair optionnelle ; récurrence comparée en formulaire ; un éditeur par calendrier) ; `@dzcalendar/pro/slots` (places : `capacity`, `seats`, refus `full`, `seatedBusyFromEvents`, `resourceSeats`) ; `@dzcalendar/pro-angular` (`dzEventEditor`, `editorClosed`, éditeur chargé à la demande).
+- **Non fait, consigné** : « cet événement et les suivants » avec une autre règle ; rotas et contraintes avancées de capacité ; les mots de tzslot en espagnol et allemand (amont).
+
+### Décisions de la Phase 16 (2026-10-19)
+
+- **Découpage** : 16a = éditeur d'événement et de récurrence, capacité des créneaux, `pro-angular` ; 16b = impression paginée et exports PDF/PNG/XLSX/ICS.
+- **Exports sans dépendance** : XLSX (zip de XML) et ICS écrits par nous ; PNG et PDF dessinés depuis le modèle de la vue (canvas pour le PNG, PDF vectoriel simple) ; chargés à la demande depuis une sous-entrée.
+- **Éditeur** : dialogue modal accessible ; récurrence usuelle (tous les N jours/semaines/mois/ans, jours de la semaine, « 2e mardi », fin jamais / à une date / après N) ; une règle plus complexe est affichée et conservée telle quelle ; l'application peut le remplacer.
+- **Capacité** : places simples (`capacity` par requête ou par ressource, `seats` par réservation, motif de refus `full`) ; pas de rotas.
+
 ### Ajustements après la Phase 15b (détail dans ROADMAP.md)
 
 - **Paquet** : `@dzcalendar/pro` = `model-entry.ts` (axe, modèle, famille, vues ; pur, sous-entrée `@dzcalendar/pro/model`) + `timeline/view.ts` + `styles.ts` (`TIMELINE_CSS`). L'import enregistre la famille `timeline` et ses huit vues : registre `registerViewSpec` dans core (les noyaux créés après les connaissent). 13,7 ko (budget 14,1, mesure + 3 %).
@@ -300,8 +315,8 @@ Règle de partage : **tout fait de fuseau horaire (temps pur) va upstream. Toute
 | `@dzcalendar/theme` | SCSS → CSS, tokens, Tailwind 3 et 4, `contrast.css` | MIT | 0 (minimal) |
 | `@dzcalendar/motion-gsap` | Adaptateur GSAP optionnel (Flip, transitions de vues) | MIT, peer `gsap` | 17 |
 | `@dzcalendar/conformance` | `cases/**/*.json`, schémas JSON, runner TS | MIT | 1 |
-| `@dzcalendar/pro` | timeline ±ressources, zone des ressources de la timeline (arbre, groupes, colonnes de champs), virtualisation 2D étendue, impression paginée, export PDF/PNG/XLSX/ICS, éditeur d'événement et de récurrence, slots avancés | FSL (source-available, bascule MIT après 2 ans) | 15–16 |
-| `@dzcalendar/pro-angular` | Wrappers Angular du Pro | FSL | 16 |
+| `@dzcalendar/pro` | timeline ±ressources, zone des ressources de la timeline (arbre, groupes, colonnes de champs), virtualisation 2D étendue, impression paginée, export PDF/PNG/XLSX/ICS, éditeur d'événement et de récurrence, slots avancés | MIT pour l'instant (décision du propriétaire ; FSL envisagée, K.9) | 15–16 |
+| `@dzcalendar/pro-angular` | Wrappers Angular du Pro (`dzEventEditor`) | MIT pour l'instant (décision du propriétaire, K.9) | 16 |
 | `@dzcalendar/compat-fullcalendar` | Traducteur d'options FC → DzCalendar, codemod | MIT | 18 |
 | `@dzcalendar/element`, `react`, `vue` | Web Component, adaptateurs | MIT | 18 |
 | `DzCalendarKit` (Swift), `dz-calendar-kotlin` | Ports du core pilotés par la conformité, UI SwiftUI/Compose | à décider | 19+ |
@@ -1212,7 +1227,7 @@ Pas de `ApplicationRef.tick()` global. Compatible zoneless : la détection est e
 | `@dzcalendar/dom` (dayGrid + timeGrid + list + multiMonth + interactions + a11y) | ≤ 26 ko (30 avant la Phase 6) | |
 | `@dzcalendar/angular` | ≤ 6 ko | hors Angular |
 | `@dzcalendar/theme` (CSS) | ≤ 8 ko | |
-| `@dzcalendar/pro` (timeline + ressources) | ≤ 16 ko | export/éditeur/impression en sous-entrées chargées à la demande |
+| `@dzcalendar/pro` (timeline + ressources) | ≤ 16 ko | export/éditeur/impression en sous-entrées chargées à la demande ; `pro/editor` 10,6 ko (36,4 ko mesurés avec le widget tzslot, budget 37,5), `pro/slots` 1,74 ko, `pro-angular` 0,8 ko (16a, mesure + 3 %) |
 | **Total gratuit utile** (core+rrule+dom+theme) | **≤ 66 ko + 20 ko tzslot = ≈ 86 ko** | À comparer à ~95 ko (FullCalendar « all ») rapportés dans le doc d'analyse |
 
 `scripts/size.mjs` calcule le gzip de chaque `dist/` et le compare à `size-budget.json` ; la CI échoue au-delà de +5 %. Chaque module exporte `sideEffects:false` (comme `build.mjs`).
@@ -1358,8 +1373,8 @@ dzcalendar/
 │  ├─ theme/
 │  │  ├─ package.json · dzcalendar.scss · dzcalendar.css (généré) · contrast.css · tailwind.css · tailwind3.css
 │  ├─ motion-gsap/          src/index.ts · flip.ts · view-transition.ts
-│  ├─ pro/                  (Phase 15+)  src/{index.ts, model-entry.ts, timeline/{axis,model,family,view,styles}.ts, print/, export/, editor/, slots-pro/}  (resource-views : dans core/dom, K.5 ; zone des ressources et fenêtrage 2D dans timeline/view.ts, 15b ; pas de license.ts, K.9)
-│  └─ pro-angular/          (Phase 16)
+│  ├─ pro/                  (Phase 15+)  src/{index.ts, model-entry.ts, editor-entry.ts, slots-entry.ts, timeline/{axis,model,family,view,styles}.ts, editor/{dialog,recurrence,messages,styles}.ts, slots/capacity.ts, print/, export/}  (resource-views : dans core/dom, K.5 ; zone des ressources et fenêtrage 2D dans timeline/view.ts, 15b ; pas de license.ts, K.9)
+│  └─ pro-angular/          (Phase 16a)  src/{index.ts, editor.ts} (directive dzEventEditor ; l'éditeur chargé à la première ouverture) · test/
 ├─ playground/
 │  ├─ index.html (Angular) · vanilla.html · tailwind.html · dst.html (4 zones côte à côte) · perf.html · a11y.html
 │  ├─ main.ts · vanilla.ts · tailwind.ts · demo.ts · dst.ts · perf.ts
