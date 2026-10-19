@@ -4,6 +4,8 @@ import type { Scope } from './render/scope.js';
 import { h } from './render/reconcile.js';
 
 export interface Toolbar {
+  /** The title (`h2`, a polite live region): what a motion adapter animates. */
+  readonly title: HTMLElement;
   readonly element: HTMLElement;
   /** Words, direction, the view switcher's pressed button. */
   draw(state: KernelState, messages: DzMessages, rtl: boolean): void;
@@ -57,6 +59,7 @@ export function createToolbar(
 
   return {
     element: bar,
+    title,
     setViews,
     draw(state, messages, rtl) {
       // Rewriting an aria-live title, even with the same words, announces it again.

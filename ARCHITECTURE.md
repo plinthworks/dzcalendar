@@ -58,7 +58,7 @@ Ils priment sur les sections citées.
 ### Ajustements après la Phase 3 (revues, détail dans ROADMAP.md)
 
 - **Décisions du propriétaire** : CSS propre de la même famille que tzslot (palette `--tz-*` partagée, mêmes valeurs) ; `slotMax` ≤ 24 h ; GSAP en adaptateur optionnel dès la Phase 3.
-- **D.10** — interface livrée `MotionAdapter { viewChange, eventsEnter, destroy }` ; `captureState/animateFrom/viewTransition/kill` restent pour la Phase 17. Le calendrier possède l'adaptateur (détruit avec lui ou quand il est remplacé).
+- **D.10** — interface livrée `MotionAdapter { viewChange, eventsEnter, destroy }` ; complétée en 17a (voir « Ajustements après la Phase 17a »).
 - **B.18** — kernel réel : `store`/`now` injectables, `events`, `timeGrid`/`dayGrid`, `getViewSpec`, `setLocale`, `refreshToday` (pas de timer dans le core), abonnés isolés. À venir (étape 4.0) : `setOptions`, `setEvents`, `batch`, `cause`, registre de familles.
 - **D.1** — `KeyedList` (clé + signature) ; colonnes réutilisées par identité ; les tailles se lisent avec repli et ne sont jamais déclarées sur `.dz-cal` ; `scrollbar-gutter: stable`. Étape 4.0 : signatures à deux niveaux, `FrameScheduler`, `Scope`, `Ticker`, `ViewHost`.
 - **D.6** — colonne `group`, événement et barre `button` ; l'étiquette parlée dit les offsets (pas « * »), la durée réelle, le fuseau de l'événement s'il diffère. Curseur virtuel et région live : Phase 8.
@@ -67,6 +67,18 @@ Ils priment sur les sections citées.
 - **C.3** — lectures d'offset portées par l'événement (pas le morceau) ; une fin n'est « seconde passe » que *dans* la seconde passe ; graduations alignées sur l'horloge murale (gouttière et mode `elapsed`). Graduations propres à la colonne de transition en mode `elapsed` : à faire.
 - **F** — classes et jetons réels : `dz-tg__*`, `dz-ev`, `dz-band--gap|repeat`, `--dz-minute`, `--dz-now`, `--dz-gap-stripe`, `--dz-repeat-bg`, `--dz-event-accent`, `--dz-tone-*`. Pas de `:where()` ; `light-dark()` seul ; `contrast.css` de tzslot agit déjà via `--tz-*`. Un thème ne redéclare pas ce que tzslot possède (rayon). À trancher avant la v1 : renommer selon F, ou F selon le code.
 - **J** — étape 4.0 ajoutée en tête de la Phase 4 (liste dans ROADMAP.md).
+
+### Ajustements après la Phase 17a (détail dans ROADMAP.md)
+
+- **D.10 (dom)** : `MotionAdapter` gagne `beforeChange(change)` (l'ancien écran encore dessiné) et `afterChange(état, change, body)` (renvoie `true` s'il a animé le changement : `viewChange`/`eventsEnter` ne sont alors pas appelés), `titleChange`, `nowTick` ; `MotionChange { causes, direction, from, to, days, root, rtl }`, `MotionSide { view, family, date, zone, title, days }`. Plusieurs changements avant un même dessin n'en font qu'un (le premier « from », toutes les causes, le dernier « to »). Par défaut `WAAPI_MOTION` (glissement, entrées, surcouches ; coupé sous mouvement réduit et sans `Element.animate`) ; `NO_MOTION` pour rien. Les copies d'impression ont `NO_MOTION`.
+- **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
+- **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
+
+### Décisions de la Phase 17 (2026-10-19, en cours)
+
+- **Effets GSAP** : fuseaux et DST (glissement des événements au changement de fuseau, heure répétée qui se déplie, « maintenant » vivant), navigation (morphing mois → jour, titre en odomètre, retour à aujourd'hui, profondeur), événements (glisser physique, dépôt, suppression/annulation, création, vague), surcouches et timeline (ouverture depuis l'origine, accordéon des rangées, défilement amorti, compteur de places).
+- **Préréglages** « sobre » (défaut) et « expressif », tout réglable ; **base WAAPI** dans `dom` sans GSAP (< 1 ko) ; **plugins** Flip, CustomEase, InertiaPlugin, ScrollToPlugin, chargés à la demande ; `prefers-reduced-motion` coupe tout.
+- **Découpage** : 17a fondations + fuseaux/DST + navigation ; 17b événements + surcouches + timeline.
 
 ### Ajustements après la Phase 16b (détail dans ROADMAP.md)
 

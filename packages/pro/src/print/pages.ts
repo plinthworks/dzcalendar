@@ -1,5 +1,5 @@
 import type { Problem, ResourceInput, ResourceNode, TimeGridModel } from '@dzcalendar/core';
-import { createCalendar } from '@dzcalendar/dom';
+import { createCalendar, NO_MOTION } from '@dzcalendar/dom';
 import type { CalendarInstance, CalendarOptions } from '@dzcalendar/dom';
 import { orientationOf, periodsFor } from '../export/periods.js';
 import type { PageOptions, PagePeriod } from '../export/periods.js';
@@ -196,6 +196,8 @@ export async function printPages(cal: CalendarInstance, o: PrintOptions = {}): P
             editable: false,
             selectable: false,
             nowIndicator: false,
+            // Nothing moves on paper (not even the default fade).
+            motion: NO_MOTION,
             // Paper is light.
             scheme: 'light',
             virtualizeAbove: Number.MAX_SAFE_INTEGER,

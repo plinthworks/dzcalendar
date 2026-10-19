@@ -4,6 +4,11 @@ import { createCalendar, NO_MOTION } from '@dzcalendar/dom';
 import '@dzcalendar/dom/list';
 import '@dzcalendar/dom/multimonth';
 import { createGsapMotion } from '@dzcalendar/motion-gsap';
+import { gsap } from 'gsap';
+import { WAAPI_MOTION } from '@dzcalendar/dom';
+
+/** The motion picked on the page. */
+const motionOf = (v: string) => (v === 'none' ? NO_MOTION : v === 'waapi' ? WAAPI_MOTION : createGsapMotion({ preset: v === 'expressive' ? 'expressive' : 'sober' }));
 import { DEMO_EVENTS } from './demo-events';
 
 const zones = ['Europe/Paris', 'America/Chicago', 'Asia/Tokyo', 'Australia/Lord_Howe', 'UTC'];
@@ -31,11 +36,15 @@ function make(axis: 'wall' | 'elapsed') {
     editable: true,
     selectable: true,
     onSelect: (sel) => say(`Sélection : ${sel.start.toString()} → ${sel.end.toString()}`),
-    onDateClick: (c) => say(c.allDay ? `Clic sur le ${c.date.toString()}` : `Clic à ${c.instant.toZonedDateTimeISO(zoneSelect.value).toString({ smallestUnit: 'minute' })}`),
+    // In the month, a day opens into its day (the morph).
+    onDateClick: (c) => {
+      if (c.allDay && cal.kernel.getState().view.family === 'dayGrid') return cal.update({ view: 'timeGridDay', date: c.date });
+      say(c.allDay ? `Clic sur le ${c.date.toString()}` : `Clic à ${c.instant.toZonedDateTimeISO(zoneSelect.value).toString({ smallestUnit: 'minute' })}`);
+    },
     // A demo rule: nothing may land on a Saturday (the drop is refused, animated back).
     rules: { allow: (p) => (p.start instanceof Temporal.PlainDate ? p.start : p.start.withTimeZone(zoneSelect.value).toPlainDate()).dayOfWeek !== 6 },
     onCommandRefused: (r) => say(`Refusé : ${[...r.problems.map((p) => p.code), ...('violations' in r && r.violations ? r.violations.map((v) => v.code) : [])].join(', ')}`),
-    motion: (document.querySelector<HTMLInputElement>('#motion')!).checked ? createGsapMotion() : NO_MOTION,
+    motion: motionOf(document.querySelector<HTMLSelectElement>('#motion')!.value),
   });
 }
 
@@ -54,8 +63,10 @@ document.querySelector<HTMLSelectElement>('#theme')!.addEventListener('change', 
   if (v) document.documentElement.dataset['theme'] = v;
   else delete document.documentElement.dataset['theme'];
 });
-document.querySelector<HTMLInputElement>('#motion')!.addEventListener('change', (e) => {
-  cal.update({ motion: (e.target as HTMLInputElement).checked ? createGsapMotion() : NO_MOTION });
-});
+document.querySelector<HTMLSelectElement>('#motion')!.addEventListener('change', (e) => cal.update({ motion: motionOf((e.target as HTMLSelectElement).value) }));
 document.querySelector<HTMLInputElement>('#weeknums')?.addEventListener('change', (e) => cal.update({ weekNumbers: (e.target as HTMLInputElement).checked }));
 document.querySelector<HTMLInputElement>('#weekends')?.addEventListener('change', (e) => cal.update({ weekends: (e.target as HTMLInputElement).checked }));
+// The checks slow the clock down to look at a motion half-way.
+(window as unknown as { __gsap: typeof gsap; __cal: () => typeof cal }).__gsap = gsap;
+(window as unknown as { __cal: () => typeof cal }).__cal = () => cal;
+

@@ -23,7 +23,7 @@ export default defineConfig({
           name: 'dom',
           globals: true,
           environment: 'jsdom',
-          include: ['packages/dom/test/**/*.test.ts', 'packages/pro/test/dom/**/*.test.ts'],
+          include: ['packages/dom/test/**/*.test.ts', 'packages/pro/test/dom/**/*.test.ts', 'packages/motion-gsap/test/**/*.test.ts'],
         },
       },
       {

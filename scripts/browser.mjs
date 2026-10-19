@@ -1211,6 +1211,102 @@ try {
       await p.close();
     }
 
+    // ── Phase 17a: motion (the index page: GSAP, sober; the resources page: the WAAPI default) ──
+    // (Every other check runs under reduced motion; these ask for motion.)
+    {
+      const { p, errors } = await page('/', { reducedMotion: 'no-preference' });
+      await p.waitForSelector('.dz-ev');
+      await p.evaluate(() => void window.__gsap.globalTimeline.timeScale(0.1));
+      // A zone change: the events travel from their old places (an inline transform half-way).
+      await p.selectOption('#zone', 'Asia/Tokyo');
+      await p.waitForTimeout(150);
+      const zone = await p.evaluate(() => [...document.querySelectorAll('.dz-tg .dz-ev')].filter((n) => n.style.transform && n.style.transform !== 'none').length);
+      check('motion: a zone change glides the events to their new times', zone > 0, String(zone));
+      await p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      // The odometer: a copy rolls, hidden from assistive tech; the live title already says the new words.
+      await p.click('.dz-toolbar__next');
+      await p.waitForTimeout(100);
+      const title = await p.evaluate(() => {
+        const t = document.querySelector('.dz-toolbar__title');
+        const roll = t.parentElement.querySelector(':scope > [aria-hidden="true"]');
+        return { said: t.textContent === window.__cal().kernel.getState().title, roll: Boolean(roll), over: roll ? Math.abs(roll.getBoundingClientRect().top - t.getBoundingClientRect().top) < 2 : false };
+      });
+      check('motion: the title rolls as an odometer over itself, its words already the new ones', title.said && title.roll && title.over, JSON.stringify(title));
+      await p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      // Month → day: the day opens out of its cell.
+      await p.evaluate(() => window.__cal().update({ view: 'dayGridMonth' }));
+      await p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      await p.evaluate(() => { const c = window.__cal(); c.update({ view: 'timeGridDay', date: c.kernel.getState().date.with({ day: 14 }) }); });
+      await p.waitForTimeout(100);
+      const morph = await p.evaluate(() => Math.min(1, ...[...document.querySelectorAll('.dz-cal [style*="transform"]')].map((el) => new DOMMatrix(getComputedStyle(el).transform).a)));
+      check('motion: month → day opens the day out of its cell (scaled down at first)', morph < 0.9, String(morph));
+      await p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      const settled = await p.evaluate(() => document.querySelector('.dz-toolbar__title').style.opacity === '' && !document.querySelector('.dz-toolbar > [aria-hidden="true"]'));
+      check('motion: once done, nothing is left (the title shown, the copy gone)', settled, '');
+      // Right to left: "next" comes from the left (the end side), not the right.
+      await p.evaluate(() => window.__cal().update({ view: 'timeGridWeek', locale: 'ar' }));
+      await p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      await p.click('.dz-toolbar__next');
+      await p.waitForTimeout(60);
+      const rtlX = await p.evaluate(() => Math.min(0, ...[...document.querySelectorAll('.dz-cal [style*="transform"]')].map((el) => new DOMMatrix(getComputedStyle(el).transform).e)));
+      check('motion: right to left, the next week slides in from the left', rtlX < -1, String(rtlX));
+      await p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      // Two zone changes in a row: no jump (the second glide starts where the events are seen).
+      await p.evaluate(() => window.__cal().update({ locale: 'fr-FR' }));
+      await p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      await p.selectOption('#zone', 'Europe/Paris');
+      await p.waitForTimeout(400);
+      // Matched as the glide matches them: by occurrence (the key up to "|") and piece (an event across midnight has two).
+      const tops = () => p.evaluate(() => { const seen = new Map(); return Object.fromEntries([...document.querySelectorAll('.dz-tg .dz-ev')].map((n) => { const k = (n.dataset.key ?? '').split('|')[0]; const i = seen.get(k) ?? 0; seen.set(k, i + 1); return [`${k}#${i}`, n.getBoundingClientRect().top]; })); });
+      const seen = await tops();
+      await p.selectOption('#zone', 'America/Chicago');
+      const then = await tops();
+      const jump = Math.max(0, ...Object.entries(then).filter(([k]) => k in seen).map(([k, t]) => Math.abs(t - seen[k])));
+      check('motion: a zone change during a glide continues from where the events are (no jump)', jump < 2, String(jump));
+      await p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      // Another adapter mid-slide: the old one's tweens finish (nothing left half-transparent or offset).
+      await p.click('.dz-toolbar__next');
+      await p.waitForTimeout(80);
+      await p.selectOption('#motion', 'expressive');
+      await p.evaluate(() => void window.__gsap.globalTimeline.progress(1));
+      const left = await p.evaluate(() => [...document.querySelectorAll('.dz-cal [style]')].filter((e) => /transform|opacity/.test(e.getAttribute('style'))).length);
+      check('motion: swapping the adapter mid-animation leaves no inline transform or opacity', left === 0, String(left));
+      check('motion: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+    {
+      // Reduced motion: nothing moves at all.
+      const ctx2 = await browser.newContext({ reducedMotion: 'reduce', viewport: { width: 1300, height: 900 } });
+      const p = await ctx2.newPage();
+      await p.goto(new URL('/', base).href, { waitUntil: 'networkidle' });
+      await p.waitForSelector('.dz-ev');
+      await p.click('.dz-toolbar__next');
+      await p.selectOption('#zone', 'Asia/Tokyo');
+      await p.waitForTimeout(80);
+      const still = await p.evaluate(() => ({ moved: [...document.querySelectorAll('.dz-cal *')].filter((n) => n.style.transform && n.style.transform !== 'none').length, roll: Boolean(document.querySelector('.dz-toolbar > [aria-hidden="true"]')), waapi: document.getAnimations().length }));
+      check('motion: under prefers-reduced-motion nothing moves (no transform, no copy, no animation)', still.moved === 0 && !still.roll && still.waapi === 0, JSON.stringify(still));
+      await ctx2.close();
+    }
+    {
+      const { p, errors } = await page('/resources.html', { reducedMotion: 'no-preference' });
+      await p.waitForSelector('.dz-ev');
+      await p.click('.dz-toolbar__next');
+      const anims = await p.evaluate(() => document.querySelector('.dz-cal').getAnimations({ subtree: true }).length);
+      check('motion: without GSAP, the WAAPI default slides the period', anims > 0, String(anims));
+      // A print copy does not move (not even the default fade): paper and screenshots show it whole.
+      const still = await p.evaluate(async () => {
+        const { prn, cal } = window.__pro;
+        await new Promise((r) => setTimeout(r, 400));
+        const j = await (await prn()).printPages(cal, { print: false });
+        const n = document.querySelector('.dz-print').getAnimations({ subtree: true }).length;
+        j.close();
+        return n;
+      });
+      check('motion: the print copies have no animation', still === 0, String(still));
+      check('motion (WAAPI): no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
     // ── Phase 16b: paged printing and the exports (timeline and resources pages) ──
     {
       const { p, errors } = await page('/timeline.html');

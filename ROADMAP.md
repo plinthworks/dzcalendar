@@ -4,13 +4,14 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–16, each committed (`git log --oneline`: the last is
-  titled "Phase 16b"). Every check green at that commit: `npm test`
-  (1 197), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
-  `test:browser` (183), `perf:browser`, `test:package`.
-- **Now: Phase 17** (animations) — Phase 16 is done (commits "Phase 16a",
-  "Phase 16b"). Next step: present Phase 17's open questions to the owner
-  (in French) before coding.
+- **Done:** Phases 0–16 and 17a, each committed (`git log --oneline`: the
+  last is titled "Phase 17a"). Every check green at that commit: `npm test`
+  (1 208), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
+  `test:browser` (195), `perf:browser`, `test:package`.
+- **Now: Phase 17b** (animations: events, overlays, timeline) — 17a is
+  committed ("Phase 17a"). Plugins come from the application (owner,
+  after 17a). Next step: the 17b hooks (an event leaving, the selection's
+  rectangle, an overlay's origin), then the effects.
 - **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
   that URL; the owner authorised pushing on 2026-10-18).
 - **Left after it:** 17 animations, 18 ecosystem (Web Component, React/Vue,
@@ -1658,3 +1659,96 @@ See `ARCHITECTURE.md` J. Phase 16.
 - The Angular directive is tested zoneless only: zone.js in jsdom breaks
   inside tzslot (`addEventListener` with `signal`, a jsdom realm issue);
   `test:package` builds it on Angular 19–22.
+
+## Phase 17 — animations (in progress)
+
+See `ARCHITECTURE.md` J. Phase 17.
+
+### Owner's decisions (2026-10-19)
+
+- **"Very nice things with GSAP"**, all four families:
+  - **zones and DST** (the product's signature): on a zone change every
+    event glides to its new time (the instant stays, the clock changes); the
+    repeated hour of a 25-hour day unfolds, a 23-hour day's skipped hour
+    folds; a living "now" line;
+  - **navigation**: month → day morph from the clicked cell (shared
+    element, Flip), the title as an odometer, "today" as a quick run
+    through the periods between, depth when sliding (heads and body at
+    different speeds);
+  - **events**: drag with tilt from the gesture's speed and magnetic slots,
+    a drop that settles, a delete that dissolves (and comes back on undo),
+    a selection that pours into an event, entrances as a wave;
+  - **overlays and timeline**: "+N" and the editor opening from what was
+    clicked, resource rows as an accordion, scrolling to "now" eased with
+    inertia, the seats counter animated.
+- **Presets:** "sober" (default: soft curves, 200–350 ms, no bounce — a
+  health app) and "expressive" (springs, squash, bounces); every duration
+  and effect adjustable.
+- **Without GSAP:** a light WAAPI base in `@dzcalendar/dom` (period slide,
+  event entrance, overlays; < 1 kB); everything else comes with GSAP.
+- **Plugins:** Flip, CustomEase, InertiaPlugin, ScrollToPlugin (GSAP 3.13+,
+  all free), each loaded only when its effect is on. GSAP stays an optional
+  peer of the application, never in `@dzcalendar/dom`.
+- Always: off under `prefers-reduced-motion`; transforms and opacity only.
+- **Split (17a / 17b)**, reviews and a commit per sub-phase.
+- **After 17a (owner):** budgets measured + 3 % (dom 43.4 kB, motion-gsap
+  3.6 kB); "today" from far is one long fast slide and a soft stop (no run
+  through the periods between); the 17b plugins are given by the
+  application.
+
+## Phase 17a — motion foundations, the zone/DST signature, navigation ✅ (2026-10-19)
+
+### Built
+
+- **`@dzcalendar/dom`:** `MotionAdapter.beforeChange` / `afterChange`
+  (`MotionChange`, `MotionSide`), `titleChange`, `nowTick`; changes before
+  one paint merged; a family remount is a change; `WAAPI_MOTION` (the
+  default: a period's slide, reversed right to left; entrances up to 60
+  nodes; overlays) and `createWaapiMotion`; the toolbar's title exposed.
+- **`@dzcalendar/motion-gsap`:** presets `SOBER` / `EXPRESSIVE`, every
+  value adjustable; effects `zone` (events glide to their new times, reads
+  then writes, only what moved, 150 at most), `dst` (the repeated hour
+  unfolds, the skipped one folds in, the "25 h" note pops), `now` (glide in
+  its column, pulse), `morph` (a day cell on screen opens into the day),
+  `odometer` (a copy rolls the changed words, or the whole title; the live
+  title already says them), `today` (> 45 days: a long fast slide), `depth`
+  (heads half the body's way, reversed right to left); `opacity` only;
+  `matchMedia` from the first use and after a destroy; destroy finishes
+  what runs.
+- **Playground:** a "Mouvement" select (GSAP sober / expressive, WAAPI,
+  none); a month day click opens the day (the morph).
+- **Tests:** dom hooks, no GSAP in dom, the adapter (presets, odometer,
+  reduced motion, toggles, destroy mid-roll, one roll at a time, a shared
+  adapter, no morph week → month); Chrome (zone glide, odometer over the
+  title, month → day, right to left, two zone changes in a row, an adapter
+  swapped mid-slide, reduced motion, the WAAPI default, print copies
+  still).
+- **Measured:** dom 42.1 kB, motion-gsap 3.5 kB; `timeGridWeek:U` 26 ms
+  (budget 27); a zone change with 336 event nodes ~23 ms of script, one
+  33 ms frame (40 nodes: frames ≤ 17 ms).
+
+### Reviews (architect; code review by execution in Chrome), fixed
+
+- Print copies took the new WAAPI default (events faded in on paper):
+  `NO_MOTION`. A module-level adapter stopped following reduced motion
+  after its first calendar was destroyed; it read `matchMedia` at creation
+  (a server would throw). `visibility` (autoAlpha) could take the focus
+  from a hidden event. The zone glide read and wrote per node, tweened
+  nodes that did not move, fired on a view + zone change; a second zone
+  change mid-glide made events jump. The morph fired on week → month and
+  from off-screen cells. The now glide measured on the screen (a scroll
+  moved it). Right to left slid the wrong way. The odometer copy was wider
+  than the title (text jumping sideways) and paired words of different
+  titles by position; it rolled on locale changes; it left the toolbar
+  positioned; two could overlap. Swapping adapters mid-slide left the body
+  half-transparent (killed tweens skip their clearProps). A stale change
+  survived a failed mount or an adapter swap; several changes before one
+  paint lost causes; `rtl` was read before a locale's direction.
+
+### Not done in Phase 17a, on purpose
+
+- The events, overlays and timeline effects (17b).
+- Week → day morph (a time grid has no day cells to open from).
+- A long glide for a zone change in a big month is capped at 150 nodes;
+  the "now" glide starts from the second minute after a paint.
+

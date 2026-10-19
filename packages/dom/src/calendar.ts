@@ -10,8 +10,8 @@ import { viewFactory } from './host.js';
 import { createMenu } from './menu.js';
 import { messagesForLocale } from './messages.js';
 import type { DzMessages } from './messages.js';
-import { NO_MOTION } from './motion.js';
-import type { MotionAdapter } from './motion.js';
+import { WAAPI_MOTION } from './motion-waapi.js';
+import type { MotionAdapter, MotionChange } from './motion.js';
 import { createPopover } from './popover.js';
 import { FrameScheduler } from './render/frame.js';
 import { h } from './render/reconcile.js';
@@ -394,7 +394,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     messages: withDefaults(options.messages, kernel.getState().locale),
     locale: kernel.getState().locale,
     zone: kernel.getState().timeZone,
-    motion: options.motion ?? NO_MOTION,
+    motion: options.motion ?? WAAPI_MOTION,
     hooks: options.hooks ?? {},
     epoch: 0,
     snapMinutes: settings.current.snapMinutes ?? 15,
@@ -510,6 +510,12 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   let holding = false;
   let dirty = false;
   let pendingDir: 'prev' | 'next' | 'other' | undefined;
+  /** The calendar has been drawn once: what comes next is a change. */
+  let painted = false;
+  /** What was last drawn: the "from" of the next change. */
+  let shown = kernel.getState();
+  /** A change seen before its redraw, with what the adapter kept of the old screen. */
+  let pendingChange: { readonly change: MotionChange; readonly token: unknown } | null = null;
 
   function mount(family: string): ViewController {
     if (view && mountedFamily === family) return view;
@@ -538,15 +544,30 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     ctx.zone = state.timeZone;
     toolbar.draw(state, ctx.messages, root.dir === 'rtl');
     const vm = kernel.viewModel();
-    const v = mount(vm.family);
+    let v: ViewController;
+    try {
+      v = mount(vm.family);
+    } catch (err) {
+      // Nothing drawn: the change it was for is gone with it.
+      pendingChange = null;
+      throw err;
+    }
     root.dataset['view'] = state.view.type;
     root.classList.toggle('dz-editable', settings.current.editable === true);
     const created = v.render(vm.model, state);
     interactions?.refresh();
     if (options.nowIndicator !== false) v.tick(kernel.now(), state);
-    if (!firstPaint && pendingDir) ctx.motion.viewChange?.(v.body, pendingDir);
-    else if (!firstPaint && created.length > 0) ctx.motion.eventsEnter?.(created);
+    // The adapter animates the change itself, or the plain hooks do.
+    const change = pendingChange;
+    pendingChange = null;
+    // A change animates from the second paint of the calendar on (a view of another family mounting is a change too).
+    const handled = painted && change !== null && ctx.motion.afterChange?.(change.token, change.change, v.body) === true;
+    if (!handled && !firstPaint && pendingDir) ctx.motion.viewChange?.(v.body, pendingDir);
+    else if (!handled && !firstPaint && created.length > 0) ctx.motion.eventsEnter?.(created);
+    if (painted && change && change.change.from.title !== state.title) ctx.motion.titleChange?.(toolbar.title, change.change.from.title, state.title, change.change);
+    painted = true;
     pendingDir = undefined;
+    shown = state;
     if (firstPaint) {
       firstPaint = false;
       if (vm.family === 'timeline' && v.scrollTo) {
@@ -661,6 +682,31 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       popover.close(false);
       if (e.type === 'state') {
         if (e.direction) pendingDir = e.direction;
+        // The old screen is still drawn: the adapter looks at it now. Several changes before one paint are one change:
+        // the first one's "from" (and what the adapter kept of it), every cause, the last "to".
+        if (pendingChange) {
+          const prev = pendingChange.change;
+          const to = { view: e.state.view.type, family: e.state.view.family, date: e.state.date, zone: e.state.timeZone, title: e.state.title, days: e.state.range.dates.length };
+          const direction = e.direction ?? prev.direction;
+          pendingChange = {
+            token: pendingChange.token,
+            change: { ...prev, causes: [...new Set([...prev.causes, ...e.causes])], to, days: prev.from.date.until(e.state.date, { largestUnit: 'days' }).days, rtl: directionOf(e.state.locale) === 'rtl', ...(direction && { direction }) },
+          };
+        } else if (view) {
+          const was = shown;
+          const side = (s: typeof was) => ({ view: s.view.type, family: s.view.family, date: s.date, zone: s.timeZone, title: s.title, days: s.range.dates.length });
+          const change: MotionChange = {
+            causes: e.causes,
+            ...(e.direction && { direction: e.direction }),
+            from: side(was),
+            to: side(e.state),
+            days: was.date.until(e.state.date, { largestUnit: 'days' }).days,
+            root,
+            // The new locale's direction (root.dir follows it just below).
+            rtl: directionOf(e.state.locale) === 'rtl',
+          };
+          pendingChange = { change, token: ctx.motion.beforeChange?.(change) };
+        }
         // Another zone or locale changes what every label says, at the same keys and places.
         if (e.causes.includes('zone') || e.causes.includes('locale')) {
           ctx.zone = e.state.timeZone;
@@ -685,7 +731,10 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   let timer: ReturnType<typeof setTimeout> | undefined;
   const untilNextMinute = () => 60000 - (kernel.now().epochMilliseconds % 60000);
   const tick = () => {
-    if (root.isConnected && !kernel.refreshToday() && options.nowIndicator !== false) view?.tick(kernel.now(), kernel.getState());
+    if (root.isConnected && !kernel.refreshToday() && options.nowIndicator !== false) {
+      view?.tick(kernel.now(), kernel.getState());
+      ctx.motion.nowTick?.([...root.querySelectorAll<HTMLElement>('.dz-now')]);
+    }
     timer = setTimeout(tick, untilNextMinute());
   };
   const startTicking = () => {
@@ -792,6 +841,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           if (changes.motion && changes.motion !== ctx.motion) {
             ctx.motion.destroy?.();
             ctx.motion = changes.motion;
+            // What the old adapter kept of the screen is not the new one's.
+            pendingChange = null;
           }
           // Compared member by member: a wrapper that rebuilds the same object
           // on every change must not redraw every event.
