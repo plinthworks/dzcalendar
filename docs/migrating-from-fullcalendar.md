@@ -61,7 +61,11 @@ Until the packages are on npm, they are tarballs (`npm run pack:local` in
 this repository writes them to `packed/`). Install the whole closure, not
 only what you import: `core`, `rrule`, `dom`, `theme`, and with the
 translator `ical` and `compat-fullcalendar` — npm cannot fetch an internal
-dependency it does not find beside the others.
+dependency it does not find beside the others. After replacing the tarballs
+in an Angular application, empty its caches (`rm -rf .angular/cache
+node_modules/.vite`): otherwise the dev server serves the old chunks and the
+screen stays blank with `NG0919: Cannot read @Component metadata`, which is
+not a circular dependency.
 
 ## What changes on the way
 

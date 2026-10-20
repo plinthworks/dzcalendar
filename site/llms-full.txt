@@ -278,6 +278,9 @@ timeline views.
   events**, in a time grid's columns, with `ctx.background`: return nothing
   for them to keep a plain tint. The all-day row's and the month's
   backgrounds stay tints.
+- An event is given with `extendedProps` (an input); read back — in
+  `eventChange`, `eventClick`, a template — it is a `CalEvent`, whose own data
+  is `props` (`change.after.props.patientId`).
 - The day-header hook covers the week, day and month views (a month's
   column: the first date of that weekday), not a list's day headings.
 - The change output says a person's change — a gesture, the keyboard, the
@@ -417,6 +420,9 @@ result's `problems` say what went wrong.
   events**, in a time grid's columns, with `ctx.background`: return nothing
   for them to keep a plain tint. The all-day row's and the month's
   backgrounds stay tints.
+- An event is given with `extendedProps` (an input); read back — in
+  `eventChange`, `eventClick`, a template — it is a `CalEvent`, whose own data
+  is `props` (`change.after.props.patientId`).
 - The day-header hook covers the week, day and month views (a month's
   column: the first date of that weekday), not a list's day headings.
 - The change output says a person's change — a gesture, the keyboard, the
@@ -535,6 +541,9 @@ result's `problems` say what went wrong.
   events**, in a time grid's columns, with `ctx.background`: return nothing
   for them to keep a plain tint. The all-day row's and the month's
   backgrounds stay tints.
+- An event is given with `extendedProps` (an input); read back — in
+  `eventChange`, `eventClick`, a template — it is a `CalEvent`, whose own data
+  is `props` (`change.after.props.patientId`).
 - The day-header hook covers the week, day and month views (a month's
   column: the first date of that weekday), not a list's day headings.
 - The change output says a person's change — a gesture, the keyboard, the
@@ -1711,7 +1720,11 @@ Until the packages are on npm, they are tarballs (`npm run pack:local` in
 this repository writes them to `packed/`). Install the whole closure, not
 only what you import: `core`, `rrule`, `dom`, `theme`, and with the
 translator `ical` and `compat-fullcalendar` — npm cannot fetch an internal
-dependency it does not find beside the others.
+dependency it does not find beside the others. After replacing the tarballs
+in an Angular application, empty its caches (`rm -rf .angular/cache
+node_modules/.vite`): otherwise the dev server serves the old chunks and the
+screen stays blank with `NG0919: Cannot read @Component metadata`, which is
+not a circular dependency.
 
 ## What changes on the way
 

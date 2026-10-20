@@ -26,7 +26,7 @@ export interface EventChange {
   readonly command?: Command;
   /** Every event and series it touched: `before` null when created, `after` null when removed. */
   readonly changes: readonly ({ readonly kind: 'event'; readonly before: CalEvent | null; readonly after: CalEvent | null } | { readonly kind: 'series'; readonly before: Series | null; readonly after: Series | null })[];
-  /** The first event touched (most commands touch one): before and after. */
+  /** The first event touched (most commands touch one): before and after — read events, their data in `props` (given as `extendedProps`). */
   readonly before: CalEvent | null;
   readonly after: CalEvent | null;
   /**

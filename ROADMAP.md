@@ -13,9 +13,17 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 - **Done:** Phase 18e (Sehhaty's feedback) committed ("Phase 18e"); every
   check green (1 344 tests, typecheck, build, size, test:browser,
   test:package) but the known noise (`normalize+index 10k`).
-- **Now: Sehhaty's second pass** — `sehhaty-c5` reruns its screen on the
-  new tarballs (`packed/`), removing its workarounds (checklist in the 18e
-  section); what is left comes back here.
+- **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
+  compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
+  `zone-guessed` left, revert on a server 409 checked on both engines, 154
+  events shown in the month instead of 18 + "+N", `eventStyle: 'solid'`
+  adopted — "no functional gap left against FullCalendar" for that screen.
+  Two doc lines added (`props` vs `extendedProps`; Angular's caches after a
+  tarball change). Seen, left: the default day heads' case comes from `Intl`
+  (lower case where theirs wrote "LUN. 19/10").
+- **Next:** first render (indexing every event at creation) and size (the
+  polyfill loaded only where Temporal is missing, K.2) — where FullCalendar 7
+  is ahead; then the CSS pass, npm publication, licences; then Phase 19.
 - **Then, from the benchmark:** first render (the kernel reads and indexes
   every event at creation: 80 % of a 10 000-event month's first render) and
   size (122 kB against FullCalendar 7's 95 kB) — the two numbers where
@@ -2367,3 +2375,16 @@ Net: −430 lines of CSS, −60 of menu, −35 of re-measuring.
 - A command your code runs with `{ validate: true }` is said as a person's
   (that is what validating means) — documented.
 
+
+## Phase 19 — native: owner's decision on the product (2026-10-20)
+
+- **A library and a showcase app.** `DzCalendarKit` (SwiftUI components for
+  applications — Sehhaty's iOS app first), then Kotlin/Compose; and a
+  **demonstration app built on it, in the spirit of macOS Calendar**: Day /
+  Week / Month / Year views, a sidebar of calendars to tick (sources on and
+  off), a mini-month to navigate, today, search. It proves the library; it
+  does **not** aim at a calendar product (no iCloud / CalDAV / Exchange sync,
+  no reminders, no App Store target). Still open before Phase 19 starts:
+  hand-written ports per language vs one Rust core (K.14).
+- On the web side this asks for a **mini-month** component (date picker /
+  navigator) — not built yet; the year view exists (`multiMonthYear`).

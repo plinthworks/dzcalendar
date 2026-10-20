@@ -162,6 +162,9 @@ timeline views.
   events**, in a time grid's columns, with `ctx.background`: return nothing
   for them to keep a plain tint. The all-day row's and the month's
   backgrounds stay tints.
+- An event is given with `extendedProps` (an input); read back — in
+  `eventChange`, `eventClick`, a template — it is a `CalEvent`, whose own data
+  is `props` (`change.after.props.patientId`).
 - The day-header hook covers the week, day and month views (a month's
   column: the first date of that weekday), not a list's day headings.
 - The change output says a person's change — a gesture, the keyboard, the
