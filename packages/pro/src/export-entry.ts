@@ -20,6 +20,7 @@ import { PAPER } from './export/paper.js';
 import type { PdfPage } from './export/pdf.js';
 import { occurrenceRows } from './export/rows.js';
 import { toXLSX } from './export/xlsx.js';
+import { zip } from './export/zip.js';
 
 export { occurrenceRows, excelSerial } from './export/rows.js';
 export type { OccurrenceRow, RowsOptions } from './export/rows.js';
@@ -223,4 +224,32 @@ export function download(blob: Blob, filename: string, doc: Document = document)
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/** The exports by name, as a framework's own button picks one. */
+export type ExportKind = 'pdf' | 'png' | 'xlsx' | 'csv' | 'ics';
+
+/**
+ * An export made and saved through the browser in one call:
+ * `downloadExport(cal, 'xlsx', 'agenda.xlsx')`. PNG sheets: one file, or a zip
+ * of them. Resolves with the problems (empty when the file was saved); never
+ * rejects.
+ */
+export async function downloadExport(cal: CalendarInstance, kind: ExportKind, filename: string, o: object = {}): Promise<readonly Problem[]> {
+  const doc = cal.element.ownerDocument;
+  if (kind === 'png') {
+    const r = await exportPNG(cal, o);
+    if (r.blobs.length === 1) download(r.blobs[0]!, filename, doc);
+    else if (r.blobs.length > 1) {
+      const base = filename.replace(/\.png$/i, '');
+      const files = await Promise.all(r.blobs.map(async (b, i) => ({ name: `${base}-${i + 1}.png`, data: new Uint8Array(await b.arrayBuffer()) })));
+      download(new Blob([zip(files) as BlobPart], { type: 'application/zip' }), `${base}.zip`, doc);
+    }
+    return r.problems;
+  }
+  const make = { pdf: exportPDF, xlsx: exportXLSX, csv: exportCSV, ics: exportICS }[kind];
+  if (!make) return [bad('kind', String(kind))];
+  const r = await make(cal, o);
+  if (r.blob) download(r.blob, filename, doc);
+  return r.problems;
 }

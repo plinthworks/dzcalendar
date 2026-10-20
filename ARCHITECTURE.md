@@ -82,6 +82,12 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18c (détail dans ROADMAP.md)
+
+- **React** `@dzcalendar/react` (18, 19) et **Vue** `@dzcalendar/vue` (3.4, 3.5), au niveau d'Angular : options en props (comparées par contenu ; Temporal par ce qu'ils impriment), `initial` pour ce qui est lu à la création, vue/date/sélection contrôlées (la prop gagne) ou libres, contenu des événements par les composants de l'application (portails React rendus avant l'affichage ; Teleport Vue), contrôleur (`useCalendarController`/`useCalendarState`, `createCalendarController`/`injectCalendarController`), défauts et mouvement par fournisseur ou plugin. Type du composant Vue écrit à la main (génériques différents entre 3.4 et 3.5).
+- **Pro** : `pro-react`, `pro-vue` (`useEventEditor` via `controller.takeOver`, `useDzExport`) ; `downloadExport` neutre dans `@dzcalendar/pro/export`.
+- **G** : `npm run size` échoue pour un paquet mesuré sans budget. **Décision du propriétaire** : budgets à la mesure + 3 % (react 3,4 ko, vue 3,55 ko, pro-react 0,76 ko, pro-vue 0,7 ko).
+
 ### Ajustements après la Phase 18b (détail dans ROADMAP.md)
 
 - **Deux paquets** : `@dzcalendar/compat-fullcalendar` traduit à l'exécution les options d'une application FullCalendar (`createFromFullCalendar`, `applyFullCalendar`, `fromFullCalendar`) ; `@dzcalendar/migrate` (`dz-migrate`, ts-morph, outil seulement) réécrit le code. Le codemod écrit `createFromFullCalendar(el, options).calendar` plutôt que `createCalendar` avec des options renommées : les options restent celles de l'application, traduites et dites à l'exécution.

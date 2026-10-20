@@ -14,8 +14,16 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const packed = join(root, 'packed');
 /** Every Angular major the package declares, each with the TypeScript its compiler takes. */
 const MAJORS = { 19: '~5.8.0', 20: '~5.9.0', 21: '~5.9.0', 22: '~6.0.0' };
+/** React and Vue: each version the packages declare, built by Vite with its own type checker. */
+const FRAMEWORKS = {
+  react18: { react: '18.3.1', types: '18.3.31', typesDom: '18.3.7' },
+  react19: { react: '19.2.8', types: '19.2.18', typesDom: '19.2.7' },
+  'vue3.4': { vue: '3.4.38' },
+  'vue3.5': { vue: '3.5.43' },
+};
 const asked = process.argv.slice(2);
-const majors = asked.length > 0 ? asked : Object.keys(MAJORS);
+const majors = asked.length > 0 ? asked.filter((a) => a in MAJORS) : Object.keys(MAJORS);
+const frameworks = asked.length > 0 ? asked.filter((a) => a in FRAMEWORKS) : Object.keys(FRAMEWORKS);
 const tgz = (name) => {
   const f = readdirSync(packed).find((x) => x.startsWith(`dzcalendar-${name}-`) && x.endsWith('.tgz'));
   if (!f) throw new Error(`no ${name} tarball in packed/: run npm run pack:local`);
@@ -26,6 +34,7 @@ for (const major of majors) smoke(major, MAJORS[major]);
 for (const major of majors.filter((m) => m === '19' || m === '22')) ngAdd(major, MAJORS[major]);
 // dz-migrate on an application written for FullCalendar (not installed): rewritten, then it builds on ours alone.
 for (const major of majors.filter((m) => m === '22')) migrateApp(major, MAJORS[major]);
+for (const f of frameworks) (f.startsWith('react') ? reactApp : vueApp)(f, FRAMEWORKS[f]);
 
 function smoke(major, typescript) {
 const angular = `^${major}.0.0`;
@@ -243,5 +252,157 @@ bootstrapApplication(App);
   if (left.length > 0) throw new Error(`dz-migrate left FullCalendar in: ${left.join(', ')}`);
   run('npx', ['ng', 'build']);
   console.log(`✓ dz-migrate, Angular ${major}: an application written for FullCalendar rewritten, then built on DzCalendar alone`);
+}
+
+/** A fresh Vite application (no lockfile) with the tarballs; `files` written, then `check` and `vite build`. */
+function viteApp(name, deps, devDeps, files, check, done) {
+  const app = join(packed, `app-${name}`);
+  console.log(`\n── ${name} ──`);
+  rmSync(app, { recursive: true, force: true });
+  mkdirSync(join(app, 'src'), { recursive: true });
+  const ours = { '@dzcalendar/core': tgz('core'), '@dzcalendar/dom': tgz('dom'), '@dzcalendar/rrule': tgz('rrule'), '@dzcalendar/ical': tgz('ical'), '@dzcalendar/slots': tgz('slots'), '@dzcalendar/pro': tgz('pro'), '@dzcalendar/theme': tgz('theme'), '@tzslot/dom': '^2.2.0' };
+  writeFileSync(join(app, 'package.json'), JSON.stringify({ name: `dzcalendar-${name}`, private: true, type: 'module', dependencies: { ...ours, ...deps }, devDependencies: { vite: '6.3.6', typescript: '5.9.3', ...devDeps } }, null, 2));
+  writeFileSync(join(app, 'index.html'), '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>smoke</title></head><body><div id="root"></div><script type="module" src="/src/main.ts"></script></body></html>\n');
+  for (const [file, text] of Object.entries(files)) writeFileSync(join(app, file), text);
+  const run = (cmd, args) => execFileSync(cmd, args, { cwd: app, stdio: 'inherit' });
+  run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error']);
+  run('npx', check);
+  run('npx', ['vite', 'build', '--logLevel', 'warn']);
+  // The Pro's editor is fetched on its first opening: in a chunk of its own, never in the one the page loads.
+  const assets = join(app, 'dist', 'assets');
+  const scripts = readdirSync(assets).filter((f) => f.endsWith('.js'));
+  const entry = readFileSync(join(app, 'dist', 'index.html'), 'utf8').match(/assets\/([^"]+\.js)/)?.[1];
+  const holding = scripts.filter((f) => readFileSync(join(assets, f), 'utf8').includes('dz-editor__btn'));
+  if (!entry || holding.length === 0 || holding.includes(entry)) throw new Error(`${name}: the editor is not in a chunk of its own (entry ${entry}, editor in ${holding.join(', ') || 'none'})`);
+  console.log(`✓ ${done}`);
+}
+
+function reactApp(name, v) {
+  const tsconfig = { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', lib: ['ES2023', 'DOM', 'DOM.Iterable'], jsx: 'react-jsx', strict: true, skipLibCheck: false, noEmit: true }, include: ['src'] };
+  viteApp(
+    name,
+    { react: v.react, 'react-dom': v.react, '@dzcalendar/react': tgz('react'), '@dzcalendar/pro-react': tgz('pro-react') },
+    { '@types/react': v.types, '@types/react-dom': v.typesDom },
+    {
+      'tsconfig.json': JSON.stringify(tsconfig, null, 2),
+      'src/main.ts': "import './app.tsx';\n",
+      // Every entry a consumer imports, in JSX, its types checked.
+      'src/app.tsx': `import '@dzcalendar/theme/dzcalendar.css';
+import '@dzcalendar/pro';
+import { createContext, useContext, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { Temporal } from '@dzcalendar/core';
+import type { CalEvent, EventInput, Selection } from '@dzcalendar/core';
+import { DzCalendar, DzCalendarProvider, useCalendarController, useCalendarState } from '@dzcalendar/react';
+import type { DzCalendarHandle } from '@dzcalendar/react';
+import { useDzExport, useEventEditor } from '@dzcalendar/pro-react';
+
+const Room = createContext('A');
+const events: EventInput[] = [{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } }];
+
+function Badge({ event }: { event: CalEvent }) {
+  return <b>{event.title} · {useContext(Room)}</b>;
+}
+
+function App() {
+  const cal = useCalendarController();
+  const { title, canUndo } = useCalendarState(cal);
+  const [view, setView] = useState('timeGridWeek');
+  const [selection, setSelection] = useState<Selection | null>(null);
+  useEventEditor(cal, { onClosed: (o) => console.log(o) });
+  const exports = useDzExport(cal);
+  return (
+    <Room.Provider value="B">
+      <header>
+        <button onClick={cal.prev}>‹</button> <strong>{title}</strong> <button onClick={cal.next}>›</button>
+        <button disabled={!canUndo} onClick={cal.undo}>Annuler</button>
+        <button onClick={() => void exports.download('pdf', 'agenda.pdf')}>PDF</button>
+      </header>
+      <DzCalendar
+        ref={(h: DzCalendarHandle | null) => void h?.instance}
+        controller={cal}
+        view={view}
+        onViewChange={setView}
+        defaultDate={Temporal.PlainDate.from('2026-10-21')}
+        selection={selection}
+        onSelectionChange={setSelection}
+        timeZone="Europe/Paris"
+        editable
+        events={events}
+        initial={{ firstDay: 1 }}
+        renderEventContent={(event) => <Badge event={event} />}
+        onEventClick={(i) => console.log(i.event.id)}
+        onProblems={(r) => console.log(r.problems.length)}
+      />
+    </Room.Provider>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<DzCalendarProvider defaults={{ locale: 'fr-FR' }}><App /></DzCalendarProvider>);
+`,
+    },
+    ['tsc', '-p', 'tsconfig.json'],
+    `React ${v.react}: an application in JSX, its types checked strictly, built by Vite against the packed tarballs`,
+  );
+}
+
+function vueApp(name, v) {
+  const tsconfig = { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'bundler', lib: ['ES2023', 'DOM', 'DOM.Iterable'], strict: true, skipLibCheck: false, noEmit: true, jsx: 'preserve' }, include: ['src/**/*.ts', 'src/**/*.vue'] };
+  viteApp(
+    name,
+    { vue: v.vue, '@dzcalendar/vue': tgz('vue'), '@dzcalendar/pro-vue': tgz('pro-vue') },
+    { '@vitejs/plugin-vue': '6.0.9', 'vue-tsc': '3.3.11' },
+    {
+      'tsconfig.json': JSON.stringify(tsconfig, null, 2),
+      'vite.config.mjs': "import vue from '@vitejs/plugin-vue';\nexport default { plugins: [vue()] };\n",
+      'src/shims.d.ts': "declare module '*.vue' {\n  import type { DefineComponent } from 'vue';\n  const c: DefineComponent;\n  export default c;\n}\n",
+      'src/main.ts': "import '@dzcalendar/theme/dzcalendar.css';\nimport '@dzcalendar/pro';\nimport { createApp } from 'vue';\nimport { DzCalendarPlugin } from '@dzcalendar/vue';\nimport App from './App.vue';\n\ncreateApp(App).use(DzCalendarPlugin, { defaults: { locale: 'fr-FR' } }).mount('#root');\n",
+      // Every entry a consumer imports, in a single-file component, its template's types checked.
+      'src/App.vue': `<script setup lang="ts">
+import { provide, ref, shallowRef } from 'vue';
+import { Temporal } from '@dzcalendar/core';
+import type { EventInput, PlainDate, Selection } from '@dzcalendar/core';
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+import { useDzExport, useEventEditor } from '@dzcalendar/pro-vue';
+
+const cal = createCalendarController();
+const view = ref('timeGridWeek');
+const date = shallowRef<PlainDate>(Temporal.PlainDate.from('2026-10-21'));
+const selection = shallowRef<Selection | null>(null);
+const events: EventInput[] = [{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } }];
+provide('room', 'B');
+useEventEditor(cal, { onClosed: (o) => console.log(o) });
+const exports = useDzExport(cal);
+</script>
+
+<template>
+  <header>
+    <button @click="cal.prev()">‹</button> <strong>{{ cal.title.value }}</strong> <button @click="cal.next()">›</button>
+    <button :disabled="!cal.canUndo.value" @click="cal.undo()">Annuler</button>
+    <button @click="exports.download('pdf', 'agenda.pdf')">PDF</button>
+  </header>
+  <DzCalendar
+    v-model:view="view"
+    v-model:date="date"
+    v-model:selection="selection"
+    class="calendar"
+    :controller="cal"
+    time-zone="Europe/Paris"
+    editable
+    :events="events"
+    :initial="{ firstDay: 1 }"
+    @event-click="(i) => console.log(i.event.id)"
+    @problems="(r) => console.log(r.problems.length)"
+  >
+    <template #event-content="{ event }">
+      <b>{{ event.title }}</b>
+    </template>
+  </DzCalendar>
+</template>
+`,
+    },
+    ['vue-tsc', '--noEmit', '-p', 'tsconfig.json'],
+    `Vue ${v.vue}: a single-file component application, its template's types checked, built by Vite against the packed tarballs`,
+  );
 }
 

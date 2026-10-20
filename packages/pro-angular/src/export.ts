@@ -98,19 +98,9 @@ export class DzExport {
   download(target: DzExportTarget, kind: 'xlsx', filename: string, o?: RangeOptions): Promise<readonly Problem[]>;
   download(target: DzExportTarget, kind: 'csv', filename: string, o?: RangeOptions & { readonly separator?: ',' | ';' | '\t' }): Promise<readonly Problem[]>;
   download(target: DzExportTarget, kind: 'ics', filename: string, o?: RangeOptions & { readonly all?: boolean; readonly name?: string }): Promise<readonly Problem[]>;
-  async download(target: DzExportTarget, kind: 'pdf' | 'png' | 'xlsx' | 'csv' | 'ics', filename: string, o: object = {}): Promise<readonly Problem[]> {
-    const m = await exportsOf();
-    if (kind === 'png') {
-      const r = await this.png(target, o);
-      if (r.blobs.length === 1) m.download(r.blobs[0]!, filename);
-      else if (r.blobs.length > 1) {
-        const files = await Promise.all(r.blobs.map(async (b, i) => ({ name: filename.replace(/\.png$/i, '') + `-${i + 1}.png`, data: new Uint8Array(await b.arrayBuffer()) })));
-        m.download(new Blob([m.zip(files) as BlobPart], { type: 'application/zip' }), filename.replace(/\.png$/i, '') + '.zip');
-      }
-      return r.problems;
-    }
-    const r = await this[kind](target, o as never);
-    if (r.blob) m.download(r.blob, filename);
-    return r.problems;
+  download(target: DzExportTarget, kind: 'pdf' | 'png' | 'xlsx' | 'csv' | 'ics', filename: string, o: object = {}): Promise<readonly Problem[]> {
+    const cal = this.instance(target);
+    if (!cal) return Promise.resolve([noCalendar()]);
+    return this.run(async () => (await exportsOf()).downloadExport(cal, kind, filename, o), (p) => [p]);
   }
 }

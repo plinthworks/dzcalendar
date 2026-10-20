@@ -57,6 +57,18 @@
       "@dzcalendar/angular/fullcalendar": [
         "./packages/angular/fullcalendar/src/index.ts"
       ],
+      "@dzcalendar/react": [
+        "./packages/react/src/index.ts"
+      ],
+      "@dzcalendar/vue": [
+        "./packages/vue/src/index.ts"
+      ],
+      "@dzcalendar/pro-react": [
+        "./packages/pro-react/src/index.ts"
+      ],
+      "@dzcalendar/pro-vue": [
+        "./packages/pro-vue/src/index.ts"
+      ],
       "@dzcalendar/compat-fullcalendar": [
         "./packages/compat-fullcalendar/src/index.ts"
       ],

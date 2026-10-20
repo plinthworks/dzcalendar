@@ -18,7 +18,7 @@ const pkg = (name) => join(root, 'packages', name);
 const read = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const run = (cmd, args, cwd = root) => execFileSync(cmd, args, { cwd, stdio: 'inherit' });
 
-const PACKAGES = ['rrule', 'core', 'ical', 'slots', 'dom', 'pro', 'motion-gsap', 'element', 'compat-fullcalendar', 'migrate'];
+const PACKAGES = ['rrule', 'core', 'ical', 'slots', 'dom', 'pro', 'motion-gsap', 'element', 'compat-fullcalendar', 'migrate', 'react', 'vue', 'pro-react', 'pro-vue'];
 const TZSLOT_RANGE = '^2.2.0';
 
 const shared = (name) => ({

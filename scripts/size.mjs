@@ -57,6 +57,11 @@ const results = {
   // ng-packagr's bundle: run `npm run build` first.
   'angular (without Angular, core, dom)': await bundle(join(root, 'packages/angular/dist/fesm2022/dzcalendar-angular.mjs'), ['@angular/core', '@dzcalendar/core', '@dzcalendar/dom', ...poly]),
   'pro-angular (without Angular, core, dom, pro)': await bundle(join(root, 'packages/pro-angular/dist/fesm2022/dzcalendar-pro-angular.mjs'), ['@angular/core', '@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/angular', '@dzcalendar/pro', '@dzcalendar/pro/editor', ...poly]),
+  'react (without React, core, dom)': await bundle(src('react'), ['react', 'react-dom', '@dzcalendar/core', '@dzcalendar/dom', ...poly]),
+  'vue (without Vue, core, dom)': await bundle(src('vue'), ['vue', '@dzcalendar/core', '@dzcalendar/dom', ...poly]),
+  // The Pro's entries are fetched on demand: left out like the framework.
+  'pro-react (without React, core, dom, pro)': await bundle(src('pro-react'), ['react', '@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/react', '@dzcalendar/pro', '@dzcalendar/pro/editor', '@dzcalendar/pro/export', '@dzcalendar/pro/print', ...poly]),
+  'pro-vue (without Vue, core, dom, pro)': await bundle(src('pro-vue'), ['vue', '@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/vue', '@dzcalendar/pro', '@dzcalendar/pro/editor', '@dzcalendar/pro/export', '@dzcalendar/pro/print', ...poly]),
   // What opening the editor costs, tzslot's widget included (fetched on demand).
   'pro/editor with tzslot dom (without core, dom)': await bundle(join(root, 'packages/pro/src/editor-entry.ts'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', '@tzslot/core', ...poly]),
   'theme css': gzipSync(readFileSync(join(root, 'packages/theme/dzcalendar.css')), { level: 9 }).length,
@@ -71,10 +76,11 @@ const budgets = JSON.parse(readFileSync(join(root, 'size-budget.json'), 'utf8'))
 let over = 0;
 for (const [name, bytes] of Object.entries(results)) {
   const budget = budgets[name];
-  const within = budget === undefined || bytes <= budget;
-  const tolerated = !within && bytes <= budget * 1.05;
+  // A package measured without a budget fails: its size would never be watched.
+  const within = budget !== undefined && bytes <= budget;
+  const tolerated = !within && budget !== undefined && bytes <= budget * 1.05;
   if (!within && !tolerated) over++;
   const mark = within ? '✓' : tolerated ? '!' : '✗';
-  console.log(`${mark} ${name.padEnd(28)} ${(bytes / 1000).toFixed(1).padStart(6)} kB   budget ${(budget / 1000).toFixed(1)} kB${tolerated ? '   (over, within 5 %)' : ''}`);
+  console.log(`${mark} ${name.padEnd(28)} ${(bytes / 1000).toFixed(1).padStart(6)} kB   budget ${budget === undefined ? 'none' : `${(budget / 1000).toFixed(1)} kB`}${tolerated ? '   (over, within 5 %)' : ''}`);
 }
 process.exit(over ? 1 : 0);

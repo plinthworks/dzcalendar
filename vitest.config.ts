@@ -23,7 +23,7 @@ export default defineConfig({
           name: 'dom',
           globals: true,
           environment: 'jsdom',
-          include: ['packages/dom/test/**/*.test.ts', 'packages/pro/test/dom/**/*.test.ts', 'packages/motion-gsap/test/**/*.test.ts', 'packages/element/test/**/*.test.ts', 'packages/compat-fullcalendar/test/**/*.test.ts'],
+          include: ['packages/dom/test/**/*.test.ts', 'packages/pro/test/dom/**/*.test.ts', 'packages/motion-gsap/test/**/*.test.ts', 'packages/element/test/**/*.test.ts', 'packages/compat-fullcalendar/test/**/*.test.ts', 'packages/react/test/**/*.test.ts', 'packages/pro-react/test/**/*.test.ts', 'packages/vue/test/**/*.test.ts', 'packages/pro-vue/test/**/*.test.ts'],
         },
       },
       {

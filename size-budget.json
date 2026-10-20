@@ -24,5 +24,9 @@
   "pro/export (without core, dom, ical)": 12300,
   "pro/print (without core, dom)": 4400,
   "element (without core, dom)": 3000,
-  "compat-fullcalendar (without core, dom, ical)": 8700
+  "compat-fullcalendar (without core, dom, ical)": 8700,
+  "react (without React, core, dom)": 3400,
+  "vue (without Vue, core, dom)": 3550,
+  "pro-react (without React, core, dom, pro)": 760,
+  "pro-vue (without Vue, core, dom, pro)": 700
 }

@@ -10,6 +10,8 @@ export default defineConfig({
   root: 'playground',
   // Only the Angular page and package are compiled by Angular (playground/tsconfig.angular.json).
   // Everything else is left to Vite's own TypeScript transform.
+  // Vue's compile-time flags (its esm-bundler build asks for them): the playground's React and Vue pages.
+  define: { __VUE_OPTIONS_API__: 'true', __VUE_PROD_DEVTOOLS__: 'false', __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: 'false' },
   plugins: [
     angular({
       tsconfig: fileURLToPath(new URL('./playground/tsconfig.angular.json', import.meta.url)),
@@ -36,6 +38,10 @@ export default defineConfig({
       '@dzcalendar/ical': fileURLToPath(new URL('./packages/ical/src/index.ts', import.meta.url)),
       '@dzcalendar/slots': fileURLToPath(new URL('./packages/slots/src/index.ts', import.meta.url)),
       '@dzcalendar/angular/fullcalendar': fileURLToPath(new URL('./packages/angular/fullcalendar/src/index.ts', import.meta.url)),
+      '@dzcalendar/pro-react': fileURLToPath(new URL('./packages/pro-react/src/index.ts', import.meta.url)),
+      '@dzcalendar/pro-vue': fileURLToPath(new URL('./packages/pro-vue/src/index.ts', import.meta.url)),
+      '@dzcalendar/react': fileURLToPath(new URL('./packages/react/src/index.ts', import.meta.url)),
+      '@dzcalendar/vue': fileURLToPath(new URL('./packages/vue/src/index.ts', import.meta.url)),
       '@dzcalendar/compat-fullcalendar': fileURLToPath(new URL('./packages/compat-fullcalendar/src/index.ts', import.meta.url)),
       '@dzcalendar/element/define': fileURLToPath(new URL('./packages/element/src/define.ts', import.meta.url)),
       '@dzcalendar/element': fileURLToPath(new URL('./packages/element/src/index.ts', import.meta.url)),
@@ -62,6 +68,8 @@ export default defineConfig({
         resources: fileURLToPath(new URL('./playground/resources.html', import.meta.url)),
         element: fileURLToPath(new URL('./playground/element.html', import.meta.url)),
         fullcalendar: fileURLToPath(new URL('./playground/fullcalendar.html', import.meta.url)),
+        react: fileURLToPath(new URL('./playground/react.html', import.meta.url)),
+        vue: fileURLToPath(new URL('./playground/vue.html', import.meta.url)),
         timeline: fileURLToPath(new URL('./playground/timeline.html', import.meta.url)),
       },
     },

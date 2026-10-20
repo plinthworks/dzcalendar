@@ -1,0 +1,467 @@
+import { Teleport, computed, defineComponent, getCurrentInstance, h, inject, nextTick, onBeforeUnmount, onMounted, provide, shallowRef, watch } from 'vue';
+import type { ComponentPublicInstance, PropType, SlotsType, VNode } from 'vue';
+import type {
+  AvailableSlot,
+  BusinessHoursInput,
+  CalEvent,
+  CreateRequest,
+  EventInput,
+  EventInstance,
+  EventSourceSpec,
+  NormalizationReport,
+  PlainDate,
+  Problem,
+  ResourceInput,
+  Selection,
+  SourceNotice,
+  Weekday,
+  ZoneId,
+} from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DzMessages, EventContentCtx, MotionAdapter } from '@dzcalendar/dom';
+import { CALENDAR_CONTROLLER, createCalendarController, writesOf } from './controller.js';
+import type { CalendarController } from './controller.js';
+import { DZ_CALENDAR_SETTLED } from './plugin.js';
+import type { DzCalendarDefaults } from './plugin.js';
+import { same } from './same.js';
+
+/** The callbacks the component turns into events: not options (they would silence them). */
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems'] as const;
+
+/** What `options` takes: what `update()` takes, less what has a prop or an event of its own. */
+export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | 'motion' | (typeof OWN_CALLBACKS)[number]>;
+
+/** What the `#event-content` slot receives. */
+export interface EventContentSlotProps {
+  readonly event: CalEvent;
+  readonly ctx: EventContentCtx;
+}
+
+/** The events whose listeners change what the calendar offers ("Open" in the menu, "New event here", slots as buttons). */
+const OFFERS = { onEventOpen: 'onEventOpen', onCreateRequest: 'onCreateRequest', onSlotClick: 'onSlotClick' } as const;
+
+/** Keys whose value is undefined are left out: a prop not bound changes nothing. */
+function defined(o: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
+}
+
+const any = <T>() => ({ type: null as unknown as PropType<T>, default: undefined });
+
+/** What `<DzCalendar>` takes: its props, and its events as `on…` listeners (`@event-click`, `v-model:view`). */
+export interface DzCalendarProps {
+  readonly events?: readonly EventInput[];
+  readonly sources?: readonly EventSourceSpec[];
+  readonly resources?: readonly ResourceInput[];
+  readonly view?: string;
+  readonly date?: PlainDate;
+  readonly selection?: Selection | null;
+  readonly timeZone?: ZoneId;
+  readonly locale?: string;
+  readonly axis?: 'wall' | 'elapsed';
+  readonly editable?: boolean;
+  readonly selectable?: boolean;
+  readonly businessHours?: BusinessHoursInput;
+  readonly weekends?: boolean;
+  readonly weekNumbers?: boolean;
+  readonly hiddenDays?: readonly Weekday[];
+  readonly messages?: Partial<DzMessages>;
+  readonly theme?: string;
+  readonly scheme?: 'auto' | 'light' | 'dark';
+  readonly density?: 'compact' | 'comfortable' | 'spacious';
+  readonly displayCalendar?: string | null;
+  readonly secondaryCalendar?: string | null;
+  readonly availableSlots?: readonly AvailableSlot[] | null;
+  readonly options?: DzCalendarOptions;
+  readonly initial?: DzCalendarDefaults;
+  readonly controller?: CalendarController;
+  readonly motion?: MotionAdapter;
+  readonly 'onUpdate:view'?: (view: string) => void;
+  readonly 'onUpdate:date'?: (date: PlainDate) => void;
+  readonly 'onUpdate:selection'?: (selection: Selection | null) => void;
+  readonly onDateClick?: (click: DateClick) => void;
+  readonly onSlotClick?: (slot: AvailableSlot) => void;
+  readonly onEventClick?: (instance: EventInstance) => void;
+  readonly onEventOpen?: (instance: EventInstance) => void;
+  readonly onCreateRequest?: (request: CreateRequest) => void;
+  readonly onSelected?: (selection: Selection) => void;
+  readonly onSourceNotice?: (notice: SourceNotice) => void;
+  readonly onProblems?: (report: NormalizationReport) => void;
+  readonly onResourceProblems?: (problems: readonly Problem[]) => void;
+  readonly onError?: (error: unknown) => void;
+}
+
+/**
+ * The component's type, written out rather than inferred: what
+ * `defineComponent` infers names Vue's internal generics, which change between
+ * minor versions (3.4 and 3.5 count them differently).
+ */
+export type DzCalendarComponent = new () => ComponentPublicInstance & {
+  $props: DzCalendarProps;
+  $slots: { 'event-content'?: (props: EventContentSlotProps) => VNode[] };
+};
+
+/**
+ * `<DzCalendar>`: the DOM calendar in a Vue application. Props for the
+ * options (what changed goes to the calendar), `v-model:view`,
+ * `v-model:date` and `v-model:selection`, events for what a person does, a
+ * `CalendarController` of refs for what sits around it, and an
+ * `#event-content` slot for the events (teleported into each event: the
+ * application's provides, store and router reach it).
+ */
+export const DzCalendar = defineComponent({
+  name: 'DzCalendar',
+  // The component renders the calendar's element and the teleports: `class`, `style`, `id`… go on the element.
+  inheritAttrs: false,
+  props: {
+    /** Diffed by the store (by id, by value): a new array with the same events redraws nothing. */
+    events: any<readonly EventInput[] | undefined>(),
+    /** The whole list; a spec is compared by identity — keep the objects stable. */
+    sources: any<readonly EventSourceSpec[] | undefined>(),
+    resources: any<readonly ResourceInput[] | undefined>(),
+    view: any<string | undefined>(),
+    date: any<PlainDate | undefined>(),
+    /** null: none; undefined (not bound): left to the calendar. */
+    selection: any<Selection | null | undefined>(),
+    timeZone: any<ZoneId | undefined>(),
+    locale: any<string | undefined>(),
+    axis: any<'wall' | 'elapsed' | undefined>(),
+    editable: { type: Boolean as PropType<boolean | undefined>, default: undefined },
+    selectable: { type: Boolean as PropType<boolean | undefined>, default: undefined },
+    businessHours: any<BusinessHoursInput | undefined>(),
+    weekends: { type: Boolean as PropType<boolean | undefined>, default: undefined },
+    weekNumbers: { type: Boolean as PropType<boolean | undefined>, default: undefined },
+    hiddenDays: any<readonly Weekday[] | undefined>(),
+    messages: any<Partial<DzMessages> | undefined>(),
+    theme: any<string | undefined>(),
+    scheme: any<'auto' | 'light' | 'dark' | undefined>(),
+    density: any<'compact' | 'comfortable' | 'spacious' | undefined>(),
+    displayCalendar: any<string | null | undefined>(),
+    secondaryCalendar: any<string | null | undefined>(),
+    availableSlots: any<readonly AvailableSlot[] | null | undefined>(),
+    /** Everything else `update()` takes. */
+    options: { type: Object as PropType<DzCalendarOptions>, default: () => ({}) },
+    /** Read and driven from beside the calendar (`createCalendarController()`); otherwise its own. */
+    controller: any<CalendarController | undefined>(),
+    /** Options read once, when the calendar is made (`firstDay`, `rules`, `now`…): over the plugin's defaults, under the props. */
+    initial: any<DzCalendarDefaults | undefined>(),
+    /** Made at creation, not changed after (the plugin's `motion` makes one per calendar). */
+    motion: any<MotionAdapter | undefined>(),
+  },
+  emits: {
+    'update:view': (_v: string) => true,
+    'update:date': (_d: PlainDate) => true,
+    'update:selection': (_s: Selection | null) => true,
+    dateClick: (_c: DateClick) => true,
+    /** A free slot clicked (or Enter on it): the slot as given. Book it; the server checks it again. */
+    slotClick: (_s: AvailableSlot) => true,
+    eventClick: (_i: EventInstance) => true,
+    eventOpen: (_i: EventInstance) => true,
+    createRequest: (_r: CreateRequest) => true,
+    /** A selection made by a person (`v-model:selection` follows it too). */
+    selected: (_s: Selection) => true,
+    /** Loading, a failed fetch, problems in a delivery, a save refused. */
+    sourceNotice: (_n: SourceNotice) => true,
+    problems: (_r: NormalizationReport) => true,
+    resourceProblems: (_p: readonly Problem[]) => true,
+    /** A value the calendar refused (an unknown view, every day hidden): the others are applied. */
+    error: (_e: unknown) => true,
+  },
+  slots: Object as SlotsType<{ 'event-content'?: (props: EventContentSlotProps) => VNode[] }>,
+  setup(props, { emit, slots, expose, attrs }) {
+    const settled = inject(DZ_CALENDAR_SETTLED, {});
+    const self = getCurrentInstance()!;
+    // The controller given (read again if another is given), else its own; children see the first (`provide`).
+    const own = createCalendarController();
+    const controller = props.controller ?? own;
+    let current = controller;
+    let writes = writesOf(controller);
+    provide(CALENDAR_CONTROLLER, controller);
+    const host = shallowRef<HTMLElement | null>(null);
+    /** A refused value, a failing motion factory: to `@error` when listened to, else to the application's error handler, else the console. */
+    const fail = (err: unknown) => {
+      if (typeof (self.vnode.props as Record<string, unknown> | null)?.['onError'] === 'function') emit('error', err);
+      else if (self.appContext.config.errorHandler) self.appContext.config.errorHandler(err, self.proxy, 'dzcalendar');
+      else console.error(err);
+    };
+    let cal: CalendarInstance | null = null;
+
+    // ── event content: one teleport per event node, rendered in this component's tree ──
+    const portals = new Map<HTMLElement, { key: string; span: HTMLElement; event: CalEvent; ctx: EventContentCtx }>();
+    const drawn = shallowRef(0);
+    let seq = 0;
+    const hasSlot = () => Boolean(slots['event-content']);
+    const contentHooks: CalendarHooks = {
+      event: {
+        content: (ctx, el) => {
+          let p = portals.get(el);
+          if (!p) {
+            const span = el.ownerDocument.createElement('span');
+            span.className = 'dz-ev__content';
+            p = { key: `e${seq++}`, span, event: ctx.instance.event, ctx };
+            portals.set(el, p);
+          } else {
+            p.event = ctx.instance.event;
+            p.ctx = ctx;
+          }
+          // Vue renders in a microtask: before the browser paints.
+          drawn.value++;
+          return p.span;
+        },
+        willUnmount: ({ el }) => {
+          if (portals.delete(el)) drawn.value++;
+        },
+      },
+    };
+    let hooksFor: boolean | null = null;
+    const hooks = (): CalendarHooks => (hasSlot() ? contentHooks : {});
+
+    const settings = computed((): Record<string, unknown> => {
+      const options: Record<string, unknown> = { ...props.options };
+      for (const k of OWN_CALLBACKS) delete options[k];
+      return {
+        ...options,
+        ...defined({
+          view: props.view,
+          date: props.date,
+          events: props.events,
+          sources: props.sources,
+          resources: props.resources,
+          timeZone: props.timeZone,
+          locale: props.locale,
+          editable: props.editable,
+          selectable: props.selectable,
+          businessHours: props.businessHours,
+          weekends: props.weekends,
+          weekNumbers: props.weekNumbers,
+          hiddenDays: props.hiddenDays,
+          messages: props.messages,
+          theme: props.theme,
+          scheme: props.scheme,
+          density: props.density,
+          displayCalendar: props.displayCalendar,
+          secondaryCalendar: props.secondaryCalendar,
+          availableSlots: props.availableSlots,
+          timeGrid: props.axis ? { ...props.options.timeGrid, axis: props.axis } : undefined,
+        }),
+      };
+    });
+
+    /** The listeners bound on this component (`@event-open`…), read again at each render. */
+    const listening = (name: string) => typeof (self.vnode.props as Record<string, unknown> | null)?.[name] === 'function';
+    // What the Pro's editor took over wins over the listeners.
+    const offers = () => ({
+      onEventOpen: writes.taken()?.onEventOpen ?? (listening(OFFERS.onEventOpen) ? (i: EventInstance) => emit('eventOpen', i) : undefined),
+      onCreateRequest: writes.taken()?.onCreateRequest ?? (listening(OFFERS.onCreateRequest) ? (r: CreateRequest) => emit('createRequest', r) : undefined),
+      onSlotClick: listening(OFFERS.onSlotClick) ? (s: AvailableSlot) => emit('slotClick', s) : undefined,
+    });
+    let offered = '';
+    const offeredNow = () => {
+      const t = writes.taken();
+      return [Boolean(t?.onEventOpen), Boolean(t?.onCreateRequest), ...Object.values(offers()).map(Boolean)].join();
+    };
+
+    const reported: { view?: string; date?: PlainDate; selection?: Selection | null; problems?: NormalizationReport | null } = {};
+    let sent: Record<string, unknown> = {};
+    const refused: { view?: string; date?: PlainDate } = {};
+    const reportProblems = (c: CalendarInstance) => {
+      const p = c.kernel.getProblems();
+      if (!p || p === reported.problems) return;
+      reported.problems = p;
+      writes.setProblems(p);
+      if (p.problems.length > 0) emit('problems', p);
+    };
+    /** `update()` refuses a bad value whole: then each change goes alone, the bad ones are reported, the good ones kept. */
+    const apply = (c: CalendarInstance, changes: Record<string, unknown>) => {
+      try {
+        c.update(changes as CalendarUpdate);
+      } catch {
+        for (const [k, v] of Object.entries(changes)) {
+          try {
+            c.update({ [k]: v } as CalendarUpdate);
+          } catch (err) {
+            fail(err);
+          }
+        }
+        // The bindings get the calendar's real view and date back.
+        const st = c.kernel.getState();
+        if ('view' in changes && changes['view'] !== st.view.type) refused.view = changes['view'] as string;
+        if ('date' in changes && !(changes['date'] as PlainDate).equals?.(st.date)) refused.date = changes['date'] as PlainDate;
+        if (props.view !== undefined && props.view !== st.view.type) emit('update:view', st.view.type);
+        if (props.date !== undefined && !props.date.equals(st.date)) emit('update:date', st.date);
+      }
+      if ('events' in changes) reportProblems(c);
+    };
+    /** What changed since the last call goes; the same view or date as the calendar's is no change. */
+    const sync = () => {
+      const c = cal;
+      if (!c) return;
+      const s = { ...settings.value };
+      const changes: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(s)) if (k !== 'view' && k !== 'date' && !same(sent[k], v)) changes[k] = v;
+      // A view or a date bound is compared with what the calendar shows, not with what was sent: the binding wins.
+      const st = c.kernel.getState();
+      // A value the calendar refused is not tried again until the binding changes (its error said once).
+      if (props.view !== undefined && props.view !== st.view.type && props.view !== refused.view) changes['view'] = reported.view = props.view;
+      if (props.date !== undefined && !props.date.equals(st.date) && !same(props.date, refused.date)) changes['date'] = reported.date = props.date;
+      sent = s;
+      if (hasSlot() !== hooksFor) {
+        hooksFor = hasSlot();
+        portals.clear();
+        changes['hooks'] = hooks();
+      }
+      const o = offeredNow();
+      if (o !== offered) {
+        offered = o;
+        Object.assign(changes, offers());
+      }
+      if (Object.keys(changes).length > 0) apply(c, changes);
+      const sel = props.selection;
+      if (sel !== undefined && sel !== reported.selection) {
+        reported.selection = sel;
+        c.select(sel);
+      }
+    };
+
+    let stop: (() => void) | null = null;
+    onMounted(() => {
+      const first = settings.value;
+      let motion: { motion?: MotionAdapter } = {};
+      if (props.motion) motion = { motion: props.motion };
+      else if (settled.motion && settled.defaults?.motion === undefined) {
+        try {
+          motion = { motion: settled.motion() };
+        } catch (err) {
+          // A factory that fails (gsap missing) is reported; the calendar is drawn still.
+          fail(err);
+        }
+      }
+      const { view, date, ...rest } = defined(first);
+      hooksFor = hasSlot();
+      offered = offeredNow();
+      const options = {
+        ...settled.defaults,
+        ...props.initial,
+        ...motion,
+        ...rest,
+        ...(view !== undefined && { initialView: view }),
+        ...(date !== undefined && { initialDate: date }),
+        hooks: hooks(),
+        ...defined(offers()),
+        onDateClick: (x: DateClick) => emit('dateClick', x),
+        onEventClick: (i: EventInstance) => emit('eventClick', i),
+        onResourceProblems: (ps: readonly Problem[]) => emit('resourceProblems', ps),
+        onSelect: (s: Selection) => {
+          reported.selection = s;
+          emit('update:selection', s);
+          emit('selected', s);
+        },
+        onUnselect: () => {
+          if (reported.selection === null) return;
+          reported.selection = null;
+          emit('update:selection', null);
+        },
+        onSource: (n: SourceNotice) => {
+          if (n.type === 'loading') writes.setLoading(n.loading);
+          if (n.type === 'problems') writes.setProblems(n.report);
+          emit('sourceNotice', n);
+        },
+      } as CalendarOptions;
+      let c: CalendarInstance;
+      try {
+        c = createCalendar(host.value!, options);
+      } catch (err) {
+        // A first view or date refused: reported, the calendar made without them.
+        fail(err);
+        const { initialView: _v, initialDate: _d, ...without } = options as Record<string, unknown>;
+        c = createCalendar(host.value!, without as CalendarOptions);
+      }
+      cal = c;
+      sent = { ...first };
+      const st = c.kernel.getState();
+      Object.assign(reported, { view: st.view.type, date: st.date, selection: props.selection ?? null });
+      if (props.selection) c.select(props.selection);
+      writes.attach(c);
+      writes.onReoffer(() => sync());
+      reportProblems(c);
+      let reading = false;
+      stop = c.kernel.subscribe((e) => {
+        if (e.type === 'source') return;
+        // The history records a command after the store has said it changed: read once the task is over.
+        if (!reading) {
+          reading = true;
+          queueMicrotask(() => {
+            reading = false;
+            if (cal === c) writes.read();
+          });
+        }
+        if (e.type !== 'state') return;
+        writes.read();
+        const s = e.state;
+        // A view or a date bound: once the parent has had its say, the binding wins (a fixed one sends the calendar back).
+        if (props.view !== undefined || props.date !== undefined) void nextTick(() => cal === c && sync());
+        if (reported.view !== s.view.type) {
+          reported.view = s.view.type;
+          emit('update:view', s.view.type);
+        }
+        if (!reported.date?.equals(s.date)) {
+          reported.date = s.date;
+          emit('update:date', s.date);
+        }
+      });
+    });
+    // Another controller given: the calendar is handed over to it.
+    watch(
+      () => props.controller ?? own,
+      (next) => {
+        if (next === current) return;
+        const c = cal;
+        if (c) {
+          writes.onReoffer(null);
+          writes.detach(c);
+        }
+        current = next;
+        writes = writesOf(next);
+        if (c) {
+          writes.attach(c);
+          writes.onReoffer(() => sync());
+          sync();
+        }
+      },
+    );
+    // Props first (pre-flush), so the calendar has them before this component renders its teleports.
+    watch(settings, () => sync(), { flush: 'pre' });
+    watch(() => props.selection, () => sync(), { flush: 'pre' });
+
+    onBeforeUnmount(() => {
+      stop?.();
+      const c = cal;
+      cal = null;
+      portals.clear();
+      if (c) {
+        c.destroy();
+        writes.onReoffer(null);
+        writes.detach(c);
+      }
+    });
+
+    expose({
+      controller,
+      /** The DOM calendar; null before mounting. */
+      get instance() {
+        return cal;
+      },
+    });
+
+    return () => {
+      // Listeners bound or unbound since the last render: what the calendar offers follows (after this render).
+      // A slot added or taken away (`v-if`) changes the hooks: after this render too.
+      if (cal && (offeredNow() !== offered || hasSlot() !== hooksFor)) void nextTick(sync);
+      void drawn.value;
+      const draw = slots['event-content'];
+      return [
+        h('div', { ...attrs, ref: host }),
+        ...(draw ? [...portals.values()].map((p) => h(Teleport, { to: p.span, key: p.key }, draw({ event: p.event, ctx: p.ctx }))) : []),
+      ];
+    };
+  },
+}) as unknown as DzCalendarComponent;

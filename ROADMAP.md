@@ -4,19 +4,19 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–17, 18a and 18b, each committed (`git log --oneline`:
-  the last is titled "Phase 18b"). Every check green at that commit: `npm
-  test` (1 270), `npm run test:ci`, `typecheck`, `build`, `size`,
-  `test:browser`, `test:package` (`ng add` on Angular 19 and 22, `dz-migrate`
-  on 22). Two timings over by noise, the same at the previous commit
-  (measured alternately in a worktree): `normalize+index 10k` (bench) and
-  `timeGridWeek:U` first frame 28 ms (≤ 27, `perf:browser`).
-- **Now: Phase 18c** (React, Vue, `llms.txt`, `commands.schema.json`, the
-  public benchmark). Next step: 18c's open questions to the owner (in
-  French), then code.
+- **Done:** Phases 0–17 and 18a–18c, each committed (`git log --oneline`:
+  the last is titled "Phase 18c"). Every check green at that commit: `npm
+  test` (1 305), `npm run test:ci`, `typecheck`, `build`, `size`,
+  `test:browser`, `perf:browser`, `test:package` (Angular 19–22, `ng add`,
+  `dz-migrate`, React 18/19, Vue 3.4/3.5). One timing over by noise, the
+  same at the 18a commit (measured alternately in a worktree):
+  `normalize+index 10k` (bench, 70–81 ms against 70).
+- **Now: Phase 18d** (`llms.txt`, `commands.schema.json`, the public
+  benchmark against FullCalendar as a black box). Next step: 18d's open
+  questions to the owner (in French), then code.
 - **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
   that URL; the owner authorised pushing on 2026-10-18).
-- **Left after it:** 18c (React/Vue, llms.txt, schema, benchmark), 19+ native (Swift/Kotlin from
+- **Left after it:** 18d (llms.txt, schema, benchmark), 19+ native (Swift/Kotlin from
   `conformance/`, then SwiftUI/Compose).
 - **How a phase is run** (owner's rule): decisions validated with the owner
   (in French) before coding → implement → two reviews in parallel
@@ -2023,4 +2023,101 @@ See `ARCHITECTURE.md` J. Phase 17.
   formats (`…Format`: the locale's), colours (tones): said, not translated.
 - The iCal entry is a hard dependency of compat (an `import()` would save a
   bundle that never reads iCal).
+
+
+## Phase 18c — React and Vue ✅ (2026-10-20)
+
+### Owner's decisions (2026-10-20)
+
+- **Split:** 18c React and Vue (with their Pro); 18d `llms.txt`,
+  `commands.schema.json`, the public benchmark. Reviews and a commit each.
+- **Versions:** React 18 and 19, Vue 3.4 and 3.5 — each checked by a real
+  application built in `test:package`.
+- **Event templates:** the application's own components, through portals —
+  React `renderEventContent={(event, ctx) => <JSX/>}`, Vue the
+  `#event-content` slot; the application's context (state, router, i18n)
+  kept.
+- **Pro:** separate packages `@dzcalendar/pro-react` and
+  `@dzcalendar/pro-vue`, as `pro-angular`: the Pro never reaches an
+  application that does not use it.
+
+### Built
+
+- **`@dzcalendar/react`** (React 18 and 19; `docs/react.md`): `<DzCalendar>`
+  — options as props (what changed goes to `update()`; arrays and objects
+  compared by contents, Temporal values by what they print, Dates by their
+  milliseconds; a cycle ends the walk), `initial` for what is read once,
+  `view` / `date` / `selection` given (they win, as a controlled input) or
+  free (`defaultView`, `defaultDate`), callbacks (`onViewChange`,
+  `onDateChange`, `onSelectionChange`, `onEventClick`… `onError`, default
+  `console.error`), `renderEventContent` through portals (the application's
+  context kept; drawn by `flushSync` in a microtask, before the browser
+  paints), `data-*` / `aria-*` / `className` / `style` / `id` on the
+  element, a ref `{ instance, controller }`. `CalendarController` (an
+  external store: `useCalendarController`, `useCalendarState`,
+  `useParentCalendarController` in the events' content; `takeOver` for the
+  Pro), `DzCalendarProvider` (defaults, a motion made per calendar). The
+  offering callbacks (`onEventOpen`, `onCreateRequest`, `onSlotClick`) given
+  only while the prop is. Layout effects only in a browser.
+- **`@dzcalendar/vue`** (Vue 3.4 and 3.5; `docs/vue.md`): `<DzCalendar>` —
+  props as Angular's inputs plus `options` and `initial`, `v-model:view`,
+  `v-model:date`, `v-model:selection` (a binding without its handler wins),
+  events (`@event-click`… `@error`, else `app.config.errorHandler`, else the
+  console), the `#event-content` slot teleported into each event (provides
+  kept; added or taken away with `v-if`), attributes on the element; its
+  type written out (Vue 3.4 and 3.5 infer different generics);
+  `createCalendarController` (refs), `injectCalendarController`,
+  `DzCalendarPlugin` and `provideDzCalendar`.
+- **`@dzcalendar/pro-react`, `@dzcalendar/pro-vue`**: `useEventEditor`
+  (through `controller.takeOver`, the editor fetched on its first opening)
+  and `useDzExport` (print, PDF, PNG, XLSX, CSV, ICS, `download` typed per
+  kind; fetched on first use; never throws). **pro/export:**
+  `downloadExport(cal, kind, filename)` — pro-angular's `download` uses it.
+- Playground `react.html`, `vue.html` (a header of one's own, the app's
+  context in the events, the DST week, the editor, an ICS).
+- `test:package` builds four real applications from the tarballs — React
+  18.3.1 and 19.2.8 in TSX (`tsc` strict), Vue 3.4.38 and 3.5.43 in single
+  file components (`vue-tsc`, templates checked) — with Vite, and checks the
+  editor is in a chunk of its own.
+- `npm run size` fails for a package measured without a budget. Budgets
+  (owner, measured + 3 %): react 3.4 kB, vue 3.55 kB, pro-react 0.76 kB,
+  pro-vue 0.7 kB.
+
+### Reviews (architect; code review by execution in Chrome), fixed
+
+- A component reading the calendar while rendering it with literals
+  (`resources={[…]}`) rendered without end: values compared by contents.
+- Creation-only options (`firstDay`, `rules`, `now`) could not be given:
+  `initial`.
+- Vue 3.4 refused the declarations made with 3.5: the component's type
+  written out.
+- React: a controlled view set back by the parent after a person's change
+  was not sent (the diff was against what was sent); a refused view was not
+  given back; a fixed `date` stayed moved after `controller.next()`; given →
+  free → given with the same value did nothing — `view` and `date` are now
+  compared with the calendar's state, a refused value not retried until it
+  changes (React and Vue).
+- The Pro's editor lost "Open" whenever the parent added or removed an
+  offering callback: it takes them through the controller (`takeOver`).
+- `same()` took a JS Date to the second and any class with `toJSON` as
+  equal: Dates by milliseconds, Temporal by tag, others by identity; a
+  cycle in `extendedProps` overflowed: ended.
+- A controller given later was never attached: handed over (React and Vue).
+- Vue: `@error` not listened to was silent; a slot added with `v-if` was
+  not drawn; `class` was lost (fragment root). React: no way for the events'
+  content to reach its controller; `data-*`/`aria-*` went to `update()`;
+  `DzCalendarProvider` gave a new value each render; layout effects warned on
+  a server (React 18). Both `useCalendarController` names meant opposite
+  things: Vue's reader is `injectCalendarController`.
+
+### Not done in Phase 18c, on purpose
+
+- No running of the smoke applications in a browser (the playground pages
+  are driven in Chrome instead).
+- `exportsFor` is the same file in pro-react and pro-vue (an entry of the
+  Pro's own would load nothing more, but is a new public entry; left).
+- A prop going back to `undefined` leaves the calendar's value (as Angular);
+  sources are compared by identity (an inline spec refetches each render) —
+  both said in the docs.
+- Vue's events' content injects the first controller given.
 
