@@ -1,6 +1,6 @@
 # Printing and exports — `@dzcalendar/pro/print`, `@dzcalendar/pro/export`
 
-No dependency (owner's decision): the PDF, the zip of an XLSX and its XML,
+No dependency: the PDF, the zip of an XLSX and its XML,
 the CSV and the iCalendar text are written here; each sub-entry is loaded
 on demand. Bad input never throws: a result carries `problems`
 (`invalid-export`: an unknown view, a range ending before it starts, a
@@ -19,7 +19,7 @@ period (a day, a week, a month; a multi-month view prints a month a sheet),
 sharing its store (nothing fetched again), with the period's title and
 "n / of". A copy has the calendar's look and options but none of its
 handlers, motion or context menu; paper is light, whatever the scheme on
-screen (owner's decision). One print job per document: a second call, or
+screen. One print job per document: a second call, or
 the calendar destroyed, closes the first. What a sheet cannot hold is a
 `clipped:n` warning; a date range that could not be fetched, a `sources`
 warning. The browser draws the text: any script, selectable in "Save as
@@ -46,7 +46,7 @@ repeated), timeline (rows over several sheets, heads repeated). Days of 23
 and 25 hours as they are: a repeated hour striped on the wall axis, a
 timeline day 25 hours wide. Right to left in Arabic and Hebrew; each text
 in its own direction. The PDF holds the sheets as images (the browser
-shapes every script; owner's decision): text is not selectable, about
+shapes every script): text is not selectable, about
 150–300 kB a sheet at `scale: 2` (192 dpi). The colours are the calendar's
 light palette (`--dzc-*`, `--dz-tone-*`), whatever the scheme on screen.
 Sheets are drawn and encoded one at a time on one canvas; at most 60

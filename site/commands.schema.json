@@ -1,0 +1,1061 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/plinthworks/dzcalendar/main/site/commands.schema.json",
+  "title": "DzCalendar commands",
+  "description": "What an assistant can ask a DzCalendar to do (calendar.run(command)), an event, and a slot query (findSlots). Dates and times are ISO 8601 strings with IANA zones; nothing here is a JS Date. Generated from the TypeScript types by scripts/gen-schema.mjs.",
+  "$ref": "#/$defs/Command",
+  "$defs": {
+    "Command": {
+      "description": "What a person or a program asks the calendar to do — plain data, so it can be logged, sent over a wire, or emitted by an assistant (`commands.schema.json` describes them). `event.create` with an `rrule` creates a series.",
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "event.create"
+            },
+            "event": {
+              "$ref": "#/$defs/EventInput"
+            }
+          },
+          "required": [
+            "type",
+            "event"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "event.update"
+            },
+            "id": {
+              "type": "string"
+            },
+            "patch": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "start": {
+                  "type": "string",
+                  "description": "A wall time in a zone, ISO 8601 with the IANA name: 2026-10-21T09:00[Europe/Paris] (an offset may be given: 2026-10-21T09:00+02:00[Europe/Paris]). Or: A date, ISO 8601: 2026-10-21. Or: A wall time without a zone, read in the event’s or the calendar’s zone: 2026-10-21T09:00. Or: An instant, ISO 8601 in UTC or with an offset: 2026-10-21T07:00:00Z.",
+                  "examples": [
+                    "2026-10-21T09:00[Europe/Paris]",
+                    "2026-10-21",
+                    "2026-10-21T09:00",
+                    "2026-10-21T07:00:00Z"
+                  ]
+                },
+                "duration": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "An ISO 8601 duration: PT45M, P1D.",
+                      "examples": [
+                        "PT45M"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "years": {
+                          "type": "number"
+                        },
+                        "months": {
+                          "type": "number"
+                        },
+                        "weeks": {
+                          "type": "number"
+                        },
+                        "days": {
+                          "type": "number"
+                        },
+                        "hours": {
+                          "type": "number"
+                        },
+                        "minutes": {
+                          "type": "number"
+                        },
+                        "seconds": {
+                          "type": "number"
+                        },
+                        "milliseconds": {
+                          "type": "number"
+                        },
+                        "microseconds": {
+                          "type": "number"
+                        },
+                        "nanoseconds": {
+                          "type": "number"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Used when `end` is absent. Days are wall days, hours are elapsed hours (`ZonedDateTime.add`)."
+                },
+                "allDay": {
+                  "type": "boolean"
+                },
+                "timeZone": {
+                  "type": "string",
+                  "description": "The event's own zone, for a start that does not carry one."
+                },
+                "resourceId": {
+                  "type": "string"
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "seriesId": {
+                  "type": "string",
+                  "description": "With `recurrenceId`, the event replaces one occurrence of the series `seriesId` (iCalendar's RECURRENCE-ID): the occurrence that *would have* started then. Linked when the series comes in the same batch."
+                },
+                "recurrenceId": {
+                  "type": "string",
+                  "description": "A wall time in a zone, ISO 8601 with the IANA name: 2026-10-21T09:00[Europe/Paris] (an offset may be given: 2026-10-21T09:00+02:00[Europe/Paris]). Or: A date, ISO 8601: 2026-10-21. Or: A wall time without a zone, read in the event’s or the calendar’s zone: 2026-10-21T09:00. Or: An instant, ISO 8601 in UTC or with an offset: 2026-10-21T07:00:00Z.",
+                  "examples": [
+                    "2026-10-21T09:00[Europe/Paris]",
+                    "2026-10-21",
+                    "2026-10-21T09:00",
+                    "2026-10-21T07:00:00Z"
+                  ]
+                },
+                "display": {
+                  "enum": [
+                    "auto",
+                    "block",
+                    "list-item",
+                    "background",
+                    "inverse-background",
+                    "none"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "confirmed",
+                    "tentative",
+                    "cancelled"
+                  ]
+                },
+                "busy": {
+                  "type": "boolean",
+                  "description": "Feeds the slot engine: a busy event blocks availability. Default: not cancelled."
+                },
+                "editable": {
+                  "type": "boolean"
+                },
+                "startEditable": {
+                  "type": "boolean"
+                },
+                "durationEditable": {
+                  "type": "boolean"
+                },
+                "resourceEditable": {
+                  "type": "boolean"
+                },
+                "classNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "extendedProps": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": {}
+                },
+                "groupId": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "end": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "description": "A wall time in a zone, ISO 8601 with the IANA name: 2026-10-21T09:00[Europe/Paris] (an offset may be given: 2026-10-21T09:00+02:00[Europe/Paris]). Or: A date, ISO 8601: 2026-10-21. Or: A wall time without a zone, read in the event’s or the calendar’s zone: 2026-10-21T09:00. Or: An instant, ISO 8601 in UTC or with an offset: 2026-10-21T07:00:00Z.",
+                      "examples": [
+                        "2026-10-21T09:00[Europe/Paris]",
+                        "2026-10-21",
+                        "2026-10-21T09:00",
+                        "2026-10-21T07:00:00Z"
+                      ]
+                    }
+                  ]
+                },
+                "tone": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "scope": {
+              "enum": [
+                "this",
+                "following",
+                "all"
+              ]
+            },
+            "key": {
+              "type": "string",
+              "description": "The occurrence's original start, when `id` is the series': as the series writes it (`2026-10-21T08:00:00+02:00[Europe/Paris]`, a date for an all-day series), or the wall time without its offset (`2026-10-21T08:00[Europe/Paris]`), or an instant."
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "patch"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "event.move"
+            },
+            "id": {
+              "type": "string"
+            },
+            "start": {
+              "$ref": "#/$defs/TemporalInput"
+            },
+            "end": {
+              "$ref": "#/$defs/TemporalInput"
+            },
+            "resourceIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "scope": {
+              "enum": [
+                "this",
+                "following",
+                "all"
+              ]
+            },
+            "key": {
+              "type": "string",
+              "description": "The occurrence's original start, when `id` is the series': as the series writes it (`2026-10-21T08:00:00+02:00[Europe/Paris]`, a date for an all-day series), or the wall time without its offset (`2026-10-21T08:00[Europe/Paris]`), or an instant."
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "start"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "event.resize"
+            },
+            "id": {
+              "type": "string"
+            },
+            "edge": {
+              "enum": [
+                "start",
+                "end"
+              ]
+            },
+            "to": {
+              "$ref": "#/$defs/TemporalInput"
+            },
+            "scope": {
+              "enum": [
+                "this",
+                "following",
+                "all"
+              ]
+            },
+            "key": {
+              "type": "string",
+              "description": "The occurrence's original start, when `id` is the series': as the series writes it (`2026-10-21T08:00:00+02:00[Europe/Paris]`, a date for an all-day series), or the wall time without its offset (`2026-10-21T08:00[Europe/Paris]`), or an instant."
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "edge",
+            "to"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "event.delete"
+            },
+            "id": {
+              "type": "string"
+            },
+            "scope": {
+              "enum": [
+                "this",
+                "following",
+                "all"
+              ]
+            },
+            "key": {
+              "type": "string",
+              "description": "The occurrence's original start, when `id` is the series': as the series writes it (`2026-10-21T08:00:00+02:00[Europe/Paris]`, a date for an all-day series), or the wall time without its offset (`2026-10-21T08:00[Europe/Paris]`), or an instant."
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "series.delete"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "series.split"
+            },
+            "id": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string"
+            },
+            "patch": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "start": {
+                  "type": "string",
+                  "description": "A wall time in a zone, ISO 8601 with the IANA name: 2026-10-21T09:00[Europe/Paris] (an offset may be given: 2026-10-21T09:00+02:00[Europe/Paris]). Or: A date, ISO 8601: 2026-10-21. Or: A wall time without a zone, read in the event’s or the calendar’s zone: 2026-10-21T09:00. Or: An instant, ISO 8601 in UTC or with an offset: 2026-10-21T07:00:00Z.",
+                  "examples": [
+                    "2026-10-21T09:00[Europe/Paris]",
+                    "2026-10-21",
+                    "2026-10-21T09:00",
+                    "2026-10-21T07:00:00Z"
+                  ]
+                },
+                "duration": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "description": "An ISO 8601 duration: PT45M, P1D.",
+                      "examples": [
+                        "PT45M"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "years": {
+                          "type": "number"
+                        },
+                        "months": {
+                          "type": "number"
+                        },
+                        "weeks": {
+                          "type": "number"
+                        },
+                        "days": {
+                          "type": "number"
+                        },
+                        "hours": {
+                          "type": "number"
+                        },
+                        "minutes": {
+                          "type": "number"
+                        },
+                        "seconds": {
+                          "type": "number"
+                        },
+                        "milliseconds": {
+                          "type": "number"
+                        },
+                        "microseconds": {
+                          "type": "number"
+                        },
+                        "nanoseconds": {
+                          "type": "number"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ],
+                  "description": "Used when `end` is absent. Days are wall days, hours are elapsed hours (`ZonedDateTime.add`)."
+                },
+                "allDay": {
+                  "type": "boolean"
+                },
+                "timeZone": {
+                  "type": "string",
+                  "description": "The event's own zone, for a start that does not carry one."
+                },
+                "resourceId": {
+                  "type": "string"
+                },
+                "resourceIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "seriesId": {
+                  "type": "string",
+                  "description": "With `recurrenceId`, the event replaces one occurrence of the series `seriesId` (iCalendar's RECURRENCE-ID): the occurrence that *would have* started then. Linked when the series comes in the same batch."
+                },
+                "recurrenceId": {
+                  "type": "string",
+                  "description": "A wall time in a zone, ISO 8601 with the IANA name: 2026-10-21T09:00[Europe/Paris] (an offset may be given: 2026-10-21T09:00+02:00[Europe/Paris]). Or: A date, ISO 8601: 2026-10-21. Or: A wall time without a zone, read in the event’s or the calendar’s zone: 2026-10-21T09:00. Or: An instant, ISO 8601 in UTC or with an offset: 2026-10-21T07:00:00Z.",
+                  "examples": [
+                    "2026-10-21T09:00[Europe/Paris]",
+                    "2026-10-21",
+                    "2026-10-21T09:00",
+                    "2026-10-21T07:00:00Z"
+                  ]
+                },
+                "display": {
+                  "enum": [
+                    "auto",
+                    "block",
+                    "list-item",
+                    "background",
+                    "inverse-background",
+                    "none"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "confirmed",
+                    "tentative",
+                    "cancelled"
+                  ]
+                },
+                "busy": {
+                  "type": "boolean",
+                  "description": "Feeds the slot engine: a busy event blocks availability. Default: not cancelled."
+                },
+                "editable": {
+                  "type": "boolean"
+                },
+                "startEditable": {
+                  "type": "boolean"
+                },
+                "durationEditable": {
+                  "type": "boolean"
+                },
+                "resourceEditable": {
+                  "type": "boolean"
+                },
+                "classNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "extendedProps": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": {}
+                },
+                "groupId": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "end": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string",
+                      "description": "A wall time in a zone, ISO 8601 with the IANA name: 2026-10-21T09:00[Europe/Paris] (an offset may be given: 2026-10-21T09:00+02:00[Europe/Paris]). Or: A date, ISO 8601: 2026-10-21. Or: A wall time without a zone, read in the event’s or the calendar’s zone: 2026-10-21T09:00. Or: An instant, ISO 8601 in UTC or with an offset: 2026-10-21T07:00:00Z.",
+                      "examples": [
+                        "2026-10-21T09:00[Europe/Paris]",
+                        "2026-10-21",
+                        "2026-10-21T09:00",
+                        "2026-10-21T07:00:00Z"
+                      ]
+                    }
+                  ]
+                },
+                "tone": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "url": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "at"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "series.rule"
+            },
+            "id": {
+              "type": "string"
+            },
+            "rrule": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "rrule"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "event.repeat"
+            },
+            "id": {
+              "type": "string"
+            },
+            "rrule": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "rrule"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "batch"
+            },
+            "label": {
+              "type": "string"
+            },
+            "commands": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Command"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "commands"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "EventInput": {
+      "description": "An event as an application hands it in: loose, partly optional, strings welcome. `normalizeEvent` turns it into a `CalEvent` or says why it cannot. With `rrule` (and optionally `exdate`, `rdate`) it becomes a series: its start is the first occurrence, its length every occurrence's length.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "groupId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "start": {
+          "$ref": "#/$defs/TemporalInput"
+        },
+        "end": {
+          "$ref": "#/$defs/TemporalInput"
+        },
+        "duration": {
+          "$ref": "#/$defs/DurationLike"
+        },
+        "allDay": {
+          "type": "boolean"
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "The event's own zone, for a start that does not carry one."
+        },
+        "resourceId": {
+          "type": "string"
+        },
+        "resourceIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rrule": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "An RFC 5545 rule (`FREQ=WEEKLY;BYDAY=MO`), or several: the event becomes a series."
+        },
+        "exdate": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TemporalInput"
+          }
+        },
+        "rdate": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TemporalInput"
+          }
+        },
+        "seriesId": {
+          "type": "string",
+          "description": "With `recurrenceId`, the event replaces one occurrence of the series `seriesId` (iCalendar's RECURRENCE-ID): the occurrence that *would have* started then. Linked when the series comes in the same batch."
+        },
+        "recurrenceId": {
+          "$ref": "#/$defs/TemporalInput"
+        },
+        "display": {
+          "enum": [
+            "auto",
+            "block",
+            "list-item",
+            "background",
+            "inverse-background",
+            "none"
+          ]
+        },
+        "status": {
+          "enum": [
+            "confirmed",
+            "tentative",
+            "cancelled"
+          ]
+        },
+        "busy": {
+          "type": "boolean",
+          "description": "Feeds the slot engine: a busy event blocks availability. Default: not cancelled."
+        },
+        "editable": {
+          "type": "boolean"
+        },
+        "startEditable": {
+          "type": "boolean"
+        },
+        "durationEditable": {
+          "type": "boolean"
+        },
+        "resourceEditable": {
+          "type": "boolean"
+        },
+        "classNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tone": {
+          "type": "string",
+          "description": "A tone, not a colour (`--dz-tone-<tone>`): `blue`, `green`, `red`, `amber`, `violet`, `slate` in the themes shipped, or one an application defines."
+        },
+        "url": {
+          "type": "string"
+        },
+        "extendedProps": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "start"
+      ]
+    },
+    "SlotQuery": {
+      "type": "object",
+      "properties": {
+        "availability": {
+          "type": "object",
+          "properties": {
+            "timeZone": {
+              "type": "string"
+            },
+            "weekly": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "days": {
+                    "type": "array",
+                    "items": {
+                      "enum": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7
+                      ]
+                    }
+                  },
+                  "from": {
+                    "$ref": "#/$defs/WallTime"
+                  },
+                  "to": {
+                    "$ref": "#/$defs/WallTime"
+                  }
+                },
+                "required": [
+                  "days",
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "exceptions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "description": "A date, ISO 8601: 2026-10-21.",
+                    "examples": [
+                      "2026-10-21"
+                    ]
+                  },
+                  "closed": {
+                    "type": "boolean"
+                  },
+                  "windows": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "$ref": "#/$defs/WallTime"
+                        },
+                        "to": {
+                          "$ref": "#/$defs/WallTime"
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "date"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "rules": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "rrule": {
+                    "type": "string"
+                  },
+                  "start": {
+                    "type": "string",
+                    "description": "A date, ISO 8601: 2026-10-21.",
+                    "examples": [
+                      "2026-10-21"
+                    ]
+                  },
+                  "exdates": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "A date, ISO 8601: 2026-10-21.",
+                      "examples": [
+                        "2026-10-21"
+                      ]
+                    }
+                  },
+                  "from": {
+                    "$ref": "#/$defs/WallTime"
+                  },
+                  "to": {
+                    "$ref": "#/$defs/WallTime"
+                  }
+                },
+                "required": [
+                  "rrule",
+                  "start",
+                  "from",
+                  "to"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "timeZone"
+          ],
+          "additionalProperties": false
+        },
+        "from": {
+          "$ref": "#/$defs/Moment"
+        },
+        "to": {
+          "$ref": "#/$defs/Moment"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Minutes of real (elapsed) time."
+        },
+        "step": {
+          "type": "number",
+          "description": "Minutes between two slot starts, counted from each opening. Default: the duration."
+        },
+        "bufferBefore": {
+          "type": "number",
+          "description": "Minutes kept free before and after each appointment (preparation, cleaning)."
+        },
+        "bufferAfter": {
+          "type": "number"
+        },
+        "minNotice": {
+          "type": "number",
+          "description": "No slot starting sooner than this many minutes after `now`."
+        },
+        "maxAdvanceDays": {
+          "type": "number",
+          "description": "No slot starting later than this many days after `now`."
+        },
+        "now": {
+          "$ref": "#/$defs/Moment"
+        },
+        "maxPerDay": {
+          "type": "number",
+          "description": "At most this many bookings starting on one of the provider's dates; a full date offers nothing."
+        },
+        "busy": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "$ref": "#/$defs/Moment"
+              },
+              "end": {
+                "$ref": "#/$defs/Moment"
+              },
+              "kind": {
+                "enum": [
+                  "block",
+                  "booking"
+                ]
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "availability",
+        "from",
+        "to",
+        "duration"
+      ],
+      "additionalProperties": false
+    },
+    "TemporalInput": {
+      "type": "string",
+      "description": "A wall time in a zone, ISO 8601 with the IANA name: 2026-10-21T09:00[Europe/Paris] (an offset may be given: 2026-10-21T09:00+02:00[Europe/Paris]). Or: A date, ISO 8601: 2026-10-21. Or: A wall time without a zone, read in the event’s or the calendar’s zone: 2026-10-21T09:00. Or: An instant, ISO 8601 in UTC or with an offset: 2026-10-21T07:00:00Z.",
+      "examples": [
+        "2026-10-21T09:00[Europe/Paris]",
+        "2026-10-21",
+        "2026-10-21T09:00",
+        "2026-10-21T07:00:00Z"
+      ]
+    },
+    "DurationLike": {
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "An ISO 8601 duration: PT45M, P1D.",
+          "examples": [
+            "PT45M"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "years": {
+              "type": "integer"
+            },
+            "months": {
+              "type": "integer"
+            },
+            "weeks": {
+              "type": "integer"
+            },
+            "days": {
+              "type": "integer"
+            },
+            "hours": {
+              "type": "integer"
+            },
+            "minutes": {
+              "type": "integer"
+            },
+            "seconds": {
+              "type": "integer"
+            },
+            "milliseconds": {
+              "type": "integer"
+            },
+            "microseconds": {
+              "type": "integer"
+            },
+            "nanoseconds": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WallTime": {
+      "type": "string",
+      "description": "A wall time of day, HH:mm: 08:30 (24:00 as an end is the next midnight).",
+      "examples": [
+        "08:30"
+      ]
+    },
+    "Moment": {
+      "type": "string",
+      "description": "A wall time in a zone, ISO 8601 with the IANA name: 2026-10-21T09:00[Europe/Paris] (an offset may be given: 2026-10-21T09:00+02:00[Europe/Paris]). Or: An instant, ISO 8601 in UTC or with an offset: 2026-10-21T07:00:00Z.",
+      "examples": [
+        "2026-10-21T09:00[Europe/Paris]",
+        "2026-10-21T07:00:00Z"
+      ]
+    }
+  }
+}

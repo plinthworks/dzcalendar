@@ -82,6 +82,12 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18d (détail dans ROADMAP.md)
+
+- **B.14** : `commands.schema.json` généré par le compilateur TypeScript (`scripts/gen-schema.mjs`, sans générateur tiers), vérifié contre les types et contre `run()` ; livré dans `@dzcalendar/core`. `llms.txt` / `llms-full.txt` générés depuis `docs/`.
+- **Commandes** : un `scope` inconnu est refusé (`invalid-edit`) ; une clé d'occurrence se lit sans offset, en instant ou en `série@début` ; `EventPatch` accepte `null` (efface `end`, `groupId`, `tone`, `url`).
+- **Benchmark public** (`bench-public/`, `npm run bench:public`) contre FullCalendar 6.1 et 7.1, en boîte noire (CLEANROOM.md) : devant sur le travail par opération et la mémoire ; derrière la v7 sur le premier rendu (80 % = indexation de tous les événements à la création) et la taille — les deux chantiers suivants.
+
 ### Ajustements après la Phase 18c (détail dans ROADMAP.md)
 
 - **React** `@dzcalendar/react` (18, 19) et **Vue** `@dzcalendar/vue` (3.4, 3.5), au niveau d'Angular : options en props (comparées par contenu ; Temporal par ce qu'ils impriment), `initial` pour ce qui est lu à la création, vue/date/sélection contrôlées (la prop gagne) ou libres, contenu des événements par les composants de l'application (portails React rendus avant l'affichage ; Teleport Vue), contrôleur (`useCalendarController`/`useCalendarState`, `createCalendarController`/`injectCalendarController`), défauts et mouvement par fournisseur ou plugin. Type du composant Vue écrit à la main (génériques différents entre 3.4 et 3.5).
@@ -1387,7 +1393,7 @@ dzcalendar/
 ├─ size-budget.json · perf/baseline.json
 ├─ scripts/
 │  ├─ build.mjs                  clone de tzslot (tsc par paquet, ng-packagr, manifestes dist, garde « pas de src/ »)
-│  ├─ size.mjs · perf-browser.mjs · gen-schema.mjs · conformance-gen.mjs · api.mjs
+│  ├─ size.mjs · perf-browser.mjs · gen-schema.mjs · gen-llms.mjs · bench-public.mjs · conformance-gen.mjs
 ├─ conformance/                  (cf. H) ── publié comme @dzcalendar/conformance
 ├─ packages/
 │  ├─ core/
@@ -1402,7 +1408,7 @@ dzcalendar/
 │  │  │  ├─ project/      segment.ts · day-axis.ts · time-axis.ts · date-index.ts
 │  │  │  ├─ layout/       column.ts · rows.ts · overflow.ts · prefix-sums.ts · virtual.ts
 │  │  │  ├─ rules/        business-hours.ts · constraints.ts · overlap.ts · validate.ts
-│  │  │  ├─ commands/     types.ts · apply.ts · history.ts · schema.ts
+│  │  │  ├─ commands/     types.ts · apply.ts · history.ts · patch.ts (le schéma JSON est généré : scripts/gen-schema.mjs)
 │  │  │  ├─ interaction/  hit.ts · propose-move.ts · propose-resize.ts · propose-select.ts · keymap.ts
 │  │  │  ├─ views/        spec.ts · builtin.ts · range.ts · nav.ts · daygrid.ts · timegrid.ts · list.ts · multimonth.ts
 │  │  │  └─ format/       intl.ts · range-title.ts · week.ts · names.ts
@@ -1442,7 +1448,7 @@ dzcalendar/
 │  ├─ index.html (Angular) · vanilla.html · tailwind.html · dst.html (4 zones côte à côte) · perf.html · a11y.html
 │  ├─ main.ts · vanilla.ts · tailwind.ts · demo.ts · dst.ts · perf.ts
 │  └─ test/
-└─ site/                    docs (vitepress), génération d'API (scripts/api.mjs), llms.txt, commands.schema.json
+└─ site/                    llms.txt, llms-full.txt, commands.schema.json, benchmark.json (générés ; la doc est dans docs/)
 ```
 
 Scripts `package.json` (même forme que tzslot) : `test`, `test:ci`, `test:watch`, `test:memory`, `test:perf`, `test:browser`, `typecheck` (un `tsc` par paquet puis `tsconfig.spec.json`), `start` (vite, port **4600** pour ne pas entrer en conflit avec le 4500 de tzslot), `build`, `build:theme`, `check:size`, `pack:local`, `publish:dry`, `publish:next`, `docs:api`.

@@ -1,7 +1,7 @@
 {
   "name": "@dzcalendar/pro-react",
   "version": "0.0.0",
-  "description": "DzCalendar Pro for React 18 and 19: useEventEditor (the event and recurrence editor, loaded on its first opening) and useDzExport (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT for now (owner's decision).",
+  "description": "DzCalendar Pro for React 18 and 19: useEventEditor (the event and recurrence editor, loaded on its first opening) and useDzExport (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT.",
   "type": "module",
   "license": "MIT",
   "dependencies": {

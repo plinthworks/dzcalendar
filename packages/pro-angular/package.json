@@ -1,7 +1,7 @@
 {
   "name": "@dzcalendar/pro-angular",
   "version": "0.0.0",
-  "description": "DzCalendar Pro for Angular 19+: a dzEventEditor directive on <dz-calendar> (the event and recurrence editor, loaded on its first opening) and the DzExport service (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT for now (owner's decision).",
+  "description": "DzCalendar Pro for Angular 19+: a dzEventEditor directive on <dz-calendar> (the event and recurrence editor, loaded on its first opening) and the DzExport service (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT.",
   "type": "module",
   "license": "MIT",
   "dependencies": {

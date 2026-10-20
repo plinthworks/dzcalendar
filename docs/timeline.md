@@ -2,7 +2,7 @@
 
 Resources in rows, time running along. The axis is **elapsed**: a position is
 real time since the start, so an event is as long on screen as it lasts, a
-25-hour day is 25 hours wide and a 23-hour one 23 (ARCHITECTURE C.3). The
+25-hour day is 25 hours wide and a 23-hour one 23. The
 slots are cut on the wall clock: on a fall-back night 02:00 happens twice —
 the second marked `02:00*`, both named with their offsets — and on a
 spring-forward night there is no 02:00 at all.
@@ -24,7 +24,7 @@ createCalendar(host, {
 });
 ```
 
-MIT for now (owner's decision): `@dzcalendar/pro` is a code boundary, no key.
+MIT: `@dzcalendar/pro` is a code boundary, no licence key.
 
 ## Views and scale
 
@@ -47,7 +47,7 @@ first day; counted in days, to today.
 
 ## Rows
 
-- **Fixed height, "+N"** (owner's decision): a resource row shows
+- **Fixed height, "+N"**: a resource row shows
   `timeline.maxLanes` lanes (default 3); past them its last lane holds "+N"
   links, one per stretch where the hidden events run into one another, and
   the link opens them in the "+N" panel. Every resource row has the same
@@ -61,8 +61,8 @@ first day; counted in days, to today.
   `onResourceToggle({ collapsedResources, collapsedGroups })` reports it,
   `update({ collapsedResources, collapsedGroups })` sets it. A day the zone
   skipped is said ("This day does not exist in this time zone").
-- **"Unassigned"** (`showUnassigned: true`, default off — owner's
-  decision): a first row of the events on no resource or on resources the
+- **"Unassigned"** (`showUnassigned: true`, default off): a
+  first row of the events on no resource or on resources the
   calendar does not know. Dropping an event there takes it off the resource
   it was taken from (the others stay); dragging it out puts it on the row it
   is dropped on. The column views offer it too. It is the view's, not a

@@ -1,6 +1,6 @@
 # Motion — `@dzcalendar/dom` hooks, `@dzcalendar/motion-gsap`
 
-Three levels (owner's decisions):
+Three levels:
 
 - **Nothing to install:** a light Web Animations base, the default — the
   period slides its way, new events fade in, a menu or a "+N" panel opens.
@@ -83,7 +83,7 @@ Any value of `MotionPreset` (`view`, `enter`, `drop`, `zone`, `morph`,
   that stay slide, the rows that open unroll (the rows that close go at
   once).
 
-Plugins are the application's (owner's decision): `createGsapMotion({ plugins:
+Plugins are the application's: `createGsapMotion({ plugins:
 { InertiaPlugin, ScrollToPlugin } })`. Without `InertiaPlugin` a drop simply
 settles; without `ScrollToPlugin` the scroll properties are tweened
 directly.

@@ -27,3 +27,12 @@ where we differ on purpose (DST, zones, keyboard). The sheet is written
 before the code, and the code's tests point to it.
 
 This applies to every contributor, human or agent.
+
+## The public benchmark
+
+FullCalendar is installed in one place only, `bench-public/fc6` and
+`bench-public/fc7`, outside the workspace, to measure it beside DzCalendar
+(`npm run bench:public`). It is driven through its documented API and observed
+from outside — the time it takes, the DOM it draws, the bytes it ships. Its
+installed files are not opened, searched or read, and nothing from them
+reaches `packages/`.

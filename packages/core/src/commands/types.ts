@@ -6,8 +6,11 @@ import type { EditScope } from '../recurrence/edit.js';
 import type { RulesContext, Violation } from '../rules/validate.js';
 import type { Mutation } from '../store/changes.js';
 
-/** Everything an update may change. The id is the command's, not the patch's. */
-export type EventPatch = Omit<EventInput, 'id' | 'rrule' | 'exdate' | 'rdate'>;
+type Patchable = Omit<EventInput, 'id' | 'rrule' | 'exdate' | 'rdate'>;
+/** What a patch can take away: `null` clears it (an end back to the default length, no tone, no url, no group). */
+type Clearable = 'end' | 'groupId' | 'tone' | 'url';
+/** Everything an update may change. The id is the command's, not the patch's; a field left out is kept. */
+export type EventPatch = Omit<Patchable, Clearable> & { readonly [K in Clearable]?: Patchable[K] | null };
 
 /**
  * Which occurrence of a series a command is about, and how far it reaches.
@@ -16,14 +19,19 @@ export type EventPatch = Omit<EventInput, 'id' | 'rrule' | 'exdate' | 'rdate'>;
  */
 export interface Reach {
   readonly scope?: EditScope;
-  /** The occurrence's original start (`RecurrenceKey`), when `id` is the series'. */
+  /**
+   * The occurrence's original start, when `id` is the series': as the series
+   * writes it (`2026-10-21T08:00:00+02:00[Europe/Paris]`, a date for an
+   * all-day series), or the wall time without its offset
+   * (`2026-10-21T08:00[Europe/Paris]`), or an instant.
+   */
   readonly key?: RecurrenceKey;
 }
 
 /**
  * What a person or a program asks the calendar to do — plain data, so it can
- * be logged, sent over a wire, or emitted by an assistant (Phase 18 publishes
- * a JSON Schema). `event.create` with an `rrule` creates a series.
+ * be logged, sent over a wire, or emitted by an assistant (`commands.schema.json`
+ * describes them). `event.create` with an `rrule` creates a series.
  */
 export type Command =
   | { readonly type: 'event.create'; readonly event: EventInput }
@@ -35,7 +43,7 @@ export type Command =
   | ({ readonly type: 'event.delete'; readonly id: EventId } & Reach)
   /** The whole series, every occurrence and every override. */
   | { readonly type: 'series.delete'; readonly id: SeriesId }
-  /** "This and following" without the drag: the series is cut at `at`, the patch applied from there. */
+  /** "This and following" without the drag: the series is cut at `at` (an occurrence's start, written as `key` is), the patch applied from there. */
   | { readonly type: 'series.split'; readonly id: SeriesId; readonly at: RecurrenceKey; readonly patch?: EventPatch }
   /**
    * A new rule for the whole series (the editor's "repeats"): its excluded and

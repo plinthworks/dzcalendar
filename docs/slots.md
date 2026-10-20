@@ -81,8 +81,8 @@ availability: {
 | `maxPerDay` | At most this many bookings starting on one of the provider's dates; a full date offers nothing (a whole number). |
 | `now` | Needed by `minNotice` and `maxAdvanceDays`: the engine never reads a clock. |
 
-Capacity (several seats per slot) is in `@dzcalendar/pro/slots` (Phase 16a,
-owner's decision: simple seats):
+Capacity (several seats per slot) is in `@dzcalendar/pro/slots` (simple
+seats):
 
 ```ts
 import { findSlots, checkSlot } from '@dzcalendar/pro/slots';

@@ -100,7 +100,8 @@ export function patchedBase(before: CalEvent, p: EventPatch): EventInput {
  */
 export function patchEvent(before: CalEvent, p: EventPatch, ctx: NormalizeContext, path: string, problems: Problem[]): CalEvent | null {
   const base = patchedBase(before, p);
-  const r = normalizeEvent({ ...base, ...p, id: before.id }, ctx, path);
+  // A `null` in the patch is read as absent (normalize: what JSON writes for a field taken away).
+  const r = normalizeEvent({ ...base, ...p, id: before.id } as EventInput, ctx, path);
   problems.push(...r.problems);
   if (!r.ok) return null;
   if (r.value.kind !== 'event') {

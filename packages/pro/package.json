@@ -1,7 +1,7 @@
 {
   "name": "@dzcalendar/pro",
   "version": "0.0.0",
-  "description": "DzCalendar Pro: the timeline (resources in rows along an elapsed time axis, a resource area with tree, groups and field columns, windowed in two dimensions), slot capacity, the event and recurrence editor, paged printing and exports (PDF, PNG, XLSX, CSV, ICS) without dependencies. MIT for now (owner's decision).",
+  "description": "DzCalendar Pro: the timeline (resources in rows along an elapsed time axis, a resource area with tree, groups and field columns, windowed in two dimensions), slot capacity, the event and recurrence editor, paged printing and exports (PDF, PNG, XLSX, CSV, ICS) without dependencies. MIT.",
   "type": "module",
   "license": "MIT",
   "dependencies": {

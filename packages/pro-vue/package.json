@@ -1,7 +1,7 @@
 {
   "name": "@dzcalendar/pro-vue",
   "version": "0.0.0",
-  "description": "DzCalendar Pro for Vue 3.4 and 3.5: useEventEditor (the event and recurrence editor, loaded on its first opening) and useDzExport (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT for now (owner's decision).",
+  "description": "DzCalendar Pro for Vue 3.4 and 3.5: useEventEditor (the event and recurrence editor, loaded on its first opening) and useDzExport (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT.",
   "type": "module",
   "license": "MIT",
   "dependencies": {

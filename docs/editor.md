@@ -1,7 +1,7 @@
 # The event editor — `@dzcalendar/pro/editor`
 
-A ready-made editor (owner's decision: a modal dialog, the usual
-recurrences). It opens on an event, an occurrence of a series, or a new
+A ready-made editor: a modal dialog with the usual
+recurrences. It opens on an event, an occurrence of a series, or a new
 event; it saves through the calendar's history (checked against its rules,
 undoable with Ctrl+Z) and resolves with what happened.
 
@@ -44,8 +44,8 @@ It takes over `onEventOpen` and `onCreateRequest`.
 - A flight's end keeps its own zone (Paris → Tokyo) unless the zone is
   changed in the dialog.
 - "This and following" with another rule is not offered: the repeat shows
-  with "all events" only (a split series is Phase 6's `event.update`
-  `following`, which keeps the rule).
+  with "all events" only (a split series is `event.update` with
+  `scope: 'following'`, which keeps the rule).
 - Only what changed is sent: a title edited on an event that already
   overlaps another is not refused for its times.
 - Checked before saving: a start and an end, a whole interval and count

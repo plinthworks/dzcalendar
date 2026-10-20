@@ -1,0 +1,1550 @@
+# DzCalendar
+
+> A calendar and scheduler written on Temporal: every event keeps its own time zone, days of 23 h, 25 h or 23 h 30 are shown for what they are, recurrence is RFC 5545, and every change is a serializable command. Vanilla JS, Angular, React, Vue and a Web Component; resources, a timeline, bookable slots, an editor, printing and exports. MIT.
+
+Rules an assistant writing DzCalendar code should keep:
+
+- Moments are Temporal values or ISO 8601 strings with IANA zones — `2026-10-21T09:00[Europe/Paris]`, a date `2026-10-21` for all-day. Never a JS `Date` (it is refused: `date-object-rejected`).
+- Every event keeps its own zone; the calendar draws in its `timeZone`. Days of 23 h or 25 h are shown for what they are: the missing hour marked, the repeated hour twice, real lengths said; `timeGrid: { axis: 'elapsed' }` draws them to scale.
+- Weekdays are ISO: Monday = 1 … Sunday = 7.
+- Every change is a command (`calendar.run({ type: 'event.move', … })`), plain data described by `commands.schema.json`; undo and redo come with it.
+- Bad data never throws: an event or a command that cannot be taken becomes a Problem `{ code, severity, path, detail }` (`run()` returns `{ ok: false, problems }`; `kernel.getProblems()?.problems` for the last events loaded), every guess a warning. Options are the exception: `createCalendar` and `update` throw a `RangeError` on one they cannot take.
+- Colours are tones (`tone: 'amber'`; the themes have blue, green, red, amber, violet, slate), themes decide what they look like.
+
+## Packages
+
+- `@dzcalendar/core`: Calendar model on Temporal: events with their own time zone, DST-correct days. No DOM, no framework, no Date.
+- `@dzcalendar/dom`: DzCalendar in plain DOM: views, rendering, interactions. No framework; wrappers sit on top.
+- `@dzcalendar/theme`: An optional stylesheet for DzCalendar, of one family with @tzslot/theme. Plain CSS, no framework.
+- `@dzcalendar/rrule`: RFC 5545 recurrence rules on Temporal: wall-clock days across clock changes, elapsed-time hours. No event model.
+- `@dzcalendar/ical`: iCalendar (RFC 5545) for DzCalendar: parse and write VEVENTs with their real time zones, and an iCal event source.
+- `@dzcalendar/slots`: Bookable slots for DzCalendar: weekly hours and exceptions in the provider's zone, minus what is busy, with buffers, notice, horizon and a daily cap. Pure, browser and Node.
+- `@dzcalendar/angular`: DzCalendar for Angular 19+: signals only — signal inputs, model(), output(), a CalendarController of signals, templates for events. Zoneless or zone.js.
+- `@dzcalendar/react`: DzCalendar for React 18 and 19: <DzCalendar> with controlled or free view, date and selection, a calendar controller read with hooks, and events drawn by the application's own components (portals: its context kept).
+- `@dzcalendar/vue`: DzCalendar for Vue 3.4 and 3.5: <DzCalendar> with v-model:view, v-model:date and v-model:selection, a calendar controller of refs, and an #event-content slot drawn by the application's own components (teleported: its context kept).
+- `@dzcalendar/element`: DzCalendar as a Web Component: <dz-calendar> for any page or framework — in the page (its CSS applies) or isolated in a shadow root; attributes, properties and dz-* DOM events.
+- `@dzcalendar/pro`: DzCalendar Pro: the timeline (resources in rows along an elapsed time axis, a resource area with tree, groups and field columns, windowed in two dimensions), slot capacity, the event and recurrence editor, paged printing and exports (PDF, PNG, XLSX, CSV, ICS) without dependencies. MIT.
+- `@dzcalendar/pro-angular`: DzCalendar Pro for Angular 19+: a dzEventEditor directive on <dz-calendar> (the event and recurrence editor, loaded on its first opening) and the DzExport service (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT.
+- `@dzcalendar/pro-react`: DzCalendar Pro for React 18 and 19: useEventEditor (the event and recurrence editor, loaded on its first opening) and useDzExport (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT.
+- `@dzcalendar/pro-vue`: DzCalendar Pro for Vue 3.4 and 3.5: useEventEditor (the event and recurrence editor, loaded on its first opening) and useDzExport (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT.
+- `@dzcalendar/motion-gsap`: Optional GSAP motion for DzCalendar: presets sober and expressive; zone glides, DST unfolding, the title odometer, month → day morph, drag tilt and magnetic slots, dissolving deletes, overlays from their origin, timeline accordion — reduced-motion aware; plugins given by the application.
+- `@dzcalendar/compat-fullcalendar`: Moving from FullCalendar: an application's FullCalendar options translated to DzCalendar at run time — views, zones, events and sources, editing, rules, callbacks, resources — with every guess and every option without an equivalent said.
+- `@dzcalendar/migrate`: dz-migrate: rewrites a FullCalendar application for DzCalendar — imports and plugins, new Calendar(...), the common calendar calls, Angular's <full-calendar> — and marks what needs a person (// dz-migrate:). A tool: never a dependency of an application.
+
+---
+
+<!-- docs/getting-started.md -->
+
+# Getting started — `@dzcalendar/core`, `@dzcalendar/dom`
+
+A calendar and scheduler on Temporal: every event keeps its own time zone,
+and days of 23 h, 25 h or 23 h 30 are shown for what they are — the hour that
+does not exist marked, the repeated hour shown twice, real lengths said (and
+drawn to scale with `timeGrid: { axis: 'elapsed' }`). No `Date` anywhere:
+moments are Temporal values or ISO 8601 strings with IANA zones.
+
+```sh
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme
+```
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+import { Temporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(document.getElementById('agenda')!, {
+  timeZone: 'Europe/Paris',          // the zone the calendar is drawn in
+  locale: 'fr-FR',
+  initialView: 'timeGridWeek',       // dayGridMonth, timeGridWeek, timeGridDay, listWeek (import '@dzcalendar/dom/list')…
+  initialDate: Temporal.PlainDate.from('2026-10-21'),
+  editable: true,
+  selectable: true,
+  events: [
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    // Its own zone: drawn at 17:00 in Paris.
+    { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true },
+    { id: 'w', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ],
+  onEventClick: (instance) => console.log(instance.event.title, String(instance.event.start)),
+  onSelect: (selection) => console.log(String(selection.start), String(selection.end)),
+});
+```
+
+## What it gives
+
+- **`calendar.run(command)`** — every change is a command, plain data
+  (`site/commands.schema.json`; in the published package
+  `@dzcalendar/core/commands.schema.json`). It returns `{ ok: true }` or
+  `{ ok: false, problems, violations? }` — a refused command never throws:
+  `{ type: 'event.move', id: 'a', start: '2026-10-22T10:00[Europe/Paris]' }`,
+  `event.create`, `event.update`, `event.resize`, `event.delete`,
+  `series.delete`, `series.split`, `series.rule`, `event.repeat`, `batch`.
+  A person's drag, resize or menu choice is the same commands.
+  `calendar.undo()` / `calendar.redo()`.
+- **`calendar.update({ … })`** — what can change live: view, date, zone,
+  locale, events, sources, resources, business hours, hidden days, theme…
+  A refused value throws a `RangeError` and changes nothing.
+- **`calendar.navigate('prev' | 'next' | 'today')`**, `calendar.select(…)`,
+  `calendar.refetch()`, `calendar.destroy()`.
+- **`calendar.kernel`** — the model without the screen: `getState()` (view,
+  date, range, title), `store.snapshot` (events, occurrences),
+  `getProblems()`.
+- **Bad data never throws**: an event that cannot be read is left out and
+  said — `calendar.kernel.getProblems()?.problems` lists `{ code, severity,
+  path, detail }` (`missing-start`, `unknown-zone`, `zone-guessed`…) for the
+  last load of events; a source's are in its `problems` notice. Options are
+  the exception: `createCalendar` and `update` throw a `RangeError` on one
+  they cannot take (an unknown view), and change nothing.
+- **Sources** fetched as the calendar moves:
+  `jsonSource('api', { url: '/events' })` (sends `start`, `end`,
+  `timeZone`), `fnSource('fn', async ({ window }) => […])`, iCalendar with
+  `@dzcalendar/ical`.
+
+## Then
+
+- Frameworks: `docs/angular.md`, `docs/react.md`, `docs/vue.md`, the Web
+  Component `docs/element.md`.
+- Resources (a column per doctor), the timeline (Pro), bookable slots,
+  the editor, printing and exports, motion, languages, theming: the other
+  files in `docs/`.
+- Moving from FullCalendar: `docs/migrating-from-fullcalendar.md`.
+
+---
+
+<!-- docs/angular.md -->
+
+# DzCalendar in Angular — `@dzcalendar/angular`, `@dzcalendar/pro-angular`
+
+Angular 19 to 22, zoneless or zone.js, signals only.
+
+## Install
+
+```sh
+ng add @dzcalendar/angular
+```
+
+It adds `@dzcalendar/core`, `dom`, `theme`; puts `dzcalendar.css` in the
+build's styles; adds `provideDzCalendar({})` to `app.config.ts`. It asks
+whether to add GSAP motion (`gsap`, `@dzcalendar/motion-gsap`,
+`provideDzMotion`), the Pro (`@dzcalendar/pro`, `pro-angular`,
+`@tzslot/dom`) and an example component (`src/app/agenda.ts`). Without
+prompts: `ng add @dzcalendar/angular --gsap --pro --example`.
+
+## A calendar
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { EventInput, PlainDate, Selection } from '@dzcalendar/core';
+
+@Component({
+  selector: 'app-agenda',
+  standalone: true,
+  imports: [DZ_CALENDAR],
+  template: `
+    <h2>{{ cal.controller.title() }}</h2>
+    <dz-calendar #cal [events]="events()" [(view)]="view" [(date)]="date" [(selection)]="selection" [editable]="true" (eventClick)="open($event)">
+      <ng-template dzEventContent let-event="event" let-ctx="ctx"><b>{{ event.title }}</b> {{ ctx.timeText }}</ng-template>
+    </dz-calendar>`,
+})
+export class Agenda {
+  readonly events = signal<EventInput[]>([{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Asia/Riyadh]', duration: { minutes: 30 } }]);
+  readonly view = signal<string | undefined>('timeGridWeek');
+  readonly date = signal<PlainDate | undefined>(undefined);
+  readonly selection = signal<Selection | null>(null);
+  open(instance: unknown) {}
+}
+```
+
+Settled once for the application:
+
+```ts
+// app.config.ts
+providers: [
+  provideDzCalendar({ timeZone: 'Asia/Riyadh', locale: 'ar-SA' }),
+  provideDzMotion(() => createGsapMotion({ preset: 'sober' })), // one adapter per calendar
+];
+```
+
+A `motion` given to `provideDzCalendar` or to a calendar wins over
+`provideDzMotion`.
+
+## The Pro
+
+```ts
+import { DzEventEditor, DzExport } from '@dzcalendar/pro-angular';
+
+@Component({
+  imports: [DZ_CALENDAR, DzEventEditor],
+  template: `
+    <dz-calendar #cal dzEventEditor (editorClosed)="saved($event)" view="resourceTimelineWeek" [resources]="rooms" [events]="events()" />
+    <button (click)="exports.download(cal.controller, 'pdf', 'agenda.pdf')">PDF</button>
+    <button (click)="exports.download(cal.controller, 'xlsx', 'agenda.xlsx')">Excel</button>
+    <button (click)="exports.print(cal.controller)">Imprimer</button>`,
+})
+export class Planning {
+  readonly exports = inject(DzExport);
+}
+```
+
+`DzExport`: `print`, `pdf`, `png`, `xlsx`, `csv`, `ics`, `download` — with a
+`CalendarController` (`#cal` then `cal.controller`, or injected inside a
+child of `<dz-calendar>`) or a DOM calendar. The Pro's modules are fetched
+on the first use; each call runs outside the zone and resolves inside it.
+Bad input never throws: a result's `problems` say it (`not-attached` before
+the calendar exists). `import '@dzcalendar/pro'` once registers the
+timeline views.
+
+---
+
+<!-- docs/react.md -->
+
+# DzCalendar in React — `@dzcalendar/react`, `@dzcalendar/pro-react`
+
+React 18 and 19.
+
+## Install
+
+```sh
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme @dzcalendar/react
+```
+
+and `import '@dzcalendar/theme/dzcalendar.css'` once.
+
+## A calendar
+
+```tsx
+import { useState } from 'react';
+import { Temporal } from '@dzcalendar/core';
+import type { EventInput, Selection } from '@dzcalendar/core';
+import { DzCalendar, useCalendarController, useCalendarState } from '@dzcalendar/react';
+
+const events: EventInput[] = [{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Asia/Riyadh]', duration: { minutes: 30 } }];
+
+export function Agenda() {
+  const cal = useCalendarController();
+  const { title, canUndo } = useCalendarState(cal);
+  const [view, setView] = useState('timeGridWeek');
+  const [selection, setSelection] = useState<Selection | null>(null);
+  return (
+    <>
+      <header>
+        <button onClick={cal.prev}>‹</button> <h2>{title}</h2> <button onClick={cal.next}>›</button>
+        <button disabled={!canUndo} onClick={cal.undo}>Undo</button>
+      </header>
+      <DzCalendar
+        controller={cal}
+        events={events}
+        view={view} onViewChange={setView}
+        defaultDate={Temporal.PlainDate.from('2026-10-21')}
+        selection={selection} onSelectionChange={setSelection}
+        timeZone="Asia/Riyadh" locale="ar-SA" editable
+        initial={{ firstDay: 7 }}
+        renderEventContent={(event, ctx) => <><b>{event.title}</b> {ctx.timeText}</>}
+        onEventClick={(i) => console.log(i.event.id)}
+      />
+    </>
+  );
+}
+```
+
+- **Options are props**: what changed since the last render goes to the
+  calendar. Arrays and objects are compared by their contents, so a literal
+  written again each render (`resources={[…]}`) changes nothing. Sources are
+  compared by identity: keep them stable (`useMemo`).
+- **`initial`**: options read once, when the calendar is made (`firstDay`,
+  `rules`, `now`…); later changes to it are not read. A prop that goes back
+  to `undefined` leaves the calendar's value as it was (pass the default to
+  restore it).
+- **`view`, `date`, `selection`**: given, they win, as a controlled input's
+  value does — `onViewChange`, `onDateChange`, `onSelectionChange` say what a
+  person (or the controller) did, and the calendar goes back to the prop
+  unless the parent follows. Not given: `defaultView`, `defaultDate`, and
+  the calendar keeps its own. A view or date the calendar refused is given
+  back (`onViewChange` with the real one) and not tried again until the prop
+  changes.
+- **`renderEventContent`**: the application's components, rendered through
+  portals in its own tree — its context, state, router and i18n reach them —
+  before the browser paints.
+- **`useCalendarController()`** gives a stable controller (`prev`, `next`,
+  `today`, `goTo`, `changeView`, `dispatch`, `undo`, `redo`, `refetch`);
+  **`useCalendarState(cal)`** reads it (`title`, `view`, `date`, `range`,
+  `canUndo`, `canRedo`, `loading`, `problems`, `instance`).
+- **A ref** gives `{ instance, controller }`. Another `controller` given
+  later takes the calendar over (the old one is let go). In what `renderEventContent`
+  renders, **`useParentCalendarController()`** gives that calendar's
+  controller.
+- `className`, `style`, `id`, `data-*` and `aria-*` go on the calendar's
+  element.
+- **Server rendering**: importing the packages touches no `document` or
+  `window`; the calendar is made in the browser only.
+- **`onError`**: a value the calendar refused (an unknown view); the other
+  changes are applied. Default `console.error`.
+- **`DzCalendarProvider`**: `defaults` (zone, locale, words…) and `motion`
+  (one adapter made per calendar: `motion={() => createGsapMotion()}`).
+- `onEventOpen`, `onCreateRequest`, `onSlotClick` change what the calendar
+  offers ("Open" in the menu…): given only while the prop is.
+
+## The Pro
+
+```tsx
+import '@dzcalendar/pro';                     // the timeline views
+import { useDzExport, useEventEditor } from '@dzcalendar/pro-react';
+
+const cal = useCalendarController();
+useEventEditor(cal, { onClosed: (outcome) => console.log(outcome) });
+const exports = useDzExport(cal);
+<button onClick={() => exports.download('pdf', 'agenda.pdf')}>PDF</button>
+```
+
+The editor takes "Open" and "New event here" through the controller
+(`cal.takeOver(…)`), over the calendar's own `onEventOpen` and
+`onCreateRequest`, until its component goes. The editor and the exports are
+fetched on first use. Nothing throws: a
+result's `problems` say what went wrong.
+
+---
+
+<!-- docs/vue.md -->
+
+# DzCalendar in Vue — `@dzcalendar/vue`, `@dzcalendar/pro-vue`
+
+Vue 3.4 and 3.5.
+
+## Install
+
+```sh
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme @dzcalendar/vue
+```
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+import { DzCalendarPlugin } from '@dzcalendar/vue';
+createApp(App).use(DzCalendarPlugin, { defaults: { timeZone: 'Asia/Riyadh', locale: 'ar-SA' } }).mount('#app');
+```
+
+## A calendar
+
+```vue
+<script setup lang="ts">
+import { ref, shallowRef } from 'vue';
+import type { EventInput, PlainDate, Selection } from '@dzcalendar/core';
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+
+const cal = createCalendarController();
+const view = ref('timeGridWeek');
+const date = shallowRef<PlainDate>();
+const selection = shallowRef<Selection | null>(null);
+const events: EventInput[] = [{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Asia/Riyadh]', duration: { minutes: 30 } }];
+</script>
+
+<template>
+  <header>
+    <button @click="cal.prev()">‹</button> <h2>{{ cal.title.value }}</h2> <button @click="cal.next()">›</button>
+    <button :disabled="!cal.canUndo.value" @click="cal.undo()">Undo</button>
+  </header>
+  <DzCalendar v-model:view="view" v-model:date="date" v-model:selection="selection"
+    :controller="cal" :events="events" editable :initial="{ firstDay: 7 }"
+    @event-click="(i) => console.log(i.event.id)">
+    <template #event-content="{ event, ctx }"><b>{{ event.title }}</b> {{ ctx.timeText }}</template>
+  </DzCalendar>
+</template>
+```
+
+- **Props** for the common options, `options` for everything else `update()`
+  takes, `initial` for what is read once (`firstDay`, `rules`, `now`…).
+  Arrays and objects are compared by their contents; sources by identity
+  (keep their specs stable). Give a new array to change events
+  (`events.value = [...events.value, e]`): a `push` on the same array is not
+  seen. `initial` is read once; a prop that goes back to `undefined` leaves
+  the calendar's value as it was.
+- **`v-model:view`, `v-model:date`, `v-model:selection`** follow the
+  calendar; a view or date bound without its `update:` handler wins (the
+  calendar goes back to it); events: `@date-click`, `@event-click`, `@event-open`,
+  `@create-request`, `@selected`, `@slot-click`, `@source-notice`,
+  `@problems`, `@resource-problems`, `@error` (a value the calendar refused;
+  the other changes are applied, the bindings get the real view back; not
+  listened to, it goes to `app.config.errorHandler`, else the console).
+- **`#event-content`**: the application's components, teleported into each
+  event — its provides, store, router and i18n reach them.
+- **The controller**: `createCalendarController()` beside the calendar, or
+  `injectCalendarController()` in a component inside it (an event's
+  content). Refs: `title`, `view`,
+  `date`, `range`, `canUndo`, `canRedo`, `loading`, `problems`, `instance`;
+  methods `prev`, `next`, `today`, `goTo`, `changeView`, `dispatch`, `undo`,
+  `redo`, `refetch`.
+- `class`, `style`, `id` and other attributes go on the calendar's element.
+- **Server rendering**: importing the packages touches no `document` or
+  `window`; the calendar is made in the browser only (`onMounted`).
+- `@event-open`, `@create-request`, `@slot-click` change what the calendar
+  offers: passed only while listened to.
+
+## The Pro
+
+```ts
+import '@dzcalendar/pro';                     // the timeline views
+import { useDzExport, useEventEditor } from '@dzcalendar/pro-vue';
+
+const cal = createCalendarController();
+useEventEditor(cal, { onClosed: (outcome) => console.log(outcome) });
+const exports = useDzExport(cal);   // exports.download('pdf', 'agenda.pdf')
+```
+
+The editor takes "Open" and "New event here" through the controller
+(`cal.takeOver(…)`), over `@event-open` and `@create-request`, until its
+component goes. Another `:controller` given later takes the calendar over
+(the events' content keeps injecting the first). The editor and the exports
+are fetched on first use. Nothing throws: a
+result's `problems` say what went wrong.
+
+---
+
+<!-- docs/element.md -->
+
+# The Web Component — `@dzcalendar/element`
+
+`<dz-calendar>` for any page or framework (plain HTML, React, Vue, Svelte,
+a CMS).
+
+```html
+<script type="module">
+  import '@dzcalendar/element/define';
+  import '@dzcalendar/theme/dzcalendar.css';
+  const cal = document.querySelector('dz-calendar');
+  cal.events = [{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]' }];
+  cal.addEventListener('dz-event-click', (e) => console.log(e.detail.event.title));
+</script>
+<dz-calendar view="timeGridWeek" time-zone="Europe/Paris" locale="fr-FR" editable selectable></dz-calendar>
+```
+
+`defineDzCalendar(name)` defines it under another name (`DzCalendarElement`
+is the class); `@dzcalendar/element/define` defines `dz-calendar`.
+
+## Attributes (live)
+
+`view`, `date` (ISO), `time-zone`, `locale`, `theme`, `scheme`, `density`,
+`editable`, `selectable`, `week-numbers`, `weekends`, `now-indicator`
+(booleans: present, or `"false"`; taken away, back to the calendar's
+default). Taking away `view`, `date`, `time-zone` or `locale` keeps the
+current value. `shadow` and `stylesheet` are read when it first connects
+(the mode is kept afterwards). It is a block (`display: block`); its height
+is `--dz-height`.
+
+## Properties
+
+`events`, `resources`, `sources` (live; what cannot be read is a
+`dz-problem`, never a throw); `options` (any other option —
+`businessHours`, `hooks`, `motion`…). A new `options` object with the same
+values changes nothing; a live key (the zone, the theme, `editable`,
+`businessHours`…) changes in place, events, edits and undo kept; any other
+key makes the calendar again on the same store (events and edits kept,
+the undo history not) and fires `dz-remade` (`detail.calendar`: the new
+one). `calendar` is the DOM calendar (`run`, `undo`, `kernel`…);
+`problems` every problem seen (the last 100). Methods:
+`navigate('prev' | 'next' | 'today')`, `update(changes)`, `undo()`,
+`redo()`. Properties set before the element is defined are taken.
+
+## Events
+
+`dz-dates-set` (`{ view, date, range, title, timeZone }`, drawn and on every
+move), `dz-select`, `dz-unselect`, `dz-date-click`, `dz-event-click`,
+`dz-event-open`, `dz-create-request`, `dz-slot-click`, `dz-command-refused`,
+`dz-proposal-refused`, `dz-resource-problems`, `dz-problem`, `dz-remade`.
+They bubble and are composed (they cross a shadow root).
+`dz-command-refused`'s detail is `{ result, command }`. Bad input never
+throws: an attribute or a property that cannot be read is a `dz-problem`
+(`invalid-option`, `path` like `attribute:time-zone`, `detail` a short code:
+`unknown-zone`, `unknown-view`, `not-a-date`, `not-a-list`, `refused`), sent
+after the current task (a page that listens once the element is parsed
+hears it). At mount, what would leave no calendar (an unknown zone or view,
+a bad source) is left out and said; the calendar is drawn.
+
+Three events offer something on screen only when listened to on the element
+(or given as a callback in `options`): `dz-event-open` ("Open" in the
+menu, Enter on an event), `dz-create-request` ("New event here"),
+`dz-slot-click` (bookable slots as buttons). Nobody listening, nothing is
+offered that would do nothing.
+
+## With Angular
+
+Use `@dzcalendar/angular` (its `<dz-calendar>` component), not this
+element: both use the tag name. In an Angular application that also needs
+the element, define it under another name: `defineDzCalendar('dz-calendar-wc')`.
+
+## In the page, or isolated
+
+By default it lives in the page: the page's CSS, a theme, Tailwind apply as
+anywhere. With `shadow` it is isolated in a shadow root: the calendar's own
+CSS is injected there, the page's does not reach in. Style it then with the
+palette (`--tz-*`, `--dz-*`, inherited through the shadow root), a theme
+linked in (`stylesheet="/path/dzcalendar.css"`) and its parts:
+`::part(calendar)`, `::part(toolbar)`.
+
+---
+
+<!-- docs/resources.md -->
+
+# Resources — one column per doctor, room or machine
+
+A resource is whatever events are booked on. Resource views draw one column
+per resource and date; each column shows its resource's events, its own
+business hours (read in its own zone), and checks its own rules. Everything
+here is in `@dzcalendar/core` and `@dzcalendar/dom` (MIT); the timeline comes
+with `@dzcalendar/pro`.
+
+```ts
+createCalendar(host, {
+  initialView: 'resourceTimeGridDay',
+  resources: [
+    { id: 'benali', title: 'Dre Benali', service: 'Cardiology' },
+    { id: 'haddad', title: 'Dr Haddad', service: 'Cardiology', timeZone: 'Asia/Riyadh',
+      businessHours: { daysOfWeek: [7, 1, 2, 3, 4], start: '08:00', end: '12:00' }, eventConstraint: 'businessHours' },
+  ],
+  resourceGroupField: 'service',
+  events: [{ id: 'a', title: 'Visit', start: '2026-10-21T09:00[Europe/Paris]', resourceId: 'benali' }],
+  editable: true,
+});
+```
+
+## Views
+
+| View | What it shows |
+|---|---|
+| `resourceTimeGridDay` | the hours of one day, a column per resource (no row of dates: the title says the day) |
+| `resourceTimeGridWeek` | each resource's seven days side by side, under its name |
+| `resourceDayGridDay`, `resourceDayGridWeek` | the same as rows of days |
+| `resourceDayGridMonth` | each week row holds every resource's week |
+
+They are the time grid and the day grid given resources (`ViewSpec.resources`),
+so everything those views do works here: drag, resize, select, the context
+menu, the keyboard, "+N", bookable slots, windowing. A custom view takes
+`resources: true` too. Resources go first: a resource's days are side by
+side (dates above resources is not offered).
+
+## Resources
+
+```ts
+interface ResourceInput {
+  id: string;
+  title?: string;
+  parentId?: string;          // a tree: a department above its doctors
+  order?: number;             // siblings by this first (lowest first)
+  timeZone?: string;          // where its business hours are read
+  businessHours?: BusinessHoursInput;   // its own, over the calendar's
+  eventConstraint?: ConstraintSpec;     // where its events may go, over the calendar's
+  eventOverlap?: boolean;     // false: no two of its events overlap; true: they may
+  classNames?: string[];      // on its head
+  extendedProps?: object;
+  [field: string]: unknown;   // your own fields: ordering, grouping
+}
+```
+
+- **Order:** depth first, children right under their parent. Siblings go by
+  `order`, then by `resourceOrder` (`'title'`, `'-title'` descending,
+  `'unit,title'`, or a comparison), then as given. Fields are read from the
+  resource, then from `extendedProps`. Numbers compare as numbers, text by
+  code unit (the same order on every machine), absent values last.
+- **Groups:** `resourceGroupField: 'service'` puts a head over each run of
+  resources sharing the value, in the order the groups first come. Grouping
+  applies to the roots; each root's subtree stays in its group.
+- **Bad input never throws.** `kernel.setResources(list)` (and the
+  `resources` option) returns what it could not read — the calendar hands it
+  to `onResourceProblems(problems)` (Angular: `(resourceProblems)`):
+  `invalid-resource` (not an object, no id — refused; a field that cannot be
+  read — dropped with a warning), `duplicate-id` (the second one refused),
+  `unknown-zone`, `unknown-resource` (an unknown parent: the resource becomes
+  a root), `resource-cycle` (the first resource of a cycle, in input order,
+  becomes a root). `kernel.getResourceProblems()` reads them again. A
+  `resourceOrder` comparison that throws leaves the input order
+  (`invalid-resource` at `resourceOrder`).
+- `update({ resources })` replaces them (the same array again changes
+  nothing); `update({ resourceOrder, resourceGroupField })` reorders.
+- An event goes on resources with `resourceId` or `resourceIds`. An event
+  on two resources is drawn in both columns. Events on no resource are not
+  shown in resource views (the timeline has an "Unassigned" row).
+- No resources at all (none given, or not loaded yet): "No resources to
+  show" in place of the columns (`noResources`, `.dz-empty`).
+- Slots: `availableSlots` entries with a `resourceId` show in that
+  resource's columns only. A resource's `timeZone` is not handed to
+  `findSlots`: give the provider's availability its zone there.
+
+## Zones and hours
+
+Every column is drawn in the calendar's zone. A
+resource's `timeZone` is where its hours are read: a doctor in Riyadh open
+08:00–12:00 is shaded outside 07:00–11:00 in Paris in October, and outside
+06:00–10:00 from the 25th, when Paris falls back an hour. A resource without
+hours of its own takes the calendar's `businessHours`, read in its zone.
+
+## Rules
+
+Each resource an event goes on checks, in its own zone:
+
+- its `eventConstraint`, else the calendar's `rules.constraint` — and
+  `'businessHours'` means its own hours (else the calendar's);
+- its `eventOverlap` for the events it shares: `false` refuses an overlap
+  even if the calendar allows them, `true` allows it even if the calendar
+  refuses them. Events on different resources never meet; an event on no
+  resource meets every event.
+
+A refused drop is said and handed to `onCommandRefused` with the violations
+(`constraint` with the resource's id, `overlap` with the other event's).
+
+## Moving between resources
+
+A drag from one resource's column to another's swaps that resource for the
+new one and keeps the others: an event on Dr A and Dr C, dragged from A to B,
+ends up on B and C. A resize keeps the resources. A selection, a date click
+(`onDateClick`) and the context menu's "New event" carry the column's
+`resourceId`.
+
+## Keyboard and screen readers
+
+- Each column's name starts with its resource ("Dr Haddad, Wednesday
+  21 October"); a day grid's cell too. The heads themselves are hidden from
+  screen readers (the columns say whose they are).
+- Left and right stay in the days of the cursor's resource (past the last
+  one, the next period, same resource). **Alt+Left and Alt+Right** go to the
+  previous or next resource, the same day and time; past the last one:
+  "No further". Page Up and Down change the period.
+- Holding an event (M), Alt+Left/Right move it to the next resource, the
+  same day and time; plain arrows move it in time, on its resource. What is
+  said starts with the new resources' names. Resources replaced while an
+  event is held let it go ("Move cancelled"); a cursor whose column went
+  away starts again at its home.
+
+## Look
+
+- Heads: `.dz-tg__resource` / `.dz-dg__resource` (with the resource's
+  `classNames`, and `data-resource`), groups `.dz-tg__group` /
+  `.dz-dg__group`. Where a resource's days start, a 2 px line
+  (`--dz-resource-border`).
+- `hooks.resource.content({ resource }, el)` (`ResourceContentCtx`) draws a head (a photo, a
+  specialty); null keeps the title.
+- Angular: `[resources]`; `resourceOrder` and `resourceGroupField` in
+  `[options]`.
+
+## Limits (on purpose, for now)
+
+- No horizontal scrolling: forty resources over a week are 280 thin columns.
+  Use the day view for many resources, or the timeline (15b).
+- No per-column zone (K.6), no dates above resources.
+- Events whose resource is unknown are kept but shown in no resource view;
+  `unknown-resource` is not reported for them (resources may arrive after
+  the events).
+
+---
+
+<!-- docs/timeline.md -->
+
+# Timeline — `@dzcalendar/pro`
+
+Resources in rows, time running along. The axis is **elapsed**: a position is
+real time since the start, so an event is as long on screen as it lasts, a
+25-hour day is 25 hours wide and a 23-hour one 23. The
+slots are cut on the wall clock: on a fall-back night 02:00 happens twice —
+the second marked `02:00*`, both named with their offsets — and on a
+spring-forward night there is no 02:00 at all.
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro'; // registers the family and its eight views
+
+createCalendar(host, {
+  initialView: 'resourceTimelineWeek',
+  resources: [
+    { id: 'card', title: 'Cardiology', service: 'Medicine' },
+    { id: 'benali', title: 'Dr Benali', parentId: 'card', room: 'B12' },
+  ],
+  resourceGroupField: 'service',
+  viewOptions: { timeline: { areaColumns: [{ field: 'title', header: 'Resource', width: 170 }, { field: 'room', header: 'Room' }] } },
+  timeline: { slot: 60, maxLanes: 3 },
+  editable: true,
+});
+```
+
+MIT: `@dzcalendar/pro` is a code boundary, no licence key.
+
+## Views and scale
+
+| View | Default slot |
+|---|---|
+| `timelineDay`, `resourceTimelineDay` | 30 minutes |
+| `timelineWeek`, `resourceTimelineWeek` | 1 hour (days above the hours, scrolled along) |
+| `timelineMonth`, `resourceTimelineMonth` | 1 day (months above) |
+| `timelineYear`, `resourceTimelineYear` | 1 day |
+
+`timeline: { slot }` sets the scale for every timeline view: whole minutes
+dividing a day (5, 10, 15, 20, 30, 60, 120…) or `'day'`; anything else is
+refused (RangeError, at creation or `update()`), and `slot: undefined` goes
+back to the default. A wall-clock slot crossing a clock change keeps its
+true width (an hourly slot is 90 minutes wide on Lord Howe's spring day). The width of a slot is the stylesheet's:
+`--dz-tl-slot` (2.75rem; 2.25rem counted in days). A timeline is continuous
+time: hidden days are not taken out. On first paint (and after another
+period or scale) it scrolls to `scrollTime` of today when shown, else of its
+first day; counted in days, to today.
+
+## Rows
+
+- **Fixed height, "+N"**: a resource row shows
+  `timeline.maxLanes` lanes (default 3); past them its last lane holds "+N"
+  links, one per stretch where the hidden events run into one another, and
+  the link opens them in the "+N" panel. Every resource row has the same
+  height, so windowing is arithmetic.
+- **Without resources** (`timelineDay`…): one row of every event, filling
+  the view (its lanes are measured).
+- **Tree and groups**: rows follow the resource tree (depth first, the
+  15a order) and `resourceGroupField` (a head row per group, roots grouped).
+  Folding a resource or a group is kept in the kernel
+  (`collapsedResources`, `collapsedGroups`), so it survives `update()`;
+  `onResourceToggle({ collapsedResources, collapsedGroups })` reports it,
+  `update({ collapsedResources, collapsedGroups })` sets it. A day the zone
+  skipped is said ("This day does not exist in this time zone").
+- **"Unassigned"** (`showUnassigned: true`, default off): a
+  first row of the events on no resource or on resources the
+  calendar does not know. Dropping an event there takes it off the resource
+  it was taken from (the others stay); dragging it out puts it on the row it
+  is dropped on. The column views offer it too. It is the view's, not a
+  resource: a date click or a selection on it carries no `resourceId`.
+- Business hours shade each row in its resource's zone (15a); counted in
+  days, a day without any open hour is shaded whole.
+
+## The resource area
+
+- Columns: `viewOptions.timeline.areaColumns` — `field` (read with
+  `fieldOf`: the resource's own, then what was given, then `extendedProps`),
+  `header` (the title column is "Resource" by default), `width` (px;
+  default 160, then 110; 40 to 480). Each head has a separator to drag; from
+  the keyboard the separators are one tab stop — ↑/↓ from one to the next,
+  ←/→ 16 px a step. A width belongs to its field and is kept while the view
+  lives.
+- `hooks.resource.content({ resource }, el)` draws the first cell's title.
+- The area sticks to the left and the heads to the top of the one scroller:
+  scrolled both ways, they follow without script.
+
+## Interactions
+
+Everything the grids do: drag between rows (the resource taken from swapped
+for the row's), resize by either edge (from the start with
+`eventResizableFromStart`), select a stretch on a row, the context menu
+(a moment, or a day, with the row's `resourceId`), undo. Near the scroller's
+edges a drag scrolls along time; the period changes only once the scroll is
+at its end; the edge zones start past the sticky area and heads. An
+all-day event stays all-day (there is no all-day row): it moves by whole
+days. Counted in days, a timed event moves by whole days and is not resized
+(as in a month).
+
+## Keyboard and screen readers
+
+- The rows are a `treegrid`: each row says its level, its expansion, its
+  index; its first cell is the row head, the time its grid cell.
+- Two tab stops: the area's row heads (↑/↓ the rows, ← folds or goes to the
+  parent, → unfolds or goes into the row's time, Enter/Space folds), and the
+  time's cursor — ←/→ along time (`snapMinutes`, or a day counted in days),
+  ↑/↓ the next resource, Home/End the row's start and end, Page Up/Down the
+  period. What the cursor says starts with the resource ("Dr Haddad,
+  Wednesday 21 October, 09:00").
+- On an event, every arrow goes to the next or previous event of its row.
+- Holding an event (M), ↑/↓ move it to the next resource, ←/→ in time (an
+  all-day event: a day a step).
+- The repeated hour's slot heads read "02:00*" and are said "02:00
+  (+01:00)": the offset, not the mark.
+
+## Performance
+
+Above `virtualizeAbove` events (or 120 rows, or 400 slots), only the rows
+meeting the view and a screen around it are mounted, and along time only
+what meets the view and a screen on each side; nothing is mounted before
+the scale is measured. Measured in Chrome, minified (`npm run
+perf:browser`, budgets in `perf/browser-budgets.json`): 500 resources ×
+10 000 events, first frame about 20 ms spread over a year (week and month)
+and 40 ms all in one week (budget 80); scrolling about 1 ms of script a
+frame (budget 8), longest frame one display frame (budget 25 ms). Not
+measured yet: a year view with business hours, a drag's validation.
+
+## Without a screen
+
+`@dzcalendar/pro/model`: `buildTimelineAxis`, `buildTimelineModel`,
+`updateTimelineModel`, `TIMELINE_VIEWS` — pure, for a server or a native
+port; the `timeline-axis` conformance suite checks the axis.
+
+---
+
+<!-- docs/slots.md -->
+
+# Bookable slots — `@dzcalendar/slots`
+
+When can this provider be booked? The engine takes the provider's hours (in
+the provider's own zone), what is already busy, and the booking rules, and
+returns the free slots. Pure Temporal, no clock read, no DOM: the page and the
+server run the same code and get the same answer.
+
+## The case in ten lines
+
+```ts
+import { findSlots, checkSlot } from '@dzcalendar/slots';
+
+const rules = {
+  availability: { timeZone: 'Asia/Riyadh', weekly: [{ days: [7, 1, 2, 3, 4], from: '08:00', to: '12:00' }] },
+  duration: 30,
+};
+const { slots } = findSlots({ ...rules, from: weekStart, to: weekEnd, busy: bookings }); // the page draws these
+createCalendar(host, { availableSlots: slots, onSlotClick: (slot) => api.book(slot.start) });
+// on the server, before saving (no range needed: it is the slot itself):
+if (!checkSlot({ ...rules, busy: bookingsFromDb }, requestedStart).ok) refuse();
+```
+
+## Availability
+
+```ts
+availability: {
+  timeZone: 'Asia/Riyadh',                     // the provider's zone: hours are read there
+  weekly: [                                    // ISO weekdays, 1 Monday … 7 Sunday
+    { days: [7, 1, 2, 3, 4], from: '08:00', to: '12:00' },
+    { days: [7, 1, 2, 3, 4], from: '13:00', to: '16:00' },
+  ],
+  exceptions: [                                // replace every window opening on that date
+    { date: '2026-12-01', closed: true },
+    { date: '2026-12-03', windows: [{ from: '10:00', to: '14:00' }] },
+  ],
+  rules: [                                     // rare cases, RFC 5545
+    { rrule: 'FREQ=MONTHLY;BYDAY=1SA', start: '2026-10-03', from: '09:00', to: '12:00', exdates: ['2026-11-07'] },
+  ],
+}
+```
+
+- An end at or before the start crosses midnight (`22:00`–`02:00`), so
+  `00:00`–`00:00` is a whole day; `'24:00'` is the next midnight. A window
+  belongs to the date it opens on: an exception closing Thursday does not cut
+  Wednesday's 22:00–02:00 after midnight. An exception with `closed: true` is
+  closed, whatever `windows` it also has.
+- Windows that touch merge: `08:00–10:00` and `10:00–12:00` are one opening.
+- Clock changes: a window across a change holds its real length (Paris
+  01:00–04:00 on 25 October is 4 h). A time the clocks skip never adds open
+  time: a window *starting* in the skipped hour opens as Temporal's
+  `compatible` reads it (02:30 → 03:30 on 29 March in Paris), one *closing*
+  in it closes at the jump (02:30 → the moment 02:00 became 03:00).
+
+## Slots
+
+- `duration` and `step` are minutes of **real** time. Slots start at each
+  opening's start, every `step` (default: the duration), while a whole slot
+  fits. Across a clock change a slot keeps its length: in Paris on 29 March,
+  01:30–03:00 is a 30-minute slot, and on 25 October 02:00 is offered twice,
+  once per offset.
+- A slot is `{ start, end }` as ZonedDateTimes in the provider's zone;
+  `slot.start.withTimeZone(clientZone)` shows it to the client. The calendar
+  draws it in its own zone.
+- `from`/`to`: only slots wholly inside. They never shift the grid (a range
+  starting at 09:30 does not create a 09:30 slot): an opening that began
+  before the range counts from its true start, looked for up to a week back.
+  An opening that never closes (around the clock) has no start to count
+  from: its slots fall on multiples of the step since the epoch.
+- `duration` and `step`: whole minutes are expected, from 1 minute to a year.
+  At most 10 000 slots are returned (and 200 000 starts looked at), with a
+  `too-many-occurrences` warning beyond: narrow the range.
+
+## Rules
+
+| Option | Meaning |
+|---|---|
+| `busy: [{ start, end, kind? }]` | Taken time. `kind: 'booking'` (default) gets the buffers and counts toward `maxPerDay`; `'block'` (leave, another agenda) only takes its time. |
+| `bufferBefore`, `bufferAfter` | Minutes kept free around each appointment. Two bookings end up `bufferAfter + bufferBefore` apart. |
+| `minNotice` | No start sooner than this many minutes after `now`. |
+| `maxAdvanceDays` | No start later than `now` plus this many days, at the same wall time in the provider's zone (a whole number). |
+| `maxPerDay` | At most this many bookings starting on one of the provider's dates; a full date offers nothing (a whole number). |
+| `now` | Needed by `minNotice` and `maxAdvanceDays`: the engine never reads a clock. |
+
+Capacity (several seats per slot) is in `@dzcalendar/pro/slots` (simple
+seats):
+
+```ts
+import { findSlots, checkSlot } from '@dzcalendar/pro/slots';
+findSlots({ ...rules, capacity: 8, busy: bookings }); // slots with `seats` left
+checkSlot({ ...rules, capacity: 8, busy: bookings }, start); // … or { ok: false, reason: 'full' }
+```
+
+- A booking takes 1 seat, or its `seats` (a whole number ≥ 1; another value
+  is a warning and counts 1). A `block` takes the whole slot.
+- A slot is offered while a seat remains: the most seats taken at once in it
+  (with the buffers, as here) is below `capacity`. Back-to-back bookings
+  share a seat.
+- `maxPerDay` counts bookings, not seats. Refusals keep this engine's order
+  (`notice`, `advance`, `daily-cap`, `busy` for a block), then `full`.
+- With `capacity: 1` and no `seats`, the same answer as this package.
+- The calendar shows the seats left beside a slot's time ("10:00 · 2 places")
+  and says them; a slot's `seats` field is what it reads.
+
+- Bad input is a Problem as in this package: `capacity`, `maxPerDay`, the
+  buffers and a `busy` that is not a list refuse the query; an unreadable
+  booking is a warning at its own place (`busy[3]`).
+
+Seats from calendar events and resources:
+
+```ts
+import { resourceSeats, seatedBusyFromEvents } from '@dzcalendar/pro/slots';
+seatedBusyFromEvents(events, zone); // a timed event's extendedProps.seats is its seats
+findSlots({ ...rules, ...resourceSeats(room, events, zone) }); // the room's extendedProps.capacity, its own bookings
+```
+
+`busyFromEvents(events, zone)` turns calendar events into busy time: events
+with `busy` (the default unless `status: 'cancelled'`); timed ones are
+bookings, all-day ones block their dates in the provider's zone.
+
+## Checking on the server
+
+`checkSlot(query, start)` answers `{ ok: true, slot }` or
+`{ ok: false, reason }` with `reason` one of `invalid-query` (with
+`problems`: why), `out-of-range`, `closed`, `misaligned`, `notice`,
+`advance`, `daily-cap`, `busy` (the first rule broken, in that order). `from`
+and `to` are optional here: without them the range is the slot itself. It
+accepts exactly what `findSlots` offers — checked on random queries over the
+nine zones of the project's tests.
+
+## Bad input
+
+Nothing throws, whatever the shape (JSON from a database included).
+`findSlots` returns `{ slots, problems }`:
+`unknown-zone` and `invalid-slot-query` (errors: no slots), and warnings for
+what was skipped — `invalid-availability` (a window or date that cannot be
+read), `invalid-rrule`, a busy entry that cannot be read. Each problem has a
+`path` (`availability.weekly[1]`).
+
+## In the calendar
+
+```ts
+createCalendar(host, {
+  initialView: 'timeGridWeek',
+  availableSlots: findSlots(query).slots,          // any { start, end } list works
+  onSlotClick: (slot) => { /* the slot as given: book it */ },
+});
+cal.update({ availableSlots: findSlots(query).slots }); // after a booking
+```
+
+- Week and day views draw each slot as a button at its time (`.dz-slot`,
+  tokens `--dz-slot-bg`, `--dz-slot-hover-bg`, `--dz-slot-border`,
+  `--dz-slot-fg`), under the events. A slot is cut to the hours shown (one
+  from before `slotMin` shows its visible part); where slots overlap (a step
+  shorter than the duration) each is drawn down to the next start, so every
+  start keeps a part of its own. Month and list views do not show slots.
+- Slots must be Temporal values (`Instant` or `ZonedDateTime`, as `findSlots`
+  gives them); anything else is skipped.
+- The calendar creates nothing: `onSlotClick` hands the slot back — the very
+  object given, extra fields included; the application books it, its server
+  checks it again.
+- Without `onSlotClick` the slots only show the free time: they are marked
+  disabled, and a click or a drag on one acts as on empty time (date click,
+  selection). With it, a drag cannot start on a slot (it is a button).
+- Keyboard: slots are out of the tab order (the grid keeps one tab stop). The
+  cursor says "Free slot, 10:00–10:30" where it stands in one, and Enter (or
+  Space) books it instead of a date click. The cursor moves by `snapMinutes`:
+  a slot shorter than that, or off its grid, may be passed over — keep slots
+  on the snap grid.
+- Words: "slot" in `slotMinutes`, `slotMin` and the cursor's hits is a row of
+  the time grid; a bookable slot is `availableSlots` / `onSlotClick`.
+- Angular: `[availableSlots]` and `(slotClick)`.
+- `playground/slots.html`: a provider in Riyadh seen from Paris, Riyadh or
+  Chicago; a click books and re-checks.
+
+---
+
+<!-- docs/editor.md -->
+
+# The event editor — `@dzcalendar/pro/editor`
+
+A ready-made editor: a modal dialog with the usual
+recurrences. It opens on an event, an occurrence of a series, or a new
+event; it saves through the calendar's history (checked against its rules,
+undoable with Ctrl+Z) and resolves with what happened.
+
+```ts
+import { editorHandlers, openEventEditor } from '@dzcalendar/pro/editor';
+
+cal.update(editorHandlers(cal)); // "Open" and "New event here" (context menu) open it
+const outcome = await openEventEditor(cal, { instance }); // 'saved' | 'deleted' | 'cancelled'
+await openEventEditor(cal, { create: { allDay: false, start: instant, resourceId: 'r1' } });
+```
+
+Angular: `<dz-calendar dzEventEditor (editorClosed)="…">` (`@dzcalendar/pro-angular`).
+It takes over `onEventOpen` and `onCreateRequest`.
+
+## What it edits
+
+- **Title**, **when** — tzslot's `createDateTimeRange`: both ends on the
+  event's zone, the measured length (a night across a clock change says
+  its real hours), the repeated hour, whole days (its own switch) — the
+  **zone** (the event's wall clock; changing it keeps the moments),
+  **resources** (when the calendar has some), **colour** (a tone).
+- **Repeats**: does not repeat; every N days, weeks (on chosen weekdays),
+  months (on the day, on the n-th weekday — "the 3rd Wednesday" — or the
+  last one), years; ends never, on a date (that whole day, inclusive) or
+  after N times. A rule beyond that (hours, set positions, several rules) is
+  shown as written, "custom", and kept unless another is picked. WKST is
+  the calendar's (a rule created here takes the locale's first day).
+- **An occurrence**: "this event / this and following / all events" (the
+  calendar's words). The repeat belongs to the series: it shows with "all
+  events" only. "All events" with another rule → the series takes it
+  (`series.rule` command: excluded dates and moved occurrences kept, its
+  own WKST too); moved at the same time, the new rule moves with it (a
+  Wednesday rule moved to Thursday repeats on Thursdays). With "does not
+  repeat" → the series stops: its first occurrence becomes the event (same
+  id, every field kept), moved occurrences stand alone. A single event made
+  to repeat keeps its id and every field (`event.repeat` command).
+- A rule read another way (its own WKST, `COUNT` instead of a date…) is
+  compared as a form, not as text: saving a title does not rewrite it.
+  Nothing changed → nothing is written (no empty change of an occurrence).
+- A flight's end keeps its own zone (Paris → Tokyo) unless the zone is
+  changed in the dialog.
+- "This and following" with another rule is not offered: the repeat shows
+  with "all events" only (a split series is `event.update` with
+  `scope: 'following'`, which keeps the rule).
+- Only what changed is sent: a title edited on an event that already
+  overlaps another is not refused for its times.
+- Checked before saving: a start and an end, a whole interval and count
+  (1 or more), at least one weekday, a last date given and not before the
+  first. The message is said in the dialog, the field marked
+  (`aria-invalid`) and focused.
+- A refusal of the rules (constraint, overlap, a resource's own rules,
+  `allow`) is said in the dialog, which stays open. A series is checked on
+  its occurrences (a year of them, 500 at most), not only its first: a
+  daily rule landing on a booked day is refused. A problem code is said in
+  words (`problem(code)`).
+
+## Accessibility
+
+`role="dialog"`, `aria-modal`, named by its heading; the title takes the
+focus, Tab stays inside (and a focus that leaves for the page comes back;
+tzslot's pickers, opened on the body, count as inside). Escape cancels —
+not while one of tzslot's pickers is open: Escape closes the picker. A
+click outside cancels an untouched form only. The focus goes back to where
+it was; opened from the context menu, to the event. The refusal is a
+`role="alert"`.
+
+One editor per calendar: a second `openEventEditor` returns the one already
+open. Destroying the calendar closes it (`cal.onDestroy`, new in
+`@dzcalendar/dom`).
+
+Known upstream: tzslot's date fields carry `aria-haspopup` on a textbox (an
+axe "aria-allowed-attr" finding) — to fix in tzslot; the browser check
+leaves `.tz-dtr` out and checks the rest of the dialog in full.
+
+## Words and look
+
+`editorMessagesFor(locale)` — English, French, Arabic, Spanish, German;
+`defineEditorLocale` adds one; `messages` overrides some. tzslot's widget
+has its own words in English, French and Arabic: under Spanish or German its
+few labels (the length, "all day") are in English until tzslot has them.
+The look reads the calendar's palette (the page's `--tz-*` first, as
+`.dz-cal`) and hands it to tzslot's widget and pickers; `EDITOR_CSS` under
+`injectStyles: false`.
+
+Size: 10.3 kB gzip; with tzslot's widget, 36.4 kB — what opening the editor
+costs. `@tzslot/dom` is an optional peer dependency (install it with the
+editor); `@dzcalendar/pro-angular` fetches the editor on its first opening,
+not with the application.
+
+---
+
+<!-- docs/export.md -->
+
+# Printing and exports — `@dzcalendar/pro/print`, `@dzcalendar/pro/export`
+
+No dependency: the PDF, the zip of an XLSX and its XML,
+the CSV and the iCalendar text are written here; each sub-entry is loaded
+on demand. Bad input never throws: a result carries `problems`
+(`invalid-export`: an unknown view, a range ending before it starts, a
+paper that is not `a4`, `letter` or `a3`).
+
+## Paged printing
+
+```ts
+import { printPages } from '@dzcalendar/pro/print';
+await printPages(cal); // the period shown, A4 landscape (portrait for a list)
+await printPages(cal, { view: 'timeGridWeek', from, to, paper: 'letter', orientation: 'portrait' });
+```
+
+Real sheets in the DOM, then `window.print()`: a copy of the calendar per
+period (a day, a week, a month; a multi-month view prints a month a sheet),
+sharing its store (nothing fetched again), with the period's title and
+"n / of". A copy has the calendar's look and options but none of its
+handlers, motion or context menu; paper is light, whatever the scheme on
+screen. One print job per document: a second call, or
+the calendar destroyed, closes the first. What a sheet cannot hold is a
+`clipped:n` warning; a date range that could not be fetched, a `sources`
+warning. The browser draws the text: any script, selectable in "Save as
+PDF". Each copy is sized to its sheet: a time grid's hours fill its height,
+a month's weeks too, a timeline's day its width (a slot coarse enough to be
+labelled: an hour, two…). A resource timeline is split between sheets by
+whole top-level resources (`rowsPerPage`, default what the sheet holds).
+No "now" line on paper. `print: false` builds the sheets and returns them
+(`job.pages`) without printing; `job.close()` takes them away (done after
+printing by itself).
+
+## PDF and PNG
+
+```ts
+import { exportPDF, exportPNG, download } from '@dzcalendar/pro/export';
+const { blob, problems } = await exportPDF(cal, { from, to, paper: 'a4' });
+if (blob) download(blob, 'agenda.pdf');
+const { blobs } = await exportPNG(cal, { scale: 2 }); // a PNG per sheet
+```
+
+Every view is drawn from its model on a canvas — time grid (with
+resources), month, list (over as many sheets as it takes, a day's head
+repeated), timeline (rows over several sheets, heads repeated). Days of 23
+and 25 hours as they are: a repeated hour striped on the wall axis, a
+timeline day 25 hours wide. Right to left in Arabic and Hebrew; each text
+in its own direction. The PDF holds the sheets as images (the browser
+shapes every script): text is not selectable, about
+150–300 kB a sheet at `scale: 2` (192 dpi). The colours are the calendar's
+light palette (`--dzc-*`, `--dz-tone-*`), whatever the scheme on screen.
+Sheets are drawn and encoded one at a time on one canvas; at most 60
+periods and 300 sheets (past them, a `cut:n` warning).
+
+The drawing is plain data: `paintSheets(kernel, periods, …)` gives each
+sheet's operations (`Pen.ops`: rectangles, lines, text, stripes), drawn by
+`drawSheet(canvas, ops, …)` — testable without a browser.
+
+## XLSX and CSV
+
+```ts
+const { blob } = await exportXLSX(cal, { from, to });
+await exportCSV(cal, { separator: ';' }); // a French Excel
+```
+
+A row per occurrence (series expanded, each once), in order: title; start
+**in the event's zone** and that zone; end **in its own zone** and that zone
+(a flight Paris → Tokyo ends at 07:00, Asia/Tokyo); start and end **in the
+calendar's zone**; the real duration in minutes (a night across a clock
+change says 420 for 00:00–06:00); all day; resources (their titles);
+status. Excel has no date before 1900: such a time is written as text
+(1 January 1900 is 1; from 1 March 1900, Excel's phantom 29 February
+counted). XLSX cells are real Excel dates (wall times: what the cell says is
+what that zone's clock said), the head row frozen and filtered, the sheet
+right to left in Arabic. The CSV is UTF-8 with a BOM and CRLF; a title
+starting with `=`, `+`, `-` or `@` is written as text (no formula).
+
+## ICS
+
+`exportICS(cal, { from, to })`: what the range shows — an event as it is,
+a series whole (its rule, its moved occurrences) — each in its own zone,
+with its VTIMEZONE (`@dzcalendar/ical`). `all: true` writes everything.
+
+## Words
+
+Column heads, statuses, "n / of": `exportMessagesFor(locale)` in English,
+French, Arabic, Spanish, German; `defineExportLocale`; `messages` over them.
+
+---
+
+<!-- docs/motion.md -->
+
+# Motion — `@dzcalendar/dom` hooks, `@dzcalendar/motion-gsap`
+
+Three levels:
+
+- **Nothing to install:** a light Web Animations base, the default — the
+  period slides its way, new events fade in, a menu or a "+N" panel opens.
+  Transform and opacity only; nothing where `Element.animate` is missing.
+- **`motion: createGsapMotion()`** (`@dzcalendar/motion-gsap`, GSAP 3.13+
+  as the application's own dependency): everything below.
+- **`motion: NO_MOTION`:** nothing moves.
+
+Under `prefers-reduced-motion: reduce`, nothing moves at any level (and
+the setting is followed if it changes while the page is open). GSAP is
+never in `@dzcalendar/dom` (a test checks it). Nothing is ever hidden with
+`visibility` (opacity only): a focused event keeps the focus. One adapter
+may serve several calendars in turn; `update({ motion })` swaps it (the old
+one's animations finish first); `NO_MOTION` turns everything off.
+
+```ts
+import { createGsapMotion } from '@dzcalendar/motion-gsap';
+createCalendar(el, { motion: createGsapMotion() }); // "sober"
+createCalendar(el, { motion: createGsapMotion({ preset: 'expressive', zone: 0.9, effects: { odometer: false } }) });
+```
+
+## Presets
+
+| | sober (default) | expressive |
+|---|---|---|
+| feel | soft curves, 200–350 ms, no bounce | springs, a little squash, bounces |
+| a period | 0.30 s, slides 4 % | 0.42 s, 7 % |
+| a zone change | 0.50 s | 0.70 s |
+| month → day | 0.42 s | 0.55 s |
+
+Any value of `MotionPreset` (`view`, `enter`, `drop`, `zone`, `morph`,
+`odometer`, `dst`, `slide`, `ease`, `move`, `settle`, `pop`, `stagger`,
+`tilt`, `leave`) can be given over the preset.
+
+## Effects (each on by default, `effects: { name: false }` turns one off)
+
+- **`zone`** — the calendar's zone changes (and nothing else: the same
+  view and dates): every event that moves glides from its old place to its
+  new one — 150 at most. The instant stays; only the wall clock it is read
+  on moves. Events that appear (another day now) fade in. A second change
+  mid-glide carries on from where the events are seen.
+- **`dst`** — a day with a clock change comes into view: its repeated hour
+  (a 25-hour day, wall axis) unfolds, its skipped hour folds in, and the
+  day's "25 h" note pops.
+- **`now`** — once a minute the "now" line glides to its new place (in
+  its column: a scroll is not a move) with a soft pulse, every minute.
+- **`morph`** — from a grid of day cells (a month, a year's month) to a
+  single day: the day opens out of its cell (when the cell is on screen),
+  its events settling in.
+- **`odometer`** — on a move of dates or views, the title's changed words
+  roll up (forward) or down (back); with other words altogether the title
+  rolls whole. The title itself already says the new words for assistive
+  technology; only a copy marked `aria-hidden` (`data-dz-roll`) rolls over
+  it. A new locale or zone simply says its words.
+- **`today`** — "today" from more than six weeks away: a long, fast run
+  that way, then a soft stop.
+- **`depth`** — the day heads travel half the body's way when a period
+  slides.
+
+- **`drag`** — a moved event leans with the gesture's speed (3° sober, 9°
+  expressive) and glides from slot to slot instead of snapping; a resize
+  does not lean. Dropped, it settles; thrown (with `InertiaPlugin`), it
+  lands with the speed it was let go with. Refused, it says "no", turns
+  upright and goes back.
+- **`leave`** — a deleted event (or occurrence) dissolves: the calendar
+  hands the motion a copy of it as it was (`.dz-leave` layer, no ids,
+  `aria-hidden`). Undone within a minute, it gathers back.
+- **`enter`** — an event made from a selection pours out of it; new events
+  otherwise arrive as a wave (a third of a second at most).
+- **`overlay`** — a context menu grows out of the point it was opened at, a
+  "+N" panel out of its link (its events cascading in), the editor out of
+  the event (or the selection) — and closes back into it.
+- **`seats`** — a slot's seats left roll and pop when a booking changes
+  them.
+- **`scroll`** — "today" from another date scrolls the hours (or the
+  timeline) to now: eased, and stopped by the person's own wheel, touch or
+  key. The scroll itself happens without motion too (a behaviour of the
+  calendar since 17b).
+- **`rows`** — a timeline's group or parent folding or unfolding: the rows
+  that stay slide, the rows that open unroll (the rows that close go at
+  once).
+
+Plugins are the application's: `createGsapMotion({ plugins:
+{ InertiaPlugin, ScrollToPlugin } })`. Without `InertiaPlugin` a drop simply
+settles; without `ScrollToPlugin` the scroll properties are tweened
+directly.
+
+## Writing an adapter
+
+`MotionAdapter` (all optional): `beforeChange(change)` — the old screen is
+still drawn, return what you need of it — then `afterChange(state, change,
+body)` once redrawn (return `true` when you animated the change yourself:
+`viewChange` and `eventsEnter` are then not called for it);
+`titleChange(title, from, to, change)`; `nowTick(nodes)`;
+`eventsEnter(nodes, { cause, from? })`; `eventsLeave(copies, info)` (return
+a promise: the copies are removed when it settles, or after 2 s) with
+`wantsLeave()` (false: nothing is captured); `seatsChange(nodes)`;
+`scroll(el, { top, left })` (true: you move it; views use the toolkit's
+`scrollEased`); `overlayOpen(el, origin?)`, `overlayClose(el, origin?)`
+(the editor waits for it); `dragStart(ghosts, kind)` (the live array;
+places in `--gx` / `--gy`); `viewChange`,
+`eventsEnter`, `dragStart`, `dropRejected`, `captureLayout` /
+`animateLayout` (FLIP), `dropSettle`, `overlayOpen`, `destroy`.
+`MotionChange` says the causes (`navigate`, `view`, `zone`, `locale`…), the
+direction, and the view, family, date, zone and title before and after.
+Every state change comes through (`options` and `resources` too, after a
+measure): pick by `causes`. Several changes before one paint arrive as one.
+Never change text or layout properties: the calendar's places are custom
+properties its CSS reads.
+
+---
+
+<!-- docs/i18n.md -->
+
+# Languages
+
+Two kinds of words appear in a calendar.
+
+- **Dates, months, weekdays, times, numbers**: from the browser's `Intl`, in
+  every language, with no import. `locale: 'ja-JP'` writes Japanese dates
+  today. The calendar turns right to left by itself for Arabic, Hebrew,
+  Persian and Urdu (from the locale's text direction).
+- **The calendar's own words** — "Today", "+3 more", the context menu, what a
+  screen reader is told: English and French are built in; Arabic, Spanish and
+  German are one import each, paid for only when imported:
+
+```ts
+import '@dzcalendar/dom/locales/ar';   // also: …/locales/es, …/locales/de
+createCalendar(host, { locale: 'ar-SA' });
+```
+
+A locale is found by its exact tag (`ar-SA`), then its language (`ar`), else
+English. Unicode extensions (`ar-SA-u-ca-islamic-umalqura`) do not change the
+words.
+
+## Changing a few words
+
+`messages` takes only what changes; the rest stays the locale's:
+
+```ts
+createCalendar(host, { locale: 'fr-FR', messages: { today: 'Ce jour', noEvents: 'Rien de prévu' } });
+calendar.update({ messages: { today: 'Maintenant' } });
+```
+
+## Another language, or a region's own wording
+
+```ts
+import { EN, defineLocale } from '@dzcalendar/dom';
+
+defineLocale('pt', { ...EN, today: 'Hoje', previous: 'Anterior', next: 'Próximo' /* … */ });
+defineLocale('de-CH', { ...DE, today: 'Hüt' });   // a region: wins over `de` for de-CH
+```
+
+`defineLocale` also takes a function of the full locale, called once per
+locale: numbers then follow it — `ar-SA` counts in Arabic-Indic digits like its
+dates, `ar-SA-u-nu-latn` in Latin ones. The built-in `ar`, `es` and `de` are
+such functions (`messagesAr(locale)`…; `AR`, `ES`, `DE` are their words for the
+bare language).
+
+```ts
+defineLocale('pt', (locale) => {
+  const n = new Intl.NumberFormat(locale);
+  return { ...EN, today: 'Hoje', moreLink: ({ count }) => `+${n.format(count)} mais` /* … */ };
+});
+```
+
+`DzMessages` lists every key; TypeScript says when one is missing. Keys that
+take parameters are functions — counts go through `Intl.PluralRules` and
+`Intl.NumberFormat` for the language (the Arabic file shows the six plural
+forms and the isolation of left-to-right fragments such as times, with
+U+2068 … U+2069, inside right-to-left sentences).
+
+`messagesForLocale(locale)` returns the words the calendar would use.
+
+---
+
+<!-- docs/theming.md -->
+
+# Theming DzCalendar
+
+A calendar that looks right with one import, and that an application can
+change entirely without fighting it.
+
+## 1. Use it as it is
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+createCalendar(host, { theme: 'slate', scheme: 'auto', density: 'comfortable' });
+```
+
+- `theme`: `'standard'` (default), `'slate'`, `'night'`, `'pastel'`, `'frost'`,
+  `'solar'`, `'contrast'`, or one of your own (`defineTheme`). Every family has
+  a light and a dark palette, all checked for WCAG AA contrast by axe in
+  Chrome; `contrast` is the high-contrast family.
+- `scheme`: `'auto'` follows the system (`prefers-color-scheme`), `'light'` or
+  `'dark'` forces it.
+- `density`: `'compact'`, `'comfortable'`, `'spacious'` — the height of a
+  minute, of a bar, the type size.
+- All three change live: `cal.update({ theme: 'night', scheme: 'dark' })`. In
+  Angular: `<dz-calendar theme="night" scheme="dark" density="compact">`.
+
+Without the theme CSS the calendar still works and reads in system colours —
+but the ready-made families (`'slate'`…) are in that CSS: without it they
+change nothing. In a shadow root, load the theme CSS *inside* that root (the
+document's sheets do not reach it); `defineTheme` themes are put there by the
+calendar itself. `THEME_NAMES` (exported) lists them; an unknown `theme`,
+`scheme` or `density` is refused with a RangeError.
+
+## 2. Change anything — your rules always win
+
+All of the calendar's CSS lives in two cascade layers, `dzcalendar.base` then
+`dzcalendar.theme`. **Any rule of yours outside a layer wins over both,
+whatever its specificity** — no `!important`, no copying our selectors:
+
+```css
+.dz-ev { border-radius: 0; }          /* square events */
+.dz-toolbar { display: none; }        /* your own header (see CalendarController) */
+```
+
+(Cascade layers: Chrome 99, Safari 15.4, Firefox 97.) One exception: while
+an event is dragged, the grabbing cursor is `!important` in the base layer.
+
+### Beside a CSS framework
+
+The calendar is built on no framework — plain CSS. What matters is the
+page's **global reset**, which touches every element:
+
+| Your page | Reset | Do |
+|---|---|---|
+| Tailwind CSS v4 | in `@layer base` | `@import '@dzcalendar/theme/tailwind.css';` before `@import 'tailwindcss';` |
+| Tailwind CSS v3 | unlayered preflight | `cssLayers: false` + `@import '@dzcalendar/theme/tailwind3.css';` after `@tailwind base;` |
+| Bootstrap 5, normalize.css, older CSS | unlayered | `cssLayers: false` + `@dzcalendar/theme/unlayered.css` |
+| Plain modern CSS | none | nothing |
+
+- Layered (the default), the calendar's sheet is appended, so its layers come
+  after any the page declared first (Tailwind 4's `base`): the preflight does
+  not reset it. `tailwind.css` also puts it *before* Tailwind's utilities, so
+  utilities on your own markup inside the calendar win.
+- `cssLayers: false` (in Angular `provideDzCalendar({ cssLayers: false })`;
+  the first calendar of a document decides): the same CSS outside any layer,
+  inserted first. Its class selectors outweigh a reset's `*` and element
+  rules; a rule of yours of the same weight, written after, wins.
+- Checked in Chrome against the real Tailwind 3 preflight, Bootstrap 5.3
+  reboot and Tailwind 4's layered preflight (`npm run test:browser`): every
+  element of a week, a month and a list keeps the borders, paddings, margins
+  and colours it has on a bare page. The one thing a reset still changes is a
+  pointer cursor on events (they are `role="button"`).
+
+**Under a Content-Security-Policy without inline styles** (`injectStyles:
+false`): include `DZ_CSS`, `LIST_CSS`, `MULTIMONTH_CSS` (from their entries)
+and, for a `defineTheme` theme, `themeCss('clinic')` in your own stylesheet.
+
+**In a shadow root**, load the theme CSS inside the root; its sizes are on `:root, :host`.
+
+## 3. Change the colours — tokens
+
+The palette is shared with tzslot (`--tz-*`), so a page using both libraries
+sets it once. The calendar's own tokens are `--dz-*`.
+
+| Token | What |
+|---|---|
+| `--tz-bg`, `--tz-bg-raised` | backgrounds (page, raised: popovers, outside days) |
+| `--tz-fg`, `--tz-fg-muted` | text, secondary text |
+| `--tz-border` | lines |
+| `--tz-accent`, `--tz-accent-fg` | accent (today, selected view, focus) and the text on it |
+| `--tz-danger`, `--tz-warning` | refusals; clock-change marks |
+| `--tz-radius`, `--tz-font` | corner radius, font |
+| `--dz-today-bg`, `--dz-now` | today's column/cell; the current-time line |
+| `--dz-event-bg`, `--dz-event-fg`, `--dz-event-accent` | events (by default derived from the accent or the event's tone) |
+| `--dz-tone-<name>` | named event tones (`tone: 'green'` on an event) |
+| `--dz-height`, `--dz-minute`, `--dz-bar-height`, `--dz-gutter-width` | sizes |
+| `--dz-allday-max` | how tall the all-day row grows before it scrolls |
+
+```css
+:root { --tz-accent: #0a7d5a; }      /* any family follows: the page first */
+.dz-cal { --dz-radius: 2px; }
+```
+
+**The page first.** A family (ready-made or `defineTheme`) gives *defaults*
+(`--dzp-*`); the calendar reads `--dz-x`, else the page's `--tz-x` (set on
+`:root` or any ancestor), else the family's, else a system colour. So a
+`--tz-accent` on `:root` recolours a calendar in `'slate'` too. The flip side:
+a page loading tzslot's theme (which sets `--tz-*` on `:root`) shows tzslot's
+palette whatever family is chosen. The palette is resolved on `.dz-cal`: set
+`--tz-*` on the calendar or an ancestor, not on an event (events have
+`--dz-event-*` and tones).
+
+A value may be a `light-dark(light, dark)` pair where the browser supports it
+(Safari 17.5+); a family's own light and dark need no such support.
+
+## 4. A theme of your own
+
+```ts
+import { defineTheme } from '@dzcalendar/dom';
+defineTheme('clinic', {
+  accent: ['#0a7d5a', '#3ddc97'],          // [light, dark]
+  bg: ['#ffffff', '#0f1915'],
+  radius: '4px',
+  tones: { urgent: ['#b91c1c', '#f87171'] },
+});
+createCalendar(host, { theme: 'clinic' });
+```
+
+It is injected in the `dzcalendar.theme` layer (outside any layer with
+`cssLayers: false`), so your plain CSS still wins, and so does a `--tz-*` of
+your page. Only the tokens listed above are accepted; values are checked (no
+`;`, `{`, `url(` …). Defined again, calendars using it follow at once, in
+shadow roots too.
+In SCSS, the theme's variables are `!default`:
+`@use '@dzcalendar/theme/dzcalendar' with ($accent: (#0a7d5a, #3ddc97));`.
+
+## 5. Calendars of the dates
+
+- `displayCalendar: 'islamic-umalqura'` writes titles, day numbers and labels
+  in that calendar (any Intl calendar: `persian`, `hebrew`…). Data and grids
+  stay Gregorian.
+- `secondaryCalendar: 'islamic-umalqura'` shows that calendar's day beside
+  each date (its month on the 1st), in headings and in what a screen reader
+  says; it is not shown when it is the calendar already displayed. For an
+  Arabic Hijri calendar with the Gregorian date beside it:
+  `{ locale: 'ar-SA', displayCalendar: 'islamic-umalqura', secondaryCalendar: 'gregory' }`
+  (write `displayCalendar` explicitly: engines differ on `ar-SA`'s default).
+- Titles name every month of the display calendar the period covers (a
+  Gregorian month in Hijri reads "Rabiʻ II – Jumada I 1448 AH"). Week numbers
+  stay ISO/locale weeks. Umm al-Qura through Intl is the civil table, not the
+  sighting-based dates of Ramadan and the Eids. A calendar Intl does not
+  support is refused (RangeError).
+- Browser baseline: Safari / iOS 15.4, Chrome 99, Firefox 97 (cascade
+  layers). Light and dark need no `light-dark()`: each family's two palettes
+  are plain values switched by `scheme`, `[data-theme]` and
+  `prefers-color-scheme`. Where `color-mix()` is missing (Safari before 16.2),
+  tints (events, today, outside days) fall back to the raised background.
+  With `cssLayers: false` the CSS also works before cascade layers.
+
+## 6. Words
+
+See `docs/i18n.md`: English and French built in, Arabic, Spanish and German as
+imports (`import '@dzcalendar/dom/locales/ar'`), `messages: { today: '…' }` to
+change any word, `defineLocale` for a new language.
+
+## 7. Printing
+
+The theme's print sheet prints what scrolls whole, in colour; call
+`cal.preparePrint()` (or set `autoPrint: true`) so everything is mounted and
+no event hides behind "+N".
+
+---
+
+<!-- docs/migrating-from-fullcalendar.md -->
+
+# Moving from FullCalendar
+
+Two tools, used together:
+
+- **`dz-migrate`** (`@dzcalendar/migrate`, a development tool) rewrites the
+  code: imports, plugins, `new Calendar(...)`, the common calls, Angular's
+  `<full-calendar>`. What needs a person is marked `// dz-migrate:`.
+- **`@dzcalendar/compat-fullcalendar`** translates the options object at run
+  time: the application keeps its FullCalendar options and callbacks.
+
+```sh
+npx @dzcalendar/migrate src              # what would change
+npx @dzcalendar/migrate src --write      # rewrite
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/compat-fullcalendar @dzcalendar/theme
+npm uninstall @fullcalendar/core @fullcalendar/daygrid …   # every @fullcalendar/* package
+```
+
+## What `dz-migrate` rewrites
+
+| Before | After |
+|---|---|
+| `import { Calendar } from '@fullcalendar/core'` | `import { createFromFullCalendar } from '@dzcalendar/compat-fullcalendar'` |
+| `new Calendar(el, options)` | `createFromFullCalendar(el, options).calendar` |
+| `calendar.render()` | removed (drawn when made) |
+| `next()`, `prev()`, `today()` | `navigate('next' \| 'prev' \| 'today')` |
+| `changeView(v)` | `update({ view: v })` |
+| `refetchEvents()`, `unselect()`, `destroy()` | `refetch()`, `select(null)`, `destroy()` |
+| types (`CalendarOptions`, `EventClickArg`, `EventApi`…) | the same names from `@dzcalendar/compat-fullcalendar` |
+| plugins (`daygrid`, `timegrid`, `interaction`, `rrule`, `icalendar`, `resource*`) | removed: built in |
+| `@fullcalendar/list`, `multimonth` | `import '@dzcalendar/dom/list'`, `'@dzcalendar/dom/multimonth'` |
+| `@fullcalendar/timeline`, `resource-timeline` | `import '@dzcalendar/pro'` |
+| `@fullcalendar/core/locales/ar` (`es`, `de`) | `import '@dzcalendar/dom/locales/ar'`; `locale: arLocale` → `locale: 'ar'` |
+| Angular: `FullCalendarModule` | `DZ_CALENDAR, DzFullCalendar` |
+| Angular: `<full-calendar [options]="o">` | `<dz-calendar [dzFullCalendar]="o">` |
+| `Calendar` as a type | `CalendarInstance` from `@dzcalendar/dom` |
+| `@fullcalendar/core/locales-all` | the Arabic, Spanish and German imports (English, French built in) |
+
+Marked for a person: `select(start, end)` (here `select({ start, end, allDay })`), `gotoDate(d)` (`update({ date: Temporal.PlainDate.from(d) })`),
+`addEvent(e)` (`run({ type: 'event.create', event })`), `getEventById`,
+`getEvents` (`kernel.store.snapshot`), `setOption(k, v)` (`update({ … })`),
+`on` / `off` (the callbacks), Angular's `getApi()` (the `CalendarController`).
+Left and said: `import * as FC from '@fullcalendar/core'` (import the names).
+
+## What the options become
+
+See `docs/behaviors/fullcalendar-options.md`. In short: the same views,
+dates and events, each in its zone. A time without a zone is read in the
+calendar's zone, and said. Days count from Monday = 1. Colours become tones
+(the colour is kept in `extendedProps.color`). Callbacks receive plain
+objects (`event.start` is a `Date`); a refused move is undone with
+`revert()`. The height is CSS (`--dz-height`).
+
+`createFromFullCalendar(el, options)` returns `{ calendar, problems,
+detach }`: read `problems` once — every guess and every option without an
+equivalent is there (`zone-guessed`, `compat-unsupported`).

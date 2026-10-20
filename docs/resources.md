@@ -4,7 +4,7 @@ A resource is whatever events are booked on. Resource views draw one column
 per resource and date; each column shows its resource's events, its own
 business hours (read in its own zone), and checks its own rules. Everything
 here is in `@dzcalendar/core` and `@dzcalendar/dom` (MIT); the timeline comes
-with `@dzcalendar/pro` (Phase 15b).
+with `@dzcalendar/pro`.
 
 ```ts
 createCalendar(host, {
@@ -75,8 +75,7 @@ interface ResourceInput {
   nothing); `update({ resourceOrder, resourceGroupField })` reorders.
 - An event goes on resources with `resourceId` or `resourceIds`. An event
   on two resources is drawn in both columns. Events on no resource are not
-  shown in resource views (owner's decision; an "unassigned" column may come
-  with the timeline).
+  shown in resource views (the timeline has an "Unassigned" row).
 - No resources at all (none given, or not loaded yet): "No resources to
   show" in place of the columns (`noResources`, `.dz-empty`).
 - Slots: `availableSlots` entries with a `resourceId` show in that
@@ -85,7 +84,7 @@ interface ResourceInput {
 
 ## Zones and hours
 
-Every column is drawn in the calendar's zone (owner's decision, K.6). A
+Every column is drawn in the calendar's zone. A
 resource's `timeZone` is where its hours are read: a doctor in Riyadh open
 08:00–12:00 is shaded outside 07:00–11:00 in Paris in October, and outside
 06:00–10:00 from the 25th, when Paris falls back an hour. A resource without

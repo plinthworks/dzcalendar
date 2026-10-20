@@ -72,7 +72,8 @@ function typescript(name) {
         // Languages, one import each: `import '@dzcalendar/dom/locales/ar'`.
         ...Object.fromEntries(['ar', 'es', 'de'].map((l) => [`./locales/${l}`, { types: `./locales/${l}.d.ts`, default: `./locales/${l}.js` }])),
       }),
-      ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' } }),
+      // The commands as JSON Schema, for an assistant in the host application (npm run gen:schema).
+      ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' }, './commands.schema.json': './commands.schema.json' }),
       // The timeline without a screen (a server, a worker): `@dzcalendar/pro/model`.
       ...(name === 'pro' && {
         './model': { types: './model-entry.d.ts', default: './model-entry.js' },
@@ -94,6 +95,7 @@ function typescript(name) {
     ...(name === 'migrate' && { bin: { 'dz-migrate': './cli.js' } }),
   };
   writeFileSync(join(dir, 'dist', 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
+  if (name === 'core') cpSync(join(root, 'site', 'commands.schema.json'), join(dir, 'dist', 'commands.schema.json'));
   extras(name);
 }
 

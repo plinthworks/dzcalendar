@@ -1,0 +1,14 @@
+{
+  "name": "bench-fullcalendar-6",
+  "private": true,
+  "description": "FullCalendar 6, installed only here, used through its public API (CLEANROOM: its code is never read).",
+  "dependencies": {
+    "@fullcalendar/core": "6.1.21",
+    "@fullcalendar/daygrid": "6.1.21",
+    "@fullcalendar/timegrid": "6.1.21",
+    "@fullcalendar/list": "6.1.21",
+    "@fullcalendar/interaction": "6.1.21",
+    "@fullcalendar/luxon3": "6.1.21",
+    "luxon": "3.7.2"
+  }
+}

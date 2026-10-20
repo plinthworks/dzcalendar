@@ -1,0 +1,9 @@
+{
+  "name": "bench-fullcalendar-7",
+  "private": true,
+  "description": "FullCalendar 7, installed only here, used through its public API (CLEANROOM: its code is never read).",
+  "dependencies": {
+    "fullcalendar": "7.1.0",
+    "temporal-polyfill": "1.0.5"
+  }
+}

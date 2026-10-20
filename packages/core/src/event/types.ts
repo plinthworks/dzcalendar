@@ -57,7 +57,7 @@ export interface EventInput {
   durationEditable?: boolean;
   resourceEditable?: boolean;
   classNames?: readonly string[];
-  /** A token name (`--dz-tone-<tone>`), not a colour: themes decide what it looks like. */
+  /** A tone, not a colour (`--dz-tone-<tone>`): `blue`, `green`, `red`, `amber`, `violet`, `slate` in the themes shipped, or one an application defines. */
   tone?: string;
   url?: string;
   extendedProps?: Readonly<Record<string, unknown>>;

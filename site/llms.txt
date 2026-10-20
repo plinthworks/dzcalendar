@@ -1,0 +1,55 @@
+# DzCalendar
+
+> A calendar and scheduler written on Temporal: every event keeps its own time zone, days of 23 h, 25 h or 23 h 30 are shown for what they are, recurrence is RFC 5545, and every change is a serializable command. Vanilla JS, Angular, React, Vue and a Web Component; resources, a timeline, bookable slots, an editor, printing and exports. MIT.
+
+Rules an assistant writing DzCalendar code should keep:
+
+- Moments are Temporal values or ISO 8601 strings with IANA zones — `2026-10-21T09:00[Europe/Paris]`, a date `2026-10-21` for all-day. Never a JS `Date` (it is refused: `date-object-rejected`).
+- Every event keeps its own zone; the calendar draws in its `timeZone`. Days of 23 h or 25 h are shown for what they are: the missing hour marked, the repeated hour twice, real lengths said; `timeGrid: { axis: 'elapsed' }` draws them to scale.
+- Weekdays are ISO: Monday = 1 … Sunday = 7.
+- Every change is a command (`calendar.run({ type: 'event.move', … })`), plain data described by `commands.schema.json`; undo and redo come with it.
+- Bad data never throws: an event or a command that cannot be taken becomes a Problem `{ code, severity, path, detail }` (`run()` returns `{ ok: false, problems }`; `kernel.getProblems()?.problems` for the last events loaded), every guess a warning. Options are the exception: `createCalendar` and `update` throw a `RangeError` on one they cannot take.
+- Colours are tones (`tone: 'amber'`; the themes have blue, green, red, amber, violet, slate), themes decide what they look like.
+
+## Docs
+
+- [Getting started — @dzcalendar/core, @dzcalendar/dom](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/getting-started.md): A calendar and scheduler on Temporal: every event keeps its own time zone, and days of 23 h, 25 h or 23 h 30 are shown for what they are — the hour that does not exist marked, the repeated hour shown twice, real lengths said (and drawn to scale with `timeGrid: { axis: 'elapsed' }`). No `Date` anywhere: moments are Temporal values or ISO 8601 strings with IANA zones.
+- [DzCalendar in Angular — @dzcalendar/angular, @dzcalendar/pro-angular](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/angular.md): Angular 19 to 22, zoneless or zone.js, signals only.
+- [DzCalendar in React — @dzcalendar/react, @dzcalendar/pro-react](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/react.md): React 18 and 19.
+- [DzCalendar in Vue — @dzcalendar/vue, @dzcalendar/pro-vue](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/vue.md): Vue 3.4 and 3.5.
+- [The Web Component — @dzcalendar/element](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/element.md): `<dz-calendar>` for any page or framework (plain HTML, React, Vue, Svelte, a CMS).
+- [Resources — one column per doctor, room or machine](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/resources.md): A resource is whatever events are booked on. Resource views draw one column per resource and date; each column shows its resource's events, its own business hours (read in its own zone), and checks its own rules. Everything here is in `@dzcalendar/core` and `@dzcalendar/dom` (MIT); the timeline comes with `@dzcalendar/pro`.
+- [Timeline — @dzcalendar/pro](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/timeline.md): Resources in rows, time running along. The axis is **elapsed**: a position is real time since the start, so an event is as long on screen as it lasts, a 25-hour day is 25 hours wide and a 23-hour one 23. The slots are cut on the wall clock: on a fall-back night 02:00 happens twice — the second marked `02:00*`, both named with their offsets — and on a spring-forward night there is no 02:00 at all.
+- [Bookable slots — @dzcalendar/slots](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/slots.md): When can this provider be booked? The engine takes the provider's hours (in the provider's own zone), what is already busy, and the booking rules, and returns the free slots. Pure Temporal, no clock read, no DOM: the page and the server run the same code and get the same answer.
+- [The event editor — @dzcalendar/pro/editor](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/editor.md): A ready-made editor: a modal dialog with the usual recurrences. It opens on an event, an occurrence of a series, or a new event; it saves through the calendar's history (checked against its rules, undoable with Ctrl+Z) and resolves with what happened.
+- [Printing and exports — @dzcalendar/pro/print, @dzcalendar/pro/export](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/export.md): No dependency: the PDF, the zip of an XLSX and its XML, the CSV and the iCalendar text are written here; each sub-entry is loaded on demand. Bad input never throws: a result carries `problems` (`invalid-export`: an unknown view, a range ending before it starts, a paper that is not `a4`, `letter` or `a3`).
+- [Motion — @dzcalendar/dom hooks, @dzcalendar/motion-gsap](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/motion.md): Animation hooks on every change (WAAPI by default, nothing with prefers-reduced-motion) and the optional GSAP adapter with its presets and effects.
+- [Languages](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/i18n.md): Locales: the words of the calendar (English and French built in; Arabic, Spanish, German as imports; defineLocale), right to left, Hijri and other display calendars.
+- [Theming DzCalendar](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/theming.md): A calendar that looks right with one import, and that an application can change entirely without fighting it.
+- [Moving from FullCalendar](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/docs/migrating-from-fullcalendar.md): dz-migrate rewrites FullCalendar code (imports, new Calendar, calls, Angular templates); @dzcalendar/compat-fullcalendar translates its options at run time, every guess said.
+
+- [commands.schema.json](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/site/commands.schema.json): every command, an event and a slot query as JSON Schema — what `calendar.run()` and `findSlots()` take (also `@dzcalendar/core/commands.schema.json` in the published package).
+
+## Packages
+
+- `@dzcalendar/core`: Calendar model on Temporal: events with their own time zone, DST-correct days. No DOM, no framework, no Date.
+- `@dzcalendar/dom`: DzCalendar in plain DOM: views, rendering, interactions. No framework; wrappers sit on top.
+- `@dzcalendar/theme`: An optional stylesheet for DzCalendar, of one family with @tzslot/theme. Plain CSS, no framework.
+- `@dzcalendar/rrule`: RFC 5545 recurrence rules on Temporal: wall-clock days across clock changes, elapsed-time hours. No event model.
+- `@dzcalendar/ical`: iCalendar (RFC 5545) for DzCalendar: parse and write VEVENTs with their real time zones, and an iCal event source.
+- `@dzcalendar/slots`: Bookable slots for DzCalendar: weekly hours and exceptions in the provider's zone, minus what is busy, with buffers, notice, horizon and a daily cap. Pure, browser and Node.
+- `@dzcalendar/angular`: DzCalendar for Angular 19+: signals only — signal inputs, model(), output(), a CalendarController of signals, templates for events. Zoneless or zone.js.
+- `@dzcalendar/react`: DzCalendar for React 18 and 19: <DzCalendar> with controlled or free view, date and selection, a calendar controller read with hooks, and events drawn by the application's own components (portals: its context kept).
+- `@dzcalendar/vue`: DzCalendar for Vue 3.4 and 3.5: <DzCalendar> with v-model:view, v-model:date and v-model:selection, a calendar controller of refs, and an #event-content slot drawn by the application's own components (teleported: its context kept).
+- `@dzcalendar/element`: DzCalendar as a Web Component: <dz-calendar> for any page or framework — in the page (its CSS applies) or isolated in a shadow root; attributes, properties and dz-* DOM events.
+- `@dzcalendar/pro`: DzCalendar Pro: the timeline (resources in rows along an elapsed time axis, a resource area with tree, groups and field columns, windowed in two dimensions), slot capacity, the event and recurrence editor, paged printing and exports (PDF, PNG, XLSX, CSV, ICS) without dependencies. MIT.
+- `@dzcalendar/pro-angular`: DzCalendar Pro for Angular 19+: a dzEventEditor directive on <dz-calendar> (the event and recurrence editor, loaded on its first opening) and the DzExport service (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT.
+- `@dzcalendar/pro-react`: DzCalendar Pro for React 18 and 19: useEventEditor (the event and recurrence editor, loaded on its first opening) and useDzExport (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT.
+- `@dzcalendar/pro-vue`: DzCalendar Pro for Vue 3.4 and 3.5: useEventEditor (the event and recurrence editor, loaded on its first opening) and useDzExport (printing, PDF, PNG, XLSX, CSV, ICS, loaded on first use). The timeline views come with `import '@dzcalendar/pro'`. MIT.
+- `@dzcalendar/motion-gsap`: Optional GSAP motion for DzCalendar: presets sober and expressive; zone glides, DST unfolding, the title odometer, month → day morph, drag tilt and magnetic slots, dissolving deletes, overlays from their origin, timeline accordion — reduced-motion aware; plugins given by the application.
+- `@dzcalendar/compat-fullcalendar`: Moving from FullCalendar: an application's FullCalendar options translated to DzCalendar at run time — views, zones, events and sources, editing, rules, callbacks, resources — with every guess and every option without an equivalent said.
+- `@dzcalendar/migrate`: dz-migrate: rewrites a FullCalendar application for DzCalendar — imports and plugins, new Calendar(...), the common calendar calls, Angular's <full-calendar> — and marks what needs a person (// dz-migrate:). A tool: never a dependency of an application.
+
+## Optional
+
+- [llms-full.txt](https://raw.githubusercontent.com/plinthworks/dzcalendar/main/site/llms-full.txt): this documentation in one file.

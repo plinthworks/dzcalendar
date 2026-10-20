@@ -4,19 +4,22 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–17 and 18a–18c, each committed (`git log --oneline`:
-  the last is titled "Phase 18c"). Every check green at that commit: `npm
-  test` (1 305), `npm run test:ci`, `typecheck`, `build`, `size`,
+- **Done:** Phases 0–18 (18a–18d), each committed (`git log --oneline`:
+  the last is titled "Phase 18d"). Every check green at that commit: `npm
+  test` (1 315), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
   `test:browser`, `perf:browser`, `test:package` (Angular 19–22, `ng add`,
-  `dz-migrate`, React 18/19, Vue 3.4/3.5). One timing over by noise, the
-  same at the 18a commit (measured alternately in a worktree):
-  `normalize+index 10k` (bench, 70–81 ms against 70).
-- **Now: Phase 18d** (`llms.txt`, `commands.schema.json`, the public
-  benchmark against FullCalendar as a black box). Next step: 18d's open
-  questions to the owner (in French), then code.
+  `dz-migrate`, React 18/19, Vue 3.4/3.5); `gen:schema --check`,
+  `gen:llms --check`. `bench:public` measured (docs/benchmark.md).
+- **Now: the real test** — Sehhaty's agent (session `sehhaty-c5`)
+  duplicates an agenda screen of Sehhaty with DzCalendar from the tarballs
+  of `npm run pack:local`; what it hits comes back here.
+- **Then, from the benchmark:** first render (the kernel reads and indexes
+  every event at creation: 80 % of a 10 000-event month's first render) and
+  size (122 kB against FullCalendar 7's 95 kB) — the two numbers where
+  FullCalendar 7 is ahead.
 - **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
   that URL; the owner authorised pushing on 2026-10-18).
-- **Left after it:** 18d (llms.txt, schema, benchmark), 19+ native (Swift/Kotlin from
+- **Left after it:** 19+ native (Swift/Kotlin from
   `conformance/`, then SwiftUI/Compose).
 - **How a phase is run** (owner's rule): decisions validated with the owner
   (in French) before coding → implement → two reviews in parallel
@@ -2120,4 +2123,88 @@ See `ARCHITECTURE.md` J. Phase 17.
   sources are compared by identity (an inline spec refetches each render) —
   both said in the docs.
 - Vue's events' content injects the first controller given.
+
+
+## Phase 18d — llms.txt, commands.schema.json, the public benchmark ✅ (2026-10-20)
+
+### Owner's decisions (2026-10-20)
+
+- **`commands.schema.json`** generated from the TypeScript types (the
+  generator a dependency of the script only); a test fails when the shipped
+  schema differs from the types, and example commands are validated against
+  it. **Scope:** every command, an event (`EventInput`) and the `find-slots`
+  query — what an assistant needs to write.
+- **`llms.txt` and `llms-full.txt`** (llmstxt.org): a short index and the
+  whole documentation, generated from `docs/` and checked by a test.
+- **Benchmark: DzCalendar against FullCalendar**, same scenarios, same
+  machine, Chrome, minified — times, memory, size — and a table of
+  observable correctness (23 h / 25 h days, Lord Howe, Apia 2011).
+  FullCalendar installed only in `bench-public/`, through its public API,
+  its code never read (CLEANROOM). Protocol and results published.
+- **FullCalendar 7 (June 2026) is on Temporal** for named zones (no Luxon
+  plugin; still `Date` objects in its API). Measured against **both 6.1.21
+  (with luxon) and 7.1.0**; the analysis « DzCalendar face à FullCalendar.md »
+  gets a FullCalendar 7 section at the end of 18d (owner, 2026-10-20).
+- **After 18d (owner):** a real test — Sehhaty's agent duplicates an agenda
+  screen of Sehhaty using DzCalendar; what it hits is fed back here.
+
+### Built
+
+- **`commands.schema.json`** (`npm run gen:schema`, `scripts/gen-schema.mjs`):
+  the TypeScript compiler reads `Command`, `EventInput`, `SlotQuery` — every
+  command closed (`additionalProperties: false`), Temporal values as ISO
+  strings described with examples, shared `$defs` (`TemporalInput`,
+  `Moment`, `WallTime`, `DurationLike`, whole-number fields), `start`
+  required on an event, comments as descriptions. In `site/` and, published,
+  `@dzcalendar/core/commands.schema.json`. A test fails when it differs from
+  the types; 20 hand-written commands (every type) pass ajv **and run**, 11
+  are refused.
+- **`llms.txt`, `llms-full.txt`** (`npm run gen:llms`): the llmstxt.org
+  index (rules an assistant keeps, the docs, the schema, the packages) and
+  the whole documentation; links checked by a test. **`docs/getting-started.md`**
+  (vanilla, its snippet run).
+- **Public benchmark** (`npm run bench:public`): `bench-public/` with
+  FullCalendar 6.1.21 (+ Luxon) and 7.1.0 isolated, lockfiles, three minified
+  pages, 7 interleaved runs (median, spread), first render / update /
+  navigation with main-thread work from CDP, events shown, elements, JS heap,
+  size, and the days that are not 24 hours long (two references neutralise
+  each library's margin). `docs/benchmark.md`, `site/benchmark.json`; the
+  analysis « DzCalendar face à FullCalendar.md » has a section on it;
+  CLEANROOM.md a paragraph on `bench-public/`.
+- **core:** an unknown `scope` is `invalid-edit` (it was read as
+  "following" and cut a series); an occurrence key is read without its
+  offset, as an instant, or as `series@start` (`key`, `series.split.at`);
+  `EventPatch` takes `null` on `end`, `groupId`, `tone`, `url`.
+
+### Reviews (architect; code review by execution in Chrome), fixed
+
+- `scope: 'thisAndFollowing'` (any unknown scope) deleted four occurrences:
+  refused now. `key: '2026-10-21T08:00[Europe/Paris]'` named nothing: read.
+  The schema had no way to clear a field: `null`.
+- The correctness table compared FullCalendar against a metric it does not
+  claim, and hid that DzCalendar's default wall axis fails the same two
+  cases: the measure is now named, and the text says it.
+- "Drawn as they are" (docs, llms.txt) said more than the wall axis does:
+  "shown for what they are", the elapsed axis named.
+- The pages did not draw the same events (different "+N" limits): the same
+  limits, and the events shown in the tables. Update and navigation were at
+  the frame floor: main-thread work added. FullCalendar's margin biased the
+  ratios (6.12 for 6): two references. "Two thirds" was not measured: the
+  kernel is timed apart (80 %). The size note blamed the polyfill
+  FullCalendar 7 also ships: corrected.
+- `tone: 'warning'` (not a tone) in llms.txt and the tests; internal words
+  (Phase, ARCHITECTURE, owner's decision) in public docs and package
+  descriptions; `getProblems()` described as a list; "never throws" too
+  broad; 8 of 11 command types tested; `$id` a page, not a schema: all fixed.
+- Bench robustness: a busy port is said, page errors checked, versions by
+  commit.
+
+### Not done in Phase 18d, on purpose
+
+- No release to npm, no site: `site/` holds the generated files; links point
+  at the repository's raw files.
+- The benchmark measures and says; it does not optimise (first render,
+  size: next).
+- A slot query's unknown `busy.kind` is refused by the schema but read as a
+  booking by the engine (left as is, noted).
 

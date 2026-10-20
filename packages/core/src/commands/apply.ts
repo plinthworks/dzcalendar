@@ -15,6 +15,30 @@ import type { StoreSnapshot } from '../store/store.js';
 import type { Command, CommandContext, CommandResult, EventPatch, Reach } from './types.js';
 import { patchEvent, toInput } from './patch.js';
 import { parseRRule } from '@dzcalendar/rrule';
+import { Temporal } from '../temporal.js';
+import type { ZonedDateTime } from '../temporal.js';
+
+const SCOPES = new Set(['this', 'following', 'all']);
+
+/**
+ * An occurrence's key as the series writes it (`ZonedDateTime.toString()`,
+ * `2026-10-21T08:00:00+02:00[Europe/Paris]`; a date for an all-day series),
+ * from what a person or an assistant may write: the wall time without the
+ * offset (`2026-10-21T08:00[Europe/Paris]`, or no zone: the series'), an
+ * instant (`…Z`). Anything else is left as given (it then names no occurrence).
+ */
+function keyOf(sr: Series, key: string): string {
+  const base = sr.base.start;
+  if (sr.base.allDay || base instanceof Temporal.PlainDate) return key.length > 10 && /^\d{4}-\d{2}-\d{2}/.test(key) ? key.slice(0, 10) : key;
+  const zone = (base as ZonedDateTime).timeZoneId;
+  try {
+    if (/\[.+\]$/.test(key)) return Temporal.ZonedDateTime.from(key, { offset: 'prefer' }).withTimeZone(zone).toString();
+    if (/(Z|[+-]\d{2}:?\d{2})$/i.test(key)) return Temporal.Instant.from(key).toZonedDateTimeISO(zone).toString();
+    return Temporal.PlainDateTime.from(key).toZonedDateTime(zone).toString();
+  } catch {
+    return key;
+  }
+}
 
 const WKST = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'] as const;
 
@@ -49,6 +73,11 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
 
   /** Resolves `id` (+ `key`, `scope`) against the current state; reports and returns null when it names nothing editable. */
   function target(id: string, reach: Reach, path: string, deleting = false): Target | null {
+    // A scope that is none of the three is refused, never read as another (an unknown one once cut a series).
+    if (reach.scope !== undefined && !SCOPES.has(reach.scope)) {
+      problems.push(problem('invalid-edit', 'error', `${path}.scope`, String(reach.scope)));
+      return null;
+    }
     const ev = current.getEvent(id);
     if (ev) {
       // An override stands for its occurrence: deleting it, or reaching past it, goes through the series.
@@ -57,9 +86,10 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
     }
     const sr = current.getSeries(id);
     // No key: the series as a whole, anchored on its first start (even when DTSTART itself is excluded or off-rule).
-    if (sr) return { kind: 'occurrence', ref: { seriesId: id, key: reach.key ?? firstKey(sr) }, scope: reach.scope ?? (reach.key === undefined ? 'all' : 'this') };
+    if (sr) return { kind: 'occurrence', ref: { seriesId: id, key: reach.key !== undefined ? keyOf(sr, reach.key) : firstKey(sr) }, scope: reach.scope ?? (reach.key === undefined ? 'all' : 'this') };
     const k = parseInstanceKey(id);
-    if ('seriesId' in k && current.getSeries(k.seriesId)) return { kind: 'occurrence', ref: { seriesId: k.seriesId, key: k.key }, scope: reach.scope ?? 'this' };
+    const of = 'seriesId' in k ? current.getSeries(k.seriesId) : undefined;
+    if ('seriesId' in k && of) return { kind: 'occurrence', ref: { seriesId: k.seriesId, key: keyOf(of, k.key) }, scope: reach.scope ?? 'this' };
     problems.push(problem('unknown-event', 'error', `${path}.id`, id));
     return null;
   }
@@ -199,11 +229,12 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
         return pushAll(deleteSeries(current, sr));
       }
       case 'series.split': {
-        if (!current.getSeries(c.id)) {
+        const sr = current.getSeries(c.id);
+        if (!sr) {
           problems.push(problem('unknown-event', 'error', `${path}.id`, c.id));
           return false;
         }
-        const r = editOccurrence(current, { seriesId: c.id, key: c.at }, c.patch ?? {}, 'following', ctx.normalize, path, problems, {}, true);
+        const r = editOccurrence(current, { seriesId: c.id, key: keyOf(sr, c.at) }, c.patch ?? {}, 'following', ctx.normalize, path, problems, {}, true);
         return r.ok && pushAll(r.mutations);
       }
       case 'event.repeat': {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyCommand, createEventStore, createHistory, createIdGenerator, normalizeMany } from '../src/index.js';
+import { Temporal, applyCommand, createEventStore, createHistory, createIdGenerator, createKernel, normalizeMany, viewWindow } from '../src/index.js';
 import type { CommandContext, Command, StoreSnapshot } from '../src/index.js';
 
 const ctx = (): CommandContext => ({ normalize: { displayZone: 'Europe/Paris', newId: createIdGenerator('c') } });
@@ -284,5 +284,45 @@ describe('history', () => {
     while (h.undo()) undos++;
     expect(undos).toBe(2);
     expect(store.snapshot.getEvent('a')).toBeDefined();
+  });
+});
+
+describe('after the 18d review: what an assistant writes', () => {
+  // A daily series from Monday 19 October 2026 08:00 in Paris, ten days (Paris +02:00 until the 25th, +01:00 after).
+  const setup = () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: () => Temporal.Instant.from('2026-10-21T08:00:00Z') });
+    k.run({ type: 'event.create', event: { id: 's', title: 'Garde', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 1 }, rrule: 'FREQ=DAILY;COUNT=10' } });
+    return k;
+  };
+  const days = (k: ReturnType<typeof setup>) => k.store.snapshot.queryInstances(viewWindow(Temporal.PlainDate.from('2026-10-01'), Temporal.PlainDate.from('2026-12-01'), 'Europe/Paris')).map((i) => String(i.event.start).slice(8, 10));
+
+  it('a scope that is none of this, following, all is refused: nothing changes', () => {
+    const k = setup();
+    const r = k.run({ type: 'event.delete', id: 's', key: '2026-10-25T08:00:00+01:00[Europe/Paris]', scope: 'thisAndFollowing' as never });
+    expect([r.ok, r.ok ? [] : r.problems.map((p) => `${p.code} ${p.path} ${p.detail}`), days(k).length]).toEqual([false, ['invalid-edit command.scope thisAndFollowing'], 10]);
+  });
+
+  it('an occurrence named by its wall time without the offset, by an instant, or as series@start', () => {
+    const k = setup();
+    // The 21st (+02:00), the 26th (+01:00: 07:00Z is 08:00 in Paris), the 27th by the instance key without its offset.
+    const a = k.run({ type: 'event.delete', id: 's', key: '2026-10-21T08:00[Europe/Paris]' });
+    const b = k.run({ type: 'event.delete', id: 's', key: '2026-10-26T07:00:00Z' });
+    const c = k.run({ type: 'event.delete', id: 's@2026-10-27T08:00[Europe/Paris]' });
+    expect([a.ok, b.ok, c.ok, days(k)]).toEqual([true, true, true, ['19', '20', '22', '23', '24', '25', '28']]);
+  });
+
+  it('series.split at a start written without its offset', () => {
+    const k = setup();
+    const r = k.run({ type: 'series.split', id: 's', at: '2026-10-24T08:00[Europe/Paris]', patch: { title: 'Garde B' } });
+    const titles = k.store.snapshot.queryInstances(viewWindow(Temporal.PlainDate.from('2026-10-01'), Temporal.PlainDate.from('2026-12-01'), 'Europe/Paris')).map((i) => i.event.title);
+    expect([r.ok, titles.filter((t) => t === 'Garde').length, titles.filter((t) => t === 'Garde B').length]).toEqual([true, 5, 5]);
+  });
+
+  it('null in a patch takes the field away', () => {
+    const k = setup();
+    k.run({ type: 'event.create', event: { id: 'a', title: 'A', start: '2026-10-21T09:00[Europe/Paris]', end: '2026-10-21T11:00[Europe/Paris]', tone: 'amber', url: 'https://example.org' } });
+    k.run({ type: 'event.update', id: 'a', patch: { tone: null, url: null } });
+    const e = k.store.snapshot.getEvent('a')!;
+    expect([e.tone, e.url]).toEqual([undefined, undefined]);
   });
 });
