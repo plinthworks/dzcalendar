@@ -9,8 +9,9 @@ Two tools, used together:
   time: the application keeps its FullCalendar options and callbacks.
 
 ```sh
-npx @dzcalendar/migrate src              # what would change
-npx @dzcalendar/migrate src --write      # rewrite
+npm install -D @dzcalendar/migrate
+npx dz-migrate src              # what would change
+npx dz-migrate src --write      # rewrite
 npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/compat-fullcalendar @dzcalendar/theme
 npm uninstall @fullcalendar/core @fullcalendar/daygrid …   # every @fullcalendar/* package
 ```
@@ -53,3 +54,26 @@ objects (`event.start` is a `Date`); a refused move is undone with
 `createFromFullCalendar(el, options)` returns `{ calendar, problems,
 detach }`: read `problems` once — every guess and every option without an
 equivalent is there (`zone-guessed`, `compat-unsupported`).
+
+## Before publication: installing from tarballs
+
+Until the packages are on npm, they are tarballs (`npm run pack:local` in
+this repository writes them to `packed/`). Install the whole closure, not
+only what you import: `core`, `rrule`, `dom`, `theme`, and with the
+translator `ical` and `compat-fullcalendar` — npm cannot fetch an internal
+dependency it does not find beside the others.
+
+## What changes on the way
+
+- **The zone.** FullCalendar's options rarely name one (theirs is the
+  browser's); the calendar's then is the application's
+  (`provideDzCalendar({ timeZone })`), never silently the browser's.
+- **Every day's events.** FullCalendar shows them all unless `dayMaxEvents`
+  says otherwise: so does the translation (`dayMaxLanes: null`, the weeks
+  grow).
+- **`eventDrop`, `eventResize`, `eventChange`, `eventAdd`, `eventRemove`**
+  follow a person's change (a gesture, the keyboard, the menu, the editor);
+  your own `calendar.run()` is not reported — theirs reports `addEvent` and
+  `setProp` too. Persist from where your code makes the change.
+- **Types**: `view` is never null in the callbacks' arguments.
+

@@ -57,7 +57,14 @@ const events: EventInput[] = [{ id: 'a', title: 'Consultation', start: '2026-10-
   the other changes are applied, the bindings get the real view back; not
   listened to, it goes to `app.config.errorHandler`, else the console).
 - **`#event-content`**: the application's components, teleported into each
-  event — its provides, store, router and i18n reach them.
+  event — its provides, store, router and i18n reach them. A background
+  event (a closed day) comes with `ctx.background`: render something for a
+  label at the top of its column, nothing (an empty `v-if`) for a tint.
+- **`#day-header="{ day }"`**: each day's head (`day.date`, `day.resource`,
+  `day.lengthMinutes`, `day.text`) — a mark, a count, a button.
+- **`@event-change`**: what a person changed (a drag, a resize, the
+  keyboard, the menu, the editor) — persist it, `change.revert()` if the
+  server refuses (exactly that change; false when the event changed again).
 - **The controller**: `createCalendarController()` beside the calendar, or
   `injectCalendarController()` in a component inside it (an event's
   content). Refs: `title`, `view`,
@@ -87,3 +94,21 @@ component goes. Another `:controller` given later takes the calendar over
 (the events' content keeps injecting the first). The editor and the exports
 are fetched on first use. Nothing throws: a
 result's `problems` say what went wrong.
+
+## Notes
+
+- A content hook (or template, slot) now also receives **background
+  events**, in a time grid's columns, with `ctx.background`: return nothing
+  for them to keep a plain tint. The all-day row's and the month's
+  backgrounds stay tints.
+- The day-header hook covers the week, day and month views (a month's
+  column: the first date of that weekday), not a list's day headings.
+- The change output says a person's change — a gesture, the keyboard, the
+  menu, the editor, and their undo / redo (`cause`). A command your code runs
+  with `{ validate: true }` counts as a person's (that is what it means:
+  checked as a gesture is); without it, it is not said.
+- A context-menu hook that returns `null` or `[]` means "no calendar menu
+  here": the browser's own menu opens. An application that opens its own menu
+  from the hook calls `preventDefault()` on the `contextmenu` event itself
+  (the calendar cannot know it did).
+

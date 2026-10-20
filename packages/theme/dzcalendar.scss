@@ -32,7 +32,7 @@ $font: inherit !default;
 
 // ── the calendar's own ───────────────────────────────────────────────────────
 $calendar: (
-  minute: 0.8px,
+  minute: 1.2px, // 72 px an hour: a 30-minute event holds two lines (Sehhaty, 2026-10-20)
   gutter-width: 3.75rem,
   bar-height: 1.375rem,
   height: 40rem,
@@ -50,6 +50,10 @@ $tones: (
   'violet': (#6d28d9, #a78bfa),
   'slate': (#475569, #94a3b8),
 ) !default;
+
+/// The text on a solid event (`eventStyle: 'solid'`): white on the light scheme's dark tones, near-black on the dark scheme's light ones —
+/// not the theme's background, which on an off-white family falls under AA (checked by test for every family and tone).
+$on-tone: (#ffffff, #111827) !default;
 
 /// Ready-made families (`theme: 'slate'` → data-dz-theme): each a (light, dark) palette,
 /// chosen for AA contrast and checked by axe in Chrome. Names are ours; palettes are
@@ -108,6 +112,7 @@ $layer: true !default;
   @each $name, $colour in $tones {
     --dz-tone-#{$name}: #{side($colour, $i)};
   }
+  --dz-on-tone: #{side($on-tone, $i)};
 }
 @mixin family($sel, $palette) {
   #{$sel} { @include vars($palette, 1); }

@@ -210,7 +210,7 @@ describe('KeyedList keeps DOM order', () => {
 describe('CSS that jsdom cannot see', () => {
   it('sizes are read with fallbacks and never declared on .dz-cal (a host value reaches it)', () => {
     expect(DZ_CSS).not.toMatch(/\.dz-cal\s*\{[^}]*--dz-minute\s*:/);
-    expect(DZ_CSS).toContain('var(--dz-minute, 0.8px)');
+    expect(DZ_CSS).toContain('var(--dz-minute, 1.2px)');
     expect(DZ_CSS).toContain('height: var(--dz-height, 40rem)');
   });
 

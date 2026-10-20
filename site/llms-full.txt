@@ -170,6 +170,82 @@ providers: [
 A `motion` given to `provideDzCalendar` or to a calendar wins over
 `provideDzMotion`.
 
+## Everything `<dz-calendar>` takes
+
+**Inputs**: `events`, `sources` (keep each spec the same object), `resources`,
+`timeZone`, `locale`, `axis` (`'wall'` | `'elapsed'`), `editable`,
+`selectable`, `businessHours`, `weekends`, `weekNumbers`, `hiddenDays`,
+`messages`, `theme`, `scheme`, `density`, `displayCalendar`,
+`secondaryCalendar`, `availableSlots`, and **`[options]`** for everything
+else `update()` takes — `firstDay`, `rules`, `nowIndicator`, `scrollTime`,
+`dayMaxLanes` (`'auto'`, a number, or `null`: every event, the weeks grow),
+`eventMaxStack`, `allDaySlot`, `displayEventTime`, `eventStyle`
+(`'tinted'` | `'solid'`), `timeGrid`, `headerViews`, `contextMenu`… All of
+them can change at any time.
+
+**Two-way**: `[(view)]`, `[(date)]`, `[(selection)]`.
+
+**Outputs**: `(dateClick)`, `(eventClick)`, `(eventOpen)`,
+`(createRequest)`, `(slotClick)`, `(selected)`, `(sourceNotice)`,
+`(problems)`, `(resourceProblems)`, and **`(eventChange)`** — what a person
+changed (a drag, a resize, the keyboard, the menu, the editor), not your own
+`run()` nor a source's delivery.
+
+**Templates**: `<ng-template dzEventContent let-event let-ctx="ctx">` for the
+events (a background event — a closed day — gets `ctx.background`: give it
+something to show a label at the top of its column, nothing and it stays a
+tint); `<ng-template dzDayHeader let-day>` for each day's head (`day.date`,
+`day.resource`, `day.lengthMinutes` — 1 380 or 1 500 on a clock change —
+`day.text`, the calendar's own words). Both are your components, in your
+injector, checked when your signals change.
+
+**The controller** (`#cal` then `cal.controller`, or `inject(CalendarController)`
+in a child): signals `state`, `title`, `range`, `view`, `date`, `canUndo`,
+`canRedo`, `loading`, `problems`, `instance`; methods `prev`, `next`,
+`today`, `goTo`, `changeView`, `dispatch` (a command), `undo`, `redo`,
+`refetch`.
+
+## Saving a person's change on the server
+
+```ts
+import type { EventChange } from '@dzcalendar/dom';
+
+@Component({
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar [events]="events()" [editable]="true" (eventChange)="save($event)" />`,
+})
+export class Agenda {
+  private readonly http = inject(HttpClient);
+  save(change: EventChange) {
+    const moved = change.after;
+    if (!moved) return;
+    this.http.patch(`/api/appointments/${moved.id}`, { start: moved.start.toString(), end: moved.end.toString() }).subscribe({
+      // Refused (a slot taken meanwhile): exactly this change is taken back — not "the last one".
+      error: () => change.revert(),
+    });
+  }
+}
+```
+
+`change.command` is the command that was run; `change.changes` lists every
+event and series it touched (`before` / `after`, null when created or
+removed). `revert()` returns false, and changes nothing, when the event was
+changed again since.
+
+## From FullCalendar options
+
+`<dz-calendar [dzFullCalendar]="calendarOptions">` (from
+`@dzcalendar/angular/fullcalendar`, with `@dzcalendar/compat-fullcalendar`)
+lays an application's FullCalendar options on the calendar; it **composes**
+with the inputs and `[options]` — the theme, the zone, a context-menu hook
+given there stay. The zone of `provideDzCalendar` is kept when the
+FullCalendar options name none (theirs is the browser's). `(fullCalendarProblems)`
+lists what was guessed or has no equivalent. See
+`docs/migrating-from-fullcalendar.md`.
+
+Check templates with `ng build`, not `tsc`: only the Angular compiler reads
+them.
+
 ## The Pro
 
 ```ts
@@ -195,6 +271,23 @@ on the first use; each call runs outside the zone and resolves inside it.
 Bad input never throws: a result's `problems` say it (`not-attached` before
 the calendar exists). `import '@dzcalendar/pro'` once registers the
 timeline views.
+
+## Notes
+
+- A content hook (or template, slot) now also receives **background
+  events**, in a time grid's columns, with `ctx.background`: return nothing
+  for them to keep a plain tint. The all-day row's and the month's
+  backgrounds stay tints.
+- The day-header hook covers the week, day and month views (a month's
+  column: the first date of that weekday), not a list's day headings.
+- The change output says a person's change — a gesture, the keyboard, the
+  menu, the editor, and their undo / redo (`cause`). A command your code runs
+  with `{ validate: true }` counts as a person's (that is what it means:
+  checked as a gesture is); without it, it is not said.
+- A context-menu hook that returns `null` or `[]` means "no calendar menu
+  here": the browser's own menu opens. An application that opens its own menu
+  from the hook calls `preventDefault()` on the `contextmenu` event itself
+  (the calendar cannot know it did).
 
 ---
 
@@ -264,6 +357,20 @@ export function Agenda() {
   the calendar keeps its own. A view or date the calendar refused is given
   back (`onViewChange` with the real one) and not tried again until the prop
   changes.
+- **`onEventChange`**: what a person changed (a drag, a resize, the
+  keyboard, the menu, the editor) — persist it, and `change.revert()` if the
+  server refuses (exactly that change, even after another; false when the
+  event changed again since). Your own `controller.dispatch()` is not said.
+  ```tsx
+  onEventChange={(change) => fetch(`/api/rdv/${change.after?.id}`, { method: 'PATCH', body: JSON.stringify({ start: String(change.after?.start) }) })
+    .then((r) => { if (!r.ok) change.revert(); })}
+  ```
+- **`renderDayHeader={(day) => …}`**: each day's head by your components
+  (`day.date`, `day.resource`, `day.lengthMinutes`, `day.text`) — a mark, a
+  count, a button.
+- A background event (a closed day) reaches `renderEventContent` with
+  `ctx.background`: return something for a label at the top of its column,
+  null for a plain tint.
 - **`renderEventContent`**: the application's components, rendered through
   portals in its own tree — its context, state, router and i18n reach them —
   before the browser paints.
@@ -303,6 +410,23 @@ The editor takes "Open" and "New event here" through the controller
 `onCreateRequest`, until its component goes. The editor and the exports are
 fetched on first use. Nothing throws: a
 result's `problems` say what went wrong.
+
+## Notes
+
+- A content hook (or template, slot) now also receives **background
+  events**, in a time grid's columns, with `ctx.background`: return nothing
+  for them to keep a plain tint. The all-day row's and the month's
+  backgrounds stay tints.
+- The day-header hook covers the week, day and month views (a month's
+  column: the first date of that weekday), not a list's day headings.
+- The change output says a person's change — a gesture, the keyboard, the
+  menu, the editor, and their undo / redo (`cause`). A command your code runs
+  with `{ validate: true }` counts as a person's (that is what it means:
+  checked as a gesture is); without it, it is not said.
+- A context-menu hook that returns `null` or `[]` means "no calendar menu
+  here": the browser's own menu opens. An application that opens its own menu
+  from the hook calls `preventDefault()` on the `contextmenu` event itself
+  (the calendar cannot know it did).
 
 ---
 
@@ -367,7 +491,14 @@ const events: EventInput[] = [{ id: 'a', title: 'Consultation', start: '2026-10-
   the other changes are applied, the bindings get the real view back; not
   listened to, it goes to `app.config.errorHandler`, else the console).
 - **`#event-content`**: the application's components, teleported into each
-  event — its provides, store, router and i18n reach them.
+  event — its provides, store, router and i18n reach them. A background
+  event (a closed day) comes with `ctx.background`: render something for a
+  label at the top of its column, nothing (an empty `v-if`) for a tint.
+- **`#day-header="{ day }"`**: each day's head (`day.date`, `day.resource`,
+  `day.lengthMinutes`, `day.text`) — a mark, a count, a button.
+- **`@event-change`**: what a person changed (a drag, a resize, the
+  keyboard, the menu, the editor) — persist it, `change.revert()` if the
+  server refuses (exactly that change; false when the event changed again).
 - **The controller**: `createCalendarController()` beside the calendar, or
   `injectCalendarController()` in a component inside it (an event's
   content). Refs: `title`, `view`,
@@ -397,6 +528,23 @@ component goes. Another `:controller` given later takes the calendar over
 (the events' content keeps injecting the first). The editor and the exports
 are fetched on first use. Nothing throws: a
 result's `problems` say what went wrong.
+
+## Notes
+
+- A content hook (or template, slot) now also receives **background
+  events**, in a time grid's columns, with `ctx.background`: return nothing
+  for them to keep a plain tint. The all-day row's and the month's
+  backgrounds stay tints.
+- The day-header hook covers the week, day and month views (a month's
+  column: the first date of that weekday), not a list's day headings.
+- The change output says a person's change — a gesture, the keyboard, the
+  menu, the editor, and their undo / redo (`cause`). A command your code runs
+  with `{ validate: true }` counts as a person's (that is what it means:
+  checked as a gesture is); without it, it is not said.
+- A context-menu hook that returns `null` or `[]` means "no calendar menu
+  here": the browser's own menu opens. An application that opens its own menu
+  from the hook calls `preventDefault()` on the `contextmenu` event itself
+  (the calendar cannot know it did).
 
 ---
 
@@ -1340,7 +1488,12 @@ createCalendar(host, { theme: 'slate', scheme: 'auto', density: 'comfortable' })
 - `scheme`: `'auto'` follows the system (`prefers-color-scheme`), `'light'` or
   `'dark'` forces it.
 - `density`: `'compact'`, `'comfortable'`, `'spacious'` — the height of a
-  minute, of a bar, the type size.
+  minute (0.8, 1.2 and 1.6 px: 48, 72 and 96 px an hour), of a bar, the
+  type size. Any other scale: `--dz-minute` (`.agenda { --dz-minute: 2px; }`
+  for 120 px an hour).
+- `eventStyle`: `'tinted'` (the default: a tint of the event's tone, its
+  edge in the tone) or `'solid'` (a block of the tone, its text in the
+  page's background colour — contrast holds in light and dark schemes).
 - All three change live: `cal.update({ theme: 'night', scheme: 'dark' })`. In
   Angular: `<dz-calendar theme="night" scheme="dark" density="compact">`.
 
@@ -1414,6 +1567,8 @@ sets it once. The calendar's own tokens are `--dz-*`.
 | `--dz-event-bg`, `--dz-event-fg`, `--dz-event-accent` | events (by default derived from the accent or the event's tone) |
 | `--dz-tone-<name>` | named event tones (`tone: 'green'` on an event) |
 | `--dz-height`, `--dz-minute`, `--dz-bar-height`, `--dz-gutter-width` | sizes |
+| `--dz-event-radius` | an event's corners (else `--dz-radius`, then tzslot's `--tz-radius`) |
+| `--dz-on-tone`, `--dz-tone-<name>-on` | the text on a solid event (`eventStyle: 'solid'`): the theme's, or a tone's own — give one with a pale tone of yours |
 | `--dz-allday-max` | how tall the all-day row grows before it scrolls |
 
 ```css
@@ -1504,8 +1659,9 @@ Two tools, used together:
   time: the application keeps its FullCalendar options and callbacks.
 
 ```sh
-npx @dzcalendar/migrate src              # what would change
-npx @dzcalendar/migrate src --write      # rewrite
+npm install -D @dzcalendar/migrate
+npx dz-migrate src              # what would change
+npx dz-migrate src --write      # rewrite
 npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/compat-fullcalendar @dzcalendar/theme
 npm uninstall @fullcalendar/core @fullcalendar/daygrid …   # every @fullcalendar/* package
 ```
@@ -1548,3 +1704,25 @@ objects (`event.start` is a `Date`); a refused move is undone with
 `createFromFullCalendar(el, options)` returns `{ calendar, problems,
 detach }`: read `problems` once — every guess and every option without an
 equivalent is there (`zone-guessed`, `compat-unsupported`).
+
+## Before publication: installing from tarballs
+
+Until the packages are on npm, they are tarballs (`npm run pack:local` in
+this repository writes them to `packed/`). Install the whole closure, not
+only what you import: `core`, `rrule`, `dom`, `theme`, and with the
+translator `ical` and `compat-fullcalendar` — npm cannot fetch an internal
+dependency it does not find beside the others.
+
+## What changes on the way
+
+- **The zone.** FullCalendar's options rarely name one (theirs is the
+  browser's); the calendar's then is the application's
+  (`provideDzCalendar({ timeZone })`), never silently the browser's.
+- **Every day's events.** FullCalendar shows them all unless `dayMaxEvents`
+  says otherwise: so does the translation (`dayMaxLanes: null`, the weeks
+  grow).
+- **`eventDrop`, `eventResize`, `eventChange`, `eventAdd`, `eventRemove`**
+  follow a person's change (a gesture, the keyboard, the menu, the editor);
+  your own `calendar.run()` is not reported — theirs reports `addEvent` and
+  `setProp` too. Persist from where your code makes the change.
+- **Types**: `view` is never null in the callbacks' arguments.

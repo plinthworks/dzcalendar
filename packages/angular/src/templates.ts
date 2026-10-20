@@ -1,6 +1,6 @@
 import { Directive, TemplateRef, inject } from '@angular/core';
 import type { CalEvent } from '@dzcalendar/core';
-import type { EventContentCtx } from '@dzcalendar/dom';
+import type { DayHeaderCtx, EventContentCtx } from '@dzcalendar/dom';
 
 /** What an event's template sees: `let-event="event" let-ctx="ctx"` (or the event as `$implicit`). */
 export interface EventContentContext {
@@ -22,3 +22,24 @@ export class DzEventContent {
     return true;
   }
 }
+
+/** What a day's head template sees: `let-day` (or the day as `$implicit`): its date, resource, length, the calendar's words. */
+export interface DayHeaderContext {
+  $implicit: DayHeaderCtx;
+  day: DayHeaderCtx;
+}
+
+/**
+ * `<ng-template dzDayHeader let-day>…</ng-template>` inside `<dz-calendar>`:
+ * every day's head (a week's or a day's date, a month's weekday) — a mark, a
+ * count, a button. Each head's view is checked on its own.
+ */
+@Directive({ selector: 'ng-template[dzDayHeader]', standalone: true })
+export class DzDayHeader {
+  readonly template = inject<TemplateRef<DayHeaderContext>>(TemplateRef);
+
+  static ngTemplateContextGuard(_dir: DzDayHeader, ctx: unknown): ctx is DayHeaderContext {
+    return true;
+  }
+}
+

@@ -267,3 +267,23 @@ describe('after the 18c code review', () => {
     expect([same(new Date(1000), new Date(1500)), same(new Date(1000), new Date(1000)), same(new K(1), new K(1))]).toEqual([false, true, false]);
   });
 });
+
+describe('after Sehhaty’s test (React)', () => {
+  const evs = [
+    { id: 'v', title: 'Vacances', start: '2026-10-23', end: '2026-10-25', allDay: true, display: 'background' as const },
+    { id: 'p', title: '', start: '2026-10-21T12:00[Europe/Paris]', duration: { hours: 1 }, display: 'background' as const },
+  ];
+  it('renderDayHeader: the application’s mark in a day’s head; renderEventContent labels a background, null leaves it mute', async () => {
+    function App() {
+      return h(DzCalendar, {
+        ...base,
+        events: evs,
+        renderDayHeader: (day) => (String(day.date) === '2026-10-23' ? h('button', { className: 'mark' }, `Fermé · ${day.text}`) : day.text),
+        renderEventContent: (e, ctx) => (ctx.background ? (e.title ? h('b', null, e.title) : null) : e.title),
+      });
+    }
+    await act(async () => render(h(App)));
+    const labels = [...el.querySelectorAll('.dz-tg__col .dz-ev--bg')].map((b) => b.textContent ?? '').sort();
+    expect([el.querySelector('.dz-tg__dayhead .mark')?.textContent, labels]).toEqual(['Fermé · ven. 23', ['', 'Vacances', 'Vacances']]);
+  });
+});

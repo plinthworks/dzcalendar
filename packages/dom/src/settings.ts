@@ -1,4 +1,4 @@
-import type { AvailableSlot, Problem, Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection } from '@dzcalendar/core';
+import type { AvailableSlot, CalEvent, Problem, Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection, Series } from '@dzcalendar/core';
 import type { MenuHook, ScopeRequest } from './host.js';
 
 /** A click on an empty day or moment. */
@@ -13,7 +13,36 @@ export type DateClick =
  * without rebuilding anything. One handler per key: what it validates, and
  * what else must follow when it changes.
  */
+/**
+ * What a person changed — a drag, a resize, the keyboard, the menu, the
+ * editor: the command, each event (and series) before and after, and how to
+ * take it back when the server refuses. A program's own `calendar.run()` and a
+ * source's deliveries are not said here.
+ */
+export interface EventChange {
+  /** A command a person asked for, or their undo / redo (Ctrl+Z, `undo()`): persist each. */
+  readonly cause: 'command' | 'undo' | 'redo';
+  /** The command (absent for an undo or a redo). */
+  readonly command?: Command;
+  /** Every event and series it touched: `before` null when created, `after` null when removed. */
+  readonly changes: readonly ({ readonly kind: 'event'; readonly before: CalEvent | null; readonly after: CalEvent | null } | { readonly kind: 'series'; readonly before: Series | null; readonly after: Series | null })[];
+  /** The first event touched (most commands touch one): before and after. */
+  readonly before: CalEvent | null;
+  readonly after: CalEvent | null;
+  /**
+   * Takes back exactly this change (not "the last one"): the server refused
+   * it. False, nothing done, when the events changed again since, or when it
+   * was one step of a merged gesture or a transaction. An undo's revert redoes
+   * that change (a redo's undoes it), whatever else is on the stacks. Called
+   * inside the callback itself (a confirm()), it is done as soon as the change
+   * is. Not said itself as a change.
+   */
+  revert(): boolean;
+}
+
 export interface LiveSettings {
+  /** After a person's change: persist it, and `revert()` it if the server refuses. */
+  readonly onEventChange?: (change: EventChange) => void;
   /** "New event here" from the context menu: the application opens its own editor. */
   readonly onCreateRequest?: (request: CreateRequest) => void;
   /** "Open" from the context menu. */
@@ -22,7 +51,7 @@ export interface LiveSettings {
   readonly editable?: boolean;
   /** A command from the calendar's own UI was refused: why (problems, rule violations). */
   readonly onCommandRefused?: (result: CommandResult, command: Command) => void;
-  /** Keep, reorder, add to or replace the context menu's entries; null leaves the browser's menu. */
+  /** Keep, reorder, add to or replace the context menu's entries; null or [] leaves the browser's menu (an application opening its own calls preventDefault itself). */
   readonly contextMenu?: MenuHook;
   /** Minutes gestures and context-menu moments snap to in a time grid. Default 15. */
   readonly snapMinutes?: number;
@@ -64,6 +93,7 @@ type Handler<K extends keyof LiveSettings> = {
 };
 
 const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
+  onEventChange: {},
   onCreateRequest: {},
   onEventOpen: {},
   editable: {},

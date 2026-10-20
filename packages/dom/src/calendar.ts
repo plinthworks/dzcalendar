@@ -1,9 +1,9 @@
 import { actionsFor, assertBusinessHours, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, Temporal } from '@dzcalendar/core';
-import type { Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
+import type { CalEvent, Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
 import { attachInteractions } from './interact/host.js';
 import type { Interactions } from './interact/host.js';
-import type { LiveSettings } from './settings.js';
+import type { EventChange, LiveSettings } from './settings.js';
 import type { Weekday, ActionItem, CalendarKernel, CreateRequest, DurationLike, EventInput, EventSourceSpec, SourceNotice, EventInstance, KernelOptions, NavDirection, PlainDate, ZoneId } from '@dzcalendar/core';
 import type { CalendarHooks, MenuHook, ViewController, ViewCtx } from './host.js';
 import { viewFactory } from './host.js';
@@ -49,8 +49,8 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly nowIndicator?: boolean;
   /** The view switcher's buttons. Default: month, week, day — those this renderer draws. */
   readonly headerViews?: readonly string[];
-  /** Lanes a month day shows before "+N": a number, or 'auto' (measured). Default 'auto'. */
-  readonly dayMaxLanes?: number | 'auto';
+  /** Lanes a month day shows before "+N": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default 'auto'. */
+  readonly dayMaxLanes?: number | 'auto' | null;
   readonly hooks?: CalendarHooks;
   /**
    * "New event here" from the context menu: the application opens its own
@@ -61,6 +61,10 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly weekends?: boolean;
   /** A number per week: on the month's rows, in the week's corner. Default false. */
   readonly weekNumbers?: boolean;
+  /** The time grid's all-day row; false: none (all-day events are then not shown there). Default true. */
+  readonly allDaySlot?: boolean;
+  /** An event's time beside its title; false: the title alone. Default true. */
+  readonly displayEventTime?: boolean;
   /**
    * A ready-made family ('standard', 'slate', 'night', 'pastel', 'frost',
    * 'solar', 'contrast' — with @dzcalendar/theme) or one made with
@@ -71,6 +75,8 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly scheme?: 'auto' | 'light' | 'dark';
   /** Default 'comfortable'. */
   readonly density?: 'compact' | 'comfortable' | 'spacious';
+  /** Events tinted with their tone's edge ('tinted', the default) or filled blocks of their tone ('solid'). */
+  readonly eventStyle?: 'tinted' | 'solid';
   /**
    * The calendar dates are written in ('islamic-umalqura', 'persian'…; Intl's
    * names). The data and the grids stay Gregorian; titles, numbers and
@@ -130,16 +136,31 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly timeGrid?: KernelOptions['timeGrid'];
   readonly weekends?: boolean;
   readonly weekNumbers?: boolean;
+  readonly allDaySlot?: boolean;
+  readonly displayEventTime?: boolean;
   readonly multiMonthMaxColumns?: number;
   /** The view switcher's buttons; equal lists change nothing. */
   readonly headerViews?: readonly string[];
   readonly theme?: string;
   readonly scheme?: 'auto' | 'light' | 'dark';
   readonly density?: 'compact' | 'comfortable' | 'spacious';
+  readonly eventStyle?: 'tinted' | 'solid';
   readonly displayCalendar?: string | null;
   readonly secondaryCalendar?: string | null;
   /** Options of a plugin's views, by family; compared family by family (a new object for one redraws it). */
   readonly viewOptions?: Readonly<Record<string, unknown>>;
+  /** The line at the current time: on or off at once. */
+  readonly nowIndicator?: boolean;
+  /** Where a time grid is scrolled to when a view is next shown. */
+  readonly scrollTime?: DurationLike;
+  /** Lanes a month day shows before "+N" (a number, 'auto', or null for every event): the month redraws. */
+  readonly dayMaxLanes?: number | 'auto' | null;
+  /** Events side by side in a time grid before "+N" (a number, 'auto', null for all): the week redraws. */
+  readonly eventMaxStack?: number | 'auto' | null;
+  /** The week's first day (ISO, Monday = 1); null: the locale's. */
+  readonly firstDay?: KernelOptions['firstDay'] | null;
+  /** What gestures are held to (constraint, overlap, allow, valid range), replacing the rules given. */
+  readonly rules?: KernelOptions['rules'];
 }
 
 export interface CalendarInstance {
@@ -242,7 +263,8 @@ function withoutCalendar(locale: string): string {
 }
 
 /** A bad theme, scheme or density is a configuration error, said before anything changes. */
-function checkLook(o: { theme?: string | undefined; scheme?: string | undefined; density?: string | undefined }): void {
+function checkLook(o: { theme?: string | undefined; scheme?: string | undefined; density?: string | undefined; eventStyle?: string | undefined }): void {
+  if (o.eventStyle !== undefined && !['tinted', 'solid'].includes(o.eventStyle)) throw new RangeError(`eventStyle is 'tinted' or 'solid': ${o.eventStyle}`);
   if (o.theme !== undefined && !isKnownTheme(o.theme)) throw new RangeError(`unknown theme: ${o.theme} (${THEME_NAMES.join(', ')}, or defineTheme first)`);
   if (o.scheme !== undefined && !['auto', 'light', 'dark'].includes(o.scheme)) throw new RangeError(`scheme is 'auto', 'light' or 'dark': ${o.scheme}`);
   if (o.density !== undefined && !['compact', 'comfortable', 'spacious'].includes(o.density)) throw new RangeError(`density is 'compact', 'comfortable' or 'spacious': ${o.density}`);
@@ -320,7 +342,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   const root = h(doc, 'div', 'dz-cal');
   root.dir = directionOf(kernel.getState().locale);
   // Theme, scheme, density: attributes the stylesheets read.
-  const look = { theme: options.theme ?? 'standard', scheme: options.scheme ?? 'auto', density: options.density ?? 'comfortable' };
+  const look = { theme: options.theme ?? 'standard', scheme: options.scheme ?? 'auto', density: options.density ?? 'comfortable', eventStyle: options.eventStyle ?? 'tinted' };
   checkLook(look);
   const applyLook = () => {
     // Always set: the theme's families (the standard one too) are keyed on it.
@@ -329,6 +351,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     else root.dataset['dzScheme'] = look.scheme;
     if (look.density === 'comfortable') delete root.dataset['dzDensity'];
     else root.dataset['dzDensity'] = look.density;
+    if (look.eventStyle === 'tinted') delete root.dataset['dzEventStyle'];
+    else root.dataset['dzEventStyle'] = look.eventStyle;
     if (options.injectStyles !== false) ensureTheme(host, look.theme, cssLayers);
   };
   applyLook();
@@ -350,6 +374,31 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   });
 
   const settings = createSettings(options);
+  // A person's change (a command run with validation: a gesture, the keyboard, the menu, the editor) is said with its revert.
+  let reverting = false;
+  const revertWith = (fn: () => boolean) => () => {
+    reverting = true;
+    try {
+      return fn();
+    } finally {
+      reverting = false;
+    }
+  };
+  const stopChanges = kernel.subscribe((e) => {
+    if (e.type !== 'store' || reverting) return;
+    const cause = e.change.cause;
+    const person = (cause === 'command' && e.validated && e.command) || cause === 'undo' || cause === 'redo';
+    if (!person) return;
+    const tell = settings.current.onEventChange;
+    if (!tell) return;
+    const applied = e.change.applied;
+    if (applied.length === 0) return;
+    const changes = applied.map((m) => (m.kind === 'event' ? { kind: 'event' as const, before: m.before ?? null, after: m.after ?? null } : { kind: 'series' as const, before: m.before ?? null, after: m.after ?? null }));
+    const first = changes.find((c) => c.kind === 'event') as { before: CalEvent | null; after: CalEvent | null } | undefined;
+    // This change by its own entry (an undo's revert redoes that entry, not whatever is on top).
+    const revert = () => kernel.history.revert(applied);
+    tell({ cause: cause as EventChange['cause'], ...(e.command && cause === 'command' && { command: e.command }), changes, before: first?.before ?? null, after: first?.after ?? null, revert: revertWith(revert) });
+  });
   // What a screen reader is told about gestures: moved, refused, moved past a skipped hour.
   const liveRegion = h(doc, 'div', 'dz-live');
   liveRegion.setAttribute('aria-live', 'polite');
@@ -404,6 +453,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     epoch: 0,
     snapMinutes: settings.current.snapMinutes ?? 15,
     weekNumbers: options.weekNumbers === true,
+    allDaySlot: options.allDaySlot !== false,
+    displayEventTime: options.displayEventTime !== false,
     altLocale: altLocaleOf(baseLocale, displayCalendar, secondaryCalendar),
     virtualizeAbove: (() => {
       const v = options.virtualizeAbove ?? 500;
@@ -511,6 +562,10 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   let viewScope: Scope | null = null;
   let mountedFamily: string | null = null;
   let firstPaint = true;
+  /** The line at the current time, and where a time grid first scrolls: both changeable by `update`. */
+  let nowOn = options.nowIndicator !== false;
+  let scrollTime = options.scrollTime;
+  root.classList.toggle('dz-cal--no-now', !nowOn);
   /** While `update` applies several changes, the kernel's events wait for one paint. */
   let holding = false;
   let dirty = false;
@@ -566,7 +621,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     root.classList.toggle('dz-editable', settings.current.editable === true);
     const created = v.render(vm.model, state);
     interactions?.refresh();
-    if (options.nowIndicator !== false) v.tick(kernel.now(), state);
+    if (nowOn) v.tick(kernel.now(), state);
     // The adapter animates the change itself, or the plain hooks do.
     const change = pendingChange;
     pendingChange = null;
@@ -584,9 +639,9 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       firstPaint = false;
       if (vm.family === 'timeline' && v.scrollTo) {
         // A timeline scrolls along time: to that hour of today when shown, else of its first day.
-        v.scrollTo(Temporal.Duration.from(options.scrollTime ?? 'PT8H').total({ unit: 'minutes' }));
+        v.scrollTo(Temporal.Duration.from(scrollTime ?? 'PT8H').total({ unit: 'minutes' }));
       } else if (vm.family === 'timeGrid' && v.scrollTo) {
-        const scroll = Temporal.Duration.from(options.scrollTime ?? 'PT8H').total({ unit: 'minutes' });
+        const scroll = Temporal.Duration.from(scrollTime ?? 'PT8H').total({ unit: 'minutes' });
         const slotMin = (vm.model as { options: { slotMin?: DurationLike } }).options.slotMin;
         const min = slotMin ? Temporal.Duration.from(slotMin).total({ unit: 'minutes' }) : 0;
         v.scrollTo(Math.max(0, scroll - min));
@@ -712,11 +767,18 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   }
 
   // ── 'auto' lanes: measured once per size, never during a render ───────────
-  const autoLanes = (options.dayMaxLanes ?? 'auto') === 'auto';
-  if (typeof options.dayMaxLanes === 'number') kernel.setOptions({ dayGrid: { maxLanes: options.dayMaxLanes } });
-  // Until measured, a month shows at most 4 lanes: a day of 10 000 events must
-  // not draw 10 000 nodes before "+N" exists.
-  else if (autoLanes) kernel.setOptions({ dayGrid: { maxLanes: 4 } });
+  let autoLanes = true;
+  /** A month's lanes: a number, or 'auto' (measured). Also what `update({ dayMaxLanes })` calls. */
+  const setLanes = (lanes: number | 'auto' | null | undefined) => {
+    if (typeof lanes === 'number' && !(Number.isInteger(lanes) && lanes >= 1)) throw new RangeError(`dayMaxLanes must be a whole number ≥ 1, 'auto' or null: ${lanes}`);
+    autoLanes = (lanes ?? 'auto') === 'auto' && lanes !== null;
+    if (lanes === null) kernel.setOptions({ dayGrid: { maxLanes: null } });
+    else if (typeof lanes === 'number') kernel.setOptions({ dayGrid: { maxLanes: lanes } });
+    // Until measured, a month shows at most 4 lanes: a day of 10 000 events must
+    // not draw 10 000 nodes before "+N" exists.
+    else kernel.setOptions({ dayGrid: { maxLanes: 4 } });
+  };
+  setLanes(options.dayMaxLanes);
   // A bar-sized probe, added once here (a write), only measured in `read`.
   // Its own class (sized like a bar), so no `.dz-bar` query ever mistakes it for an event.
   const probe = h(doc, 'div', 'dz-probe');
@@ -752,8 +814,12 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     });
   }
   // ── 'auto' stacking in a time grid: as many lanes as fit at ~2.5rem each ──
-  const stack = options.eventMaxStack === undefined ? 'auto' : options.eventMaxStack;
-  if (typeof stack === 'number' && !(Number.isInteger(stack) && stack >= 1)) throw new RangeError(`eventMaxStack must be a whole number ≥ 1, 'auto' or null: ${stack}`);
+  let stack: number | 'auto' | null = 'auto';
+  const assertStack = (x: unknown) => {
+    if (typeof x === 'number' && !(Number.isInteger(x) && x >= 1)) throw new RangeError(`eventMaxStack must be a whole number ≥ 1, 'auto' or null: ${x}`);
+  };
+  assertStack(options.eventMaxStack);
+  stack = options.eventMaxStack === undefined ? 'auto' : options.eventMaxStack;
   // Until measured, a guess from the host's width (the gutter aside), else four: a
   // crowded week must not draw ten thousand slivers first, nor draw twice when the guess is right.
   const guessStack = (): number => {
@@ -870,7 +936,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   let timer: ReturnType<typeof setTimeout> | undefined;
   const untilNextMinute = () => 60000 - (kernel.now().epochMilliseconds % 60000);
   const tick = () => {
-    if (root.isConnected && !kernel.refreshToday() && options.nowIndicator !== false) {
+    if (root.isConnected && !kernel.refreshToday() && nowOn) {
       view?.tick(kernel.now(), kernel.getState());
       ctx.motion.nowTick?.([...root.querySelectorAll<HTMLElement>('.dz-now')]);
     }
@@ -882,7 +948,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   };
   scope.on(doc, 'visibilitychange', () => {
     if (doc.hidden) return clearTimeout(timer);
-    if (!kernel.refreshToday() && options.nowIndicator !== false) view?.tick(kernel.now(), kernel.getState());
+    if (!kernel.refreshToday() && nowOn) view?.tick(kernel.now(), kernel.getState());
     startTicking();
   });
   scope.add(() => clearTimeout(timer));
@@ -958,6 +1024,9 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
         throw new RangeError(`multiMonthMaxColumns must be a whole number ≥ 1: ${changes.multiMonthMaxColumns}`);
       }
       checkLook(changes);
+      if (changes.dayMaxLanes !== undefined && typeof changes.dayMaxLanes === 'number' && !(Number.isInteger(changes.dayMaxLanes) && changes.dayMaxLanes >= 1)) throw new RangeError(`dayMaxLanes must be a whole number ≥ 1, 'auto' or null: ${changes.dayMaxLanes}`);
+      if ('eventMaxStack' in changes) assertStack(changes.eventMaxStack);
+      if (changes.firstDay != null && !(Number.isInteger(changes.firstDay) && changes.firstDay >= 1 && changes.firstDay <= 7)) throw new RangeError(`firstDay is an ISO weekday, 1 (Monday) to 7 (Sunday): ${changes.firstDay}`);
       // Locale and calendars together, checked before anything changes (a bad one must not stick).
       const touchesLocale = Boolean(changes.locale) || 'displayCalendar' in changes || 'secondaryCalendar' in changes;
       const nextBase = changes.locale || baseLocale;
@@ -1003,10 +1072,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
               dirty = true;
             }
           }
-          if ((changes.theme && changes.theme !== look.theme) || (changes.scheme && changes.scheme !== look.scheme) || (changes.density && changes.density !== look.density)) {
+          if ((changes.theme && changes.theme !== look.theme) || (changes.scheme && changes.scheme !== look.scheme) || (changes.density && changes.density !== look.density) || (changes.eventStyle && changes.eventStyle !== look.eventStyle)) {
             look.theme = changes.theme ?? look.theme;
             look.scheme = changes.scheme ?? look.scheme;
             look.density = changes.density ?? look.density;
+            look.eventStyle = changes.eventStyle ?? look.eventStyle;
             applyLook();
             // Another density: another scale, lanes and stacks measured again.
             measureLanes();
@@ -1049,6 +1119,12 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             hidden = { days: 'hiddenDays' in changes ? changes.hiddenDays : hidden.days, weekends: 'weekends' in changes ? changes.weekends : hidden.weekends };
             kernel.setOptions({ hiddenDays: hiddenOf(hidden.days, hidden.weekends) });
           }
+          for (const k of ['allDaySlot', 'displayEventTime'] as const) {
+            if (changes[k] === undefined || changes[k] === ctx[k]) continue;
+            ctx[k] = changes[k];
+            ctx.epoch++;
+            dirty = true;
+          }
           if (changes.weekNumbers !== undefined && changes.weekNumbers !== ctx.weekNumbers) {
             ctx.weekNumbers = changes.weekNumbers;
             ctx.epoch++;
@@ -1064,6 +1140,24 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             headerAsked = changes.headerViews;
             toolbar.setViews(tabsOf(headerAsked));
             dirty = true;
+          }
+          // Read at creation once; now changed at any time.
+          if ('firstDay' in changes) kernel.setFirstDay(changes.firstDay ?? null);
+          if ('rules' in changes) kernel.setRules(changes.rules);
+          if ('scrollTime' in changes) scrollTime = changes.scrollTime;
+          if (changes.nowIndicator !== undefined && changes.nowIndicator !== nowOn) {
+            nowOn = changes.nowIndicator;
+            root.classList.toggle('dz-cal--no-now', !nowOn);
+            if (nowOn) view?.tick(kernel.now(), kernel.getState());
+          }
+          if ('dayMaxLanes' in changes) {
+            setLanes(changes.dayMaxLanes);
+            measureLanes();
+          }
+          if ('eventMaxStack' in changes) {
+            stack = changes.eventMaxStack === undefined ? 'auto' : changes.eventMaxStack;
+            kernel.setOptions({ timeGrid: { maxStack: stack === 'auto' ? guessStack() : stack } });
+            measureStack();
           }
           if (changes.events) kernel.setEvents(changes.events);
           if (changes.sources) {
@@ -1106,6 +1200,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       return () => destroyHooks.delete(fn);
     },
     destroy() {
+      stopChanges();
       for (const fn of [...destroyHooks]) {
         try {
           fn();

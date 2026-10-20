@@ -65,7 +65,7 @@ export function eventInfo(ev: CalEvent, zone: ZoneId): Rec {
 }
 
 /** The other library's options as DzCalendar's (see docs/behaviors/fullcalendar-options.md). Never throws. */
-export function translate(given: unknown): Translation {
+export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}): Translation {
   const problems: Problem[] = [];
   const raw: Rec = given && typeof given === 'object' ? (given as Rec) : {};
   if (given === null || typeof given !== 'object') problems.push(said('invalid-option', 'options', typeof given, 'error'));
@@ -85,16 +85,19 @@ export function translate(given: unknown): Translation {
   const timeGrid: Rec = {};
   const rules: Rec = {};
   let cal: CalendarInstance | null = null;
-  const zone = zoneOf(fc['timeZone'], problems) ?? Temporal.Now.timeZoneId();
-  if (fc['timeZone'] === undefined) problems.push(said('zone-guessed', 'timeZone', `browser:${zone}`));
-  out['timeZone'] = zone;
+  // Their options rarely name a zone (theirs is the browser's): the calendar's then (the application's defaults), the browser's only when there is none — said.
+  const named = zoneOf(fc['timeZone'], problems);
+  const zone = named ?? how.zone ?? Temporal.Now.timeZoneId();
+  if (named === undefined && how.zone === undefined) problems.push(said('zone-guessed', 'timeZone', `browser:${zone}`));
+  if (named !== undefined || how.zone === undefined) out['timeZone'] = zone;
   const doc = (): Document | null => cal?.element.ownerDocument ?? (typeof document === 'undefined' ? null : document);
   const view = () => {
     const s = cal?.kernel.getState();
     // Their active range is the grid shown (a month's padding days too); their current range the month itself.
-    return s
-      ? { type: s.view.type, title: s.title, activeStart: dateOf(s.range.start, zone), activeEnd: dateOf(s.range.end, zone), currentStart: dateOf(s.range.activeStart, zone), currentEnd: dateOf(s.range.activeEnd, zone) }
-      : null;
+    if (s) return { type: s.view.type, title: s.title, activeStart: dateOf(s.range.start, zone), activeEnd: dateOf(s.range.end, zone), currentStart: dateOf(s.range.activeStart, zone), currentEnd: dateOf(s.range.activeEnd, zone) };
+    // While the calendar is being made (its first drawing calls the hooks): what the options say, never null (theirs is not).
+    const d = out['initialDate'] instanceof Temporal.PlainDate ? dateOf(out['initialDate'], zone) : new Date(NaN);
+    return { type: typeof out['initialView'] === 'string' ? out['initialView'] : 'dayGridMonth', title: '', activeStart: d, activeEnd: d, currentStart: d, currentEnd: d };
   };
   const nodeOf = (id: string) => cal?.element.querySelector<HTMLElement>(`[data-event-id="${id.replace(/["\\]/g, '\\$&')}"]`) ?? null;
   const fn = (k: string) => (typeof fc[k] === 'function' ? (fc[k] as Fn) : null);
@@ -112,7 +115,7 @@ export function translate(given: unknown): Translation {
     return m ? dateOf10(m) : null;
   };
 
-  for (const k of ['initialView', 'locale', 'editable', 'selectable', 'nowIndicator', 'weekNumbers', 'weekends', 'eventMaxStack'] as const) if (fc[k] !== undefined) out[k] = take(k);
+  for (const k of ['initialView', 'locale', 'editable', 'selectable', 'nowIndicator', 'weekNumbers', 'weekends', 'eventMaxStack', 'allDaySlot', 'displayEventTime'] as const) if (fc[k] !== undefined) out[k] = take(k);
   if (fc['initialDate'] !== undefined) {
     const d = date('initialDate', take('initialDate'));
     if (d) out['initialDate'] = d;
@@ -128,6 +131,8 @@ export function translate(given: unknown): Translation {
     else problems.push(said('invalid-option', 'hiddenDays', 'not-a-list', 'error'));
   }
   if (fc['direction'] !== undefined && take('direction') === 'rtl') problems.push(said('compat-unsupported', 'direction', 'from-locale'));
+  // Theirs shows every event of a day unless told otherwise: the weeks grow (dayMaxLanes null).
+  out['dayMaxLanes'] = null;
   for (const k of ['dayMaxEventRows', 'dayMaxEvents']) {
     const v = take(k);
     if (typeof v === 'number') out['dayMaxLanes'] = v;
@@ -296,6 +301,15 @@ export function translate(given: unknown): Translation {
   const didMount = hook('eventDidMount');
   const willUnmount = hook('eventWillUnmount');
   const label = hook('resourceLabelContent');
+  const dayContent = hook('dayHeaderContent');
+  const dayDidMount = hook('dayHeaderDidMount');
+  const dayWillUnmount = hook('dayHeaderWillUnmount');
+  /** A day head's argument, as the other library gives it. */
+  const dayArg = (d: { date: PlainDate; text: string; today: boolean; resource: { id: string } | null }, el: HTMLElement) => {
+    const today = cal?.kernel.getState().today ?? Temporal.Now.plainDateISO(zone);
+    const c = Temporal.PlainDate.compare(d.date, today);
+    return { date: dateOf(d.date, zone), text: d.text, isToday: d.today, isPast: c < 0, isFuture: c > 0, resource: d.resource ? { id: d.resource.id } : undefined, el, view: view() };
+  };
   const arg = (inst: EventInstance, el: HTMLElement, timeText: string) => ({ event: eventInfo(inst.event, zone), el, timeText, view: view(), isStart: true, isEnd: true });
   const rendered = (r: unknown): string | Node | null => {
     if (r === undefined || r === null || r === true || r === false) return null;
@@ -315,7 +329,7 @@ export function translate(given: unknown): Translation {
     }
     return null;
   };
-  if (content || didMount || willUnmount || label) {
+  if (content || didMount || willUnmount || label || dayContent || dayDidMount || dayWillUnmount) {
     type Ctx = { instance: EventInstance; timeText: string };
     out['hooks'] = {
       ...((content || didMount || willUnmount) && {
@@ -323,6 +337,13 @@ export function translate(given: unknown): Translation {
           ...(content && { content: (ctx: Ctx, el: HTMLElement) => rendered(content(arg(ctx.instance, el, ctx.timeText))) }),
           ...(didMount && { didMount: ({ el, ctx }: { el: HTMLElement; ctx: Ctx }) => void didMount(arg(ctx.instance, el, ctx.timeText)) }),
           ...(willUnmount && { willUnmount: ({ el, ctx }: { el: HTMLElement; ctx: Ctx }) => void willUnmount(arg(ctx.instance, el, ctx.timeText)) }),
+        },
+      }),
+      ...((dayContent || dayDidMount || dayWillUnmount) && {
+        dayHeader: {
+          ...(dayContent && { content: (d: never, el: HTMLElement) => rendered(dayContent(dayArg(d, el))) }),
+          ...(dayDidMount && { didMount: ({ el, ctx }: { el: HTMLElement; ctx: never }) => void dayDidMount(dayArg(ctx, el)) }),
+          ...(dayWillUnmount && { willUnmount: ({ el, ctx }: { el: HTMLElement; ctx: never }) => void dayWillUnmount(dayArg(ctx, el)) }),
         },
       }),
       ...(label && { resource: { content: (ctx: { resource: { id: string; title: string } }) => rendered(label({ resource: { id: ctx.resource.id, title: ctx.resource.title }, fieldValue: ctx.resource.title })) } }),
@@ -399,9 +420,11 @@ export function translate(given: unknown): Translation {
           k.subscribe((e) => {
             if (e.type !== 'store') return;
             const change: StoreChange = e.change;
-            // A person's change or the application's command, not a source's delivery nor an undo.
-            if (change.cause !== 'command') return;
-            const revert = () => void calendar.undo();
+            // A person's change (a validated command: a gesture, the keyboard, the menu, the editor), as the other library says it —
+            // not the application's own run, a source's delivery nor an undo.
+            if (change.cause !== 'command' || !e.validated) return;
+            // Exactly this change (a late refusal of the first of two drags takes back the first), not the last undo.
+            const revert = () => void k.history.revert(change.applied);
             // An occurrence moved alone becomes an event of its own (an override): to the other library, the series' event changed.
             const occurrence = new Map<string, { series: Series; key: string }>();
             for (const m of change.applied) {

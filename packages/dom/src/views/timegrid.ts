@@ -6,6 +6,7 @@ import type { ViewController, ViewCtx } from '../host.js';
 import { registerView, scrollEased } from '../host.js';
 import { attachMenuTriggers } from '../menu.js';
 import { applyEventLook, fillEvent, formatMinutes, timeLabels, timedContent, unmountEvent } from '../render/event.js';
+import { ownDayHead, unmountDayHead } from '../render/day-head.js';
 import { KeyedList, contentsHost, h } from '../render/reconcile.js';
 import { onScrollFrame } from '../render/window.js';
 import { NodePool } from '../render/pool.js';
@@ -100,6 +101,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   /** The header's row of dates: below the resources' (and groups'), absent in a one-day resource view. */
   let dateRow = 1;
   let created: HTMLElement[] = [];
+  /** The view's type, for the day-header hook. */
+  let viewType = '';
 
   // ── headers ────────────────────────────────────────────────────────────────
   const heads = new KeyedList<ColumnItem>(
@@ -110,6 +113,18 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       // Seen, not read: each column's group says its day (and a length other than 24 h) itself.
       el.setAttribute('aria-hidden', 'true');
       el.classList.toggle('dz-tg__dayhead--today', it.today);
+      const words = `${formatTemporal(date, { weekday: 'short' }, ctx.locale)} ${formatTemporal(date, { day: 'numeric' }, ctx.locale)}`;
+      // The application's head (a mark, a count): in place of the calendar's, then placed as the calendar's is.
+      const own = ownDayHead(ctx, el, { date, resource: it.column.resource, view: viewType, today: it.today, lengthMinutes: axis.day.lengthMinutes, text: words });
+      if (own) {
+        if (it.today) el.setAttribute('aria-current', 'date');
+        else el.removeAttribute('aria-current');
+        if (dateRow > 1) {
+          el.style.gridRow = String(dateRow);
+          el.style.gridColumn = String(it.index + 2);
+        }
+        return;
+      }
       el.replaceChildren(
         h(doc, 'span', 'dz-tg__dayhead-weekday', formatTemporal(date, { weekday: 'short' }, ctx.locale)),
         h(doc, 'span', 'dz-tg__dayhead-date', formatTemporal(date, { day: 'numeric' }, ctx.locale)),
@@ -127,6 +142,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
         el.style.gridColumn = String(it.index + 2);
       }
     },
+    (el) => unmountDayHead(ctx, el),
   );
   const resourceHeads = drawResourceHeads(ctx, groupsHost, resourcesHost, 'dz-tg', 2);
   const emptyNote = noResourcesNote(ctx, root);
@@ -191,7 +207,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
         hours,
         bands,
         events: new KeyedList<EventItem>(evHost, () => eventPool.take(), (n, e, c) => drawEvent(n, e.placed, false, c), (n) => unmountEvent(ctx, n), (n) => eventPool.release(n)),
-        background: new KeyedList<EventItem>(bgHost, () => h(doc, 'div', 'dz-ev dz-ev--bg'), (n, e, c) => drawEvent(n, e.placed, true, c)),
+        background: new KeyedList<EventItem>(bgHost, () => h(doc, 'div', 'dz-ev dz-ev--bg'), (n, e, c) => drawEvent(n, e.placed, true, c), (n) => unmountEvent(ctx, n)),
         more: new KeyedList<MoreItem>(
           moreHost,
           () => {
@@ -326,7 +342,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       item.dataset['segment'] = p.segment.key;
       const title = ev.title || ctx.messages.untitled;
       const labels = timeLabels(ctx, ev, { ...(p.startReading && { start: p.startReading }), ...(p.endReading && { end: p.endReading }) });
-      fillEvent(ctx, item, { instance: p.segment.instance, segment: p.segment, timeText: labels.text, displayZone: ctx.zone, family: 'timeGrid' }, () => [h(doc, 'span', 'dz-bar__time', labels.text), doc.createTextNode(` ${title}`)], true);
+      fillEvent(ctx, item, { instance: p.segment.instance, segment: p.segment, timeText: labels.text, displayZone: ctx.zone, family: 'timeGrid' }, () => (ctx.displayEventTime ? [h(doc, 'span', 'dz-bar__time', labels.text), doc.createTextNode(` ${title}`)] : [doc.createTextNode(title)]), true);
       item.tabIndex = 0;
       item.setAttribute('role', 'button');
       item.setAttribute('aria-label', ctx.messages.eventLabel({ title, time: labels.spoken }));
@@ -447,6 +463,15 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     el.classList.toggle('dz-ev--cont-end', !seg.endsHere);
     applyEventLook(el, ev);
     handles(el, seg, bg);
+    if (bg && ctx.hooks.event?.content) {
+      // A background's own content (a "Vacances" label), if the hook gives one: drawn, read; none: mute as before.
+      fillEvent(ctx, el, { instance: seg.instance, segment: seg, timeText: '', displayZone: ctx.zone, family: 'timeGrid', background: true }, () => [], changed.created);
+      const labelled = el.childNodes.length > 0;
+      el.classList.toggle('dz-ev--labelled', labelled);
+      if (labelled) el.removeAttribute('aria-hidden');
+      else el.setAttribute('aria-hidden', 'true');
+      return;
+    }
     if (bg || ev.allDay) {
       el.replaceChildren();
       el.setAttribute('aria-hidden', 'true');
@@ -519,7 +544,10 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   const usable = (c: TimeGridColumn) => !c.folded && c.axis.length > 0;
 
   const keys: KeyboardSurface = {
-    allDayRow: true,
+    // allDaySlot false: no all-day row to step into (it is folded: a cursor there would be unseen).
+    get allDayRow() {
+      return ctx.allDaySlot;
+    },
     home() {
       const cols = model?.columns ?? [];
       const today = ctx.kernel.getState().today;
@@ -539,6 +567,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
         // A hidden day inside the period: null, and the keyboard steps on past it.
         return Temporal.PlainDate.compare(hit.date, r.end) >= 0 ? 'next' : null;
       }
+      if (hit.kind === 'day' && !ctx.allDaySlot) return usable(col) ? topSlot(col) : null;
       if (hit.kind === 'day') return hit.allDayRow && hit.resourceId === col.resource?.id ? hit : own({ kind: 'day', date: hit.date, allDayRow: true }, col);
       if (!usable(col)) return null;
       const s = col.axis.start.epochMilliseconds;
@@ -805,6 +834,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
 
     render(next, state) {
       const m = next as TimeGridModel;
+      viewType = state.view.type;
       created = [];
       const epoch = ctx.epoch;
       const cols = m.columns.map((column, index): ColumnItem => ({ key: column.key, sig: `${idOf(column)}|${epoch}`, column, today: column.date.equals(state.today), index }));
@@ -819,12 +849,14 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       emptyNote(m.options.resources !== undefined && m.options.resources.length === 0);
       root.style.setProperty('--dz-cols', String(m.columns.length));
       alldayLabel.textContent = ctx.messages.allDay;
+      // allDaySlot false: the row folds to nothing (it still holds the keyboard's cursor, which goes home when focused), no all-day event in it.
+      allday.classList.toggle('dz-tg__allday--none', !ctx.allDaySlot);
       // The week's number in the corner (the head is drawn, not read: the columns say their dates).
       const first = m.columns[0]?.date;
       corner.textContent = ctx.weekNumbers && first ? ctx.messages.weekShort({ week: weekNumber(first, { ...weekRulesFor(ctx.locale), firstDay: state.firstDay }) }) : '';
       if (!cursorHits.has(cursorNode)) cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
       heads.sync(withDates ? cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${c.today}|${epoch}|${c.index}|${dateRow}` })) : []);
-      bars.sync([
+      bars.sync(!ctx.allDaySlot ? [] : [
         ...m.allDay.background.map((bar) => ({
           key: `bg:${bar.segment.key}`,
           sig: `${bar.column}|${bar.segment.dayCount}`,
@@ -909,6 +941,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
 
     destroy() {
       bars.clear();
+      // The heads the application filled let go of what it put there.
+      heads.clear();
       resourceHeads.clear();
       for (const p of parts.values()) {
         p.events.clear();

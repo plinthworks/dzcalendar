@@ -33,14 +33,14 @@ import type {
   ZoneId,
 } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DzMessages, MotionAdapter } from '@dzcalendar/dom';
+import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DzMessages, EventChange, MotionAdapter } from '@dzcalendar/dom';
 import { CalendarController } from './controller.js';
 import { DZ_CALENDAR_DEFAULTS, DZ_MOTION } from './providers.js';
-import { DzEventContent } from './templates.js';
-import type { EventContentContext } from './templates.js';
+import { DzDayHeader, DzEventContent } from './templates.js';
+import type { DayHeaderContext, EventContentContext } from './templates.js';
 
 /** The callbacks the component turns into outputs: not options (they would silence the outputs). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange'] as const;
 
 /** What `[options]` takes: what `update()` takes, less what has an input or an output of its own. */
 export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | (typeof OWN_CALLBACKS)[number]>;
@@ -139,13 +139,17 @@ export class DzCalendar implements OnDestroy {
   readonly problems = output<NormalizationReport>();
   /** What the `resources` given could not be read as. */
   readonly resourceProblems = output<readonly Problem[]>();
+  /** What a person changed (a drag, a resize, the keyboard, the menu, the editor): persist it; `revert()` if the server refuses. */
+  readonly eventChange = output<EventChange>();
 
   private readonly eventTemplate = contentChild(DzEventContent);
+  private readonly dayTemplate = contentChild(DzDayHeader);
 
   /** One hooks object per template: `update()` compares hooks member by member. */
   private readonly hooks = computed((): CalendarHooks => {
     const dir = this.eventTemplate();
-    return dir ? { event: this.templateHooks(dir) } : {};
+    const day = this.dayTemplate();
+    return { ...(dir && { event: this.templateHooks(dir) }), ...(day && { dayHeader: this.dayHeaderHooks(day) }) };
   });
 
   private readonly settings = computed((): CalendarUpdate => {
@@ -199,6 +203,7 @@ export class DzCalendar implements OnDestroy {
       onSlotClick: (x) => this.emit(() => this.slotClick.emit(x)),
       onResourceProblems: (ps) => this.emit(() => this.resourceProblems.emit(ps)),
       onEventClick: (i) => this.emit(() => this.eventClick.emit(i)),
+      onEventChange: (c) => this.emit(() => this.eventChange.emit(c)),
       onEventOpen: (i) => this.emit(() => this.eventOpen.emit(i)),
       onCreateRequest: (r) => this.emit(() => this.createRequest.emit(r)),
       onSelect: (sel) =>
@@ -294,6 +299,8 @@ export class DzCalendar implements OnDestroy {
   private dropViews(): void {
     for (const v of this.views.values()) v.destroy();
     this.views.clear();
+    for (const v of this.dayViews.values()) v.destroy();
+    this.dayViews.clear();
   }
 
   /** The DOM calendar, for what the inputs and the controller do not cover. */
@@ -353,6 +360,14 @@ export class DzCalendar implements OnDestroy {
   private templateHooks(dir: DzEventContent): NonNullable<CalendarHooks['event']> {
     return {
       content: (ctx, el) => {
+        // A background (a closed day): drawn only when the template gives it something (`@if (ctx.background)`).
+        if (ctx.background) {
+          const probe = this.vcr.createEmbeddedView(dir.template, { $implicit: ctx.instance.event, event: ctx.instance.event, ctx });
+          probe.detectChanges();
+          const empty = probe.rootNodes.every((n: Node) => n.nodeType === 8 || (n.nodeType === 3 && !n.textContent?.trim()) || (n instanceof Element && !n.childNodes.length && !n.textContent?.trim() && n.tagName !== 'IMG'));
+          probe.destroy();
+          if (empty) return null;
+        }
         const context: EventContentContext = { $implicit: ctx.instance.event, event: ctx.instance.event, ctx };
         let view = this.views.get(el);
         if (!view || view.destroyed) {
@@ -372,6 +387,31 @@ export class DzCalendar implements OnDestroy {
       willUnmount: ({ el }) => {
         this.views.get(el)?.destroy();
         this.views.delete(el);
+      },
+    };
+  }
+
+  // ── day-head templates: one embedded view per head, checked alone ──
+  private readonly dayViews = new Map<HTMLElement, EmbeddedViewRef<DayHeaderContext>>();
+
+  private dayHeaderHooks(dir: DzDayHeader): NonNullable<CalendarHooks['dayHeader']> {
+    return {
+      content: (day, el) => {
+        const context: DayHeaderContext = { $implicit: day, day };
+        let view = this.dayViews.get(el);
+        if (!view || view.destroyed) {
+          view = this.vcr.createEmbeddedView(dir.template, context);
+          this.dayViews.set(el, view);
+        } else Object.assign(view.context, context);
+        view.detectChanges();
+        const host = this.host.ownerDocument.createElement('span');
+        host.className = 'dz-dayhead__content';
+        host.append(...(view.rootNodes as Node[]));
+        return host;
+      },
+      willUnmount: ({ el }) => {
+        this.dayViews.get(el)?.destroy();
+        this.dayViews.delete(el);
       },
     };
   }

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — retours Sehhaty</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: #52525b; max-width: 90ch; }
+      .bar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; }
+      #cal { --dz-height: 46rem; }
+      .mark { font-size: 0.6875rem; font-weight: 600; color: #b91c1c; display: block; }
+      .mark button { font: inherit; color: inherit; background: #fee2e2; border: 0; border-radius: 0.25rem; padding: 0 0.25rem; cursor: pointer; }
+      .label { font-weight: 600; font-size: 0.75rem; display: inline-block; margin: 0.25rem; padding: 0 0.375rem; border-radius: 0.25rem; background: #18181b; color: #fff; }
+      #log { min-height: 1.4em; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <h1>Retours Sehhaty (phase 18e)</h1>
+    <p>Fuseau Africa/Algiers (sans changement d'heure). Vendredi 23 et samedi 24 fermés : colonnes lavées, étiquette « Vacances » par le crochet de contenu, marque et compteur en tête de colonne par le crochet d'en-tête. Le mois affiche tout (les semaines grandissent). Un déplacement est « envoyé au serveur » ; un déplacement vers 12:00 est refusé et repris.</p>
+    <div class="bar">
+      <label>Style <select id="style"><option value="solid">plein</option><option value="tinted">teinté</option></select></label>
+      <label><input type="checkbox" id="allday" /> rangée « Journée »</label>
+      <label><input type="checkbox" id="times" checked /> heures des événements</label>
+    </div>
+    <p id="log" role="status"></p>
+    <div id="cal"></div>
+    <script type="module" src="./sehhaty.ts"></script>
+  </body>
+</html>

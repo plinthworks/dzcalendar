@@ -177,7 +177,13 @@ export type KernelEvent =
       /** Which way the dates moved, when they moved. */
       readonly direction?: 'prev' | 'next' | 'other';
     }
-  | { readonly type: 'store'; readonly change: StoreChange }
+  | {
+      readonly type: 'store';
+      readonly change: StoreChange;
+      /** The command that made it (`run`): with `validated`, what a person asked — a gesture, a menu, the keyboard, the editor. */
+      readonly command?: Command;
+      readonly validated?: boolean;
+    }
   /** From the sources: loading, a failed fetch, problems in a delivery, a save. */
   | { readonly type: 'source'; readonly notice: SourceNotice };
 
@@ -193,6 +199,10 @@ export interface CalendarKernel {
   setLocale(locale: string): void;
   /** Shallow-merged per key (`timeGrid`, `dayGrid`) over the current options. */
   setOptions(options: ModelOptions): void;
+  /** The week's first day (ISO, Monday = 1); null: the locale's again. A view whose range moves redraws. */
+  setFirstDay(day: Weekday | null): void;
+  /** The rules gestures and checked commands are held to (constraint, overlap, allow, valid range…), replacing those given. */
+  setRules(rules: KernelOptions['rules']): void;
   /** The options in force (what `setOptions` merged). */
   getOptions(): ModelOptions;
   /**
@@ -280,7 +290,10 @@ export function createKernel(o: KernelOptions): CalendarKernel {
 
   let timeZone = o.timeZone;
   let locale = o.locale;
-  let firstDay = o.firstDay ?? weekRulesFor(locale).firstDay;
+  /** The first day given (null: the locale's), and the rules: both changeable later (setFirstDay, setRules). */
+  let firstDayGiven: Weekday | null = o.firstDay ?? null;
+  let rulesGiven = o.rules;
+  let firstDay = firstDayGiven ?? weekRulesFor(locale).firstDay;
   let options: ModelOptions = {
     ...(o.timeGrid && { timeGrid: o.timeGrid }),
     ...(o.dayGrid && { dayGrid: o.dayGrid }),
@@ -338,11 +351,13 @@ export function createKernel(o: KernelOptions): CalendarKernel {
 
   const nav = (): NavContext => ({ firstDay, today: todayIn(timeZone) });
   let validating = false;
+  /** The command `run` is applying: what its store change came from. */
+  let running: Command | null = null;
   const rulesNow = (): RulesContext => ({
     displayZone: timeZone,
     ...(options.businessHours !== undefined && { businessHours: options.businessHours }),
     ...(resourceTree.order.length > 0 && { resources: resourceTree }),
-    ...o.rules,
+    ...rulesGiven,
   });
   // Read at every command: the zone, the locale's first day and the rules may have changed since.
   const history = createHistory(
@@ -436,7 +451,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   const unsubscribe = store.subscribe((change) => {
     const family = model ? FAMILIES.get(model.family) : undefined;
     model = model && family?.update ? { family: model.family, model: family.update(model.model, store.snapshot, change) } : null;
-    emit({ type: 'store', change });
+    emit(change.cause === 'command' && running ? { type: 'store', change, command: running, validated: validating } : { type: 'store', change });
   });
   fetchShown();
   for (const spec of o.sources ?? []) sources.add(spec);
@@ -471,8 +486,21 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     setLocale(next) {
       if (next === locale) return;
       locale = next;
-      if (o.firstDay === undefined) firstDay = weekRulesFor(next).firstDay;
+      if (firstDayGiven === null) firstDay = weekRulesFor(next).firstDay;
       changeState('locale');
+    },
+    setFirstDay(day) {
+      if (day !== null && !(Number.isInteger(day) && day >= 1 && day <= 7)) throw new RangeError(`firstDay is an ISO weekday, 1 (Monday) to 7 (Sunday): ${day}`);
+      firstDayGiven = day;
+      const next = day ?? weekRulesFor(locale).firstDay;
+      if (next === firstDay) return;
+      // Weeks start elsewhere: the range moves, every grid's columns too.
+      firstDay = next;
+      changeState('options');
+    },
+    setRules(rules) {
+      // Read at every gesture and command: nothing to redraw.
+      rulesGiven = rules;
     },
     setOptions(next) {
       if (next.businessHours !== undefined) assertBusinessHours(next.businessHours);
@@ -578,10 +606,12 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     },
     run(cmd, opts = {}) {
       validating = opts.validate === true;
+      running = cmd;
       try {
         return history.run(cmd);
       } finally {
         validating = false;
+        running = null;
       }
     },
     rules: rulesNow,

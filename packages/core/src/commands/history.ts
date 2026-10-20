@@ -32,6 +32,12 @@ export interface History {
   undo(): boolean;
   redo(): boolean;
   /**
+   * Takes back exactly what one command applied (`change.applied`), not the
+   * last entry: a server's late refusal of the first of two drags. False,
+   * and nothing changed, when something else has changed those events since.
+   */
+  revert(applied: readonly Mutation[]): boolean;
+  /**
    * Every `run` inside `fn` becomes a single entry. If `fn` throws, what it
    * already applied stays applied and stays undoable as that entry.
    */
@@ -144,17 +150,35 @@ export function createHistory(store: EventStore, ctx: CommandContext | (() => Co
     options.onDropped?.(dropped);
   });
 
+  /** The entry each command's applied mutations went into: what `revert` takes out. */
+  const origin = new WeakMap<readonly Mutation[], Entry>();
+  /** What each write was (a command, an undo, a redo), and the write going on now. */
+  const kindOf = new WeakMap<readonly Mutation[], 'command' | 'undo' | 'redo'>();
+  let pending: 'command' | 'undo' | 'redo' | null = null;
+  let deferred: readonly Mutation[] | null = null;
+  /** How many commands went into an entry (a transaction counts as many): `revert` takes back an entry of one only. */
+  const commands = new WeakMap<Entry, number>();
+  const count = (e: Entry, n = 1) => commands.set(e, (commands.get(e) ?? 0) + n);
   const record = (label: string, applied: readonly Mutation[], mergeKey: string | null) => {
     if (open) {
       open.mutations.push(...applied);
+      // Part of a transaction: taking it back alone would leave the others un-undoable.
+      origin.set(applied, open);
+      count(open, 2);
       return;
     }
     const last = done[done.length - 1];
     if (mergeKey !== null && undone.length === 0 && last && last.mergeKey === mergeKey && continues(last.mutations, applied)) {
       last.mutations = compact([...last.mutations, ...applied]);
+      // Merged with the commands before it (one gesture): none of them alone any more.
+      origin.set(applied, last);
+      count(last);
       return;
     }
-    push({ label, mutations: compact(applied), mergeKey });
+    const entry = { label, mutations: compact(applied), mergeKey };
+    origin.set(applied, entry);
+    count(entry);
+    push(entry);
   };
 
   const replay = (from: Entry[], to: Entry[], backwards: boolean): boolean => {
@@ -169,10 +193,48 @@ export function createHistory(store: EventStore, ctx: CommandContext | (() => Co
       options.onDropped?.([entry.label]);
       return false;
     }
-    write(steps, backwards ? 'undo' : 'redo');
+    pending = backwards ? 'undo' : 'redo';
+    const change = write(steps, pending);
+    pending = null;
     to.push(entry);
+    kindOf.set(change.applied, backwards ? 'undo' : 'redo');
+    origin.set(change.applied, entry);
+    settleDeferred(change.applied);
     return true;
   };
+
+  /**
+   * Takes back one write — a command, an undo, a redo — by the entry it went
+   * into, whatever is on top of the stacks: a command's entry leaves the
+   * history (refused when merged with others or in a transaction), an undo's
+   * goes back to the done stack, a redo's back to the undone one.
+   */
+  function takeBack(applied: readonly Mutation[], kind: 'command' | 'undo' | 'redo', entry: Entry | undefined): boolean {
+    if (!entry || !stillApplies(store, applied)) return false;
+    const steps = [...applied].reverse().map(invert);
+    if (restoresOrphan(store, steps)) return false;
+    if (kind === 'command') {
+      if ((commands.get(entry) ?? 0) > 1 || entry === open) return false;
+      done = done.filter((e) => e !== entry);
+      undone = undone.filter((e) => e !== entry);
+    } else if (kind === 'undo') {
+      if (!undone.includes(entry)) return false;
+      undone = undone.filter((e) => e !== entry);
+      done.push(entry);
+    } else {
+      if (!done.includes(entry)) return false;
+      done = done.filter((e) => e !== entry);
+      undone.push(entry);
+    }
+    write(steps, kind === 'undo' ? 'redo' : 'undo');
+    return true;
+  }
+  /** A revert asked while its own change was being announced (a confirm() in the callback): done once the write is over. */
+  function settleDeferred(applied: readonly Mutation[]): void {
+    if (deferred !== applied) return;
+    deferred = null;
+    takeBack(applied, kindOf.get(applied)!, origin.get(applied));
+  }
 
   return {
     get canUndo() {
@@ -185,15 +247,30 @@ export function createHistory(store: EventStore, ctx: CommandContext | (() => Co
     run(cmd) {
       const result = applyCommand(store.snapshot, cmd, context());
       if (!result.ok || result.mutations.length === 0) return result;
+      pending = 'command';
       const change = write(result.mutations, 'command');
+      pending = null;
       if (change.applied.length > 0) {
         const label = cmd.type === 'batch' ? (cmd.label ?? 'batch') : cmd.type;
         record(label, change.applied, options.mergeKey?.(cmd) ?? null);
+        kindOf.set(change.applied, 'command');
+        settleDeferred(change.applied);
       }
       return { ...result, change };
     },
 
     undo: () => replay(done, undone, true),
+    revert(applied) {
+      if (applied.length === 0) return false;
+      // Its own change being announced (the callback runs inside the write): taken back once the write is over.
+      if (writing && pending && !kindOf.has(applied)) {
+        if (pending === 'command' && open) return false;
+        deferred = applied;
+        return true;
+      }
+      const kind = kindOf.get(applied);
+      return kind ? takeBack(applied, kind, origin.get(applied)) : false;
+    },
     redo: () => replay(undone, done, false),
 
     transaction(label, fn) {

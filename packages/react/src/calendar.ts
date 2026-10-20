@@ -3,7 +3,7 @@ import type { CSSProperties, ForwardedRef, ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import type { AvailableSlot, CalEvent, CreateRequest, EventInstance, NormalizationReport, PlainDate, Problem, Selection, SourceNotice } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, EventContentCtx, MotionAdapter } from '@dzcalendar/dom';
+import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DayHeaderCtx, EventChange, EventContentCtx, MotionAdapter } from '@dzcalendar/dom';
 import { DzCalendarContext } from './context.js';
 import type { DzCalendarDefaults } from './context.js';
 import { CalendarController, CalendarControllerContext } from './controller.js';
@@ -13,9 +13,9 @@ import { same } from './same.js';
 const useBrowserLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
 
 /** The callbacks the component takes as its own props (with what the calendar reports). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange'] as const;
 /** Props that are not options of the calendar. */
-const NOT_OPTIONS = new Set<string>([...OWN_CALLBACKS, 'controller', 'renderEventContent', 'defaultView', 'defaultDate', 'onViewChange', 'onDateChange', 'selection', 'onSelectionChange', 'onSourceNotice', 'onProblems', 'onError', 'axis', 'className', 'style', 'id', 'motion', 'initial']);
+const NOT_OPTIONS = new Set<string>([...OWN_CALLBACKS, 'controller', 'renderEventContent', 'renderDayHeader', 'defaultView', 'defaultDate', 'onViewChange', 'onDateChange', 'selection', 'onSelectionChange', 'onSourceNotice', 'onProblems', 'onError', 'axis', 'className', 'style', 'id', 'motion', 'initial']);
 
 /** Everything `update()` takes, less what has a prop of its own below. */
 export type DzCalendarOptions = Omit<CalendarUpdate, 'hooks' | 'motion' | (typeof OWN_CALLBACKS)[number]>;
@@ -42,10 +42,14 @@ export interface DzCalendarProps extends DzCalendarOptions {
   readonly motion?: MotionAdapter;
   /** Each event's content, drawn by the application's components (in its tree: its context, state and router reach them). */
   readonly renderEventContent?: (event: CalEvent, ctx: EventContentCtx) => ReactNode;
+  /** Each day's head (a week's or a day's date, a month's weekday), by the application's components: a mark, a count, a button. */
+  readonly renderDayHeader?: (day: DayHeaderCtx) => ReactNode;
   readonly onDateClick?: (click: DateClick) => void;
   /** A free slot clicked (or Enter on it): the slot as given. Book it; the server checks it again. */
   readonly onSlotClick?: (slot: AvailableSlot) => void;
   readonly onEventClick?: (instance: EventInstance) => void;
+  /** What a person changed (a drag, a resize, the keyboard, the menu, the editor): persist it; `revert()` if the server refuses. */
+  readonly onEventChange?: (change: EventChange) => void;
   readonly onEventOpen?: (instance: EventInstance) => void;
   readonly onCreateRequest?: (request: CreateRequest) => void;
   /** A selection made by a person (`onSelectionChange` hears it too). */
@@ -119,13 +123,37 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
   };
   const seq = useRef(0);
   const rendering = Boolean(props.renderEventContent);
+  const heading = Boolean(props.renderDayHeader);
+  const dayPortals = useRef(new Map<HTMLElement, { readonly key: string; readonly span: HTMLElement; day: DayHeaderCtx }>());
   /** One hooks object while there is a renderer: `update()` compares hooks member by member. */
   const hooks = useMemo(
-    (): CalendarHooks =>
-      rendering
-        ? {
+    (): CalendarHooks => ({
+      ...(heading && {
+        dayHeader: {
+          content: (day: DayHeaderCtx, el: HTMLElement) => {
+            let p = dayPortals.current.get(el);
+            if (!p) {
+              const span = el.ownerDocument.createElement('span');
+              span.className = 'dz-dayhead__content';
+              p = { key: `d${seq.current++}`, span, day };
+              dayPortals.current.set(el, p);
+            } else p.day = day;
+            refresh();
+            return p.span;
+          },
+          willUnmount: ({ el }: { el: HTMLElement }) => {
+            if (dayPortals.current.delete(el)) refresh();
+          },
+        },
+      }),
+      ...(rendering && {
             event: {
-              content: (ctx, el) => {
+              content: (ctx: EventContentCtx, el: HTMLElement) => {
+                // A background is drawn only when the application gives it something: asked now, not after the portal renders.
+                if (ctx.background) {
+                  const out = latest.current.renderEventContent?.(ctx.instance.event, ctx);
+                  if (out === null || out === undefined || out === false) return null;
+                }
                 let p = portals.current.get(el);
                 if (!p) {
                   const span = el.ownerDocument.createElement('span');
@@ -139,14 +167,14 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
                 refresh();
                 return p.span;
               },
-              willUnmount: ({ el }) => {
+              willUnmount: ({ el }: { el: HTMLElement }) => {
                 if (portals.current.delete(el)) refresh();
               },
             },
-          }
-        : {},
+      }),
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rendering],
+    [rendering, heading],
   );
 
   // ── the options: what changed since the last render goes to the calendar ──
@@ -258,6 +286,7 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
       ...(view !== undefined && { initialView: view }),
       ...(date !== undefined && { initialDate: date }),
       onDateClick: (x: DateClick) => latest.current.onDateClick?.(x),
+      onEventChange: (c: EventChange) => latest.current.onEventChange?.(c),
       ...defined(offers()),
       onResourceProblems: (ps: readonly Problem[]) => latest.current.onResourceProblems?.(ps),
       onEventClick: (i: EventInstance) => latest.current.onEventClick?.(i),
@@ -326,6 +355,7 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
       cal.current = null;
       c.destroy();
       portals.current.clear();
+      dayPortals.current.clear();
       ctl.current.onReoffer(null);
       ctl.current.detach(c);
     };
@@ -348,7 +378,10 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
     if (changes['date'] !== undefined) reported.current.date = changes['date'] as PlainDate;
     // Everything seen is recorded — a view or date dropped above as no change too, or the parent setting it back later would look like nothing.
     for (const [k, v] of Object.entries(settings)) if (v !== undefined) sent.current[k] = v;
-    if ('hooks' in changes) portals.current.clear();
+    if ('hooks' in changes) {
+      portals.current.clear();
+      dayPortals.current.clear();
+    }
     if (offered !== lastOffered.current) {
       lastOffered.current = offered;
       Object.assign(changes, offers());
@@ -383,12 +416,20 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
   }), [controller]);
 
   const draw = props.renderEventContent;
+  const drawDay = props.renderDayHeader;
   return h(
     Fragment,
     null,
     h('div', { ...attributes, ref: host, className: props.className, style: props.style, id: props.id }),
     // The events' content sees this calendar's controller (`useParentCalendarController()`).
-    draw ? h(CalendarControllerContext.Provider, { value: controller }, [...portals.current.values()].map((p) => createPortal(draw(p.event, p.ctx), p.span, p.key))) : null,
+    draw || drawDay
+      ? h(
+          CalendarControllerContext.Provider,
+          { value: controller },
+          draw ? [...portals.current.values()].map((p) => createPortal(draw(p.event, p.ctx), p.span, p.key)) : null,
+          drawDay ? [...dayPortals.current.values()].map((p) => createPortal(drawDay(p.day), p.span, p.key)) : null,
+        )
+      : null,
   );
 }
 

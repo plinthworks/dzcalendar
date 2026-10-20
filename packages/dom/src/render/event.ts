@@ -79,8 +79,15 @@ export function applyEventLook(el: HTMLElement, ev: CalEvent): void {
   for (const c of ev.classNames) el.classList.add(c);
   if (ev.classNames.length > 0) el.dataset['dzClasses'] = ev.classNames.join(' ');
   else delete el.dataset['dzClasses'];
-  if (ev.tone) el.style.setProperty('--dz-event-accent', `var(--dz-tone-${ev.tone})`);
-  else el.style.removeProperty('--dz-event-accent');
+  if (ev.tone) {
+    el.style.setProperty('--dz-event-accent', `var(--dz-tone-${ev.tone})`);
+    // A tone may say its own text colour on a solid block (an application's pale tone): unset, the theme's is used.
+    el.style.setProperty('--dz-tone-on', `var(--dz-tone-${ev.tone}-on)`);
+  }
+  else {
+    el.style.removeProperty('--dz-event-accent');
+    el.style.removeProperty('--dz-tone-on');
+  }
   el.dataset['eventId'] = ev.id;
   // An occurrence: its id is `series@start`; the series is what an application looks up.
   if (ev.ref) el.dataset['seriesId'] = ev.ref.seriesId;
@@ -95,7 +102,8 @@ const mounted = new WeakMap<HTMLElement, { cleanup?: () => void; ctx: EventConte
  * neighbour moved.
  */
 /** An application hook that throws must not take the calendar down: reported, and the default used. */
-function guard<T>(fn: () => T, fallback: T): T {
+/** An application's hook that throws: reported (an unhandled rejection), the calendar's own drawing kept. */
+export function guard<T>(fn: () => T, fallback: T): T {
   try {
     return fn();
   } catch (err) {
@@ -131,7 +139,7 @@ export function unmountEvent(ctx: ViewCtx, el: HTMLElement): void {
 
 /** The default content of a timed event: hours (with badges) and title. */
 export function timedContent(ctx: ViewCtx, labels: TimeLabels, title: string, startsHere: boolean): Node[] {
-  const time = h(ctx.doc, 'span', 'dz-ev__time', startsHere ? labels.text : '');
+  const time = h(ctx.doc, 'span', 'dz-ev__time', startsHere && ctx.displayEventTime ? labels.text : '');
   time.dir = 'ltr';
   if (startsHere && labels.offset) time.append(h(ctx.doc, 'span', 'dz-ev__offset', labels.offset));
   if (startsHere && labels.real) time.append(h(ctx.doc, 'span', 'dz-ev__real', labels.real));

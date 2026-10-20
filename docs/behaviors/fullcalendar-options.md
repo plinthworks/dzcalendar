@@ -21,10 +21,10 @@ public documentation (option names and what they do), in our own words.
   `end` as `Date`, `allDay`, `extendedProps`…), not live objects with
   methods; changing an event is a command (`calendar.run`).
 - **A refused move** is undone through the history: `revert()` is an undo.
-- **`eventDrop`, `eventResize`, `eventChange`** follow every command —
-  a person's gesture or the application's `calendar.run` — not a source's
-  delivery nor an undo. An occurrence moved alone is the series' event
-  (its id), dropped.
+- **`eventDrop`, `eventResize`, `eventChange`** follow a person's change —
+  a gesture, the keyboard, the menu, the editor — not the application's own
+  `calendar.run`, a source's delivery nor an undo. An occurrence moved alone
+  is the series' event (its id), dropped.
 - **`jsEvent`** is a stand-in (`type`, `preventDefault`, `stopPropagation`):
   the calendar hands no native event to these callbacks. A click on an event
   with a `url` follows it unless `eventClick` returns `false` or calls
@@ -65,6 +65,8 @@ public documentation (option names and what they do), in our own words.
 | `businessHours` | the same shape, days converted |
 | `eventConstraint`, `eventOverlap`, `eventAllow`, `selectAllow`, `validRange` | the rules (`constraint`, `overlap`, `allow`, `validRange`) |
 | `nowIndicator`, `weekNumbers`, `dayMaxEventRows` / `dayMaxEvents`, `eventMaxStack` | the same (lanes, stack) |
+| `allDaySlot`, `displayEventTime` | the same |
+| `dayHeaderContent`, `dayHeaderDidMount`, `dayHeaderWillUnmount` | the day-header hook (date, resource, the day's info), in week, day and month views — not a list's day headings |
 | `headerToolbar` | the views it names are the view switch |
 | `resources`, `resourceGroupField`, `resourceOrder`, `resourceAreaColumns` | the same (nested `children` flattened with their parent) |
 | `eventContent`, `eventDidMount`, `eventWillUnmount`, `resourceLabelContent` | the render hooks |

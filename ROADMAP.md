@@ -10,9 +10,12 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   `test:browser`, `perf:browser`, `test:package` (Angular 19–22, `ng add`,
   `dz-migrate`, React 18/19, Vue 3.4/3.5); `gen:schema --check`,
   `gen:llms --check`. `bench:public` measured (docs/benchmark.md).
-- **Now: the real test** — Sehhaty's agent (session `sehhaty-c5`)
-  duplicates an agenda screen of Sehhaty with DzCalendar from the tarballs
-  of `npm run pack:local`; what it hits comes back here.
+- **Done:** Phase 18e (Sehhaty's feedback) committed ("Phase 18e"); every
+  check green (1 344 tests, typecheck, build, size, test:browser,
+  test:package) but the known noise (`normalize+index 10k`).
+- **Now: Sehhaty's second pass** — `sehhaty-c5` reruns its screen on the
+  new tarballs (`packed/`), removing its workarounds (checklist in the 18e
+  section); what is left comes back here.
 - **Then, from the benchmark:** first render (the kernel reads and indexes
   every event at creation: 80 % of a 10 000-event month's first render) and
   size (122 kB against FullCalendar 7's 95 kB) — the two numbers where
@@ -2207,4 +2210,160 @@ See `ARCHITECTURE.md` J. Phase 17.
   size: next).
 - A slot query's unknown `busy.kind` is refused by the schema but read as a
   booking by the engine (left as is, noted).
+
+
+## The real test — Sehhaty's agenda on DzCalendar (2026-10-20)
+
+Sehhaty's agent duplicated `/agenda/:doctorId` (Angular 21 zoneless,
+FullCalendar 6.1.20, three views, background layers, drag and drop, context
+menu, SSE, six side panels, fr/en/ar + RTL) as `/agenda-dz/:doctorId` on
+the branch `spike/dzcalendar-agenda` of sehhaty-dashboard (commit 30f6c50,
+not pushed), from the tarballs and the docs only; the orchestrator is the
+original file to one import.
+
+**Worked at once:** `dz-migrate` in one pass; the palette inherited from
+tzslot's `--tz-accent` (430 lines of `.fc-*` overrides gone, ~10 variables);
+no re-measuring (FullCalendar needed a ResizeObserver and a `resize()` from
+the parent); the typed context menu with the instant (replacing 60 lines of
+`elementsFromPoint`: FullCalendar's menu did not open in week/day); drag and
+drop with the server's refusal reverted; 50 events, no console or API error.
+Net: −430 lines of CSS, −60 of menu, −35 of re-measuring.
+
+**What it hit (to fix):**
+- **A. The application's zone lost** — `provideDzCalendar({ timeZone })` is
+  overridden by the compat layer when the FullCalendar options name no zone
+  (they rarely do): `zone-guessed browser:…`, events read in the browser's
+  zone. The defaults' zone should win.
+- **B. No day-header hook** — `CalendarHooks` has `event` and `resource`
+  only, and `hooks` is out of reach from Angular (`DzCalendarOptions` omits
+  it). Sehhaty marks a day ("Fermé · Congrès") and counts the patients to
+  move in the column head. `dayHeaderContent` is `compat-unsupported`.
+- **C. An all-day background event does not wash the column** in the time
+  grid (FullCalendar does: a closed day shows at every hour). Worked around
+  with a timed layer over the hours shown.
+- **D. `allDaySlot: false`, `displayEventTime: false`** unsupported (the
+  all-day row stays; a 30-minute event's time and title cut each other).
+- **E. `dz-migrate` drops `DateClickArg`** imported from
+  `@fullcalendar/interaction` ("has no equivalent") although compat exports
+  it: the types table is only for `@fullcalendar/core`.
+- **F. Compat types looser than FullCalendar's**: `view` is
+  `ViewApi | null` in `DatesSetArg`, `EventClickArg`, `DateClickArg`,
+  `DateSelectArg` — strict code no longer compiles (TS18047).
+- **G. At-creation options with the directive**: `nowIndicator`,
+  `scrollTime`, `dayMaxLanes`, `eventMaxStack`, `firstDay`, rules are read at
+  construction, the directive applies after: lost (said `at-creation`). Only
+  the behaviour sheet says to move them to `provideDzCalendar`.
+- **H.** `npx @dzcalendar/migrate` (the doc) cannot work before publication
+  — `npx dz-migrate` after a local install does.
+- **I.** Installing from tarballs needs the whole internal closure
+  (`ical`, `rrule` too): to be said.
+- **J. `angular.md` is thin**: 5 inputs and 1 output shown of 22 and 12;
+  nothing on persisting a drag server-side (no output for "an event moved":
+  `kernel.subscribe` → `store` change, `cause === 'command'`, `applied`,
+  then `controller.undo()` on refusal — found in the `.d.ts` only); that
+  `[options]` and `[dzFullCalendar]` compose is not said.
+- Its own lesson: `tsc` does not check Angular templates — `ng build` does.
+
+## Phase 18e — Sehhaty's feedback ✅ (2026-10-20)
+
+### Owner's decisions (2026-10-20)
+
+- **B. A day-header hook** in dom (`hooks.dayHeader`: content, didMount,
+  willUnmount; with the date, the resource, the day's info — 23 h / 25 h),
+  exposed in each framework: Angular `dzDayHeader` template, React
+  `renderDayHeader`, Vue `#day-header` slot; compat maps `dayHeaderContent`.
+- **C. An all-day background event washes the whole column** of the time
+  grid as well as the all-day row (behaviour sheet first).
+- **G. Every at-creation option live**: `nowIndicator`, `scrollTime`,
+  `dayMaxLanes`, `eventMaxStack`, `firstDay`, rules through `update()`.
+- **J. An `eventChange` output** in dom (`onEventChange`) and each
+  framework: after a person's gesture or command, `{ before, after, command,
+  revert() }` (revert = undo); the framework docs show the server call and
+  the revert on refusal.
+- **From the owner's side-by-side screenshots (FullCalendar vs DzCalendar
+  in Sehhaty):** (1) the month gets a **"show everything" mode**,
+  `dayMaxLanes: null` — no cap, weeks grow, the month scrolls (default stays
+  `'auto'`); (2) the time grid's **default scale higher**, about 1.2 px a
+  minute (72 px an hour), and `--dz-minute` documented in theming; (3) an
+  **`eventStyle: 'tinted' | 'solid'`** option (solid: a filled block, text
+  contrast checked AA) — the rest of the look waits for the CSS pass; (4)
+  **background events can carry content** through the content hook
+  (`ctx.background: true`; Angular `dzEventContent`, React
+  `renderEventContent`, Vue `#event-content`); without a hook they stay
+  mute. Also seen: in the month, timed events show their dot without their
+  title — to reproduce.
+- Without a decision to take: A (the defaults' zone wins in compat), D
+  (`allDaySlot`, `displayEventTime` options, mapped by compat), E (dz-migrate
+  types from every `@fullcalendar/*`), F (`view` non-null in compat types),
+  H/I (install docs: `npx dz-migrate`, the tarballs' closure), J's docs
+  (the whole Angular/React/Vue surface; `[options]` and `[dzFullCalendar]`
+  compose). Then Sehhaty's agent runs its screen again on the new tarballs, removing
+  its workarounds (its checklist: A `timeZone: FUSEAU` out of `options`, the
+  "25 h" mark must not come back on 25 Oct in Algiers; B `dayHeaderContent`
+  and `enTeteDeJour` back, "Fermé · Congrès" on Fri 23 / Sat 24 and the
+  patients counter clickable; C `coucheVersEvenement` out, columns washed
+  top to bottom; D the title-only template out, no empty all-day row; G
+  `nowIndicator` / `scrollTime` out of `provideDzCalendar`; J the drag done
+  again without `[dzFullCalendar]`, `e2e/dz-glisser.spec.ts`). Its traps:
+  `ng build` checks templates, `tsc` does not; a test click must stay inside
+  the viewport.
+
+### Built
+
+- **Day-header hook** `hooks.dayHeader` (content, didMount, willUnmount; date,
+  resource, the day's real length, the calendar's words) in week, day and
+  month views — Angular `dzDayHeader`, React `renderDayHeader`, Vue
+  `#day-header`, compat `dayHeaderContent`; a head with the application's
+  content (or a didMount) is read by assistive technology; a throwing hook
+  is reported, the calendar drawn.
+- **All-day backgrounds wash their columns** (core model;
+  `docs/behaviors/allday-background.md`); **backgrounds take the content
+  hook** in the time grid (`ctx.background`, a sticky label).
+- **Live options**: `firstDay` (kernel `setFirstDay`), `rules`
+  (`setRules`), `nowIndicator`, `scrollTime`, `dayMaxLanes` (and `null`: the
+  weeks grow), `eventMaxStack`; new `allDaySlot`, `displayEventTime`,
+  `eventStyle: 'tinted' | 'solid'` (text `--dz-on-tone` / `--dz-tone-<name>-on`,
+  AA by test for every tone), `--dz-event-radius`; the time grid's default
+  scale 1.2 px a minute (densities 0.8 / 1.2 / 1.6).
+- **`onEventChange`** (dom) and `(eventChange)` / `onEventChange` /
+  `@event-change`: a person's command (validated), undo or redo, with its
+  `revert()` — kernel store events carry `command` and `validated`;
+  `history.revert(applied)` takes back that write by its own entry (an undo's
+  goes back to done, a redo's to undone), refuses a merged entry or a
+  transaction, and works from inside the callback.
+- **Compat**: the calendar's zone wins over the browser's; `dayMaxLanes:
+  null` by default (theirs shows all); `eventDrop` / `eventResize` /
+  `eventChange` / `eventAdd` / `eventRemove` for a person's changes, `revert`
+  exact; `view` non-null; `isPast` / `isFuture`. **dz-migrate** keeps types
+  imported from plugins.
+- Docs: angular.md (the whole surface, saving a change with revert,
+  `[dzFullCalendar]` composing), react.md, vue.md, theming.md,
+  migrating-from-fullcalendar.md (npx dz-migrate, tarballs' closure);
+  playground `sehhaty.html`.
+- Budgets (owner, measured + 3 %): dom 46.35 kB, react 3.55 kB, vue 3.75 kB,
+  compat-fullcalendar 9.0 kB.
+
+### Reviews (architect; code review by execution in Chrome), fixed
+
+- An undo's revert redid whatever was on top (the wrong appointment moved):
+  by its own entry now. A revert inside the callback left a phantom entry and
+  slipped past the transaction rule: deferred to the end of the write.
+  `history.revert` took a merged entry whole: refused.
+- A person's undo / redo was not said: said, with `cause`.
+- Compat's revert was "the last undo": exact.
+- `allDaySlot: false` let the keyboard into the folded row: no all-day row
+  for the keyboard then.
+- Solid text on off-white families (pastel, frost) fell under AA: its own
+  token, tested for every tone.
+- Month heads: resource null and 24 h always: the column's resource, the
+  day's length. A didMount-only head stayed `aria-hidden`: read.
+- The background sheet promised a reading that was not built: corrected.
+
+### Not done in Phase 18e, on purpose
+
+- The day-header hook does not reach a list's day headings; background
+  content is in the time grid's columns only (the all-day row and the month
+  stay tints) — both said in the docs.
+- A command your code runs with `{ validate: true }` is said as a person's
+  (that is what validating means) — documented.
 

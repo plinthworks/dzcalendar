@@ -249,7 +249,14 @@ export function buildTimeGridColumn(
   const aEnd = axis.end.epochMilliseconds;
   const segs: TimedSegment[] = [];
   for (const inst of instances) {
-    if (inst.event.allDay) continue;
+    if (inst.event.allDay) {
+      // An all-day background (a closed day) tints the whole column too, every hour shown — not only the all-day row.
+      if (inst.event.display === 'background') {
+        const wash = `${inst.key}|day${resource ? `|${resource.id}` : ''}`;
+        segs.push({ key: wash, instance: inst, dayIndex: 0, dayCount: 1, part: 0, startsHere: true, endsHere: true, from: axis.start, to: axis.end });
+      }
+      continue;
+    }
     for (const seg of segmentTimed(inst, [day], { cutAtRepeat: mode === 'wall' })) {
       const f = seg.from.epochMilliseconds;
       const t = seg.to.epochMilliseconds;

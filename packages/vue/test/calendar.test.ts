@@ -182,3 +182,24 @@ describe('after the 18c code review (Vue)', () => {
   });
 });
 
+
+describe('after Sehhaty’s test (Vue)', () => {
+  it('#day-header: the application’s mark; #event-content labels a background, an empty v-if leaves it mute', async () => {
+    const evs = [
+      { id: 'v', title: 'Vacances', start: '2026-10-23', end: '2026-10-25', allDay: true, display: 'background' as const },
+      { id: 'p', title: '', start: '2026-10-21T12:00[Europe/Paris]', duration: { hours: 1 }, display: 'background' as const },
+    ];
+    await mount(
+      defineComponent({
+        setup: () => () =>
+          h(DzCalendar, { ...base, events: evs }, {
+            'day-header': ({ day }: { day: { date: unknown; text: string } }) => (String(day.date) === '2026-10-23' ? [h('button', { class: 'mark' }, `Fermé · ${day.text}`)] : [day.text as never]),
+            'event-content': ({ event, ctx }: { event: { title: string }; ctx: { background?: boolean } }) => (ctx.background ? (event.title ? [h('b', event.title)] : []) : [event.title as never]),
+          }),
+      }),
+    );
+    await nextTick();
+    const labels = [...el.querySelectorAll('.dz-tg__col .dz-ev--bg')].map((b) => b.textContent ?? '').sort();
+    expect([el.querySelector('.dz-tg__dayhead .mark')?.textContent, labels]).toEqual(['Fermé · ven. 23', ['', 'Vacances', 'Vacances']]);
+  });
+});

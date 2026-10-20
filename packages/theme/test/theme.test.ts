@@ -61,3 +61,27 @@ describe('@dzcalendar/theme', () => {
     expect(css).toMatch(/\[data-theme=dark\]\s*\{\s*--tz-color-scheme: dark;/);
   });
 });
+
+describe("eventStyle 'solid': every tone readable on every theme (Sehhaty, 2026-10-20)", () => {
+  // The solid block is the tone, its text the theme's background (styles.ts): their contrast, WCAG 2.x, AA for text is 4.5:1.
+  const scss = readFileSync(new URL('../dzcalendar.scss', import.meta.url), 'utf8');
+  const pairs = (block: string) => [...block.matchAll(/'?([\w-]+)'?:\s*\((#[0-9a-f]{6}),\s*(#[0-9a-f]{6})\)/gi)].map((m) => [m[1]!, m[2]!, m[3]!] as const);
+  const tones = pairs(/\$tones:\s*\(([\s\S]*?)\)\s*!default/.exec(scss)![1]!);
+  const bgs = [['standard', ...(/\$bg:\s*\((#[0-9a-f]{6}),\s*(#[0-9a-f]{6})\)/i.exec(scss)!.slice(1, 3))], ...[...scss.matchAll(/'([\w-]+)':\s*\(\s*bg:\s*\((#[0-9a-f]{6}),\s*(#[0-9a-f]{6})\)/gi)].map((m) => [m[1]!, m[2]!, m[3]!])] as [string, string, string][];
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  };
+  const ratio = (a: string, b: string) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  it('six tones, the standard background and the families read from the stylesheet', () => {
+    expect([tones.length, bgs.length >= 2]).toEqual([6, true]);
+  });
+  it('light and dark: each tone against the text written on it (--dz-on-tone) ≥ 4.5', () => {
+    const [onLight, onDark] = /\$on-tone:\s*\((#[0-9a-f]{6}),\s*(#[0-9a-f]{6})\)/i.exec(scss)!.slice(1, 3) as [string, string];
+    const low = tones.flatMap(([tone, tl, td]) => [[`light ${tone}`, ratio(tl, onLight)], [`dark ${tone}`, ratio(td, onDark)]] as const).filter(([, r]) => r < 4.5).map(([n, r]) => `${n} ${r.toFixed(2)}`);
+    expect(low).toEqual([]);
+  });
+  it('the tones are the same on every family (the families change backgrounds, not tones): one check holds for all', () => {
+    expect(scss.match(/\$tones:/g)?.length).toBe(1);
+  });
+});

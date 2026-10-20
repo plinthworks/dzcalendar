@@ -97,10 +97,19 @@ export async function migrateSource(text: string, fileName = 'file.ts'): Promise
     if (from in PLUGINS) {
       const def = imp.getDefaultImport()?.getText();
       if (def) removedValues.add(def);
+      const types: string[] = [];
       for (const n of imp.getNamedImports()) {
-        removedValues.add(n.getAliasNode()?.getText() ?? n.getName());
-        notes.push(`${from}: ${n.getName()} has no equivalent (dropped)`);
+        const name = n.getName();
+        const local = n.getAliasNode()?.getText() ?? name;
+        // A type the plugin exports (DateClickArg from interaction…): the same name here.
+        if (TYPES.has(name)) {
+          types.push(local === name ? name : `${name} as ${local}`);
+          continue;
+        }
+        removedValues.add(local);
+        notes.push(`${from}: ${name} has no equivalent (dropped)`);
       }
+      if (types.length > 0) add.push({ module: '@dzcalendar/compat-fullcalendar', names: types, types: true });
       const to = PLUGINS[from];
       if (to) sideEffects.add(to);
       imp.remove();

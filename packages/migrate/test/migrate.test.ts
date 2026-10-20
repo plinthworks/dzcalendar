@@ -128,3 +128,10 @@ const other: CalendarInstance = createFromFullCalendar(document.body, {}).calend
   });
 });
 
+describe('dz-migrate after Sehhaty’s test', () => {
+  it('a type imported from a plugin (DateClickArg from interaction) is kept, from compat', async () => {
+    const r = await migrateSource(`import interactionPlugin, { DateClickArg } from '@fullcalendar/interaction';\nexport const f = (a: DateClickArg) => a.dateStr;\nexport const p = [interactionPlugin];\n`, 'x.ts');
+    expect([r.text.includes('import type { DateClickArg } from "@dzcalendar/compat-fullcalendar";'), r.notes]).toEqual([true, []]);
+  });
+});
+

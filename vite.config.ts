@@ -70,6 +70,7 @@ export default defineConfig({
         fullcalendar: fileURLToPath(new URL('./playground/fullcalendar.html', import.meta.url)),
         react: fileURLToPath(new URL('./playground/react.html', import.meta.url)),
         vue: fileURLToPath(new URL('./playground/vue.html', import.meta.url)),
+        sehhaty: fileURLToPath(new URL('./playground/sehhaty.html', import.meta.url)),
         timeline: fileURLToPath(new URL('./playground/timeline.html', import.meta.url)),
       },
     },

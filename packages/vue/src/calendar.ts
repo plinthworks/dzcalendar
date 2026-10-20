@@ -1,4 +1,4 @@
-import { Teleport, computed, defineComponent, getCurrentInstance, h, inject, nextTick, onBeforeUnmount, onMounted, provide, shallowRef, watch } from 'vue';
+import { Comment, Teleport, Text, computed, defineComponent, getCurrentInstance, h, inject, nextTick, onBeforeUnmount, onMounted, provide, shallowRef, watch } from 'vue';
 import type { ComponentPublicInstance, PropType, SlotsType, VNode } from 'vue';
 import type {
   AvailableSlot,
@@ -18,7 +18,7 @@ import type {
   ZoneId,
 } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DzMessages, EventContentCtx, MotionAdapter } from '@dzcalendar/dom';
+import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DayHeaderCtx, DzMessages, EventChange, EventContentCtx, MotionAdapter } from '@dzcalendar/dom';
 import { CALENDAR_CONTROLLER, createCalendarController, writesOf } from './controller.js';
 import type { CalendarController } from './controller.js';
 import { DZ_CALENDAR_SETTLED } from './plugin.js';
@@ -26,10 +26,15 @@ import type { DzCalendarDefaults } from './plugin.js';
 import { same } from './same.js';
 
 /** The callbacks the component turns into events: not options (they would silence them). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange'] as const;
 
 /** What `options` takes: what `update()` takes, less what has a prop or an event of its own. */
 export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | 'motion' | (typeof OWN_CALLBACKS)[number]>;
+
+/** What the `#day-header` slot receives: the day (its date, resource, length, the calendar's words). */
+export interface DayHeaderSlotProps {
+  readonly day: DayHeaderCtx;
+}
 
 /** What the `#event-content` slot receives. */
 export interface EventContentSlotProps {
@@ -81,6 +86,7 @@ export interface DzCalendarProps {
   readonly onDateClick?: (click: DateClick) => void;
   readonly onSlotClick?: (slot: AvailableSlot) => void;
   readonly onEventClick?: (instance: EventInstance) => void;
+  readonly onEventChange?: (change: EventChange) => void;
   readonly onEventOpen?: (instance: EventInstance) => void;
   readonly onCreateRequest?: (request: CreateRequest) => void;
   readonly onSelected?: (selection: Selection) => void;
@@ -97,7 +103,7 @@ export interface DzCalendarProps {
  */
 export type DzCalendarComponent = new () => ComponentPublicInstance & {
   $props: DzCalendarProps;
-  $slots: { 'event-content'?: (props: EventContentSlotProps) => VNode[] };
+  $slots: { 'event-content'?: (props: EventContentSlotProps) => VNode[]; 'day-header'?: (props: DayHeaderSlotProps) => VNode[] };
 };
 
 /**
@@ -155,6 +161,8 @@ export const DzCalendar = defineComponent({
     /** A free slot clicked (or Enter on it): the slot as given. Book it; the server checks it again. */
     slotClick: (_s: AvailableSlot) => true,
     eventClick: (_i: EventInstance) => true,
+    /** What a person changed (a drag, a resize, the keyboard, the menu, the editor): persist it; `revert()` if the server refuses. */
+    eventChange: (_c: EventChange) => true,
     eventOpen: (_i: EventInstance) => true,
     createRequest: (_r: CreateRequest) => true,
     /** A selection made by a person (`v-model:selection` follows it too). */
@@ -166,7 +174,7 @@ export const DzCalendar = defineComponent({
     /** A value the calendar refused (an unknown view, every day hidden): the others are applied. */
     error: (_e: unknown) => true,
   },
-  slots: Object as SlotsType<{ 'event-content'?: (props: EventContentSlotProps) => VNode[] }>,
+  slots: Object as SlotsType<{ 'event-content'?: (props: EventContentSlotProps) => VNode[]; 'day-header'?: (props: DayHeaderSlotProps) => VNode[] }>,
   setup(props, { emit, slots, expose, attrs }) {
     const settled = inject(DZ_CALENDAR_SETTLED, {});
     const self = getCurrentInstance()!;
@@ -190,9 +198,31 @@ export const DzCalendar = defineComponent({
     const drawn = shallowRef(0);
     let seq = 0;
     const hasSlot = () => Boolean(slots['event-content']);
+    const hasDaySlot = () => Boolean(slots['day-header']);
+    const dayPortals = new Map<HTMLElement, { key: string; span: HTMLElement; day: DayHeaderCtx }>();
+    /** A slot's output that draws nothing (an empty `v-if`): comments and blank text only. */
+    const blank = (nodes: VNode[] | undefined) => !nodes || nodes.every((n) => n.type === Comment || (n.type === Text && !String(n.children ?? '').trim()));
+    const dayHooks: NonNullable<CalendarHooks['dayHeader']> = {
+      content: (day, el) => {
+        let p = dayPortals.get(el);
+        if (!p) {
+          const span = el.ownerDocument.createElement('span');
+          span.className = 'dz-dayhead__content';
+          p = { key: `d${seq++}`, span, day };
+          dayPortals.set(el, p);
+        } else p.day = day;
+        drawn.value++;
+        return p.span;
+      },
+      willUnmount: ({ el }) => {
+        if (dayPortals.delete(el)) drawn.value++;
+      },
+    };
     const contentHooks: CalendarHooks = {
       event: {
         content: (ctx, el) => {
+          // A background is drawn only when the slot gives it something: asked now, not after the teleport renders.
+          if (ctx.background && blank(slots['event-content']?.({ event: ctx.instance.event, ctx }))) return null;
           let p = portals.get(el);
           if (!p) {
             const span = el.ownerDocument.createElement('span');
@@ -212,8 +242,9 @@ export const DzCalendar = defineComponent({
         },
       },
     };
-    let hooksFor: boolean | null = null;
-    const hooks = (): CalendarHooks => (hasSlot() ? contentHooks : {});
+    let hooksFor: string | null = null;
+    const hooksKey = () => `${hasSlot()}|${hasDaySlot()}`;
+    const hooks = (): CalendarHooks => ({ ...(hasSlot() && contentHooks), ...(hasDaySlot() && { dayHeader: dayHooks }) });
 
     const settings = computed((): Record<string, unknown> => {
       const options: Record<string, unknown> = { ...props.options };
@@ -304,9 +335,10 @@ export const DzCalendar = defineComponent({
       if (props.view !== undefined && props.view !== st.view.type && props.view !== refused.view) changes['view'] = reported.view = props.view;
       if (props.date !== undefined && !props.date.equals(st.date) && !same(props.date, refused.date)) changes['date'] = reported.date = props.date;
       sent = s;
-      if (hasSlot() !== hooksFor) {
-        hooksFor = hasSlot();
+      if (hooksKey() !== hooksFor) {
+        hooksFor = hooksKey();
         portals.clear();
+        dayPortals.clear();
         changes['hooks'] = hooks();
       }
       const o = offeredNow();
@@ -336,7 +368,7 @@ export const DzCalendar = defineComponent({
         }
       }
       const { view, date, ...rest } = defined(first);
-      hooksFor = hasSlot();
+      hooksFor = hooksKey();
       offered = offeredNow();
       const options = {
         ...settled.defaults,
@@ -349,6 +381,7 @@ export const DzCalendar = defineComponent({
         ...defined(offers()),
         onDateClick: (x: DateClick) => emit('dateClick', x),
         onEventClick: (i: EventInstance) => emit('eventClick', i),
+        onEventChange: (c: EventChange) => emit('eventChange', c),
         onResourceProblems: (ps: readonly Problem[]) => emit('resourceProblems', ps),
         onSelect: (s: Selection) => {
           reported.selection = s;
@@ -437,6 +470,7 @@ export const DzCalendar = defineComponent({
       const c = cal;
       cal = null;
       portals.clear();
+      dayPortals.clear();
       if (c) {
         c.destroy();
         writes.onReoffer(null);
@@ -455,12 +489,14 @@ export const DzCalendar = defineComponent({
     return () => {
       // Listeners bound or unbound since the last render: what the calendar offers follows (after this render).
       // A slot added or taken away (`v-if`) changes the hooks: after this render too.
-      if (cal && (offeredNow() !== offered || hasSlot() !== hooksFor)) void nextTick(sync);
+      if (cal && (offeredNow() !== offered || hooksKey() !== hooksFor)) void nextTick(sync);
       void drawn.value;
       const draw = slots['event-content'];
+      const drawDay = slots['day-header'];
       return [
         h('div', { ...attrs, ref: host }),
         ...(draw ? [...portals.values()].map((p) => h(Teleport, { to: p.span, key: p.key }, draw({ event: p.event, ctx: p.ctx }))) : []),
+        ...(drawDay ? [...dayPortals.values()].map((p) => h(Teleport, { to: p.span, key: p.key }, drawDay({ day: p.day }))) : []),
       ];
     };
   },

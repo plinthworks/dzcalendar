@@ -1,4 +1,5 @@
 import type { ActionItem, ActionTarget, CalendarKernel, Resource, Command, CommandResult, EditScope, EventInstance, Instant, KernelState, Proposal, RulesContext, Segment, ZoneId } from '@dzcalendar/core';
+import type { DayHeaderHooks } from './render/day-head.js';
 import type { InteractionSurface } from './interact/surface.js';
 import type { LiveSettings } from './settings.js';
 
@@ -18,6 +19,8 @@ export interface EventContentCtx {
   readonly timeText: string;
   readonly displayZone: ZoneId;
   readonly family: string;
+  /** A background event (a closed day, leave) in a time grid's column: its content, if the hook gives one, is drawn at its top; null leaves it mute. */
+  readonly background?: boolean;
 }
 
 export interface EventHooks {
@@ -46,6 +49,8 @@ export interface ResourceHooks {
 export interface CalendarHooks {
   readonly event?: EventHooks;
   readonly resource?: ResourceHooks;
+  /** A day's head (a week's or a day's date, a month's weekday): a mark, a count, a button. */
+  readonly dayHeader?: DayHeaderHooks;
 }
 
 export interface ContextMenuCtx {
@@ -80,6 +85,10 @@ export interface ViewCtx {
   readonly cssLayers: boolean;
   /** Week numbers on the month's rows and the week's corner. */
   weekNumbers: boolean;
+  /** The time grid's all-day row (false: none, and no all-day event in it). */
+  allDaySlot: boolean;
+  /** An event's time beside its title (false: the title alone; a real length across a clock change stays said). */
+  displayEventTime: boolean;
   /** A second calendar's locale (`-u-ca-`), for the date shown beside each date; null: none. */
   altLocale: string | null;
   /**

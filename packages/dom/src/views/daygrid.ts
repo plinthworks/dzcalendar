@@ -1,4 +1,4 @@
-import { Temporal, formatTemporal } from '@dzcalendar/core';
+import { Temporal, formatTemporal, dayInfo } from '@dzcalendar/core';
 import { weekNumber, weekRulesFor } from '@dzcalendar/core';
 import type { DayGridBar, DayGridModel, DayGridWeek, Hit, KernelState, PlainDate, Segment, ZonedDateTime } from '@dzcalendar/core';
 
@@ -17,6 +17,7 @@ import { altDate } from '../render/alt.js';
 import { NodePool } from '../render/pool.js';
 import { drawResourceHeads, noResourcesNote, resourceName } from '../render/resource-heads.js';
 import { activeIn } from '../focus.js';
+import { ownDayHead, unmountDayHead } from '../render/day-head.js';
 
 /** A cell's key: its date, and its resource in a resource view (the same date shows once per resource). */
 const cellKey = (date: PlainDate, resourceId: string | undefined) => (resourceId === undefined ? date.toString() : `${date.toString()}|${resourceId}`);
@@ -240,9 +241,17 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     const row = (m.groupHeads.length > 0 ? 1 : 0) + (resourced ? 1 : 0) + 1;
     // A one-day resource view: the resources are the columns, the title says the day.
     const dates = resourced && (m.weeks[0]?.dates.length ?? 0) === m.resourceHeads.length ? [] : (m.weeks[0]?.dates ?? []);
+    // Heads the application filled are let go before new ones are drawn.
+    for (const old of host.children) unmountDayHead(ctx, old as HTMLElement);
+    const today = state?.today;
     host.replaceChildren(
       ...dates.map((d, i) => {
-        const c = h(doc, 'div', 'dz-dg__weekday', formatTemporal(d, { weekday: 'short' }, ctx.locale));
+        const words = formatTemporal(d, { weekday: 'short' }, ctx.locale);
+        const c = h(doc, 'div', 'dz-dg__weekday', words);
+        // A month's column head names a weekday: its date is the column's first (as the other library gives it).
+        // The column's resource in a resource view; the day's real length in the calendar's zone (a week's Sunday 25 October in Paris: 1 500).
+        const resource = m.resourceHeads.find((r) => i >= r.from && i < r.from + r.count)?.resource ?? null;
+        ownDayHead(ctx, c, { date: d, resource, view: state?.view.type ?? '', today: today ? d.equals(today) : false, lengthMinutes: dayInfo(d, ctx.zone).lengthMinutes, text: words });
         c.setAttribute('role', 'columnheader');
         if (resourced) {
           c.style.gridRow = String(row);
@@ -543,7 +552,9 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     const fallback = () =>
       ev.allDay
         ? [doc.createTextNode(title)]
-        : [h(doc, 'span', 'dz-bar__time', labels.text.split(' – ')[0]), doc.createTextNode(` ${title}`)];
+        : ctx.displayEventTime
+          ? [h(doc, 'span', 'dz-bar__time', labels.text.split(' – ')[0]), doc.createTextNode(` ${title}`)]
+          : [doc.createTextNode(title)];
     fillEvent(ctx, el, { instance: s.instance, segment: s, timeText: labels.text, displayZone: ctx.zone, family: 'dayGrid' }, fallback, changed.created);
   }
 
@@ -563,7 +574,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
         ctx,
         item,
         { instance: sg.instance, segment: sg, timeText: labels.text, displayZone: ctx.zone, family: 'dayGrid' },
-        () => (ev.allDay ? [doc.createTextNode(title)] : [h(doc, 'span', 'dz-bar__time', labels.text), doc.createTextNode(` ${title}`)]),
+        () => (ev.allDay || !ctx.displayEventTime ? [doc.createTextNode(title)] : [h(doc, 'span', 'dz-bar__time', labels.text), doc.createTextNode(` ${title}`)]),
         true,
       );
       item.tabIndex = 0;
@@ -874,6 +885,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       if (heads.length === 0) cursorResource = undefined;
       else if (!heads.some((x) => x.resource.id === cursorResource)) cursorResource = heads[0]!.resource.id;
       root.classList.toggle('dz-dg--month', s.view.alignment === 'month' || multi);
+      // No cap (dayMaxLanes: null): every event shown, the weeks grow, the month scrolls.
+      root.classList.toggle('dz-dg--grow', !multi && (next as DayGridModel).maxLanes === null);
       if (multi) {
         // A crowded year draws the months near the cursor's first; the rest wake as they come near the screen.
         // Asleep only once a month's real height is known: before, an asleep month would collapse.
@@ -926,6 +939,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     },
     destroy() {
       for (const p of parts.values()) p.bars.clear();
+      // The weekday heads the application filled let go of what it put there.
+      for (const el of root.querySelectorAll<HTMLElement>('.dz-dg__weekday')) unmountDayHead(ctx, el);
       resourceHeads.clear();
       weeks.clear();
       months.clear();

@@ -10,7 +10,7 @@
  */
 :root, :host {
   /* On :root, not .dz-cal: a size set on the host or any ancestor must reach the calendar. */
-  --dz-minute: 0.8px;
+  --dz-minute: 1.2px;
   --dz-gutter-width: 3.75rem;
   --dz-bar-height: 1.375rem;
   --dz-height: 40rem;
@@ -45,6 +45,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,6 +65,7 @@
     --dz-tone-amber: #fbbf24;
     --dz-tone-violet: #a78bfa;
     --dz-tone-slate: #94a3b8;
+    --dz-on-tone: #111827;
   }
 }
 [data-theme=light] .dz-cal[data-dz-theme=standard]:not([data-dz-scheme=dark]) {
@@ -82,6 +84,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 [data-theme=dark] .dz-cal[data-dz-theme=standard]:not([data-dz-scheme=light]) {
@@ -100,6 +103,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=standard][data-dz-scheme=light] {
@@ -118,6 +122,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 .dz-cal[data-dz-theme=standard][data-dz-scheme=dark] {
@@ -136,6 +141,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=slate] {
@@ -154,6 +160,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -173,6 +180,7 @@
     --dz-tone-amber: #fbbf24;
     --dz-tone-violet: #a78bfa;
     --dz-tone-slate: #94a3b8;
+    --dz-on-tone: #111827;
   }
 }
 [data-theme=light] .dz-cal[data-dz-theme=slate]:not([data-dz-scheme=dark]) {
@@ -191,6 +199,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 [data-theme=dark] .dz-cal[data-dz-theme=slate]:not([data-dz-scheme=light]) {
@@ -209,6 +218,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=slate][data-dz-scheme=light] {
@@ -227,6 +237,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 .dz-cal[data-dz-theme=slate][data-dz-scheme=dark] {
@@ -245,6 +256,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=night] {
@@ -263,6 +275,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -282,6 +295,7 @@
     --dz-tone-amber: #fbbf24;
     --dz-tone-violet: #a78bfa;
     --dz-tone-slate: #94a3b8;
+    --dz-on-tone: #111827;
   }
 }
 [data-theme=light] .dz-cal[data-dz-theme=night]:not([data-dz-scheme=dark]) {
@@ -300,6 +314,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 [data-theme=dark] .dz-cal[data-dz-theme=night]:not([data-dz-scheme=light]) {
@@ -318,6 +333,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=night][data-dz-scheme=light] {
@@ -336,6 +352,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 .dz-cal[data-dz-theme=night][data-dz-scheme=dark] {
@@ -354,6 +371,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=pastel] {
@@ -372,6 +390,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -391,6 +410,7 @@
     --dz-tone-amber: #fbbf24;
     --dz-tone-violet: #a78bfa;
     --dz-tone-slate: #94a3b8;
+    --dz-on-tone: #111827;
   }
 }
 [data-theme=light] .dz-cal[data-dz-theme=pastel]:not([data-dz-scheme=dark]) {
@@ -409,6 +429,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 [data-theme=dark] .dz-cal[data-dz-theme=pastel]:not([data-dz-scheme=light]) {
@@ -427,6 +448,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=pastel][data-dz-scheme=light] {
@@ -445,6 +467,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 .dz-cal[data-dz-theme=pastel][data-dz-scheme=dark] {
@@ -463,6 +486,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=frost] {
@@ -481,6 +505,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -500,6 +525,7 @@
     --dz-tone-amber: #fbbf24;
     --dz-tone-violet: #a78bfa;
     --dz-tone-slate: #94a3b8;
+    --dz-on-tone: #111827;
   }
 }
 [data-theme=light] .dz-cal[data-dz-theme=frost]:not([data-dz-scheme=dark]) {
@@ -518,6 +544,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 [data-theme=dark] .dz-cal[data-dz-theme=frost]:not([data-dz-scheme=light]) {
@@ -536,6 +563,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=frost][data-dz-scheme=light] {
@@ -554,6 +582,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 .dz-cal[data-dz-theme=frost][data-dz-scheme=dark] {
@@ -572,6 +601,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=solar] {
@@ -590,6 +620,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -609,6 +640,7 @@
     --dz-tone-amber: #fbbf24;
     --dz-tone-violet: #a78bfa;
     --dz-tone-slate: #94a3b8;
+    --dz-on-tone: #111827;
   }
 }
 [data-theme=light] .dz-cal[data-dz-theme=solar]:not([data-dz-scheme=dark]) {
@@ -627,6 +659,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 [data-theme=dark] .dz-cal[data-dz-theme=solar]:not([data-dz-scheme=light]) {
@@ -645,6 +678,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=solar][data-dz-scheme=light] {
@@ -663,6 +697,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 .dz-cal[data-dz-theme=solar][data-dz-scheme=dark] {
@@ -681,6 +716,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=contrast] {
@@ -699,6 +735,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -718,6 +755,7 @@
     --dz-tone-amber: #fbbf24;
     --dz-tone-violet: #a78bfa;
     --dz-tone-slate: #94a3b8;
+    --dz-on-tone: #111827;
   }
 }
 [data-theme=light] .dz-cal[data-dz-theme=contrast]:not([data-dz-scheme=dark]) {
@@ -736,6 +774,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 [data-theme=dark] .dz-cal[data-dz-theme=contrast]:not([data-dz-scheme=light]) {
@@ -754,6 +793,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-cal[data-dz-theme=contrast][data-dz-scheme=light] {
@@ -772,6 +812,7 @@
   --dz-tone-amber: #b45309;
   --dz-tone-violet: #6d28d9;
   --dz-tone-slate: #475569;
+  --dz-on-tone: #ffffff;
 }
 
 .dz-cal[data-dz-theme=contrast][data-dz-scheme=dark] {
@@ -790,6 +831,7 @@
   --dz-tone-amber: #fbbf24;
   --dz-tone-violet: #a78bfa;
   --dz-tone-slate: #94a3b8;
+  --dz-on-tone: #111827;
 }
 
 .dz-toolbar__btn:hover:not(:disabled):not([aria-pressed=true]) {

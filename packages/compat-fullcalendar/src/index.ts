@@ -23,6 +23,8 @@ export type { Translation, JsEventLike } from './translate.js';
 export interface CompatOptions {
   /** Says the problems once in the console (`console.warn`), as the other library warns of unknown options. Default true. */
   readonly warn?: boolean;
+  /** The zone when the options name none (theirs is the browser's); default the browser's, said. */
+  readonly timeZone?: string;
 }
 
 /** The entry a view's family needs. */
@@ -60,9 +62,9 @@ function refused(el: HTMLElement, options: Record<string, unknown>, problems: Pr
 
 /** Makes the calendar from the other library's options, its following callbacks wired. Never throws. */
 export function createFromFullCalendar(el: HTMLElement, fullCalendarOptions: unknown, compat: CompatOptions = {}): { readonly calendar: CalendarInstance; readonly problems: readonly Problem[]; detach(): void } {
-  const t = translate(fullCalendarOptions);
+  const t = translate(fullCalendarOptions, compat.timeZone !== undefined ? { zone: compat.timeZone } : {});
   const problems: Problem[] = [...t.problems];
-  const options = t.options as Record<string, unknown>;
+  const options: Record<string, unknown> = { ...(compat.timeZone !== undefined && { timeZone: compat.timeZone }), ...(t.options as Record<string, unknown>) };
   let calendar: CalendarInstance;
   try {
     calendar = createCalendar(el, options as DzOptions);
@@ -83,7 +85,7 @@ export function createFromFullCalendar(el: HTMLElement, fullCalendarOptions: unk
 }
 
 /** What `update` cannot change after the calendar is made. */
-const AT_CREATION = ['rules', 'firstDay', 'nowIndicator', 'scrollTime', 'dayMaxLanes', 'eventMaxStack', 'virtualizeAbove', 'autoPrint'];
+const AT_CREATION = ['virtualizeAbove', 'autoPrint'];
 
 /**
  * The other library's options laid on a calendar that exists (one an
@@ -94,7 +96,8 @@ const AT_CREATION = ['rules', 'firstDay', 'nowIndicator', 'scrollTime', 'dayMaxL
  * the calendar back). Never throws.
  */
 export function applyFullCalendar(calendar: CalendarInstance, fullCalendarOptions: unknown, how: { readonly initial?: boolean } = {}): { readonly problems: readonly Problem[]; detach(): void } {
-  const t = translate(fullCalendarOptions);
+  // The calendar's zone (what the application settled) when the options name none.
+  const t = translate(fullCalendarOptions, { zone: calendar.kernel.getState().timeZone });
   const { initialView, initialDate, timeZone, ...rest } = t.options as Record<string, unknown>;
   const problems: Problem[] = [...t.problems];
   const sources = rest['sources'];
@@ -106,7 +109,7 @@ export function applyFullCalendar(calendar: CalendarInstance, fullCalendarOption
       problems.push(said('invalid-option', path, path === 'initialView' ? `${String(initialView)}:no-renderer` : 'refused', 'error'));
     }
   };
-  if (timeZone !== calendar.kernel.getState().timeZone) tryUpdate('timeZone', { timeZone });
+  if (timeZone !== undefined && timeZone !== calendar.kernel.getState().timeZone) tryUpdate('timeZone', { timeZone });
   if (how.initial !== false && (initialView !== undefined || initialDate !== undefined)) tryUpdate(initialView !== undefined ? 'initialView' : 'initialDate', { ...(initialView !== undefined && { view: initialView }), ...(initialDate !== undefined && { date: initialDate }) });
   // The options own the events: none given is none.
   rest['events'] ??= [];
@@ -164,7 +167,7 @@ export interface EventClickArg {
   readonly event: EventApi;
   readonly el: HTMLElement | null;
   readonly jsEvent: JsEventLike;
-  readonly view: ViewApi | null;
+  readonly view: ViewApi;
 }
 export interface DateClickArg {
   readonly date: Date;
@@ -172,7 +175,7 @@ export interface DateClickArg {
   readonly allDay: boolean;
   readonly resource?: { readonly id: string };
   readonly jsEvent: JsEventLike;
-  readonly view: ViewApi | null;
+  readonly view: ViewApi;
 }
 export interface DateSelectArg {
   readonly start: Date;
@@ -182,7 +185,7 @@ export interface DateSelectArg {
   readonly allDay: boolean;
   readonly resource?: { readonly id: string };
   readonly jsEvent: JsEventLike;
-  readonly view: ViewApi | null;
+  readonly view: ViewApi;
 }
 export interface EventChangeArg {
   readonly event: EventApi;
@@ -190,8 +193,8 @@ export interface EventChangeArg {
   readonly relatedEvents: readonly EventApi[];
   revert(): void;
 }
-export type EventDropArg = EventChangeArg & { readonly delta: null; readonly jsEvent: JsEventLike; readonly view: ViewApi | null };
-export type EventResizeDoneArg = EventChangeArg & { readonly startDelta: null; readonly endDelta: null; readonly jsEvent: JsEventLike; readonly view: ViewApi | null };
+export type EventDropArg = EventChangeArg & { readonly delta: null; readonly jsEvent: JsEventLike; readonly view: ViewApi };
+export type EventResizeDoneArg = EventChangeArg & { readonly startDelta: null; readonly endDelta: null; readonly jsEvent: JsEventLike; readonly view: ViewApi };
 export interface EventAddArg {
   readonly event: EventApi;
   readonly relatedEvents: readonly EventApi[];
@@ -204,13 +207,13 @@ export interface DatesSetArg {
   readonly startStr: string;
   readonly endStr: string;
   readonly timeZone: string;
-  readonly view: ViewApi | null;
+  readonly view: ViewApi;
 }
 export interface EventContentArg {
   readonly event: EventApi;
   readonly el: HTMLElement;
   readonly timeText: string;
-  readonly view: ViewApi | null;
+  readonly view: ViewApi;
   readonly isStart: boolean;
   readonly isEnd: boolean;
 }

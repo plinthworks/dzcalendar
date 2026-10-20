@@ -17,7 +17,12 @@ createCalendar(host, { theme: 'slate', scheme: 'auto', density: 'comfortable' })
 - `scheme`: `'auto'` follows the system (`prefers-color-scheme`), `'light'` or
   `'dark'` forces it.
 - `density`: `'compact'`, `'comfortable'`, `'spacious'` — the height of a
-  minute, of a bar, the type size.
+  minute (0.8, 1.2 and 1.6 px: 48, 72 and 96 px an hour), of a bar, the
+  type size. Any other scale: `--dz-minute` (`.agenda { --dz-minute: 2px; }`
+  for 120 px an hour).
+- `eventStyle`: `'tinted'` (the default: a tint of the event's tone, its
+  edge in the tone) or `'solid'` (a block of the tone, its text in the
+  page's background colour — contrast holds in light and dark schemes).
 - All three change live: `cal.update({ theme: 'night', scheme: 'dark' })`. In
   Angular: `<dz-calendar theme="night" scheme="dark" density="compact">`.
 
@@ -91,6 +96,8 @@ sets it once. The calendar's own tokens are `--dz-*`.
 | `--dz-event-bg`, `--dz-event-fg`, `--dz-event-accent` | events (by default derived from the accent or the event's tone) |
 | `--dz-tone-<name>` | named event tones (`tone: 'green'` on an event) |
 | `--dz-height`, `--dz-minute`, `--dz-bar-height`, `--dz-gutter-width` | sizes |
+| `--dz-event-radius` | an event's corners (else `--dz-radius`, then tzslot's `--tz-radius`) |
+| `--dz-on-tone`, `--dz-tone-<name>-on` | the text on a solid event (`eventStyle: 'solid'`): the theme's, or a tone's own — give one with a pale tone of yours |
 | `--dz-allday-max` | how tall the all-day row grows before it scrolls |
 
 ```css

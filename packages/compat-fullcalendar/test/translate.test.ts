@@ -124,7 +124,8 @@ describe('callbacks and resources, on a calendar', () => {
       eventDrop: (info: never) => dropped.push(info),
     });
     calendar.element.querySelector<HTMLElement>('[data-event-id="a"]')!.click();
-    calendar.run({ type: 'event.update', id: 'a', patch: { start: '2026-10-22T09:00[Europe/Paris]', end: '2026-10-22T10:00[Europe/Paris]' } });
+    // As a person's drag: a validated command.
+    calendar.run({ type: 'event.update', id: 'a', patch: { start: '2026-10-22T09:00[Europe/Paris]', end: '2026-10-22T10:00[Europe/Paris]' } }, { validate: true });
     expect([clicked, dropped.map((x) => [x.oldEvent.start.toISOString(), x.event.start.toISOString()])]).toEqual([[['a', '2026-10-21T07:00:00.000Z', { room: 'B12' }]], [['2026-10-21T07:00:00.000Z', '2026-10-22T07:00:00.000Z']]]);
     dropped[0]!.revert();
     expect(String(calendar.kernel.store.snapshot.getEvent('a')!.start)).toBe('2026-10-21T09:00:00+02:00[Europe/Paris]');
@@ -234,7 +235,7 @@ describe('after review: callbacks', () => {
       eventChange: (i: { event: { id: string } }) => seen.push(`change ${i.event.id}`),
       eventAdd: (i: { event: { id: string } }) => seen.push(`add ${i.event.id}`),
     }, { warn: false });
-    calendar.run({ type: 'event.move', id: 'w', key: '2026-10-21T14:00:00+02:00[Europe/Paris]', scope: 'this', start: '2026-10-21T16:00[Europe/Paris]' } as never);
+    calendar.run({ type: 'event.move', id: 'w', key: '2026-10-21T14:00:00+02:00[Europe/Paris]', scope: 'this', start: '2026-10-21T16:00[Europe/Paris]' } as never, { validate: true });
     expect(seen).toEqual(['drop w 2026-10-21T14:00:00+02:00 → 2026-10-21T16:00:00+02:00', 'change w']);
   });
 
@@ -268,6 +269,20 @@ describe('after review: callbacks', () => {
     make(true);
     make(false);
     expect(go).toEqual(['https://example.org/u']);
+  });
+});
+
+describe('after Sehhaty’s test: compat follows a person, not the program', () => {
+  it('eventDrop for a person’s move; nothing for the application’s own calendar.run', () => {
+    const dropped: string[] = [];
+    const { calendar } = createFromFullCalendar(document.body.appendChild(document.createElement('div')), {
+      timeZone: P, initialView: 'timeGridWeek', initialDate: '2026-10-21',
+      events: [{ id: 'a', start: '2026-10-21T09:00:00+02:00', end: '2026-10-21T10:00:00+02:00' }],
+      eventDrop: (i: { event: { startStr: string } }) => dropped.push(i.event.startStr),
+    }, { warn: false });
+    calendar.run({ type: 'event.move', id: 'a', start: '2026-10-21T11:00[Europe/Paris]' });
+    calendar.run({ type: 'event.move', id: 'a', start: '2026-10-21T12:00[Europe/Paris]' }, { validate: true });
+    expect(dropped).toEqual(['2026-10-21T12:00:00+02:00']);
   });
 });
 

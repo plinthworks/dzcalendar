@@ -102,7 +102,7 @@ export const DZ_CSS = `
   grid-column: calc(var(--col) + 1) / span var(--span);
   margin: 0 2px;
   padding: 0 0.375rem;
-  border-radius: var(--dz-radius, var(--dzc-radius));
+  border-radius: var(--dz-event-radius, var(--dz-radius, var(--dzc-radius)));
   font-size: 0.75rem;
   line-height: var(--dz-bar-height, 1.375rem);
   white-space: nowrap;
@@ -118,11 +118,11 @@ export const DZ_CSS = `
 
 .dz-tg__body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .dz-tg__grid { position: relative; align-items: start; }
-.dz-tg__gutter { position: relative; height: calc(var(--dz-len) * var(--dz-minute, 0.8px)); }
+.dz-tg__gutter { position: relative; height: calc(var(--dz-len) * var(--dz-minute, 1.2px)); }
 .dz-tick {
   position: absolute;
   inset-inline-end: 0.375rem;
-  top: calc(var(--t) * var(--dz-minute, 0.8px));
+  top: calc(var(--t) * var(--dz-minute, 1.2px));
   transform: translateY(-50%);
   font-size: 0.6875rem;
   color: var(--dz-fg-muted, var(--dzc-fg-muted));
@@ -131,14 +131,14 @@ export const DZ_CSS = `
 .dz-tick:first-child { transform: none; }
 .dz-tg__col {
   position: relative;
-  height: calc(var(--dz-len) * var(--dz-minute, 0.8px));
+  height: calc(var(--dz-len) * var(--dz-minute, 1.2px));
   border-inline-start: 1px solid var(--dz-border, var(--dzc-border));
   background-image: repeating-linear-gradient(
     to bottom,
     var(--dz-line, color-mix(in srgb, var(--dz-border, var(--dzc-border)) 70%, transparent)) 0 1px,
-    transparent 1px calc(60 * var(--dz-minute, 0.8px))
+    transparent 1px calc(60 * var(--dz-minute, 1.2px))
   );
-  background-position-y: calc(var(--dz-line-offset, 0) * var(--dz-minute, 0.8px));
+  background-position-y: calc(var(--dz-line-offset, 0) * var(--dz-minute, 1.2px));
   min-width: 0;
 }
 .dz-tg__col--today { background-color: var(--dz-today-bg, color-mix(in srgb, var(--dz-accent, var(--dzc-accent)) 5%, transparent)); }
@@ -158,8 +158,8 @@ export const DZ_CSS = `
   position: absolute;
   box-sizing: border-box;
   inset-inline: 0;
-  top: calc(var(--t) * var(--dz-minute, 0.8px));
-  height: calc(var(--h) * var(--dz-minute, 0.8px));
+  top: calc(var(--t) * var(--dz-minute, 1.2px));
+  height: calc(var(--h) * var(--dz-minute, 1.2px));
   font-size: 0.625rem;
   padding: 0.125rem 0.25rem;
   overflow: hidden;
@@ -178,13 +178,14 @@ export const DZ_CSS = `
 
 .dz-ev {
   position: absolute;
-  top: calc(var(--t) * var(--dz-minute, 0.8px));
-  height: calc(var(--h) * var(--dz-minute, 0.8px));
+  top: calc(var(--t) * var(--dz-minute, 1.2px));
+  height: calc(var(--h) * var(--dz-minute, 1.2px));
   inset-inline-start: calc(var(--l) * 100%);
   width: calc(var(--w) * 100% - 3px);
   box-sizing: border-box;
   padding: 0.125rem 0.375rem;
-  border-radius: var(--dz-radius, var(--dzc-radius));
+  /* Its own radius: a page's --tz-radius set for its popovers would turn a 22 px block into a pill. */
+  border-radius: var(--dz-event-radius, var(--dz-radius, var(--dzc-radius)));
   overflow: hidden;
   font-size: 0.75rem;
   line-height: 1.25;
@@ -198,6 +199,10 @@ export const DZ_CSS = `
 .dz-ev--cont-start { border-start-start-radius: 0; border-start-end-radius: 0; }
 .dz-ev--cont-end { border-end-start-radius: 0; border-end-end-radius: 0; }
 .dz-ev--bg { z-index: 0; opacity: 0.35; border: 0; }
+/* A background with its own content: the tint mixed in, the label at full strength. */
+.dz-ev--bg.dz-ev--labelled { overflow: visible; opacity: 1; background: color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 22%, transparent); color: var(--dz-fg, var(--dzc-fg)); pointer-events: none; }
+/* Its label stays at the top of what is shown: the column starts at midnight, the grid is scrolled to the morning. */
+.dz-ev--bg.dz-ev--labelled > * { position: sticky; top: 0; }
 .dz-ev__time { display: block; font-size: 0.6875rem; opacity: 0.85; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dz-ev__title { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .dz-ev__offset, .dz-ev__real {
@@ -209,10 +214,24 @@ export const DZ_CSS = `
   background: var(--dz-badge-bg, color-mix(in srgb, var(--dz-warning, var(--dzc-warning)) 20%, transparent));
   color: var(--dz-warning, var(--dzc-warning));
 }
+/* eventStyle: 'solid' — a block of its tone, its text the theme's colour for text on a tone. */
+.dz-cal[data-dz-event-style='solid'] :is(.dz-ev:not(.dz-ev--bg), .dz-bar:not(.dz-bar--bg)) {
+  --dz-event-bg: var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
+  /* A tone of the application's may say its own text colour (--dz-tone-<name>-on); else the theme's (--dz-on-tone). */
+  --dz-event-fg: var(--dz-tone-on, var(--dz-on-tone, var(--dz-bg, var(--dzc-bg))));
+  background: var(--dz-event-bg);
+  color: var(--dz-event-fg);
+}
+.dz-cal[data-dz-event-style='solid'] .dz-bar--timed { padding-inline-start: 0.375rem; }
+.dz-cal[data-dz-event-style='solid'] .dz-bar--timed::before { display: none; }
+/* allDaySlot: false — the row folds (its keyboard cursor stays focusable). */
+.dz-tg__allday--none { min-height: 0; height: 0; padding-block: 0; border-block-width: 0; overflow: hidden; }
+/* nowIndicator: false, at any time (the timeline's line too). */
+.dz-cal--no-now .dz-now, .dz-cal--no-now .dz-tl__now { display: none; }
 .dz-now {
   position: absolute;
   inset-inline: 0;
-  top: calc(var(--t) * var(--dz-minute, 0.8px));
+  top: calc(var(--t) * var(--dz-minute, 1.2px));
   border-top: 2px solid var(--dz-now, var(--dzc-danger));
   z-index: 2;
   pointer-events: none;
@@ -238,8 +257,8 @@ export const DZ_CSS = `
 .dz-slot {
   position: absolute;
   inset-inline: 2px;
-  top: calc(var(--t) * var(--dz-minute, 0.8px));
-  height: calc(var(--h) * var(--dz-minute, 0.8px));
+  top: calc(var(--t) * var(--dz-minute, 1.2px));
+  height: calc(var(--h) * var(--dz-minute, 1.2px));
   box-sizing: border-box;
   margin: 0;
   padding: 0 0.25rem;
@@ -266,8 +285,8 @@ export const DZ_CSS = `
 .dz-off {
   position: absolute;
   inset-inline: 0;
-  top: calc(var(--t) * var(--dz-minute, 0.8px));
-  height: calc(var(--h) * var(--dz-minute, 0.8px));
+  top: calc(var(--t) * var(--dz-minute, 1.2px));
+  height: calc(var(--h) * var(--dz-minute, 1.2px));
   background: var(--dz-off-bg, color-mix(in srgb, var(--dz-fg-muted, var(--dzc-fg-muted)) 9%, transparent));
   pointer-events: none;
   z-index: 0;
@@ -279,6 +298,7 @@ export const DZ_CSS = `
 .dz-dg__weekday { padding: 0.375rem 0.25rem; text-align: center; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dz-fg-muted, var(--dzc-fg-muted)); }
 .dz-dg__body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; }
 .dz-dg--month .dz-dg__week { flex: 1 1 0; min-height: var(--dz-week-min, 5.5rem); }
+.dz-dg--grow .dz-dg__week { flex: 1 0 auto; }
 .dz-dg__week {
   display: grid;
   position: relative;
@@ -353,8 +373,8 @@ export const DZ_CSS = `
 /* In a time grid: where the hidden events are, in the cluster's last lane. */
 .dz-more--tg {
   position: absolute;
-  top: calc(var(--t) * var(--dz-minute, 0.8px));
-  height: calc(var(--h) * var(--dz-minute, 0.8px));
+  top: calc(var(--t) * var(--dz-minute, 1.2px));
+  height: calc(var(--h) * var(--dz-minute, 1.2px));
   inset-inline-start: calc(var(--l) * 100%);
   width: calc(var(--w) * 100% - 3px);
   margin: 0;
@@ -459,7 +479,7 @@ export const DZ_CSS = `
 /* ── keyboard: the time grid's cursor, a month's cells and their items ───── */
 .dz-tg__allday { position: relative; }
 .dz-cursor { position: absolute; grid-row: 1; inset-inline: 1px; z-index: 5; pointer-events: none; box-sizing: border-box; border-radius: var(--dz-radius, var(--dzc-radius)); opacity: 0; }
-.dz-tg__grid > .dz-cursor { top: calc(var(--t, 0) * var(--dz-minute, 0.8px)); height: calc(var(--h, 15) * var(--dz-minute, 0.8px)); }
+.dz-tg__grid > .dz-cursor { top: calc(var(--t, 0) * var(--dz-minute, 1.2px)); height: calc(var(--h, 15) * var(--dz-minute, 1.2px)); }
 .dz-tg__allday > .dz-cursor { inset-block: 2px; }
 .dz-cursor:focus { opacity: 1; outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: -2px; background: color-mix(in srgb, var(--dz-accent, var(--dzc-accent)) 12%, transparent); }
 .dz-dg__cell:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: -2px; }
@@ -492,7 +512,7 @@ export const DZ_CSS = `
 /* Without color-mix() (Safari before 16.2): plain palette colours instead of the tints, never nothing. */
 @supports not (color: color-mix(in srgb, red 50%, blue)) {
   .dz-ev:not(.dz-ev--bg), .dz-bar:not(.dz-bar--bg) { background: var(--dz-event-bg, var(--dz-bg-raised, var(--dzc-bg-raised))); }
-  .dz-tg__col { background-image: repeating-linear-gradient(to bottom, var(--dz-line, var(--dz-border, var(--dzc-border))) 0 1px, transparent 1px calc(60 * var(--dz-minute, 0.8px))); }
+  .dz-tg__col { background-image: repeating-linear-gradient(to bottom, var(--dz-line, var(--dz-border, var(--dzc-border))) 0 1px, transparent 1px calc(60 * var(--dz-minute, 1.2px))); }
   .dz-tg__col--today, .dz-dg__cell--today { background-color: var(--dz-today-bg, var(--dz-bg-raised, var(--dzc-bg-raised))); }
   .dz-tg__col--folded { background: repeating-linear-gradient(135deg, transparent 0 6px, var(--dz-border, var(--dzc-border)) 6px 7px); }
   .dz-band--gap { background: repeating-linear-gradient(135deg, transparent 0 5px, var(--dz-gap-stripe, var(--dz-border, var(--dzc-border))) 5px 6px); }
@@ -517,8 +537,8 @@ export const DZ_CSS = `
 .dz-cal[data-dz-scheme='light'] { color-scheme: light; }
 .dz-cal[data-dz-scheme='dark'] { color-scheme: dark; }
 /* Density (option "density"): the minute, the bars, the type. */
-.dz-cal[data-dz-density='compact'] { --dz-minute: 0.6px; --dz-bar-height: 1.125rem; --dz-day-head: 1.5rem; --dz-week-min: 4.5rem; font-size: 0.8125rem; }
-.dz-cal[data-dz-density='spacious'] { --dz-minute: 1.2px; --dz-bar-height: 1.625rem; --dz-day-head: 2rem; --dz-week-min: 7rem; font-size: 0.9375rem; }
+.dz-cal[data-dz-density='compact'] { --dz-minute: 0.8px; --dz-bar-height: 1.125rem; --dz-day-head: 1.5rem; --dz-week-min: 4.5rem; font-size: 0.8125rem; }
+.dz-cal[data-dz-density='spacious'] { --dz-minute: 1.6px; --dz-bar-height: 1.625rem; --dz-day-head: 2rem; --dz-week-min: 7rem; font-size: 0.9375rem; }
 }
 `;
 

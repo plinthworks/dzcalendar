@@ -62,6 +62,20 @@ export function Agenda() {
   the calendar keeps its own. A view or date the calendar refused is given
   back (`onViewChange` with the real one) and not tried again until the prop
   changes.
+- **`onEventChange`**: what a person changed (a drag, a resize, the
+  keyboard, the menu, the editor) — persist it, and `change.revert()` if the
+  server refuses (exactly that change, even after another; false when the
+  event changed again since). Your own `controller.dispatch()` is not said.
+  ```tsx
+  onEventChange={(change) => fetch(`/api/rdv/${change.after?.id}`, { method: 'PATCH', body: JSON.stringify({ start: String(change.after?.start) }) })
+    .then((r) => { if (!r.ok) change.revert(); })}
+  ```
+- **`renderDayHeader={(day) => …}`**: each day's head by your components
+  (`day.date`, `day.resource`, `day.lengthMinutes`, `day.text`) — a mark, a
+  count, a button.
+- A background event (a closed day) reaches `renderEventContent` with
+  `ctx.background`: return something for a label at the top of its column,
+  null for a plain tint.
 - **`renderEventContent`**: the application's components, rendered through
   portals in its own tree — its context, state, router and i18n reach them —
   before the browser paints.
@@ -101,3 +115,21 @@ The editor takes "Open" and "New event here" through the controller
 `onCreateRequest`, until its component goes. The editor and the exports are
 fetched on first use. Nothing throws: a
 result's `problems` say what went wrong.
+
+## Notes
+
+- A content hook (or template, slot) now also receives **background
+  events**, in a time grid's columns, with `ctx.background`: return nothing
+  for them to keep a plain tint. The all-day row's and the month's
+  backgrounds stay tints.
+- The day-header hook covers the week, day and month views (a month's
+  column: the first date of that weekday), not a list's day headings.
+- The change output says a person's change — a gesture, the keyboard, the
+  menu, the editor, and their undo / redo (`cause`). A command your code runs
+  with `{ validate: true }` counts as a person's (that is what it means:
+  checked as a gesture is); without it, it is not said.
+- A context-menu hook that returns `null` or `[]` means "no calendar menu
+  here": the browser's own menu opens. An application that opens its own menu
+  from the hook calls `preventDefault()` on the `contextmenu` event itself
+  (the calendar cannot know it did).
+
