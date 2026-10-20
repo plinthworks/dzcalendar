@@ -4,18 +4,19 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 
 ## Resume here (if a session is lost)
 
-- **Done:** Phases 0–17 and 18a, each committed (`git log --oneline`: the
-  last is titled "Phase 18a"). Every check green at that commit: `npm test`
-  (1 229), `npm run test:ci`, `typecheck`, `build`, `size`, `bench`,
-  `test:browser` (221), `perf:browser`, `test:package` (with `ng add` on
-  Angular 19 and 22).
-- **Now: Phase 18b** (the FullCalendar translator and its codemod) — 18a
-  is committed ("Phase 18a": Angular complements and the Web Component).
-  Next step: 18b's open questions to the owner (in French), then code.
+- **Done:** Phases 0–17, 18a and 18b, each committed (`git log --oneline`:
+  the last is titled "Phase 18b"). Every check green at that commit: `npm
+  test` (1 270), `npm run test:ci`, `typecheck`, `build`, `size`,
+  `test:browser`, `test:package` (`ng add` on Angular 19 and 22, `dz-migrate`
+  on 22). Two timings over by noise, the same at the previous commit
+  (measured alternately in a worktree): `normalize+index 10k` (bench) and
+  `timeGridWeek:U` first frame 28 ms (≤ 27, `perf:browser`).
+- **Now: Phase 18c** (React, Vue, `llms.txt`, `commands.schema.json`, the
+  public benchmark). Next step: 18c's open questions to the owner (in
+  French), then code.
 - **Remote:** `git@github.com:plinthworks/dzcalendar.git` (push `main` by
   that URL; the owner authorised pushing on 2026-10-18).
-- **Left after it:** 18 ecosystem (Web Component, React/Vue,
-  FullCalendar options translator), 19+ native (Swift/Kotlin from
+- **Left after it:** 18c (React/Vue, llms.txt, schema, benchmark), 19+ native (Swift/Kotlin from
   `conformance/`, then SwiftUI/Compose).
 - **How a phase is run** (owner's rule): decisions validated with the owner
   (in French) before coding → implement → two reviews in parallel
@@ -1917,4 +1918,109 @@ See `ARCHITECTURE.md` J. Phase 17.
 - The schematic's NgModule application path is handled by
   `addRootProvider` but not in `test:package` (standalone only).
 - Remade on new options: the undo history starts again.
+
+### 18b — owner's decisions (2026-10-20)
+
+- **Coverage: essentials + Premium** — views and navigation, zone and
+  locale, events and sources (JSON, function, iCal), editing and selection,
+  hours and days shown, business hours, constraints, callbacks (click,
+  select, drop), the toolbar, resources and the timeline; anything else a
+  warning "no equivalent".
+- **Dates:** a time without a zone is read in the calendar's zone, a
+  warning each time (`zone-guessed`); a `Date` is the instant it stands for;
+  `timeZone: 'local'` the browser's zone, said too.
+- **Codemod: JS/TS + Angular** — `@fullcalendar/*` imports, `new
+  Calendar(el, opts)` → `createCalendar(el, opts)` with options renamed,
+  `<full-calendar [options]>` → `<dz-calendar>` in Angular templates; what
+  does not translate as is gets a `// dz-migrate:` comment.
+- **Parser: ts-morph** (a dependency of the tool only); Angular templates
+  read with Angular's own compiler.
+- Two packages so the parser never reaches an application:
+  `@dzcalendar/compat-fullcalendar` (run time) and `@dzcalendar/migrate`
+  (the command-line codemod).
+
+## Phase 18b — the FullCalendar translator and its codemod ✅ (2026-10-20)
+
+### Built
+
+- **`@dzcalendar/compat-fullcalendar`** (run time; behaviour sheet
+  `docs/behaviors/fullcalendar-options.md`, guide
+  `docs/migrating-from-fullcalendar.md`): `fromFullCalendar(options)` →
+  `{ options, problems, attach(calendar) }`; `createFromFullCalendar(el,
+  options, { warn })` → `{ calendar, problems, detach }`;
+  `applyFullCalendar(calendar, options, { initial })` for a calendar that
+  exists. Views, dates, zones (a wall time in the calendar's zone, said; a
+  `Date` an instant; `'local'` the browser's, said), Sunday = 0 → ISO,
+  events (ids as text, `className`, colours kept in `extendedProps` and said
+  once per field), simple recurrence → RRULE (`endRecur` excluded in the
+  calendar's zone; no `startRecur` → from 2000-01-03), the rrule plugin (text
+  with DTSTART/EXDATE, object), sources (JSON with its parameters, function
+  with callbacks or a promise, iCal), hours, snap, business hours, rules,
+  toolbar views, resources (nested → `parentId`), area columns, `views: {…}`
+  for the first view, render hooks (function or value), callbacks with plain
+  objects and `Date`s (`jsEvent` a stand-in; a `url` followed unless
+  prevented), `datesSet` once per dates (grid = active, period = current),
+  `eventDrop`/`eventResize`/`eventChange`/`eventAdd`/`eventRemove` with
+  `revert` = undo (an occurrence moved alone = the series' event dropped),
+  `eventsSet` once per burst, `loading`. The other library's type names
+  (`CalendarOptions`, `EventClickArg`, `EventApi`…) exported for the codemod.
+  Nothing throws: refused options are found key by key and said.
+- **`@dzcalendar/angular/fullcalendar`** (secondary entry, the compat package
+  an optional peer): `<dz-calendar [dzFullCalendar]="options"
+  (fullCalendarProblems)>`; callbacks in Angular's zone; the first options
+  decide the view and date; problems in the console in dev mode.
+- **`@dzcalendar/migrate`** (`dz-migrate [paths] [--write]`, ts-morph; a
+  tool, never an application's dependency): imports (plugins built in or
+  their entry, `locales/*` and `locales-all`, types), `new Calendar` (held by
+  a declaration, a field or an assignment; `.render()` chained or not), the
+  `Calendar` type → `CalendarInstance`, calls (`next`/`prev`/`today`,
+  `changeView`, `refetchEvents`, `unselect`, `destroy`; the rest marked
+  `// dz-migrate:`), `FullCalendarModule`, `<full-calendar [options]>` in
+  external (Angular's own parser) and inline templates (quotes kept, escaped).
+  Idempotent; a file it cannot read is reported, the others done; exit code.
+- **core:** problem code `compat-unsupported`; a source spec replaced under
+  the same id drops what it fetched for dates not shown. **dom:**
+  `hasRenderer(family)`.
+- Playground `fullcalendar.html`; `test:package` migrates an Angular 22
+  application written for FullCalendar, then builds it on DzCalendar alone.
+- Budget (owner, measured + 3 %): compat-fullcalendar 8.7 kB (8 438 B).
+
+### Reviews (architect; code review by execution in Chrome), fixed
+
+- Bad input threw (`initialDate` unreadable or impossible, `validRange`,
+  `endRecur`, an `until` in an unknown zone, `resourceAreaColumns: [null]`,
+  `businessHours.daysOfWeek: 'x'`, an unknown or not imported
+  `initialView`, a zero slot, a half-minute snap): every moment is now
+  parsed before use, numbers bounded, the calendar made without what it
+  refuses — each said.
+- `datesSet` / `view` gave the period as the active range: the grid now
+  (28 Sep – 9 Nov for October, Monday first).
+- `endRecur` was a UTC midnight (Chicago lost a day, Lord Howe kept one):
+  the calendar zone's midnight.
+- A series without `startRecur` began today: from 2000.
+- `applyFullCalendar` sent the calendar back to `initialDate` on every
+  change and kept sources and events no longer given; and core kept a
+  replaced spec's chunks for dates not shown.
+- An occurrence moved alone fired `eventAdd`: now `eventDrop` + `eventChange`
+  on the series' id.
+- The rule text's EXDATE was lost when `exdate` was also given: merged.
+- `jsEvent: null` broke `info.jsEvent.preventDefault()`: a stand-in.
+- `datesSet` on every state change, `eventsSet` per chunk: deduplicated.
+- Event defaults only reached inline events; `eventContent` as a value was
+  dropped; colours said once per event; toolbar views that cannot be drawn
+  silent: all fixed (`listWeek:@dzcalendar/dom/list`).
+- Codemod: `this.calendar = new Calendar` and `.render()` chained were left
+  unmigrated, the `Calendar` type dangling, `select(start, end)` passed
+  through, `${`/backslashes in inline templates changed meaning, `import *
+  as` removed, `locales-all` misreported: all fixed and tested.
+
+### Not done in Phase 18b, on purpose
+
+- No React or Vue codemod (18c), no `getApi()` translation (marked).
+- `eventDrop`/`eventResize` also follow the application's own commands (the
+  store does not tell a gesture from a call) — said in the sheet.
+- Per-view options for views other than the first, custom view types,
+  formats (`…Format`: the locale's), colours (tones): said, not translated.
+- The iCal entry is a hard dependency of compat (an `import()` would save a
+  bundle that never reads iCal).
 

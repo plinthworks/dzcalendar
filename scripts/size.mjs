@@ -60,6 +60,7 @@ const results = {
   // What opening the editor costs, tzslot's widget included (fetched on demand).
   'pro/editor with tzslot dom (without core, dom)': await bundle(join(root, 'packages/pro/src/editor-entry.ts'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', '@tzslot/core', ...poly]),
   'theme css': gzipSync(readFileSync(join(root, 'packages/theme/dzcalendar.css')), { level: 9 }).length,
+  'compat-fullcalendar (without core, dom, ical)': await bundle(src('compat-fullcalendar'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/ical', ...poly]),
   'element (without core, dom)': await bundle(join(root, 'packages/element/src/define.ts'), ['@dzcalendar/core', '@dzcalendar/dom', ...poly]),
   'motion-gsap (without gsap)': await bundle(src('motion-gsap'), ['gsap', '@dzcalendar/dom']),
   'temporal polyfill': (await bundle(src('core'), ['@dzcalendar/rrule'])) - (await bundle(src('core'), ['@dzcalendar/rrule', ...poly])),

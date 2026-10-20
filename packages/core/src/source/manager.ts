@@ -513,6 +513,11 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
           prev.gen++;
           for (const req of [...prev.requests]) abort(req);
           drop(prev, [...prev.cache.keys()]);
+        } else {
+          // What another spec fetched for dates not shown would come back unchanged when they are: gone, fetched anew then.
+          const shown = new Set(neededChunks(prev).map((c) => c.key));
+          const unseen = [...prev.cache.keys()].filter((k) => !shown.has(k));
+          if (unseen.length > 0) drop(prev, unseen);
         }
         refetch(spec.id);
         return;

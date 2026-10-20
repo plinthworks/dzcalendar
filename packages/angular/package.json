@@ -9,8 +9,14 @@
     "@dzcalendar/dom": "0.0.0"
   },
   "peerDependencies": {
-    "@angular/core": "^19.0.0 || ^20.0.0 || ^21.0.0 || ^22.0.0"
+    "@angular/core": "^19.0.0 || ^20.0.0 || ^21.0.0 || ^22.0.0",
+    "@dzcalendar/compat-fullcalendar": "0.0.0"
   },
   "main": "./src/index.ts",
-  "types": "./src/index.ts"
+  "types": "./src/index.ts",
+  "peerDependenciesMeta": {
+    "@dzcalendar/compat-fullcalendar": {
+      "optional": true
+    }
+  }
 }

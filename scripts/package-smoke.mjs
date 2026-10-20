@@ -24,6 +24,8 @@ const tgz = (name) => {
 for (const major of majors) smoke(major, MAJORS[major]);
 // `ng add @dzcalendar/angular` on the oldest and the newest Angular: a bare application, the schematic, a build.
 for (const major of majors.filter((m) => m === '19' || m === '22')) ngAdd(major, MAJORS[major]);
+// dz-migrate on an application written for FullCalendar (not installed): rewritten, then it builds on ours alone.
+for (const major of majors.filter((m) => m === '22')) migrateApp(major, MAJORS[major]);
 
 function smoke(major, typescript) {
 const angular = `^${major}.0.0`;
@@ -164,5 +166,82 @@ bootstrapApplication(App, appConfig);
   if (twice.length > 0 || JSON.parse(read('angular.json')).projects.app.architect.build.options.styles.length !== styles.length) throw new Error(`ng add run twice doubled: ${twice.join(', ') || 'the styles'}`);
   run('npx', ['ng', 'build']);
   console.log(`✓ ng add, Angular ${major}: theme, providers, GSAP motion, the Pro and the example component (run twice, nothing doubled), then built`);
+}
+
+function migrateApp(major, typescript) {
+  const angular = `^${major}.0.0`;
+  const app = join(packed, `migrate-${major}`);
+  console.log(`\n── dz-migrate, Angular ${major} ──`);
+  rmSync(app, { recursive: true, force: true });
+  mkdirSync(join(app, 'src', 'app'), { recursive: true });
+  const write = (file, text) => writeFileSync(join(app, file), text);
+  write('package.json', JSON.stringify({
+    name: 'dzcalendar-migrate', private: true, type: 'module',
+    dependencies: {
+      '@angular/common': angular, '@angular/compiler': angular, '@angular/core': angular, '@angular/platform-browser': angular,
+      '@dzcalendar/angular': tgz('angular'), '@dzcalendar/core': tgz('core'), '@dzcalendar/dom': tgz('dom'), '@dzcalendar/rrule': tgz('rrule'), '@dzcalendar/theme': tgz('theme'),
+      '@dzcalendar/ical': tgz('ical'), '@dzcalendar/compat-fullcalendar': tgz('compat-fullcalendar'), rxjs: '~7.8.0', tslib: '^2.6.0',
+    },
+    devDependencies: { '@angular/build': angular, '@angular/cli': angular, '@angular/compiler-cli': angular, typescript, '@dzcalendar/migrate': tgz('migrate') },
+  }, null, 2));
+  write('angular.json', JSON.stringify({
+    version: 1, projects: { app: { projectType: 'application', root: '', sourceRoot: 'src', architect: { build: { builder: '@angular/build:application',
+      options: { outputPath: 'dist', index: 'src/index.html', browser: 'src/main.ts', tsConfig: 'tsconfig.json', styles: ['node_modules/@dzcalendar/theme/dzcalendar.css'] } } } } },
+    cli: { analytics: false },
+  }, null, 2));
+  write('tsconfig.json', JSON.stringify({
+    compilerOptions: { target: 'ES2022', module: 'ES2022', moduleResolution: 'bundler', lib: ['ES2022', 'DOM'], strict: true, skipLibCheck: false, useDefineForClassFields: false },
+    angularCompilerOptions: { strictTemplates: true }, files: ['src/main.ts'],
+  }, null, 2));
+  write('src/index.html', '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>migrate</title></head><body><app-root></app-root></body></html>\n');
+  // Written as for FullCalendar 6 (from its public documentation's usage), not runnable until migrated.
+  write('src/app/agenda.ts', `import { Component } from '@angular/core';
+import { FullCalendarModule } from '@fullcalendar/angular';
+import { CalendarOptions, EventClickArg, DateSelectArg } from '@fullcalendar/core';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
+import frLocale from '@fullcalendar/core/locales/fr';
+
+@Component({
+  selector: 'app-agenda',
+  standalone: true,
+  imports: [FullCalendarModule],
+  templateUrl: './agenda.html',
+})
+export class Agenda {
+  readonly picked: string[] = [];
+  calendarOptions: CalendarOptions = {
+    plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+    initialView: 'timeGridWeek',
+    timeZone: 'Europe/Paris',
+    locale: frLocale,
+    firstDay: 1,
+    slotMinTime: '07:00:00',
+    editable: true,
+    selectable: true,
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+    events: [{ id: 'a', title: 'Réunion', start: '2026-10-21T09:00:00', end: '2026-10-21T10:00:00' }],
+    eventClick: (info: EventClickArg) => this.picked.push(info.event.title),
+    select: (info: DateSelectArg) => this.picked.push(info.startStr),
+  };
+}
+`);
+  write('src/app/agenda.html', '<h1>Agenda</h1>\n<full-calendar [options]="calendarOptions"></full-calendar>\n');
+  write('src/main.ts', `import { Component } from '@angular/core';
+import { bootstrapApplication } from '@angular/platform-browser';
+import { Agenda } from './app/agenda';
+
+@Component({ selector: 'app-root', standalone: true, imports: [Agenda], template: '<app-agenda />' })
+class App {}
+bootstrapApplication(App);
+`);
+  const run = (cmd, args) => execFileSync(cmd, args, { cwd: app, stdio: 'inherit' });
+  run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error']);
+  run('npx', ['dz-migrate', 'src', '--write']);
+  const left = ['src/app/agenda.ts', 'src/app/agenda.html'].filter((f) => readFileSync(join(app, f), 'utf8').includes('fullcalendar/') || readFileSync(join(app, f), 'utf8').includes('<full-calendar'));
+  if (left.length > 0) throw new Error(`dz-migrate left FullCalendar in: ${left.join(', ')}`);
+  run('npx', ['ng', 'build']);
+  console.log(`✓ dz-migrate, Angular ${major}: an application written for FullCalendar rewritten, then built on DzCalendar alone`);
 }
 

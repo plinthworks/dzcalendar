@@ -661,3 +661,20 @@ describe('hold: what could not be loaded is said', () => {
   });
 });
 
+
+describe('a spec replaced under the same id', () => {
+  it('what the old spec fetched for dates no longer shown goes; the dates shown are fetched again', async () => {
+    const { store, m } = setup();
+    const old = fnSource('s', (r) => [{ id: `old-${r.window!.startDate.month}`, title: `old ${r.window!.startDate.month}`, start: `${r.window!.startDate}T09:00[${PARIS}]` }], { chunk: { unit: 'month', prefetch: 0 } });
+    m.add(old);
+    m.setRange(d('2026-10-01'), d('2026-11-01'), PARIS);
+    await m.idle();
+    m.setRange(d('2026-11-01'), d('2026-12-01'), PARIS);
+    await m.idle();
+    expect(titles(store)).toEqual(['old 10', 'old 11']);
+    m.add(fnSource('s', (r) => [{ id: `new-${r.window!.startDate.month}`, title: `new ${r.window!.startDate.month}`, start: `${r.window!.startDate}T09:00[${PARIS}]` }], { chunk: { unit: 'month', prefetch: 0 } }));
+    await m.idle();
+    // October, not shown, held the old spec's answer: gone, not served when it is shown again.
+    expect(titles(store)).toEqual(['new 11']);
+  });
+});

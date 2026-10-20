@@ -154,6 +154,9 @@ export function viewFactory(family: string): ViewFactory | undefined {
   return VIEWS.get(family);
 }
 
+/** Whether a family's views can be drawn (its entry imported: `@dzcalendar/dom/list`, the Pro's timeline…). */
+export const hasRenderer = (family: string): boolean => VIEWS.has(family);
+
 export type MenuHook = (ctx: ContextMenuCtx, defaults: readonly ActionItem[]) => readonly ActionItem[] | null;
 
 /**

@@ -42,7 +42,9 @@ export type ProblemCode =
   /** A print or an export asked for what cannot be put on paper or in a file (an unknown view, a range ending before it starts). */
   | 'invalid-export'
   /** An option given by an attribute or a property that cannot be read (the Web Component). */
-  | 'invalid-option';
+  | 'invalid-option'
+  /** An option of another calendar library with no equivalent here (the FullCalendar translator): said, left out. */
+  | 'compat-unsupported';
 
 export type Severity = 'error' | 'warning';
 

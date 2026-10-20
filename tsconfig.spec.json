@@ -54,6 +54,12 @@
       "@dzcalendar/pro/editor": [
         "./packages/pro/src/editor-entry.ts"
       ],
+      "@dzcalendar/angular/fullcalendar": [
+        "./packages/angular/fullcalendar/src/index.ts"
+      ],
+      "@dzcalendar/compat-fullcalendar": [
+        "./packages/compat-fullcalendar/src/index.ts"
+      ],
       "@dzcalendar/element": [
         "./packages/element/src/index.ts"
       ],

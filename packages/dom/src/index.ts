@@ -11,7 +11,7 @@ export type { ThemeTokens, ThemeColor, ThemeName } from './themes.js';
 export { NO_MOTION } from './motion.js';
 export type { MotionAdapter, MotionChange, MotionSide, MotionEnter } from './motion.js';
 export { WAAPI_MOTION, createWaapiMotion } from './motion-waapi.js';
-export { registerView } from './host.js';
+export { registerView, hasRenderer } from './host.js';
 export type { ViewController, ViewCtx, ViewFactory, CalendarHooks, EventHooks, EventContentCtx, ResourceHooks, ResourceContentCtx, ContextMenuCtx, MenuHook, ScopeRequest } from './host.js';
 export type { LiveSettings, DateClick } from './settings.js';
 // A custom view takes part in gestures with a surface, and in the keyboard with its `keys` (none: no keyboard).

@@ -15,7 +15,7 @@ export default defineConfig({
           name: 'core',
           globals: true,
           environment: 'node',
-          include: ['packages/core/test/**/*.test.ts', 'packages/theme/test/**/*.test.ts', 'packages/rrule/test/**/*.test.ts', 'packages/ical/test/**/*.test.ts', 'packages/slots/test/**/*.test.ts', 'packages/pro/test/*.test.ts'],
+          include: ['packages/core/test/**/*.test.ts', 'packages/theme/test/**/*.test.ts', 'packages/rrule/test/**/*.test.ts', 'packages/ical/test/**/*.test.ts', 'packages/slots/test/**/*.test.ts', 'packages/pro/test/*.test.ts', 'packages/migrate/test/**/*.test.ts'],
         },
       },
       {
@@ -23,7 +23,7 @@ export default defineConfig({
           name: 'dom',
           globals: true,
           environment: 'jsdom',
-          include: ['packages/dom/test/**/*.test.ts', 'packages/pro/test/dom/**/*.test.ts', 'packages/motion-gsap/test/**/*.test.ts', 'packages/element/test/**/*.test.ts'],
+          include: ['packages/dom/test/**/*.test.ts', 'packages/pro/test/dom/**/*.test.ts', 'packages/motion-gsap/test/**/*.test.ts', 'packages/element/test/**/*.test.ts', 'packages/compat-fullcalendar/test/**/*.test.ts'],
         },
       },
       {

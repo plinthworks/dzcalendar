@@ -18,7 +18,7 @@ const pkg = (name) => join(root, 'packages', name);
 const read = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const run = (cmd, args, cwd = root) => execFileSync(cmd, args, { cwd, stdio: 'inherit' });
 
-const PACKAGES = ['rrule', 'core', 'ical', 'slots', 'dom', 'pro', 'motion-gsap', 'element'];
+const PACKAGES = ['rrule', 'core', 'ical', 'slots', 'dom', 'pro', 'motion-gsap', 'element', 'compat-fullcalendar', 'migrate'];
 const TZSLOT_RANGE = '^2.2.0';
 
 const shared = (name) => ({
@@ -89,6 +89,9 @@ function typescript(name) {
     },
     ...(source.dependencies && { dependencies: internal(source.dependencies) }),
     ...(source.peerDependencies && { peerDependencies: source.peerDependencies }),
+    ...(source.peerDependenciesMeta && { peerDependenciesMeta: source.peerDependenciesMeta }),
+    // The codemod's command.
+    ...(name === 'migrate' && { bin: { 'dz-migrate': './cli.js' } }),
   };
   writeFileSync(join(dir, 'dist', 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
   extras(name);

@@ -1,0 +1,20 @@
+{
+  "name": "@dzcalendar/migrate",
+  "version": "0.0.0",
+  "description": "dz-migrate: rewrites a FullCalendar application for DzCalendar — imports and plugins, new Calendar(...), the common calendar calls, Angular's <full-calendar> — and marks what needs a person (// dz-migrate:). A tool: never a dependency of an application.",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "dz-migrate": "./src/cli.ts" },
+  "dependencies": {
+    "ts-morph": "^28.0.0"
+  },
+  "peerDependencies": {
+    "@angular/compiler": ">=19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@angular/compiler": { "optional": true }
+  },
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  }
+}

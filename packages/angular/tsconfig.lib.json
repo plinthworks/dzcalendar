@@ -10,7 +10,9 @@
     "useDefineForClassFields": false,
     "paths": {
       "@dzcalendar/core": ["../core/dist/index.d.ts"],
-      "@dzcalendar/dom": ["../dom/dist/index.d.ts"]
+      "@dzcalendar/dom": ["../dom/dist/index.d.ts"],
+      "@dzcalendar/ical": ["../ical/dist/index.d.ts"],
+      "@dzcalendar/compat-fullcalendar": ["../compat-fullcalendar/dist/index.d.ts"]
     },
     "types": []
   },

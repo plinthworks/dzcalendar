@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — depuis FullCalendar</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: #52525b; max-width: 80ch; }
+      #cal { --dz-height: 36rem; }
+      #log { min-height: 1.4em; font-weight: 600; }
+      #problems { font: 12px/1.5 ui-monospace, monospace; color: #92400e; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Des options FullCalendar, telles quelles</h1>
+      <p>Le calendrier ci-dessous est créé par <code>createFromFullCalendar</code> à partir d'un objet d'options écrit pour FullCalendar (heures sans fuseau, dimanche = 0, série simple, plugin rrule, couleur). Ce qui a été deviné ou n'a pas d'équivalent est listé.</p>
+      <p id="log" role="status"></p>
+      <div id="cal"></div>
+      <ul id="problems"></ul>
+    </main>
+    <script type="module" src="./fullcalendar.ts"></script>
+  </body>
+</html>

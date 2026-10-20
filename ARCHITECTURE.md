@@ -82,6 +82,14 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18b (détail dans ROADMAP.md)
+
+- **Deux paquets** : `@dzcalendar/compat-fullcalendar` traduit à l'exécution les options d'une application FullCalendar (`createFromFullCalendar`, `applyFullCalendar`, `fromFullCalendar`) ; `@dzcalendar/migrate` (`dz-migrate`, ts-morph, outil seulement) réécrit le code. Le codemod écrit `createFromFullCalendar(el, options).calendar` plutôt que `createCalendar` avec des options renommées : les options restent celles de l'application, traduites et dites à l'exécution.
+- **Angular** : entrée secondaire `@dzcalendar/angular/fullcalendar` (`DzFullCalendar`, `[dzFullCalendar]`), le paquet compat en pair optionnel.
+- **Rien ne lève** : une option refusée par le calendrier est trouvée clé par clé et dite (`invalid-option`) ; une vue non dessinable est dite avec son import ; code `compat-unsupported`. Les problèmes sont écrits une fois dans la console (`warn: false`).
+- **C (sources)** : une source remplacée sous le même id oublie ce qu'elle avait chargé pour les dates non affichées. **D (dom)** : `hasRenderer(family)`.
+- **Décision du propriétaire (après revue)** : budget à la mesure + 3 % (compat-fullcalendar 8,7 ko).
+
 ### Ajustements après la Phase 18a (détail dans ROADMAP.md)
 
 - **Angular** : `provideDzMotion` (un adaptateur par calendrier) ; `ng add @dzcalendar/angular` (schéma CommonJS dans `dist/schematics`, versions par paquet, idempotent) ; `DzExport` dans `pro-angular` (`@dzcalendar/angular` en pair).

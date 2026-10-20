@@ -23,5 +23,6 @@
   "pro/editor with tzslot dom (without core, dom)": 37500,
   "pro/export (without core, dom, ical)": 12300,
   "pro/print (without core, dom)": 4400,
-  "element (without core, dom)": 3000
+  "element (without core, dom)": 3000,
+  "compat-fullcalendar (without core, dom, ical)": 8700
 }
