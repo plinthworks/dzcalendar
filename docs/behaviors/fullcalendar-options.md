@@ -66,6 +66,8 @@ public documentation (option names and what they do), in our own words.
 | `eventConstraint`, `eventOverlap`, `eventAllow`, `selectAllow`, `validRange` | the rules (`constraint`, `overlap`, `allow`, `validRange`) |
 | `nowIndicator`, `weekNumbers`, `dayMaxEventRows` / `dayMaxEvents`, `eventMaxStack` | the same (lanes, stack) |
 | `allDaySlot`, `displayEventTime` | the same |
+| `titleFormat`, `dayHeaderFormat`, `slotLabelFormat`, `eventTimeFormat`, `listDayFormat`, `listDaySideFormat`, `dayPopoverFormat` | `formats` (their own keys and format functions said) |
+| `views: { x: { type, duration, dayCount, dateIncrement, visibleRange } }`, `visibleRange` | custom views by settings (`docs/custom-views.md`); a function `visibleRange` and `buttonText` said |
 | `headerToolbar`, `customButtons` | kept whole (`left` / `right`: `start` / `end`; `false`: no header); `prevYear` / `nextYear` said and left out; a button's `icon` becomes the class `fc-icon fc-icon-<name>` (docs/behaviors/header-toolbar.md) |
 | `resources`, `resourceGroupField`, `resourceOrder`, `resourceAreaColumns` | the same (nested `children` flattened with their parent) |
 | `<name>ClassNames`, `<name>Content`, `<name>DidMount`, `<name>WillUnmount` (event, dayHeader, dayCell, slotLabel, slotLane, allDay, moreLink, dayPopover, nowIndicator, weekNumber, noEvents, view, resourceLabel, resourceLane, resourceGroupLabel, resourceGroupLane, resourceAreaHeader) | the render hooks, their arguments rebuilt (docs/behaviors/render-hooks.md) |

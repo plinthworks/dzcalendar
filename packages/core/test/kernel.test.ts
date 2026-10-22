@@ -95,3 +95,92 @@ describe('modelAt after the 16b review: the view as shown, and the caps paper li
     expect([capped.maxLanes, lifted.maxLanes, k.getOptions().dayGrid?.maxLanes]).toEqual([2, null, 2]);
   });
 });
+
+describe('titleFormat (18f-3)', () => {
+  const at = () => Temporal.Instant.from('2026-10-21T08:00:00Z');
+  it('a function is given the first and last days shown; options write a range; one that throws leaves the default', async () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, initialView: 'timeGridWeek', titleFormat: (t) => `${t.start}/${t.end}/${t.view}` });
+    const fn = k.getState().title;
+    k.setTitleFormat({ day: 'numeric', month: 'numeric' });
+    const opts = k.getState().title;
+    k.setTitleFormat(null);
+    const byDefault = k.getState().title;
+    const seen: unknown[] = [];
+    const on = (e: unknown) => void seen.push(e);
+    process.on('unhandledRejection', on as never);
+    k.setTitleFormat(() => {
+      throw new Error('app bug');
+    });
+    const kept = k.getState().title;
+    await new Promise((r) => setTimeout(r, 0));
+    process.off('unhandledRejection', on as never);
+    // Monday 19 to Sunday 25 October 2026; fr-FR writes day/month "19/10".
+    expect([fn, opts.includes('19/10'), opts.includes('25/10'), kept === byDefault, seen.length]).toEqual(['2026-10-19/2026-10-25/timeGridWeek', true, true, true, 1]);
+  });
+});
+
+describe('visibleRange and views by settings (18f-3)', () => {
+  const at = () => Temporal.Instant.from('2026-10-21T08:00:00Z');
+  const congress = { start: Temporal.PlainDate.from('2026-11-03'), end: Temporal.PlainDate.from('2026-11-13') };
+  it('a congress, 3 to 12 November 2026: ten days whatever the date; previous, next and today stay on it', () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, initialView: 'congres', views: { congres: { family: 'timeGrid', visibleRange: congress } } });
+    const r = () => k.getState().range;
+    const first = [String(r().start), String(r().end), r().dates.length, k.getState().view.type];
+    k.navigate('next');
+    k.navigate('today');
+    k.navigate('prev');
+    expect([...first, String(r().start), String(r().end)]).toEqual(['2026-11-03', '2026-11-13', 10, 'congres', '2026-11-03', '2026-11-13']);
+  });
+
+  it('in a day grid its rows are whole weeks: Monday 2 to Sunday 8, Monday 9 to Sunday 15; the period itself 3 to 12', () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, initialView: 'c', views: { c: { family: 'dayGrid', visibleRange: congress } } });
+    const r = k.getState().range;
+    expect([r.weeks.map((w) => `${w[0]}..${w[w.length - 1]}`), String(r.activeStart), String(r.activeEnd)]).toEqual([['2026-11-02..2026-11-08', '2026-11-09..2026-11-15'], '2026-11-03', '2026-11-13']);
+  });
+
+  it('a range that ends before it starts is refused', () => {
+    expect(() => createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, initialView: 'c', views: { c: { family: 'timeGrid', visibleRange: { start: congress.end, end: congress.start } } } })).toThrow(RangeError);
+  });
+
+  it('settings are filled in: the type is the key, three days from the date given', () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, initialView: 'trois', views: { trois: { family: 'timeGrid', duration: { days: 3 } } } });
+    expect([k.getState().view.type, k.getState().range.dates.map(String)]).toEqual(['trois', ['2026-10-21', '2026-10-22', '2026-10-23']]);
+  });
+});
+
+describe('after the 18f-3 review (kernel)', () => {
+  const at = () => Temporal.Instant.from('2026-10-21T08:00:00Z');
+  it('a month title in options is the month, not the grid’s padding days (28 September – 8 November)', () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, initialView: 'dayGridMonth', titleFormat: { month: 'long', year: 'numeric' } });
+    const seen: string[] = [];
+    k.setTitleFormat((t) => (seen.push(`${t.start}..${t.end}`), 'x'));
+    expect([seen[0]]).toEqual(['2026-10-01..2026-10-31']);
+    k.setTitleFormat({ month: 'long', year: 'numeric' });
+    expect(k.getState().title).toBe('octobre 2026');
+  });
+
+  it('a day grid of two months shows both: 28 September to 6 December, aligned on the weeks', () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, initialView: 'deux', views: { deux: { family: 'dayGrid', duration: { months: 2 }, alignment: 'month' } } });
+    const r = k.getState().range;
+    expect([String(r.start), String(r.end), String(r.activeStart), String(r.activeEnd)]).toEqual(['2026-09-28', '2026-12-07', '2026-10-01', '2026-12-01']);
+  });
+
+  it('a view that cannot be made is refused whole: the kernel stays on the one it showed', () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, initialView: 'timeGridWeek', views: { weekend: { family: 'timeGrid', visibleRange: { start: Temporal.PlainDate.from('2026-10-24'), end: Temporal.PlainDate.from('2026-10-26') } } } });
+    k.setView('weekend');
+    // Saturday 24 and Sunday 25 hidden: the fixed period has no day left.
+    expect(() => k.setOptions({ hiddenDays: [6, 7] })).toThrow(RangeError);
+    k.navigate('next');
+    expect([k.getState().view.type, String(k.getState().range.start), k.getOptions().hiddenDays ?? []]).toEqual(['weekend', '2026-10-24', []]);
+  });
+
+  it('bad settings are refused when the kernel is made: a day count of 0, a duration of nothing, a range of strings', () => {
+    const make = (v: object) => () => createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, views: { v: { family: 'timeGrid', ...v } as never } });
+    expect([make({ dayCount: 0 }), make({ duration: { days: 0 } }), make({ visibleRange: { start: '2026-11-03', end: '2026-11-13' } })].map((f) => { try { f(); return 'made'; } catch (e) { return e instanceof RangeError ? 'refused' : 'threw'; } })).toEqual(['refused', 'refused', 'refused']);
+  });
+
+  it('a setting left undefined (a framework’s unset input) keeps the default', () => {
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now: at, initialView: 'v', views: { v: { family: 'timeGrid', duration: { days: 2 }, hiddenDays: undefined } as never } });
+    expect(k.getState().range.dates.length).toBe(2);
+  });
+});

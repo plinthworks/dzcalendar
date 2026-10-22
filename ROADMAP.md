@@ -24,8 +24,12 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 - **Done:** Phase 18f-2 (templates in every framework, the header's places)
   committed ("Phase 18f-2"); every check green (1 410 tests, test:ci,
   typecheck, build, size, bench, test:browser, perf:browser,
-  test:package). **Next: 18f-3** (formats, custom views with
-  `visibleRange`).
+  test:package).
+- **Done:** Phase 18f-3 (formats, custom views with `visibleRange`)
+  committed ("Phase 18f-3"); every check green (1 439 tests, test:ci,
+  typecheck, build, size, test:browser, perf:browser, test:package) but the
+  known noise (`normalize+index 10k`). **Next: 18f-4** (external and
+  cross-calendar dragging).
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2646,6 +2650,52 @@ slots", a business view). Decided:
 - `.dz-tpl*` spans have no CSS yet (the CSS pass).
 - Seen outside 18f-2, not checked at HEAD: in Vue with `v-model:view`,
   `controller.changeView` reports the view three times.
+
+### 18f-3 — done (2026-10-22)
+
+**Built**
+- `docs/behaviors/formats.md` (CLEANROOM). `formats` (DOM, live): `title`
+  (the kernel's `titleFormat` / `setTitleFormat`), `dayHeader`, `dayCell`,
+  `slotLabel`, `eventTime`, `eventTimeRange`, `listDay`, `listDaySide`,
+  `monthHeader`, `morePopover` — the platform's options or a function —,
+  `weekNumber` (a function: the platform has no week). In every view where
+  the place is, the Pro timeline's heads too. What is said keeps the
+  calendar's full words.
+- Custom views: `ViewSpec.visibleRange` (a fixed period, `end` exclusive:
+  navigation does not move it, the arrows and "today" disabled, PageUp /
+  PageDown said "no further"; a day grid's rows padded to whole weeks);
+  `views` takes settings (`{ family, … }`, the type its key, the alignment
+  from the duration's unit, `fixedWeekCount` true), checked when the kernel
+  is made; a day grid of several months in one grid. `docs/custom-views.md`.
+- compat-fullcalendar: their format options (`titleFormat`,
+  `slotLabelFormat`, `eventTimeFormat`…) as `formats`, their own keys said;
+  custom views (`type`, `duration` in their forms, `dayCount`,
+  `dateIncrement`, `visibleRange`, `hiddenDays`), a calendar-wide
+  `visibleRange`.
+- Tests: DOM formats (13), kernel (10), compat (6).
+- Budgets (owner, measured + 3 %): core 42 974, compat-fullcalendar 10 649.
+
+**Reviews fixed** (architect + execution in Chrome)
+- A month's title in options was "septembre – novembre" (the grid's padding
+  days); a view that could not be made left the kernel half changed
+  (`setView`, `setOptions` now atomic); views' settings were never checked
+  (a day count of 0, a duration of nothing threw later); `fixedWeekCount`
+  defaulted to false; a two-month day grid showed one month; a broken
+  format was reported at every cell (now once); short words were said as
+  they were written (now the full ones); the timeline's heads ignored
+  `dayHeader` / `monthHeader` / `dayCell`; an open "+N" kept old formats;
+  a fixed period's day grid had rows of 6 and 4 columns (misaligned; now
+  whole weeks, checked in Chrome); PageDown jumped back to the first day;
+  long custom day heads overflowed; the compat lost a custom view's own
+  options silently, read only Temporal durations, and dropped a
+  calendar-wide `visibleRange` without `initialView`.
+
+**Not done on purpose**
+- A function `visibleRange` (theirs: a function of the date); a view's
+  `buttonText` (give `messages.views`).
+- Disabled header buttons are not styled yet (the CSS pass).
+- On a shared kernel, the title format is the kernel's: the last calendar
+  giving one wins.
 
 ### Order
 

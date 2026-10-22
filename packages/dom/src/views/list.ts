@@ -2,7 +2,7 @@ import { formatTemporal, registerModelFamily } from '@dzcalendar/core';
 import type { CalEvent, Command, EventInstance, KernelState, Segment } from '@dzcalendar/core';
 import { buildListModel } from '@dzcalendar/core/views';
 import type { ListDay, ListEntry, ListModel } from '@dzcalendar/core/views';
-import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, decorate, ensureStyles, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
+import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, decorate, ensureStyles, written, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
 import type { ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
 import { activeIn } from '../focus.js';
 
@@ -93,7 +93,8 @@ export function createListView(ctx: ViewCtx): ViewController {
   const byKey = new Map<string, ListEntry>();
 
   const dayView = () => (ctx.kernel.getViewSpec('timeGridDay') ? 'timeGridDay' : ctx.kernel.getViewSpec('dayGridDay') ? 'dayGridDay' : null);
-  const longDate = (day: ListDay) => formatTemporal(day.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, ctx.locale);
+  const longDate = (day: ListDay) =>
+    written(ctx, ctx.formats.listDay, day.date, () => ({ date: day.date, view: viewType, locale: ctx.locale }), () => formatTemporal(day.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, ctx.locale));
 
   const gapNode = (tag: string) => {
     const g = h(doc, tag, 'dz-list__gap');
@@ -164,6 +165,8 @@ export function createListView(ctx: ViewCtx): ViewController {
     const head = section.firstElementChild as HTMLElement;
     const view = dayView();
     const date = h(doc, view ? 'button' : 'span', 'dz-list__date', longDate(day));
+    // A short heading of the application's ("19/10") is for the eye: the full date is said.
+    if (ctx.formats.listDay) date.setAttribute('aria-label', formatTemporal(day.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, ctx.locale));
     if (view) {
       (date as HTMLButtonElement).type = 'button';
       // The events are the list's tab stop; the date is reached by pointer and screen-reader browsing.
@@ -174,6 +177,9 @@ export function createListView(ctx: ViewCtx): ViewController {
     if (ctx.altLocale) head.append(h(doc, 'span', 'dz-list__alt', altDate(day.date, ctx.altLocale).long));
     // A 23- or 25-hour day says how long it really is.
     if (day.lengthMinutes !== 1440) head.append(h(doc, 'span', 'dz-list__len', formatMinutes(day.lengthMinutes, ctx.locale)));
+    // A second text at the heading's end, if the application asks for one.
+    const side = ctx.formats.listDaySide ? written(ctx, ctx.formats.listDaySide, day.date, () => ({ date: day.date, view: viewType, locale: ctx.locale }), () => '') : '';
+    if (side) head.append(h(doc, 'span', 'dz-list__side', side));
     decorate(ctx, ctx.hooks.listDayHeader, head, { view: viewType, date: day.date, lengthMinutes: day.lengthMinutes, text: longDate(day) });
   }
 

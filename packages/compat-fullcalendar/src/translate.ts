@@ -1,4 +1,4 @@
-import { Temporal, fnSource, jsonSource } from '@dzcalendar/core';
+import { BUILTIN_VIEWS, Temporal, fnSource, jsonSource, registeredViewSpecs } from '@dzcalendar/core';
 import type { CalEvent, EventInput, Series, EventInstance, EventSourceSpec, Instant, PlainDate, Problem, ResourceInput, StoreChange, ZonedDateTime, ZoneId } from '@dzcalendar/core';
 import type { CalendarInstance, CalendarOptions, DateClick } from '@dzcalendar/dom';
 import { icalSource } from '@dzcalendar/ical';
@@ -64,6 +64,52 @@ export function eventInfo(ev: CalEvent, zone: ZoneId): Rec {
   };
 }
 
+/** Their singular duration keys (`{ day: 4 }`) as Temporal's. */
+const PLURAL: Record<string, string> = { year: 'years', month: 'months', week: 'weeks', day: 'days', hour: 'hours', minute: 'minutes', second: 'seconds', millisecond: 'milliseconds', ms: 'milliseconds' };
+/**
+ * A view's length as they write it: an object (`{ days: 4 }`, `{ day: 4 }`),
+ * a string ("72:00:00", an ISO duration), milliseconds; in whole days when
+ * it counts hours or less. Null for what is not a positive period.
+ */
+function periodOf(x: unknown): ReturnType<typeof Temporal.Duration.from> | null {
+  try {
+    if (x && typeof x === 'object') {
+      const o = Object.fromEntries(Object.entries(x as Rec).map(([k, v]) => [PLURAL[k] ?? k, v]));
+      const d = Temporal.Duration.from(o as never);
+      if (d.years || d.months || d.weeks) return d.sign > 0 ? d : null;
+      x = o;
+    }
+    const m = minutesOf(x);
+    if (m === null || m <= 0 || m % 1440 !== 0) return null;
+    return Temporal.Duration.from({ days: m / 1440 });
+  } catch {
+    return null;
+  }
+}
+
+/** Their format options and the places they write. */
+const FORMATS: readonly (readonly [string, string])[] = [
+  ['titleFormat', 'title'],
+  ['dayHeaderFormat', 'dayHeader'],
+  ['slotLabelFormat', 'slotLabel'],
+  ['eventTimeFormat', 'eventTime'],
+  ['listDayFormat', 'listDay'],
+  ['listDaySideFormat', 'listDaySide'],
+  ['dayPopoverFormat', 'morePopover'],
+];
+
+/** Their view types' families, by prefix (the longer first). */
+const FAMILY_OF: readonly (readonly [string, string])[] = [
+  ['resourceTimeGrid', 'timeGrid'],
+  ['resourceDayGrid', 'dayGrid'],
+  ['resourceTimeline', 'timeline'],
+  ['timeGrid', 'timeGrid'],
+  ['dayGrid', 'dayGrid'],
+  ['list', 'list'],
+  ['multiMonth', 'multiMonth'],
+  ['timeline', 'timeline'],
+];
+
 /** The other library's options as DzCalendar's (see docs/behaviors/fullcalendar-options.md). Never throws. */
 export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}): Translation {
   const problems: Problem[] = [];
@@ -71,11 +117,18 @@ export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}):
   if (given === null || typeof given !== 'object') problems.push(said('invalid-option', 'options', typeof given, 'error'));
   // `views: { timeGrid: {…}, timeGridWeek: {…} }`: what concerns the first view laid over the rest; the others said.
   const fc: Rec = { ...raw };
+  /** Their custom views (`{ type, duration, dayCount, visibleRange… }`), made once the zone is known. */
+  const custom: [string, Rec][] = [];
   if (raw['views'] && typeof raw['views'] === 'object') {
     const first = typeof raw['initialView'] === 'string' ? raw['initialView'] : 'dayGridMonth';
     for (const [name, o] of Object.entries(raw['views'] as Rec)) {
-      if (o && typeof o === 'object' && first.startsWith(name)) {
+      if (o && typeof o === 'object' && typeof (o as Rec)['type'] === 'string') custom.push([name, o as Rec]);
+      else if (o && typeof o === 'object' && first.startsWith(name)) {
         const { type: _t, duration: _d, buttonText: _b, ...rest } = o as Rec;
+        // A built-in view's own length is ours: a duration or a day count given to it is said (make a view of your own: `type`).
+        for (const k of ['duration', 'dayCount', 'visibleRange'] as const) if ((o as Rec)[k] !== undefined) problems.push(said('compat-unsupported', `views.${name}.${k}`, 'built-in'));
+        delete rest['dayCount'];
+        delete rest['visibleRange'];
         Object.assign(fc, rest);
       } else problems.push(said('compat-unsupported', `views.${name}`, 'per-view'));
     }
@@ -119,6 +172,79 @@ export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}):
   if (fc['initialDate'] !== undefined) {
     const d = date('initialDate', take('initialDate'));
     if (d) out['initialDate'] = d;
+  }
+  // Their formats: the platform's options are ours too; their own keys and their format functions (given their date objects) are said.
+  const formats: Rec = {};
+  for (const [theirs, ours] of FORMATS) {
+    const f = take(theirs);
+    if (f === undefined) continue;
+    if (f === null || typeof f !== 'object') {
+      problems.push(said('compat-unsupported', theirs, typeof f));
+      continue;
+    }
+    const { meridiem, omitZeroMinute, omitCommas, omitZeroDay, separator, ...intl } = f as Rec;
+    for (const [k, v] of Object.entries({ meridiem, omitZeroMinute, omitCommas, omitZeroDay, separator })) if (v !== undefined) problems.push(said('compat-unsupported', `${theirs}.${k}`, 'intl'));
+    formats[ours] = intl;
+  }
+  if (Object.keys(formats).length > 0) out['formats'] = formats;
+  // Their custom views as ours by settings: the family (and a view's own settings) of `type`, then what they change.
+  // A calendar-wide `visibleRange` makes the first view one too (`initialView: 'timeGrid'`).
+  if (fc['visibleRange'] !== undefined) {
+    const first = typeof fc['initialView'] === 'string' ? fc['initialView'] : 'timeGrid';
+    custom.push([first, { type: first, visibleRange: take('visibleRange') }]);
+    // Theirs holds for every view; ours for the first: the calendar opens on it, the others are said.
+    if (fc['initialView'] === undefined) out['initialView'] = first;
+    if (out['headerViews'] !== undefined || (fc['headerToolbar'] && typeof fc['headerToolbar'] === 'object')) problems.push(said('compat-unsupported', 'visibleRange', 'first-view-only'));
+  }
+  if (custom.length > 0) {
+    const views: Rec = {};
+    for (const [name, o] of custom) {
+      const type = String(o['type']);
+      const base = BUILTIN_VIEWS[type] ?? registeredViewSpecs()[type];
+      const family = base?.family ?? FAMILY_OF.find(([prefix]) => type.startsWith(prefix))?.[1];
+      if (!family) {
+        problems.push(said('compat-unsupported', `views.${name}.type`, type));
+        continue;
+      }
+      const v: Rec = base ? { ...base, type: name } : { family, ...(type.startsWith('resource') && { resources: true }) };
+      if (o['duration'] !== undefined) {
+        const d = periodOf(o['duration']);
+        if (d) {
+          v['duration'] = d;
+          // A duration of their own: aligned on what it counts (months on the 1st, weeks on the week's first day), else on the date.
+          v['alignment'] = d.years ? 'year' : d.months ? 'month' : d.weeks ? 'week' : 'none';
+        } else problems.push(said('invalid-option', `views.${name}.duration`, 'unreadable', 'error'));
+      }
+      if (o['dayCount'] !== undefined) {
+        if (typeof o['dayCount'] === 'number' && Number.isInteger(o['dayCount']) && o['dayCount'] >= 1) {
+          v['dayCount'] = o['dayCount'];
+          v['alignment'] = 'none';
+        } else problems.push(said('invalid-option', `views.${name}.dayCount`, String(o['dayCount']), 'error'));
+      }
+      if (o['dateIncrement'] !== undefined) {
+        const d = periodOf(o['dateIncrement']);
+        if (d) v['dateIncrement'] = d;
+        else problems.push(said('invalid-option', `views.${name}.dateIncrement`, 'unreadable', 'error'));
+      }
+      const range = o['visibleRange'];
+      if (typeof range === 'function') problems.push(said('compat-unsupported', `views.${name}.visibleRange`, 'function'));
+      else if (range && typeof range === 'object') {
+        const start = date(`views.${name}.visibleRange.start`, (range as Rec)['start']);
+        const end = date(`views.${name}.visibleRange.end`, (range as Rec)['end']);
+        if (start && end && Temporal.PlainDate.compare(start, end) < 0) v['visibleRange'] = { start, end };
+        else problems.push(said('invalid-option', `views.${name}.visibleRange`, 'unreadable', 'error'));
+      }
+      if (o['buttonText'] !== undefined) problems.push(said('compat-unsupported', `views.${name}.buttonText`, 'messages'));
+      if (o['hiddenDays'] !== undefined) {
+        const days = weekdays(o['hiddenDays']);
+        if (days) v['hiddenDays'] = days;
+        else problems.push(said('invalid-option', `views.${name}.hiddenDays`, 'unreadable', 'error'));
+      }
+      // The rest of a view's own options (hours, formats…) are the calendar's here: said, not lost.
+      for (const k of Object.keys(o)) if (!['type', 'duration', 'dayCount', 'dateIncrement', 'visibleRange', 'buttonText', 'hiddenDays'].includes(k)) problems.push(said('compat-unsupported', `views.${name}.${k}`, 'per-view'));
+      views[name] = v;
+    }
+    out['views'] = views;
   }
   if (fc['firstDay'] !== undefined) {
     const d = weekday(take('firstDay'));

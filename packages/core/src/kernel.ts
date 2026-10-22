@@ -23,8 +23,8 @@ import { buildDayGridModel, updateDayGridModel } from './views/daygrid.js';
 import type { DayGridModel, DayGridOptions } from './views/daygrid.js';
 import { navigate } from './views/nav.js';
 import type { NavDirection } from './views/nav.js';
-import { computeViewRange } from './views/range.js';
-import type { NavContext, ViewRange, ViewSpec } from './views/spec.js';
+import { assertViewSpec, computeViewRange } from './views/range.js';
+import type { NavContext, ViewRange, ViewSettings, ViewSpec } from './views/spec.js';
 import { buildTimeGridModel, updateTimeGridModel } from './views/timegrid.js';
 import type { AvailableSlot, TimeGridModel, TimeGridOptions } from './views/timegrid.js';
 import { isValidZone } from './zone.js';
@@ -64,16 +64,30 @@ export interface ModelOptions {
   readonly hiddenDays?: readonly Weekday[];
 }
 
+/** What a title written by the application is given: the first and last days shown. */
+export interface TitleFormatArg {
+  readonly start: PlainDate;
+  /** The last day shown. */
+  readonly end: PlainDate;
+  /** The view's type. */
+  readonly view: string;
+  readonly locale: string;
+}
+/** How the title is written: the platform's date-format options (a range when the first and last days differ), or a function. */
+export type TitleFormat = Intl.DateTimeFormatOptions | ((arg: TitleFormatArg) => string);
+
 export interface KernelOptions extends ModelOptions {
   readonly timeZone: ZoneId;
   readonly locale: string;
   /** Default: the locale's. */
   readonly firstDay?: Weekday;
+  /** How the title is written; default: the month, a week's days, a day in full. */
+  readonly titleFormat?: TitleFormat;
   /** Default: today in `timeZone`. */
   readonly initialDate?: PlainDate;
   readonly initialView?: string;
-  /** Added to (and overriding) the built-in views. */
-  readonly views?: Readonly<Record<string, ViewSpec>>;
+  /** Added to (and overriding) the built-in views: a whole spec, or settings (`{ family: 'timeGrid', visibleRange }`) the rest filled in, the type its key. */
+  readonly views?: Readonly<Record<string, ViewSpec | ViewSettings>>;
   /** A store to share: four kernels on one store show the same events in four zones. */
   readonly store?: EventStore;
   /** Loaded as an array source named "events"; replaced with `setEvents`. */
@@ -201,6 +215,8 @@ export interface CalendarKernel {
   setOptions(options: ModelOptions): void;
   /** The week's first day (ISO, Monday = 1); null: the locale's again. A view whose range moves redraws. */
   setFirstDay(day: Weekday | null): void;
+  /** How the title is written from now on (null: the default again). */
+  setTitleFormat(format: TitleFormat | null): void;
   /** The rules gestures and checked commands are held to (constraint, overlap, allow, valid range…), replacing those given. */
   setRules(rules: KernelOptions['rules']): void;
   /** The options in force (what `setOptions` merged). */
@@ -283,7 +299,22 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   if (!isValidZone(o.timeZone)) throw new RangeError(`timeZone is not a time zone: ${o.timeZone}`);
   if (o.businessHours !== undefined) assertBusinessHours(o.businessHours);
   if (o.timeline) assertTimeline(o.timeline);
-  const views = { ...BUILTIN_VIEWS, ...registeredViewSpecs(), ...o.views };
+  const views: Record<string, ViewSpec> = { ...BUILTIN_VIEWS, ...registeredViewSpecs() };
+  for (const [type, v] of Object.entries(o.views ?? {})) {
+    // A member a framework left `undefined` does not erase a default.
+    const given = Object.fromEntries(Object.entries(v).filter(([, x]) => x !== undefined)) as ViewSettings;
+    // Aligned on what its duration counts (months on the 1st, weeks on the week's first day), else on the date.
+    let alignment: ViewSpec['alignment'] = 'none';
+    try {
+      const d = Temporal.Duration.from((given.duration ?? { days: 1 }) as never);
+      alignment = d.years ? 'year' : d.months ? 'month' : d.weeks ? 'week' : 'none';
+    } catch {
+      /* said by assertViewSpec below */
+    }
+    const spec: ViewSpec = { type, duration: { days: 1 }, alignment, fixedWeekCount: true, hiddenDays: [], showNonCurrentDates: true, ...given };
+    assertViewSpec(spec);
+    views[type] = spec;
+  }
   const now = o.now ?? systemNow;
   const store = o.store ?? createEventStore();
   const listeners = new Set<(e: KernelEvent) => void>();
@@ -292,6 +323,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   let locale = o.locale;
   /** The first day given (null: the locale's), and the rules: both changeable later (setFirstDay, setRules). */
   let firstDayGiven: Weekday | null = o.firstDay ?? null;
+  let titleFormat: TitleFormat | null = o.titleFormat ?? null;
   let rulesGiven = o.rules;
   let firstDay = firstDayGiven ?? weekRulesFor(locale).firstDay;
   let options: ModelOptions = {
@@ -388,7 +420,31 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   let pending: StateCause[] = [];
   let direction: 'prev' | 'next' | 'other' | undefined;
 
+  /** Formats already reported: a broken one is said once, not at every title. */
+  const reported = new WeakSet<object>();
+  const reportOnce = (fmt: object, err: unknown) => {
+    if (reported.has(fmt)) return;
+    reported.add(fmt);
+    void Promise.reject(err);
+  };
   function titleFor(range: ViewRange, spec: ViewSpec): string {
+    // A month's or a year's period is its own days, not the grid's padding ones (28 September opens October's grid).
+    const own = spec.alignment === 'month' || spec.alignment === 'year' || spec.visibleRange !== undefined;
+    const first = own ? range.activeStart : (range.dates[0] ?? range.activeStart);
+    const last = own ? range.activeEnd.subtract({ days: 1 }) : (range.dates[range.dates.length - 1] ?? range.activeEnd.subtract({ days: 1 }));
+    if (titleFormat) {
+      const fmt = titleFormat;
+      try {
+        if (typeof fmt === 'function') {
+          const out = fmt({ start: first, end: last, view: spec.type, locale });
+          if (typeof out === 'string') return out;
+          reportOnce(fmt, new TypeError('dzcalendar: titleFormat returned no text'));
+        } else return first.equals(last) ? formatTemporal(first, fmt, locale) : formatRangeTitle(first, last, fmt, locale);
+      } catch (err) {
+        // The application's bug is reported (once for that format); the title is written as by default.
+        reportOnce(fmt, err);
+      }
+    }
     switch (spec.alignment) {
       case 'month': {
         // The months the period covers *as the locale writes them*: a Gregorian
@@ -405,8 +461,6 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         return one === formatTemporal(last, { year: 'numeric' }, locale) ? one : formatRangeTitle(range.activeStart, last, { year: 'numeric' }, locale);
       }
       default: {
-        const first = range.dates[0] ?? range.activeStart;
-        const last = range.dates[range.dates.length - 1] ?? range.activeEnd.subtract({ days: 1 });
         return first.equals(last)
           ? formatTemporal(first, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }, locale)
           : formatRangeTitle(first, last, { day: 'numeric', month: 'short', year: 'numeric' }, locale);
@@ -463,8 +517,11 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     setView(type, at) {
       const spec = viewOf(type);
       if (spec === raw && (!at || at.equals(date))) return;
+      // The next state first: a view whose range cannot be made (every day of a fixed period hidden) changes nothing.
+      const nextView = effectiveOf(spec);
+      computeState(at ?? date, nextView);
       raw = spec;
-      view = effectiveOf(spec);
+      view = nextView;
       if (at) date = at;
       direction ??= 'other';
       changeState('view');
@@ -498,6 +555,10 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       firstDay = next;
       changeState('options');
     },
+    setTitleFormat(format) {
+      titleFormat = format;
+      changeState('options');
+    },
     setRules(rules) {
       // Read at every gesture and command: nothing to redraw.
       rulesGiven = rules;
@@ -524,6 +585,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         return;
       }
       if (next.hiddenDays && new Set(next.hiddenDays).size >= 7) throw new RangeError('hiddenDays: every day of the week is hidden');
+      const was = options;
       options = {
         ...options,
         ...(next.timeGrid && { timeGrid: { ...options.timeGrid, ...next.timeGrid } }),
@@ -538,8 +600,16 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         ...('collapsedResources' in next && { collapsedResources: next.collapsedResources }),
         ...('collapsedGroups' in next && { collapsedGroups: next.collapsedGroups }),
       } as ModelOptions;
+      // The view as these options make it, tried first: a fixed period whose days all become hidden changes nothing.
+      const nextView = effectiveOf(raw);
+      try {
+        computeState(date, nextView);
+      } catch (err) {
+        options = was;
+        throw err;
+      }
       if ('resourceOrder' in next || 'resourceGroupField' in next) buildResources();
-      view = effectiveOf(raw);
+      view = nextView;
       changeState('options');
     },
     setEvents(events) {

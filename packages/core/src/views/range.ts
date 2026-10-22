@@ -21,16 +21,62 @@ function datesBetween(start: PlainDate, end: PlainDate, spec: ViewSpec): PlainDa
  * weeks the month touches); a week starts on the first weekday; a day view
  * with `dayCount` counts shown days, stepping over hidden ones.
  */
+/**
+ * A view's settings readable before any range is made: a duration, a day
+ * count, a step and a fixed period that make a period. A `RangeError` names
+ * what is wrong (options are refused whole, as elsewhere).
+ */
+export function assertViewSpec(spec: ViewSpec): void {
+  const positive = (d: unknown, what: string) => {
+    let dur: { readonly sign: number };
+    try {
+      dur = Temporal.Duration.from(d as never);
+    } catch {
+      throw new RangeError(`${spec.type}: ${what} is not a duration`);
+    }
+    if (dur.sign <= 0) throw new RangeError(`${spec.type}: ${what} must be longer than nothing`);
+  };
+  positive(spec.duration, 'duration');
+  if (spec.dateIncrement !== undefined) positive(spec.dateIncrement, 'dateIncrement');
+  if (spec.dayCount !== undefined && !(Number.isInteger(spec.dayCount) && spec.dayCount >= 1)) throw new RangeError(`${spec.type}: dayCount is a whole number of days, 1 or more`);
+  if (!Array.isArray(spec.hiddenDays)) throw new RangeError(`${spec.type}: hiddenDays is a list of ISO weekdays`);
+  const r = spec.visibleRange;
+  if (r !== undefined && !(r && r.start instanceof Temporal.PlainDate && r.end instanceof Temporal.PlainDate)) throw new RangeError(`${spec.type}: visibleRange is { start, end } as PlainDate`);
+}
+
 export function computeViewRange(anchor: PlainDate, spec: ViewSpec, ctx: NavContext): ViewRange {
   if (spec.hiddenDays.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw new RangeError(`${spec.type}: hiddenDays are ISO weekdays, 1 to 7`);
   if (new Set(spec.hiddenDays).size >= 7) throw new RangeError(`${spec.type}: every day of the week is hidden`);
+  if (spec.visibleRange) {
+    // A fixed period: the same whatever the anchor; a grid's rows run from the week's first day.
+    const { start, end } = spec.visibleRange;
+    if (Temporal.PlainDate.compare(start, end) >= 0) throw new RangeError(`${spec.type}: visibleRange ends before it starts (its end is exclusive)`);
+    if (datesBetween(start, end, spec).length === 0) throw new RangeError(`${spec.type}: visibleRange shows no day (every one of its days is hidden)`);
+    if (spec.family === 'dayGrid') {
+      // A grid's rows are whole weeks (its columns line up under the weekdays): the days around the period pad them, as a month's do.
+      const from = startOfWeek(start, ctx.firstDay);
+      const to = startOfWeek(end.subtract({ days: 1 }), ctx.firstDay).add({ days: 7 });
+      const dates = datesBetween(from, to, spec);
+      return { start: from, end: to, activeStart: start, activeEnd: end, dates, weeks: chunkWeeks(dates, ctx.firstDay) };
+    }
+    const dates = datesBetween(start, end, spec);
+    return { start, end, activeStart: start, activeEnd: end, dates, weeks: [dates] };
+  }
   if (spec.family === 'multiMonth') return multiMonthRange(anchor, spec, ctx);
 
   switch (spec.alignment) {
     case 'month': {
       const first = anchor.with({ day: 1 });
       // A month grid is one month; a list or several months run for the duration.
-      const activeEnd = spec.family === 'dayGrid' ? first.add({ months: 1 }) : first.add(spec.duration);
+      const activeEnd = spec.family === 'dayGrid' && !(Temporal.Duration.from(spec.duration).months > 1) ? first.add({ months: 1 }) : first.add(spec.duration);
+      if (spec.family === 'dayGrid' && Temporal.Duration.from(spec.duration).months > 1) {
+        // Several months in one grid: from the first month's first week to the last month's last.
+        const last = activeEnd.subtract({ days: 1 });
+        const start = startOfWeek(first, ctx.firstDay);
+        const end = startOfWeek(last, ctx.firstDay).add({ days: 7 });
+        const dates = datesBetween(start, end, spec);
+        return { start, end, activeStart: first, activeEnd, dates, weeks: chunkWeeks(dates, ctx.firstDay) };
+      }
       if (spec.family === 'dayGrid') {
         let grid = getMonthGrid(first.year, first.month, ctx.firstDay);
         if (!spec.fixedWeekCount) grid = grid.filter((week) => week.some((d) => d.month === first.month && d.year === first.year));

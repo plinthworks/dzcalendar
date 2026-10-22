@@ -1,5 +1,7 @@
 import { decorate, flushMounts, holder, undecorate } from './render/hooks.js';
 import type { ElementHooks, HeaderItemCtx } from './render/hooks.js';
+import { sameFormats } from './render/formats.js';
+import type { Formats } from './render/formats.js';
 import { actionsFor, assertBusinessHours, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, Temporal } from '@dzcalendar/core';
 import type { CalEvent, Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
@@ -58,6 +60,8 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly customButtons?: Readonly<Record<string, CustomButton>>;
   /** The application's places in the header (a menu, a filter, a badge), named in `headerToolbar`: its content, classes and mounts. */
   readonly headerItems?: Readonly<Record<string, ElementHooks<HeaderItemCtx>>>;
+  /** How each place is written: `{ slotLabel: { hour: 'numeric' }, title: (t) => … }` (docs/behaviors/formats.md). */
+  readonly formats?: Formats;
   /** Lanes a month day shows before "+N": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default 'auto'. */
   readonly dayMaxLanes?: number | 'auto' | null;
   readonly hooks?: CalendarHooks;
@@ -156,6 +160,8 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly customButtons?: Readonly<Record<string, CustomButton>>;
   /** Compared by name, member by member. */
   readonly headerItems?: Readonly<Record<string, ElementHooks<HeaderItemCtx>>>;
+  /** Compared place by place (options by their contents, functions by identity). */
+  readonly formats?: Formats;
   readonly theme?: string;
   readonly scheme?: 'auto' | 'light' | 'dark';
   readonly density?: 'compact' | 'comfortable' | 'spacious';
@@ -335,7 +341,10 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       timeZone: options.timeZone || Temporal.Now.timeZoneId(),
       hiddenDays: hiddenOf(options.hiddenDays, options.weekends),
       locale: withCalendar(baseLocale, displayCalendar),
+      ...(options.formats?.title && { titleFormat: options.formats.title }),
     } as KernelOptions);
+  // Someone else's kernel: the title written as asked here too.
+  if (options.kernel && options.formats?.title) options.kernel.setTitleFormat(options.formats.title);
   if (options.kernel) {
     // Someone else's kernel: its locale is the base; a display calendar asked here is applied now, not at a later update.
     baseLocale = withoutCalendar(options.kernel.getState().locale);
@@ -466,6 +475,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     motion: options.motion ?? WAAPI_MOTION,
     easeScroll: false,
     hooks: options.hooks ?? {},
+    formats: options.formats ?? {},
     epoch: 0,
     snapMinutes: settings.current.snapMinutes ?? 15,
     weekNumbers: options.weekNumbers === true,
@@ -1096,6 +1106,17 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           }
           // Compared member by member: a wrapper that rebuilds the same object
           // on every change must not redraw every event.
+          // How places are written: compared by their options and functions; the title is the kernel's.
+          if (changes.formats && !sameFormats(changes.formats, ctx.formats)) {
+            // An open "+N" panel was written with the old formats: it closes.
+            popover.close(false);
+            const was = ctx.formats.title;
+            ctx.formats = changes.formats;
+            const next = changes.formats.title;
+            if (!sameFormats(was ? { title: was } : {}, next ? { title: next } : {})) kernel.setTitleFormat(next ?? null);
+            ctx.epoch++;
+            dirty = true;
+          }
           if (changes.hooks && !sameHooks(changes.hooks, ctx.hooks)) {
             // An open "+N" panel was drawn with the old hooks: it closes (its events and itself let go by them).
             popover.close(false);

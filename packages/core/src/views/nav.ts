@@ -11,6 +11,8 @@ export type NavDirection = 'prev' | 'next' | 'today' | { readonly to: PlainDate 
  * shown days, so four weekdays forward from Thursday lands on Wednesday.
  */
 export function navigate(anchor: PlainDate, spec: ViewSpec, dir: NavDirection, ctx: NavContext): PlainDate {
+  // A fixed period does not move: previous, next and today stay on it.
+  if (spec.visibleRange && typeof dir !== 'object') return anchor;
   if (dir === 'today') return ctx.today;
   if (typeof dir === 'object') return dir.to;
   const sign = dir === 'next' ? 1 : -1;

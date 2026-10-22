@@ -249,6 +249,9 @@ export function createToolbar(
       next.textContent = rtl ? '‹' : '›';
       next.setAttribute('aria-label', messages.next);
       today.textContent = messages.today;
+      // A fixed period (`visibleRange`) does not move: the arrows and "today" have nothing to do.
+      const fixed = Boolean(now.view.visibleRange);
+      for (const b of [prev, next, today]) b.disabled = fixed;
       for (const s of switchers) s.setAttribute('aria-label', messages.viewSwitcher);
       for (const b of viewButtons) {
         const v = b.dataset['view']!;

@@ -90,7 +90,7 @@ export { BUILTIN_VIEWS, registerViewSpec, registeredViewSpecs } from './views/bu
 export { computeViewRange } from './views/range.js';
 export { navigate } from './views/nav.js';
 export type { NavDirection } from './views/nav.js';
-export type { ViewSpec, ViewFamily, ViewRange, NavContext } from './views/spec.js';
+export type { ViewSpec, ViewSettings, ViewFamily, ViewRange, NavContext } from './views/spec.js';
 export { buildTimeGridModel, buildTimeGridColumn, updateTimeGridModel, locateNow, slotInstant } from './views/timegrid.js';
 export type { TimeGridModel, TimeGridColumn, TimeGridOptions, PlacedTimed, MoreTimed, AllDayBar, Reading, AvailableSlot, PlacedSlot, ResourceHead, ResourceGroupHead } from './views/timegrid.js';
 export { buildResourceTree, fieldOf, EMPTY_TREE } from './resource/tree.js';
@@ -105,7 +105,7 @@ export type { Fmt, Formattable } from './format/intl.js';
 export { weekNumber, weekRulesFor } from './format/week.js';
 export type { WeekRules } from './format/week.js';
 export { createKernel, registerModelFamily, assertTimeline } from './kernel.js';
-export type { CalendarKernel, KernelOptions, KernelState, KernelEvent, ViewModel, ModelFamily, ModelOptions, StateCause } from './kernel.js';
+export type { CalendarKernel, KernelOptions, KernelState, KernelEvent, ViewModel, ModelFamily, ModelOptions, StateCause, TitleFormat, TitleFormatArg } from './kernel.js';
 export { businessIntervals, assertBusinessHours } from './rules/business-hours.js';
 export type { BusinessHoursRule, BusinessHoursInput } from './rules/business-hours.js';
 export { actionsFor } from './actions/actions.js';

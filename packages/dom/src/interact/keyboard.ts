@@ -227,6 +227,11 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
         // The cursor's date moves by the view's own step (a month: the 31st becomes the 30th), the way the view did.
         const before = ctx.kernel.getState();
         const spec = before.view;
+        // A fixed period does not move: said, as at a view's edge; the cursor stays.
+        if (spec.visibleRange) {
+          ctx.announce(m().noFurther);
+          return true;
+        }
         ctx.kernel.navigate(intent.dir);
         const sign = intent.dir === 'next' ? 1 : -1;
         const step = spec.dayCount === undefined || spec.dateIncrement !== undefined ? Temporal.Duration.from(spec.dateIncrement ?? spec.duration) : null;

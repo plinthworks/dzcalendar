@@ -1,3 +1,4 @@
+import { weekWords, written } from '../render/formats.js';
 import { Temporal, formatTemporal, dayInfo } from '@dzcalendar/core';
 import { weekNumber, weekRulesFor } from '@dzcalendar/core';
 import type { DayGridBar, DayGridModel, DayGridWeek, Hit, KernelState, PlainDate, Resource, Segment, ZonedDateTime } from '@dzcalendar/core';
@@ -253,8 +254,10 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     const today = state?.today;
     host.replaceChildren(
       ...dates.map((d, i) => {
-        const words = formatTemporal(d, { weekday: 'short' }, ctx.locale);
+        const words = written(ctx, ctx.formats.dayHeader, d, () => ({ date: d, view: state?.view.type ?? '', locale: ctx.locale }), () => formatTemporal(d, { weekday: 'short' }, ctx.locale));
         const c = h(doc, 'div', 'dz-dg__weekday', words);
+        // A short head of the application's ("L") is for the eye: the weekday is said in full.
+        if (ctx.formats.dayHeader) c.setAttribute('aria-label', formatTemporal(d, { weekday: 'long' }, ctx.locale));
         // A month's column head names a weekday: its date is the column's first (as the other library gives it).
         // The column's resource in a resource view; the day's real length in the calendar's zone (a week's Sunday 25 October in Paris: 1 500).
         const resource = m.resourceHeads.find((r) => i >= r.from && i < r.from + r.count)?.resource ?? null;
@@ -280,18 +283,20 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
   }
 
   function drawMonth(el: HTMLElement, x: Section): void {
-    const name = formatTemporal(x.month!, { month: 'long', year: 'numeric' }, ctx.locale);
+    const name = written(ctx, ctx.formats.monthHeader, x.month!, () => ({ month: x.month!, locale: ctx.locale }), () => formatTemporal(x.month!, { month: 'long', year: 'numeric' }, ctx.locale));
     const title = el.querySelector<HTMLElement>('.dz-mm__title')!;
     const go = h(doc, 'button', 'dz-mm__go', name) as HTMLButtonElement;
     go.type = 'button';
-    go.setAttribute('aria-label', `${ctx.messages.goToMonth}, ${name}`);
+    // Said in full whatever the application writes ("Oct" is for the eye).
+    const spoken = formatTemporal(x.month!, { month: 'long', year: 'numeric' }, ctx.locale);
+    go.setAttribute('aria-label', `${ctx.messages.goToMonth}, ${spoken}`);
     go.addEventListener('click', () => ctx.kernel.getViewSpec('dayGridMonth') && ctx.kernel.setView('dayGridMonth', x.month!));
     const was = title.firstElementChild as HTMLElement | null;
     if (was) undecorate(was);
     title.replaceChildren(go);
     decorate(ctx, ctx.hooks.monthHeader, go, { view: state?.view.type ?? '', month: x.month!, text: name });
     const grid = el.querySelector<HTMLElement>('.dz-mm__grid')!;
-    grid.setAttribute('aria-label', name);
+    grid.setAttribute('aria-label', spoken);
     grid.style.setProperty('--dz-cols', String(x.model.weeks[0]?.dates.length ?? 7));
     weekdayHead(grid.querySelector<HTMLElement>('.dz-dg__head')!, x.model);
     fill(x.key, x, !asleep.has(x.key), el);
@@ -476,7 +481,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     cell.tabIndex = cursorDate?.equals(c.date) && cursorResource === c.resourceId ? 0 : -1;
     // The day number leads to that day, where a day view exists (the context menu's "Go to this day" too).
     const dayView = ctx.kernel.getViewSpec('timeGridDay') ? 'timeGridDay' : ctx.kernel.getViewSpec('dayGridDay') ? 'dayGridDay' : null;
-    const num = h(doc, dayView ? 'button' : 'span', 'dz-dg__num', formatTemporal(c.date, { day: 'numeric' }, ctx.locale));
+    const num = h(doc, dayView ? 'button' : 'span', 'dz-dg__num', written(ctx, ctx.formats.dayCell, c.date, () => ({ date: c.date, view: state?.view.type ?? '', locale: ctx.locale }), () => formatTemporal(c.date, { day: 'numeric' }, ctx.locale)));
     if (dayView) {
       (num as HTMLButtonElement).type = 'button';
       num.tabIndex = -1;
@@ -518,7 +523,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     if (c.week !== null) {
       // The week's number, leading to that week where a week view exists.
       const weekView = ctx.kernel.getViewSpec('timeGridWeek') ? 'timeGridWeek' : ctx.kernel.getViewSpec('dayGridWeek') ? 'dayGridWeek' : null;
-      const wk = h(doc, weekView ? 'button' : 'span', 'dz-dg__wk', ctx.messages.weekShort({ week: c.week }));
+      const wk = h(doc, weekView ? 'button' : 'span', 'dz-dg__wk', weekWords(ctx, c.week, c.date));
       wk.setAttribute('aria-label', ctx.messages.weekLabel({ week: c.week }));
       if (weekView) {
         (wk as HTMLButtonElement).type = 'button';
@@ -610,7 +615,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     });
     ctx.openMore(
       link,
-      formatTemporal(date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale),
+      written(ctx, ctx.formats.morePopover, date, () => ({ date, view: state?.view.type ?? '', locale: ctx.locale }), () => formatTemporal(date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale)),
       nodes,
       () => {
         for (const n of nodes) unmountEvent(ctx, n);

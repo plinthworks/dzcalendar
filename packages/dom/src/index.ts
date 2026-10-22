@@ -37,5 +37,6 @@ export type {
 } from './render/hooks.js';
 export type { LiveSettings, DateClick, EventChange } from './settings.js';
 export type { CustomButton, HeaderToolbar } from './toolbar.js';
+export type { DateFormatArg, EventTimeFormatArg, EventTimeRangeFormatArg, FormatSpec, Formats, MonthFormatArg, TimeFormatArg, WeekFormatArg } from './render/formats.js';
 // A custom view takes part in gestures with a surface, and in the keyboard with its `keys` (none: no keyboard).
 export type { InteractionSurface, KeyboardSurface, Box } from './interact/surface.js';

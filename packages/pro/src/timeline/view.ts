@@ -20,7 +20,7 @@ import {
   activeIn,
 } from '@dzcalendar/dom/toolkit';
 import type { Box, InteractionSurface, KeyboardSurface, ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
-import { decorate, holder, undecorate, undecorateAll } from '@dzcalendar/dom/toolkit';
+import { decorate, holder, undecorate, undecorateAll, written } from '@dzcalendar/dom/toolkit';
 import type { TimelineBar, TimelineModel, TimelineMore, TimelineRow } from './model.js';
 import { timelineNow } from './model.js';
 import { TIMELINE_CSS } from './styles.js';
@@ -268,7 +268,10 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     () => h(doc, 'div', 'dz-tl__group'),
     (el, it) => {
       place(el, it.from, it.to);
-      el.replaceChildren(h(doc, 'span', 'dz-tl__group-text', it.text));
+      // Seen as the application writes it, said in full.
+      const seen = h(doc, 'span', 'dz-tl__group-text', it.text);
+      if (it.label !== it.text) seen.setAttribute('aria-hidden', 'true');
+      el.replaceChildren(seen, ...(it.label !== it.text ? [h(doc, 'span', 'dz-tl__sr', it.label)] : []));
     },
   );
   const slotHeads = new KeyedList<HeadItem>(
@@ -301,14 +304,18 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     const s = m.axis.slots[i]!;
     if (!s.time)
       return {
-        text: formatTemporal(s.date, { day: 'numeric' }, ctx.locale),
+        // A day's slot written as a month's day number is (dayCell), said in full.
+        text: written(ctx, ctx.formats.dayCell, s.date, () => ({ date: s.date, view: ctx.kernel.getState().view.type, locale: ctx.locale }), () => formatTemporal(s.date, { day: 'numeric' }, ctx.locale)),
         label: formatTemporal(s.date, DAY, ctx.locale),
       };
     const hm = formatTemporal(s.time, HM, ctx.locale);
-    if (s.pass === null) return { text: hm, label: hm };
+    // What is seen as the application writes it; the label (said, on hover) keeps the full time.
+    const time = s.time;
+    const seen = written(ctx, ctx.formats.slotLabel, time, () => ({ time, view: ctx.kernel.getState().view.type, locale: ctx.locale }), () => hm);
+    if (s.pass === null) return { text: seen, label: hm };
     // The two 02:00s of a fall-back night: the second marked, both with their offsets in the label.
     return {
-      text: `${hm}${s.pass === 'second' ? ctx.messages.secondPassMark : ''}`,
+      text: `${seen}${s.pass === 'second' ? ctx.messages.secondPassMark : ''}`,
       label: `${hm} (${s.offset})`,
     };
   }
@@ -322,15 +329,21 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         .map((g) => {
           const from = a.toPosition(g.start);
           const to = a.toPosition(g.end);
-          const text =
+          // A month over days, a day over hours: as the application writes them (monthHeader, dayHeader), said in full.
+          const view = ctx.kernel.getState().view.type;
+          const label =
             a.unit === 'day' ? formatTemporal(g.date, { month: 'long', year: 'numeric' }, ctx.locale) : formatTemporal(g.date, { weekday: 'short', day: 'numeric', month: 'short' }, ctx.locale);
+          const text =
+            a.unit === 'day'
+              ? written(ctx, ctx.formats.monthHeader, g.date, () => ({ month: g.date, locale: ctx.locale }), () => label)
+              : written(ctx, ctx.formats.dayHeader, g.date, () => ({ date: g.date, view, locale: ctx.locale }), () => label);
           return {
             key: g.date.toString(),
             sig: `${from}|${to}|${ctx.epoch}`,
             from,
             to,
             text,
-            label: text,
+            label,
           };
         }),
     );
@@ -671,7 +684,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     const date = first.toZonedDateTimeISO(ctx.zone).toPlainDate();
     ctx.openMore(
       link,
-      owner + formatTemporal(date, DAY, ctx.locale),
+      owner + written(ctx, ctx.formats.morePopover, date, () => ({ date, view: ctx.kernel.getState().view.type, locale: ctx.locale }), () => formatTemporal(date, DAY, ctx.locale)),
       nodes,
       () => {
         for (const n of nodes) unmountEvent(ctx, n);

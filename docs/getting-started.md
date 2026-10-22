@@ -53,6 +53,11 @@ const calendar = createCalendar(document.getElementById('agenda')!, {
   groups, a comma inside one; `false`: none) and the application's buttons,
   `customButtons: { reload: { text, hint?, icon?, click, active? } }`
   (`docs/behaviors/header-toolbar.md`).
+- **Formats**: `formats: { slotLabel: { hour: 'numeric' }, title: (t) => … }`
+  — each place written with the platform's options or a function
+  (`docs/behaviors/formats.md`).
+- **Custom views**: `views: { congres: { family: 'timeGrid', visibleRange:
+  { start, end } } }` and more (`docs/custom-views.md`).
 - **Render hooks**: `hooks.<element>` — `class`, `content`, `didMount`,
   `willUnmount` — on events, days, hours, "+N", the now line, resources…
   (`docs/behaviors/render-hooks.md`).

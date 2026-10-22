@@ -1,3 +1,4 @@
+import type { Formats } from './render/formats.js';
 import type { ActionItem, ActionTarget, CalendarKernel, PlainDate, Resource, Command, CommandResult, EditScope, EventInstance, Instant, KernelState, Proposal, RulesContext, Segment, ZoneId } from '@dzcalendar/core';
 import type {
   AllDayLabelCtx,
@@ -130,6 +131,8 @@ export interface ViewCtx {
   /** A view's scroll after this paint may be eased (a change, not the calendar's first paint). */
   easeScroll: boolean;
   hooks: CalendarHooks;
+  /** How the application asked each place to be written (`formats`). */
+  formats: Formats;
   epoch: number;
   /** Minutes a context-menu moment snaps to in a time grid. */
   snapMinutes: number;

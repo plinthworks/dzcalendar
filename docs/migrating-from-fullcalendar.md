@@ -84,6 +84,14 @@ not a circular dependency.
   `icon` becomes the class `fc-icon fc-icon-<name>`: bring its icon in your
   CSS). `prevYear` / `nextYear` are said and left out
   (`docs/behaviors/header-toolbar.md`).
+- **Formats.** `titleFormat`, `dayHeaderFormat`, `slotLabelFormat`,
+  `eventTimeFormat`, `listDayFormat`, `listDaySideFormat`,
+  `dayPopoverFormat` keep their platform options (`formats`); their own keys
+  (`meridiem`, `omitZeroMinute`…) and format functions are said. Without
+  one, hours are the locale's ("09:00" in French, "9:00 AM" in English), not
+  their compact "9a".
+- **Custom views.** `views: { x: { type, duration, dayCount, dateIncrement,
+  visibleRange } }` become ours by settings (`docs/custom-views.md`).
 - **Render hooks.** `<name>ClassNames`, `<name>Content`, `<name>DidMount`,
   `<name>WillUnmount` for the elements in `docs/behaviors/render-hooks.md`,
   with their arguments' names; a `ClassNames` function gets no `el`.

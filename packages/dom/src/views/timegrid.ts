@@ -1,3 +1,5 @@
+import { weekWords } from '../render/formats.js';
+import { written } from '../render/formats.js';
 import { Temporal, formatTemporal, locateNow, weekNumber, weekRulesFor } from '@dzcalendar/core';
 import type { AllDayBar, AxisBand, Hit, MoreTimed, PlacedSlot, PlacedTimed, PlainDate, ResourceGroupHead, ResourceHead, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
 import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
@@ -118,10 +120,13 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       // Seen, not read: each column's group says its day (and a length other than 24 h) itself.
       el.setAttribute('aria-hidden', 'true');
       el.classList.toggle('dz-tg__dayhead--today', it.today);
-      const words = `${formatTemporal(date, { weekday: 'short' }, ctx.locale)} ${formatTemporal(date, { day: 'numeric' }, ctx.locale)}`;
+      // The application's format, else the weekday and the day's number.
+      const asked = ctx.formats.dayHeader;
+      const own = asked ? written(ctx, asked, date, () => ({ date, view: viewType, locale: ctx.locale }), () => '') : '';
+      const words = own || `${formatTemporal(date, { weekday: 'short' }, ctx.locale)} ${formatTemporal(date, { day: 'numeric' }, ctx.locale)}`;
       // The application's head (a mark, a count): in place of the calendar's, then placed as the calendar's is.
-      const own = ownDayHead(ctx, el, { date, resource: it.column.resource, view: viewType, today: it.today, lengthMinutes: axis.day.lengthMinutes, text: words });
-      if (own) {
+      const hooked = ownDayHead(ctx, el, { date, resource: it.column.resource, view: viewType, today: it.today, lengthMinutes: axis.day.lengthMinutes, text: words });
+      if (hooked) {
         if (it.today) el.setAttribute('aria-current', 'date');
         else el.removeAttribute('aria-current');
         if (dateRow > 1) {
@@ -131,8 +136,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
         return;
       }
       el.replaceChildren(
-        h(doc, 'span', 'dz-tg__dayhead-weekday', formatTemporal(date, { weekday: 'short' }, ctx.locale)),
-        h(doc, 'span', 'dz-tg__dayhead-date', formatTemporal(date, { day: 'numeric' }, ctx.locale)),
+        ...(own
+          ? [h(doc, 'span', 'dz-tg__dayhead-text', own)]
+          : [h(doc, 'span', 'dz-tg__dayhead-weekday', formatTemporal(date, { weekday: 'short' }, ctx.locale)), h(doc, 'span', 'dz-tg__dayhead-date', formatTemporal(date, { day: 'numeric' }, ctx.locale))]),
         ...(ctx.altLocale ? [h(doc, 'span', 'dz-tg__dayhead-alt', altDate(date, ctx.altLocale).short)] : []),
       );
       // A day that is not 24 hours long says so where the eye lands first.
@@ -359,7 +365,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     });
     ctx.openMore(
       link,
-      formatTemporal(date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale),
+      written(ctx, ctx.formats.morePopover, date, () => ({ date, view: viewType, locale: ctx.locale }), () => formatTemporal(date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale)),
       nodes,
       () => {
         for (const n of nodes) unmountEvent(ctx, n);
@@ -513,7 +519,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     for (const old of gutter.children) undecorate(old as HTMLElement);
     gutter.replaceChildren(
       ...m.gutter.map((t) => {
-        const el = h(doc, 'span', 'dz-tick', t.major ? formatTemporal(t.label, HM, ctx.locale) : '');
+        const el = h(doc, 'span', 'dz-tick', t.major ? written(ctx, ctx.formats.slotLabel, t.label, () => ({ time: t.label, view: viewType, locale: ctx.locale }), () => formatTemporal(t.label, HM, ctx.locale)) : '');
         el.style.setProperty('--t', String(t.position));
         decorate(ctx, ctx.hooks.slotLabel, el, { view: viewType, time: t.label, position: t.position, pass: t.note === 'second-pass' ? 2 : 1, text: el.textContent ?? '' });
         return el;
@@ -894,7 +900,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       // The week's number in the corner (the head is drawn, not read: the columns say their dates).
       const first = m.columns[0]?.date;
       const week = first ? weekNumber(first, { ...weekRulesFor(ctx.locale), firstDay: state.firstDay }) : 0;
-      corner.textContent = ctx.weekNumbers && first ? ctx.messages.weekShort({ week }) : '';
+      corner.textContent = ctx.weekNumbers && first ? weekWords(ctx, week, first) : '';
       if (ctx.weekNumbers && first) decorate(ctx, ctx.hooks.weekNumber, corner, { view: viewType, week, date: first, text: corner.textContent });
       if (!cursorHits.has(cursorNode)) cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
       heads.sync(withDates ? cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${c.today}|${epoch}|${c.index}|${dateRow}` })) : []);

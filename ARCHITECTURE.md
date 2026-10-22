@@ -82,6 +82,12 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18f-3 — formats et vues personnalisées (détail dans ROADMAP.md)
+
+- **D (dom)** : `formats` (options `Intl` ou une fonction par endroit) ; ce qui est lu garde les mots complets. **B (noyau)** : `titleFormat` / `setTitleFormat` ; `ViewSpec.visibleRange` (période fixe, la navigation ne la déplace pas) ; `views` accepte des réglages complétés et vérifiés à la création ; `setView` et `setOptions` atomiques.
+- **Compat** : formats, vues personnalisées et leurs durées traduits.
+- **Décision du propriétaire** : budgets à la mesure + 3 % (core 43,0 ko, compat-fullcalendar 10,6 ko).
+
 ### Ajustements après la Phase 18f-2 — modèles partout (détail dans ROADMAP.md)
 
 - **Frameworks** : un constructeur commun (`@dzcalendar/dom/toolkit`, `templateHooks`) ; chaque framework ne dit que « ai-je un modèle pour cet élément », ses `hooks` et ses portails. Les crochets sont refaits élément par élément, seulement quand sa part de la forme change. React `render<Élément>`, Vue `#<élément>` (`{ ctx }`), Angular `dz<Élément>` (`let-ctx`) ; les classes et montages par `hooks`, fusionné.

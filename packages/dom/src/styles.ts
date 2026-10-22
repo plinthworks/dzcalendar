@@ -94,6 +94,9 @@ export const DZ_CSS = `
 .dz-tg__dayhead-weekday { display: block; color: var(--dz-fg-muted, var(--dzc-fg-muted)); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .dz-tg__dayhead-date { display: inline-block; min-width: 1.75rem; padding: 0.125rem 0.25rem; border-radius: 999px; font-size: 1rem; font-weight: 600; }
 .dz-tg__dayhead--today .dz-tg__dayhead-date { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); }
+/* The application's words for a day (formats.dayHeader): kept in their column, today marked as the date is. */
+.dz-tg__dayhead-text { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.dz-tg__dayhead--today .dz-tg__dayhead-text { color: var(--dz-accent, var(--dzc-accent)); font-weight: 600; }
 .dz-tg__dayhead-note { display: block; font-size: 0.625rem; color: var(--dz-warning, var(--dzc-warning)); }
 /* Resource views: a row of groups, a row of resources, each over its columns (placed by grid-row / grid-column). */
 .dz-tg__resource, .dz-dg__resource { padding: 0.375rem 0.25rem; text-align: center; font-size: 0.8125rem; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-inline-start: 1px solid var(--dz-border, var(--dzc-border)); }

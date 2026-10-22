@@ -23,7 +23,12 @@ export interface ViewSpec {
   readonly showNonCurrentDates: boolean;
   /** A resource view: its family draws one column per resource and date (timeGrid, dayGrid). */
   readonly resources?: boolean;
+  /** A fixed period (a congress, 3 to 12 November: `end` exclusive, the 13th): shown whatever the date, navigation does not move it. */
+  readonly visibleRange?: { readonly start: PlainDate; readonly end: PlainDate };
 }
+
+/** A view by its settings: its family and what differs; the rest as a plain view's (one day, no alignment, every day shown). */
+export type ViewSettings = Partial<Omit<ViewSpec, 'family'>> & { readonly family: ViewSpec['family'] };
 
 /** The dates a view covers. `start`/`end` include padding days; `active*` is the period itself. */
 export interface ViewRange {

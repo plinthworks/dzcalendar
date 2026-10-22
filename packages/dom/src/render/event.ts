@@ -1,3 +1,4 @@
+import { written } from './formats.js';
 import { decorate, undecorate } from './hooks.js';
 import { formatTemporal, resolveWall } from '@dzcalendar/core';
 import type { CalEvent, PlainDateTime, Reading, Segment } from '@dzcalendar/core';
@@ -44,7 +45,17 @@ export function timeLabels(ctx: ViewCtx, ev: CalEvent, r: { start?: Reading; end
     : ev.end.toInstant().subtract({ milliseconds: 1 }).toZonedDateTimeISO(ctx.zone).toPlainDateTime().add({ milliseconds: 1 });
   const hm = (w: PlainDateTime) => formatTemporal(w, HM, ctx.locale);
   const mark = (x?: Reading) => (x?.pass === 'second' ? ctx.messages.secondPassMark : '');
-  const text = `${hm(startWall)}${mark(r.start)} – ${hm(endWall)}${mark(r.end)}`;
+  // What is seen: the application's formats if given (each hour, or the whole); what is said keeps the full words below.
+  const seen = (w: PlainDateTime) => written(ctx, ctx.formats.eventTime, w, () => ({ time: w, event: ev, locale: ctx.locale }), () => hm(w));
+  const startText = `${seen(startWall)}${mark(r.start)}`;
+  const endText = `${seen(endWall)}${mark(r.end)}`;
+  const range = ctx.formats.eventTimeRange;
+  const text =
+    range === undefined
+      ? `${startText} – ${endText}`
+      : typeof range === 'function'
+        ? written(ctx, range, startWall, () => ({ start: ev.start.withTimeZone(ctx.zone), end: ev.end.withTimeZone(ctx.zone), startText, endText, event: ev, locale: ctx.locale }), () => `${startText} – ${endText}`)
+        : `${written(ctx, range, startWall, () => null as never, () => hm(startWall))}${mark(r.start)} – ${written(ctx, range, endWall, () => null as never, () => hm(endWall))}${mark(r.end)}`;
   let real = '';
   if (r.realMinutes !== undefined) {
     const wall = startWall.until(endWall, { largestUnit: 'minutes' }).total({ unit: 'minutes' });

@@ -1,6 +1,6 @@
 {
   "_comment": "gzip bytes of a minified bundle per entry (ARCHITECTURE.md G.1). The Temporal polyfill is counted apart.",
-  "core (without polyfill)": 41500,
+  "core (without polyfill)": 42974,
   "core/views (beyond core)": 1500,
   "rrule (without polyfill)": 7000,
   "ical (without core)": 8100,
@@ -25,7 +25,7 @@
   "pro/export (without core, dom, ical)": 12300,
   "pro/print (without core, dom)": 4400,
   "element (without core, dom)": 3000,
-  "compat-fullcalendar (without core, dom, ical)": 9623,
+  "compat-fullcalendar (without core, dom, ical)": 10649,
   "react (without React, core, dom)": 3819,
   "vue (without Vue, core, dom)": 4010,
   "pro-react (without React, core, dom, pro)": 760,

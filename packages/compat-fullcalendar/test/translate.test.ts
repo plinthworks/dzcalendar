@@ -313,3 +313,55 @@ describe('the header (18f-1b)', () => {
     ]);
   });
 });
+
+describe('formats and custom views (18f-3)', () => {
+  const el = () => document.body.appendChild(document.createElement('div'));
+  it('their format options are ours; their own keys said', () => {
+    const t = fromFullCalendar({ timeZone: P, slotLabelFormat: { hour: 'numeric', minute: '2-digit', omitZeroMinute: true }, titleFormat: { year: 'numeric', month: 'long' } });
+    const o = t.options as { formats: Record<string, unknown> };
+    expect([o.formats['slotLabel'], o.formats['title'], codes(t.problems)]).toEqual([{ hour: 'numeric', minute: '2-digit' }, { year: 'numeric', month: 'long' }, ['compat-unsupported slotLabelFormat.omitZeroMinute intl']]);
+  });
+
+  it('a custom view: a congress, 3 to 12 November (their end exclusive); a four-day view; an unknown type said', () => {
+    const t = fromFullCalendar({
+      timeZone: P,
+      initialView: 'congres',
+      views: {
+        congres: { type: 'timeGrid', visibleRange: { start: '2026-11-03', end: '2026-11-13' }, buttonText: 'Congrès' },
+        quatre: { type: 'timeGrid', duration: { days: 4 } },
+        bizarre: { type: 'gantt' },
+      },
+    });
+    const v = (t.options as { views: Record<string, { family: string; visibleRange?: { start: unknown; end: unknown }; duration?: unknown; alignment?: string }> }).views;
+    expect([v['congres']!.family, String(v['congres']!.visibleRange!.start), String(v['congres']!.visibleRange!.end), String(v['quatre']!.duration), v['quatre']!.alignment, 'bizarre' in v]).toEqual(['timeGrid', '2026-11-03', '2026-11-13', 'P4D', 'none', false]);
+    expect(codes(t.problems)).toEqual(['compat-unsupported views.congres.buttonText messages', 'compat-unsupported views.bizarre.type gantt']);
+  });
+
+  it('made: the congress shows its ten days', () => {
+    const r = createFromFullCalendar(el(), { timeZone: P, initialView: 'congres', views: { congres: { type: 'timeGrid', visibleRange: { start: '2026-11-03', end: '2026-11-13' } } } }, { warn: false });
+    expect(r.calendar.element.querySelectorAll('.dz-tg__col').length).toBe(10);
+    r.calendar.destroy();
+  });
+});
+
+describe('after the 18f-3 review (compat)', () => {
+  it('their durations: singular keys, "72:00:00", milliseconds; a day count of 0 said', () => {
+    const t = fromFullCalendar({ timeZone: P, views: { a: { type: 'timeGrid', duration: { day: 4 } }, b: { type: 'timeGrid', duration: '72:00:00' }, c: { type: 'timeGrid', duration: 172800000 }, d: { type: 'timeGrid', dayCount: 0 } } });
+    const v = (t.options as { views: Record<string, { duration?: unknown; dayCount?: number }> }).views;
+    expect([String(v['a']!.duration), String(v['b']!.duration), String(v['c']!.duration), v['d']!.dayCount, codes(t.problems)]).toEqual(['P4D', 'P3D', 'P2D', undefined, ['invalid-option views.d.dayCount 0']]);
+  });
+
+  it('a calendar-wide visibleRange without initialView opens on it', () => {
+    const t = fromFullCalendar({ timeZone: P, visibleRange: { start: '2026-11-03', end: '2026-11-13' } });
+    const o = t.options as { initialView: string; views: Record<string, { family: string }> };
+    expect([o.initialView, o.views['timeGrid']!.family]).toEqual(['timeGrid', 'timeGrid']);
+  });
+});
+
+describe('after the 18f-3 execution review (compat)', () => {
+  it('a custom view’s own options: hiddenDays taken, the rest said', () => {
+    const t = fromFullCalendar({ timeZone: P, initialView: 'congres', views: { congres: { type: 'timeGrid', visibleRange: { start: '2026-11-03', end: '2026-11-13' }, hiddenDays: [0], slotMinTime: '08:00' } } });
+    const v = (t.options as { views: Record<string, { hiddenDays?: number[] }> }).views;
+    expect([v['congres']!.hiddenDays, codes(t.problems)]).toEqual([[7], ['compat-unsupported views.congres.slotMinTime per-view']]);
+  });
+});
