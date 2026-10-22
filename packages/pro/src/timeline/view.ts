@@ -606,7 +606,9 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     const ev = seg.instance.event;
     el.classList.toggle('dz-tl__ev--cont-start', !seg.startsHere);
     el.classList.toggle('dz-tl__ev--cont-end', !seg.endsHere);
-    applyEventLook(el, ev);
+    el.toggleAttribute('data-continues-before', !seg.startsHere);
+    el.toggleAttribute('data-continues-after', !seg.endsHere);
+    applyEventLook(el, ev, ctx.kernel.now());
     handles(el, seg, it.bg);
     if (it.bg) {
       el.replaceChildren();
@@ -657,7 +659,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     const nodes = m.events.map((e) => {
       const ev = e.segment.instance.event;
       const item = h(doc, 'div', 'dz-bar dz-bar--in-popover');
-      applyEventLook(item, ev);
+      applyEventLook(item, ev, ctx.kernel.now());
       item.dataset['segment'] = e.segment.key;
       const title = ev.title || ctx.messages.untitled;
       const labels = timeLabels(ctx, ev, {});

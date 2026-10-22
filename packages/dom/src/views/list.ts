@@ -2,7 +2,7 @@ import { formatTemporal, registerModelFamily } from '@dzcalendar/core';
 import type { CalEvent, Command, EventInstance, KernelState, Segment } from '@dzcalendar/core';
 import { buildListModel } from '@dzcalendar/core/views';
 import type { ListDay, ListEntry, ListModel } from '@dzcalendar/core/views';
-import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, decorate, ensureStyles, written, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
+import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, dayStates, decorate, ensureStyles, written, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
 import type { ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
 import { activeIn } from '../focus.js';
 
@@ -162,6 +162,7 @@ export function createListView(ctx: ViewCtx): ViewController {
   function drawDay(section: HTMLElement, it: Exclude<DayItem, GapItem>): void {
     const { day } = it;
     section.dataset['date'] = String(day.date);
+    dayStates(section, day.date, ctx.kernel.getState().today, false, false, false);
     const head = section.firstElementChild as HTMLElement;
     const view = dayView();
     const date = h(doc, view ? 'button' : 'span', 'dz-list__date', longDate(day));
@@ -200,7 +201,7 @@ export function createListView(ctx: ViewCtx): ViewController {
     const e = it.entry;
     const ev = e.instance.event;
     byKey.set(e.key, e);
-    applyEventLook(el, ev);
+    applyEventLook(el, ev, ctx.kernel.now());
     el.dataset['segment'] = e.key;
     el.tabIndex = e.key === cursorKey ? 0 : -1;
     const title = ev.title || ctx.messages.untitled;

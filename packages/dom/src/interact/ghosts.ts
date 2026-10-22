@@ -38,6 +38,7 @@ export function syncGhosts(layer: HTMLElement, ghosts: HTMLElement[], boxes: rea
     el.style.setProperty('--gw', `${b.w}px`);
     el.style.setProperty('--gh', `${b.h}px`);
     el.classList.toggle('dz-event--invalid', state.invalid);
+    el.toggleAttribute('data-invalid', state.invalid);
     for (const old of el.querySelectorAll(':scope > .dz-ghost__handle')) old.remove();
     if (look.handles) {
       if (i === 0) el.append(h(doc, 'span', 'dz-ghost__handle dz-ghost__handle--start'));

@@ -222,6 +222,7 @@ export function dropTarget<G>(ctx: ViewCtx, shared: InteractionShared<G>): DropT
       proposal = hit ? proposeDrop(ctx, shared, c, hit) : null;
       const boxes = proposal && hit ? surface.boxesFor(geo, proposal, 0, 0) : [];
       surface.root.classList.toggle('dz-dropping', proposal !== null);
+      surface.root.toggleAttribute('data-dropping', proposal !== null);
       syncGhosts(shared.layer, ghosts, boxes, { kind: 'event', node: c.kind === 'outside' ? c.element : null, instance: c.kind === 'calendar' ? c.instance : null, title: titleOf(ctx, c) }, {
         invalid: proposal ? !proposal.valid : false,
         time: proposal ? timeOf(ctx, proposal.start, proposal) : '',
@@ -234,6 +235,7 @@ export function dropTarget<G>(ctx: ViewCtx, shared: InteractionShared<G>): DropT
       key = '';
       proposal = null;
       surface.root.classList.remove('dz-dropping');
+      surface.root.removeAttribute('data-dropping');
       clearGhosts(ghosts);
     },
     async drop(c, o = {}) {

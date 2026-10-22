@@ -1,3 +1,4 @@
+import { dayStates } from '../render/event.js';
 import { weekWords, written } from '../render/formats.js';
 import { Temporal, formatTemporal, dayInfo } from '@dzcalendar/core';
 import { weekNumber, weekRulesFor } from '@dzcalendar/core';
@@ -400,7 +401,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
         const resourceStart = res !== null && i > 0 && week.resources[i - 1] !== res;
         return {
           key: cellKey(date, res?.id),
-          sig: `${i}|${today}|${outside}|${closed}|${items}|${wk}|${resourceStart}|${ctx.epoch}`,
+          // The day's side of today (-1, 0, 1), not only "today": a jump of days (a laptop asleep) redraws the past and future states.
+          sig: `${i}|${Temporal.PlainDate.compare(date, s.today)}|${outside}|${closed}|${items}|${wk}|${resourceStart}|${ctx.epoch}`,
           date,
           resourceId: res?.id,
           resourceTitle: res ? resourceName(ctx, res) : '',
@@ -470,6 +472,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     cell.classList.toggle('dz-dg__cell--today', c.today);
     cell.classList.toggle('dz-dg__cell--outside', c.outside);
     cell.classList.toggle('dz-dg__cell--closed', c.closed);
+    // The same states as attributes (docs/styling.md): \`[data-today]\`, Tailwind's \`data-[today]:\`.
+    dayStates(cell, c.date, state?.today, c.outside, c.closed, false);
     if (c.today) cell.setAttribute('aria-current', 'date');
     else cell.removeAttribute('aria-current');
     // The month too on a grid's first day: a grid starting mid-month would otherwise show bare numbers.
@@ -563,8 +567,10 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     el.dataset['segment'] = s.key;
     el.classList.toggle('dz-bar--cont-start', !(s.startsHere && it.first));
     el.classList.toggle('dz-bar--cont-end', !(s.endsHere && it.last));
+    el.toggleAttribute('data-continues-before', !(s.startsHere && it.first));
+    el.toggleAttribute('data-continues-after', !(s.endsHere && it.last));
     el.classList.toggle('dz-bar--timed', !ev.allDay);
-    applyEventLook(el, ev);
+    applyEventLook(el, ev, ctx.kernel.now());
     // Days are pulled by their edges where the event really starts or ends in this row; timed events in a month only move.
     const resizable = !it.bg && ev.allDay && ev.perms.duration;
     if (resizable && s.endsHere && it.last) el.dataset['resizeEnd'] = '1';
@@ -596,7 +602,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     const nodes = segs.map((sg) => {
       const ev = sg.instance.event;
       const item = h(doc, 'div', 'dz-bar dz-bar--in-popover');
-      applyEventLook(item, ev);
+      applyEventLook(item, ev, ctx.kernel.now());
       item.dataset['segment'] = sg.key;
       const title = ev.title || ctx.messages.untitled;
       const reading = startReadingOf(ev, ctx.zone);

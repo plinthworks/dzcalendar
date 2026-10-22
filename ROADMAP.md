@@ -33,9 +33,12 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   committed ("Phase 18f-4") — **Phase 18f is complete**. Every check green
   (1 455 tests, test:ci, typecheck, build, size, test:browser,
   perf:browser, test:package) but the known noise (`normalize+index 10k`).
-  **Next: Phase 18g, the CSS and accessibility pass** (owner, 2026-10-22,
-  before first render and size) — see "Phase 18g" below; then first render
-  and size, npm publication, licences, Phase 19.
+  **Phase 18g, the CSS and accessibility pass** (owner, 2026-10-22, before
+  first render and size) — see "Phase 18g" below; then first render and
+  size, npm publication, licences, Phase 19.
+- **Done:** 18g-1 (the styling contract) committed ("Phase 18g-1"); every
+  check green (1 465 tests, exit codes checked) but the known noise.
+  **Next: 18g-2** (unstyled mode, the Tailwind 4 bridge).
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2788,6 +2791,43 @@ as automated checks.
   `data-past`, `data-outside`, `data-selected`, `data-dragging`,
   `data-all-day`, `data-tone`, `data-invalid`… (Tailwind variants
   `data-[today]:…`; plain selectors elsewhere); the classes kept.
+
+### 18g-1 — done (2026-10-22)
+
+**Built**
+- `docs/styling.md`: the contract — five ways to change the look, every
+  part (253), state (`data-*`) and token (`--dz-*`), what is internal, the
+  element's `::part`s; a rename is a major version.
+- `scripts/css-contract.mjs` (comments stripped; dom, pro, motion-gsap and
+  the theme scanned) and `packages/dom/test/styling-contract.test.ts`: the
+  code and the page agree on parts, tokens and data-* attributes.
+- States as attributes beside the classes: a day's `data-date`,
+  `data-weekday`, `data-today` / `-past` / `-future`, `data-outside`,
+  `data-closed`, `data-folded`, `data-resource`; an event's `data-tone`,
+  `data-all-day`, `data-background`, `data-past` / `-future`,
+  `data-continues-before` / `-after`, `data-selected`, `data-moving`; the
+  surfaces' `data-dragging`, `-selecting`, `-grabbing`, `-dropping`; the
+  calendar's `data-editable`, `-loading`; a ghost's `data-invalid`.
+- Tests: `packages/dom/test/data-states.test.ts` (7).
+
+**Reviews fixed** (architect + execution in Chrome)
+- A token documented that only a comment named (`--dz-tone`); data-*
+  attributes outside the contract test (a rename passed); a day's past and
+  future stale after a jump of days (its side of today now in the
+  signatures); `data-closed` meaning two things (`data-folded` split off);
+  `data-source` renamed `data-moving` before it was frozen; `data-date` and
+  `data-resource` missing on day heads; the time grid's closed days never
+  marked; a conditional `setAttribute` the inventory could not read;
+  `data-scheme`, density, event style, the `[data-theme]` ancestor and
+  `::part` undocumented; a touch-selected event kept selected after
+  `editable: false`; `state()` writing unchanged attributes.
+- Found while checking: `perf:browser` did not build since 18f-4 (the
+  playground's Vite alias lacked `@dzcalendar/dom/drag`) — fixed; exit codes
+  are read from now on, not only the count of ✗.
+
+**Not done on purpose**
+- The timeline's heads carry no day states (its events do); an event's past
+  and future are read when it is drawn (both in the contract).
 
 ### 18g-2 — unstyled mode and the Tailwind bridge
 - `look: 'none'`: the structure only (grids, positions, sizes, what a

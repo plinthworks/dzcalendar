@@ -205,11 +205,13 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     if (selected === node) return;
     if (selected?.isConnected) {
       selected.classList.remove('dz-ev--selected');
+      selected.removeAttribute('data-selected');
       selected.removeAttribute('aria-pressed');
     }
     selected = node;
     if (node) {
       node.classList.add('dz-ev--selected');
+      node.setAttribute('data-selected', '');
       node.setAttribute('aria-pressed', 'true');
     }
   };
@@ -450,7 +452,9 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       /* the pointer is already gone */
     }
     root.classList.add(p.mode.kind === 'select' ? 'dz-selecting' : 'dz-dragging');
-    for (const n of gesture.sources) n.classList.add('dz-ev--source');
+    for (const n of gesture.sources) n.classList.add('dz-ev--source'), n.setAttribute('data-moving', '');
+    if (p.mode.kind === 'select') root.setAttribute('data-selecting', '');
+    else root.setAttribute('data-dragging', '');
     compute(gesture);
     draw(gesture);
     if (p.mode.kind !== 'select') ctx.motion.dragStart?.(gesture.ghosts, p.mode.kind);
@@ -640,7 +644,9 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       /* released already */
     }
     root.classList.remove('dz-dragging', 'dz-selecting');
-    for (const n of g.sources) n.classList.remove('dz-ev--source');
+    root.removeAttribute('data-dragging');
+    root.removeAttribute('data-selecting');
+    for (const n of g.sources) n.classList.remove('dz-ev--source'), n.removeAttribute('data-moving');
     return g;
   }
 
@@ -729,6 +735,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
 
   return {
     refresh() {
+      // No longer editable: an event selected by a touch is let go (its handles mean nothing now).
+      if (selected && ctx.live().editable !== true) select(null);
       if (!selection) return;
       // Another period: the selection was of the one left.
       if (rangeNow() !== rangeKey) return shared.showSelection(null);

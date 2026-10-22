@@ -31,6 +31,7 @@ export default defineConfig({
       '@dzcalendar/dom/locales/de': fileURLToPath(new URL('./packages/dom/src/locales/de.ts', import.meta.url)),
       '@dzcalendar/dom/toolkit': fileURLToPath(new URL('./packages/dom/src/toolkit.ts', import.meta.url)),
       '@dzcalendar/dom/custom': fileURLToPath(new URL('./packages/dom/src/custom.ts', import.meta.url)),
+      '@dzcalendar/dom/drag': fileURLToPath(new URL('./packages/dom/src/drag.ts', import.meta.url)),
       '@dzcalendar/core/views': fileURLToPath(new URL('./packages/core/src/views.ts', import.meta.url)),
       '@dzcalendar/angular': fileURLToPath(new URL('./packages/angular/src/index.ts', import.meta.url)),
       '@dzcalendar/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),

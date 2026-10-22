@@ -333,6 +333,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     shared.showSelection(null);
     anchor = null;
     root.classList.add('dz-grabbing');
+    root.setAttribute('data-grabbing', '');
     drawHeld(held);
     ctx.motion.dragStart?.(held.ghosts, kind);
     const title = inst.event.title || m().untitled;
@@ -345,9 +346,9 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
   function drawHeld(h: Held): void {
     const ev = h.event;
     // Another period drew other nodes for it: those are dimmed now.
-    for (const n of h.sources) n.classList.remove('dz-ev--source');
+    for (const n of h.sources) n.classList.remove('dz-ev--source'), n.removeAttribute('data-moving');
     h.sources = sourcesOf(h.instance.event.id);
-    for (const n of h.sources) n.classList.add('dz-ev--source');
+    for (const n of h.sources) n.classList.add('dz-ev--source'), n.setAttribute('data-moving', '');
     const edgeHit = eventHit(ev, h.kind === 'resize' ? h.edge : 'start', { displayZone: zone(), grid: hits() });
     keys!.reveal(h.resourceId !== undefined ? { ...edgeHit, resourceId: h.resourceId } : edgeHit);
     const geo = surface.measure(shared.layerOrigin());
@@ -403,7 +404,8 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     held = null;
     shared.holding = false;
     root.classList.remove('dz-grabbing');
-    for (const n of h.sources) n.classList.remove('dz-ev--source');
+    root.removeAttribute('data-grabbing');
+    for (const n of h.sources) n.classList.remove('dz-ev--source'), n.removeAttribute('data-moving');
     clearGhosts(h.ghosts);
   }
 
@@ -455,6 +457,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     shared.showSelection(null);
     anchor = null;
     root.classList.add('dz-grabbing');
+    root.setAttribute('data-grabbing', '');
     drawHeld(held);
     // Back to it after a Tab: said held again, the help not repeated.
     ctx.announce(back ? m().grabbed({ title: carriedTitle(ctx, page.carried) }) : `${m().grabbed({ title: carriedTitle(ctx, page.carried) })} ${m().grabHelp}`);

@@ -1,7 +1,7 @@
 import { written } from './formats.js';
 import { decorate, undecorate } from './hooks.js';
-import { formatTemporal, resolveWall } from '@dzcalendar/core';
-import type { CalEvent, PlainDateTime, Reading, Segment } from '@dzcalendar/core';
+import { Temporal, formatTemporal, resolveWall } from '@dzcalendar/core';
+import type { Instant, CalEvent, PlainDate, PlainDateTime, Reading, Segment } from '@dzcalendar/core';
 import type { EventContentCtx, ViewCtx } from '../host.js';
 import { h } from './reconcile.js';
 
@@ -85,7 +85,46 @@ export function startReadingOf(ev: CalEvent, zone: string): Reading | undefined 
 }
 
 /** The event's own classes, swapped as a set; its tone as its own variable (no cycle). */
-export function applyEventLook(el: HTMLElement, ev: CalEvent): void {
+/** A state as an attribute (`data-today`…, docs/styling.md): present when true, gone when not — for `[data-today]` and Tailwind's `data-[today]:`. */
+export function state(el: HTMLElement, name: string, on: boolean): void {
+  // Nothing written when nothing changed (no style invalidation, no mutation record).
+  el.toggleAttribute(`data-${name}`, on);
+}
+
+/**
+ * A day's states as attributes (docs/styling.md): its date and ISO weekday;
+ * today, past, future (against the calendar's today); outside (a month's
+ * padding day); closed (business hours); folded (a day that did not exist).
+ */
+export function dayStates(el: HTMLElement, date: PlainDate, today: PlainDate | null | undefined, outside: boolean, closed: boolean, folded: boolean): void {
+  const c = today ? Temporal.PlainDate.compare(date, today) : null;
+  el.dataset['date'] = String(date);
+  el.dataset['weekday'] = String(date.dayOfWeek);
+  state(el, 'today', c === 0);
+  state(el, 'past', c !== null && c < 0);
+  state(el, 'future', c !== null && c > 0);
+  state(el, 'outside', outside);
+  state(el, 'closed', closed);
+  state(el, 'folded', folded);
+}
+
+/**
+ * The event's own look and states on its node (any view): its classes, its
+ * tone (\`--dz-event-accent\`, \`data-tone\`), all-day, background, and — when
+ * \`now\` is given — past or future (read when it is drawn).
+ */
+export function applyEventLook(el: HTMLElement, ev: CalEvent, now?: Instant): void {
+  state(el, 'all-day', ev.allDay);
+  state(el, 'background', ev.display === 'background' || ev.display === 'inverse-background');
+  if (ev.tone) el.dataset['tone'] = ev.tone;
+  else delete el.dataset['tone'];
+  if (now) {
+    const ms = now.epochMilliseconds;
+    const end = ev.allDay ? null : (ev.end as { epochMilliseconds: number }).epochMilliseconds;
+    const start = ev.allDay ? null : (ev.start as { epochMilliseconds: number }).epochMilliseconds;
+    state(el, 'past', end !== null && end <= ms);
+    state(el, 'future', start !== null && start > ms);
+  }
   const before = el.dataset['dzClasses'];
   if (before) for (const c of before.split(' ')) el.classList.remove(c);
   for (const c of ev.classNames) el.classList.add(c);

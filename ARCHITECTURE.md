@@ -82,6 +82,10 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18g-1 — le contrat de style (détail dans ROADMAP.md)
+
+- **D (dom)** : `docs/styling.md` est un contrat versionné (parties `.dz-*`, états `data-*`, jetons `--dz-*`, internes) ; un test le tient contre le code (`scripts/css-contract.mjs`). Les états sont aussi des attributs à côté des classes (`dayStates`, `applyEventLook(el, ev, now)`).
+
 ### Ajustements après la Phase 18f-4 — glisser depuis la page et entre calendriers (détail dans ROADMAP.md)
 
 - **D (dom)** : chaque surface de vue est une cible de dépôt de sa page (registre par document) ; `makeDraggable` dans l'entrée `@dzcalendar/dom/drag` ; un dépôt est une commande `event.create` validée comme un geste, dite à `onEventReceive` seulement ; entre deux calendriers, créé là-bas puis retiré ici, ou rien du tout, avec un `revert()` pour les deux. **B (noyau)** : `Placement.external`, `kernel.run({ external })` pour la règle `allow` ; `toInput` exporté.

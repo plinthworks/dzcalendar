@@ -684,6 +684,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     }
     root.dataset['view'] = state.view.type;
     root.classList.toggle('dz-editable', settings.current.editable === true);
+    root.toggleAttribute('data-editable', settings.current.editable === true);
     const created = v.render(vm.model, state);
     interactions?.refresh();
     if (nowOn) v.tick(kernel.now(), state);
@@ -925,6 +926,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   const sourceNotice = (n: SourceNotice) => {
     if (n.type === 'loading') {
       root.classList.toggle('dz-loading', n.loading);
+      root.toggleAttribute('data-loading', n.loading);
       if (n.loading) root.setAttribute('aria-busy', 'true');
       else root.removeAttribute('aria-busy');
     } else if (n.type === 'save-error') {
@@ -1109,6 +1111,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       if (settings.apply(changes)) {
         ctx.snapMinutes = settings.current.snapMinutes ?? 15;
         root.classList.toggle('dz-editable', settings.current.editable === true);
+        root.toggleAttribute('data-editable', settings.current.editable === true);
+    root.toggleAttribute('data-editable', settings.current.editable === true);
       }
       holding = true;
       try {

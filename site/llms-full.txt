@@ -1575,6 +1575,9 @@ document's sheets do not reach it); `defineTheme` themes are put there by the
 calendar itself. `THEME_NAMES` (exported) lists them; an unknown `theme`,
 `scheme` or `density` is refused with a RangeError.
 
+Every part, state and token you may rely on is listed in
+`docs/styling.md` — the contract (a rename there is a major version).
+
 ## 2. Change anything — your rules always win
 
 All of the calendar's CSS lives in two cascade layers, `dzcalendar.base` then

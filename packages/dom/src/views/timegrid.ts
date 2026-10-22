@@ -1,3 +1,4 @@
+import { dayStates } from '../render/event.js';
 import { weekWords } from '../render/formats.js';
 import { written } from '../render/formats.js';
 import { Temporal, formatTemporal, locateNow, weekNumber, weekRulesFor } from '@dzcalendar/core';
@@ -111,6 +112,10 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   /** The view's type, for the day-header hook. */
   let viewType = '';
 
+  /** The calendar's today (for the days' past and future states). */
+  const todayNow = () => ctx.kernel.getState().today;
+  /** Closed all day: its closed hours cover its whole axis (business hours, that day none). */
+  const closedAll = (c: TimeGridModel['columns'][number]) => !c.folded && c.axis.length > 0 && c.offHours.reduce((n, o) => n + o.height, 0) >= c.axis.length;
   // ── headers ────────────────────────────────────────────────────────────────
   const heads = new KeyedList<ColumnItem>(
     headsHost,
@@ -120,6 +125,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       // Seen, not read: each column's group says its day (and a length other than 24 h) itself.
       el.setAttribute('aria-hidden', 'true');
       el.classList.toggle('dz-tg__dayhead--today', it.today);
+      dayStates(el, date, todayNow(), false, closedAll(it.column), false);
+      if (it.column.resource) el.dataset['resource'] = it.column.resource.id;
+      else delete el.dataset['resource'];
       // The application's format, else the weekday and the day's number.
       const asked = ctx.formats.dayHeader;
       const own = asked ? written(ctx, asked, date, () => ({ date, view: viewType, locale: ctx.locale }), () => '') : '';
@@ -177,13 +185,15 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       el.classList.toggle('dz-bar--bg', it.bg);
       el.classList.toggle('dz-bar--cont-start', !s.startsHere);
       el.classList.toggle('dz-bar--cont-end', !s.endsHere);
+      el.toggleAttribute('data-continues-before', !s.startsHere);
+      el.toggleAttribute('data-continues-after', !s.endsHere);
       el.style.setProperty('--lane', String(it.bar.lane));
       el.style.setProperty('--col', String(it.bar.column));
       el.style.setProperty('--span', String(s.dayCount));
       if (it.resourceId !== undefined) el.dataset['resource'] = it.resourceId;
       else delete el.dataset['resource'];
       if (!changed.content) return;
-      applyEventLook(el, ev);
+      applyEventLook(el, ev, ctx.kernel.now());
       handles(el, s, it.bg);
       if (it.bg) {
         el.replaceChildren();
@@ -277,6 +287,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const length = column.axis.day.lengthMinutes;
     el.setAttribute('aria-label', length === 1440 ? name : length === 0 ? `${name}, ${ctx.messages.dayDoesNotExist}` : `${name}, ${formatMinutes(length, ctx.locale)}`);
     el.classList.toggle('dz-tg__col--today', it.today);
+    dayStates(el, column.date, todayNow(), false, closedAll(column), column.folded);
     const per = model?.range.dates.length ?? 1;
     el.classList.toggle('dz-tg__col--resource-start', column.resource !== null && it.index > 0 && it.index % per === 0);
     el.classList.toggle('dz-tg__col--folded', column.folded);
@@ -353,7 +364,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const nodes = more.events.map((p) => {
       const ev = p.segment.instance.event;
       const item = h(doc, 'div', 'dz-bar dz-bar--in-popover');
-      applyEventLook(item, ev);
+      applyEventLook(item, ev, ctx.kernel.now());
       item.dataset['segment'] = p.segment.key;
       const title = ev.title || ctx.messages.untitled;
       const labels = timeLabels(ctx, ev, { ...(p.startReading && { start: p.startReading }), ...(p.endReading && { end: p.endReading }) });
@@ -482,7 +493,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const ev = seg.instance.event;
     el.classList.toggle('dz-ev--cont-start', !seg.startsHere);
     el.classList.toggle('dz-ev--cont-end', !seg.endsHere);
-    applyEventLook(el, ev);
+    el.toggleAttribute('data-continues-before', !seg.startsHere);
+    el.toggleAttribute('data-continues-after', !seg.endsHere);
+    applyEventLook(el, ev, ctx.kernel.now());
     handles(el, seg, bg);
     if (bg && ctx.hooks.event) {
       // A background's own content (a "Vacances" label), if the hook gives one: drawn, read; none: mute as before.
@@ -903,7 +916,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       corner.textContent = ctx.weekNumbers && first ? weekWords(ctx, week, first) : '';
       if (ctx.weekNumbers && first) decorate(ctx, ctx.hooks.weekNumber, corner, { view: viewType, week, date: first, text: corner.textContent });
       if (!cursorHits.has(cursorNode)) cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
-      heads.sync(withDates ? cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${c.today}|${epoch}|${c.index}|${dateRow}` })) : []);
+      // The day's side of today (-1, 0, 1): a jump of days redraws the past and future states.
+      const side = (c: ColumnItem) => Temporal.PlainDate.compare(c.column.date, state.today);
+      heads.sync(withDates ? cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${side(c)}|${epoch}|${c.index}|${dateRow}` })) : []);
       bars.sync(!ctx.allDaySlot ? [] : [
         ...m.allDay.background.map((bar) => ({
           key: `bg:${bar.segment.key}`,
@@ -934,7 +949,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const known = crowded && win !== null && win.to >= win.from;
       if (!crowded) win = null;
       else if (!known) win = { from: 0, to: -1 };
-      columns.sync(cols.map((c) => ({ ...c, sig: `${c.sig}|${c.today}` })));
+      columns.sync(cols.map((c) => ({ ...c, sig: `${c.sig}|${side(c)}` })));
       // The cursor's column went away (its resource removed, or resource columns gone or come): it has no place
       // any more. A fresh one waits in the all-day row; focused, the keyboard puts it at home with its words.
       const at = cursorHits.get(cursorNode);
