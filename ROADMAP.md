@@ -2388,3 +2388,70 @@ Net: −430 lines of CSS, −60 of menu, −35 of re-measuring.
   hand-written ports per language vs one Rust core (K.14).
 - On the web side this asks for a **mini-month** component (date picker /
   navigator) — not built yet; the year view exists (`multiMonthYear`).
+
+## Phase 18f — what FullCalendar has that we lack (planned)
+
+Compared on 2026-10-22 with FullCalendar 7's public docs (`docs/all`): the
+three gaps worth closing, owner's decisions (2026-10-22).
+
+### 1. Render hooks "as theirs": every element, four forms, everywhere
+
+- **DOM**: `hooks.<element>.{ class, content, didMount, willUnmount }` for
+  every element a calendar draws — `class` (a string, a list, or a function
+  of the element's context), `content` (text, a node, or null to keep ours),
+  `didMount` (may return its cleanup), `willUnmount`. Our names (CLEANROOM:
+  behaviour sheets first); compat translates theirs (`eventClassNames`,
+  `dayCellContent`, `moreLinkDidMount`…).
+- **Elements** (contexts carry Temporal values, the day's length on a clock
+  change, the resource): `event` (with its kind: block, bar, list item,
+  background), `dayCell`, `dayHeader` (already: + class), `dayLane` (a time
+  grid's column), `slotLabel`, `slotLane`, `allDayLabel`, `moreLink`,
+  `morePopover`, `nowIndicator`, `weekNumber`, `noEvents`, `listDayHeader`,
+  `view`, `monthHeader` (multi-month), `resource` (head: + class, mount),
+  `resourceLane`, `resourceGroupHeader`, `resourceGroupLane`, and the
+  timeline's `resourceCell` / `resourceAreaHeader`.
+- **Frameworks — all of them** (owner: "tous partout"): an Angular template
+  directive, a React render prop and a Vue slot for each element, plus a
+  class input; templates checked by `ng build` / `vue-tsc` in
+  `test:package`.
+- Guarded like the event hook (an application's hook that throws is
+  reported, ours drawn); a head or cell with the application's content is
+  read by assistive technology; hooks compared member by member.
+
+### 2. Dragging in from the page, and between calendars
+
+- `makeDraggable(el, data)` on any element of the page (mouse, touch, pen;
+  a keyboard alternative: "Put in the calendar…" from its menu), the event
+  data a function or an object; `droppable`, `onDrop` (a date, maybe a
+  resource), `onEventReceive` (an event created by the drop, with `revert()`).
+- Between two calendars of the page: an event dragged out of one into the
+  other (`onEventLeave` on the first, `onEventReceive` on the second), the
+  rules of both applied, the source's save path respected, one revert taking
+  both back. Behaviour sheet first (`docs/behaviors/external-drag.md`).
+
+### 3. Display formats
+
+- `formats: { eventTime, eventTimeRange, dayHeader, slotLabel, title,
+  listDay, listDaySide, weekNumber, dayCell, monthHeader, morePopover }`,
+  each an `Intl.DateTimeFormat` options object (in the calendar's locale and
+  display calendar: `{ weekday: 'short', day: '2-digit', month: '2-digit' }`
+  → "lun. 19/10", the case by CSS) or a function of the Temporal value;
+  compat translates `eventTimeFormat`, `dayHeaderFormat`, `slotLabelFormat`,
+  `titleFormat`, `listDayFormat`…
+
+### 4. Custom views (their "Custom Views" page, read by the owner)
+
+- Already here: a view made from a family by settings (`views: { name: {
+  family, duration, dayCount, alignment, dateIncrement, hiddenDays } }`) and
+  from scratch (`registerView(family, factory)`, the `custom` family).
+- To add: **`visibleRange`** — a fixed, exact span (3–12 November, a
+  congress) that navigation does not move; a **`docs/custom-views.md`** page
+  (by settings, from scratch, the custom family's model and gestures); the
+  compat translating their custom views (`type` + `duration` / `dayCount` /
+  `visibleRange`).
+
+### Order
+
+18f-1 the hooks in the DOM (all elements, four forms) → 18f-2 the framework
+templates for each → 18f-3 formats and custom views (`visibleRange`, the docs page, compat) →
+18f-4 external and cross-calendar dragging. Reviews and a commit at the end of each.
