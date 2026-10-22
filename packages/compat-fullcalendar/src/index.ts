@@ -18,6 +18,8 @@ import { said } from './dates.js';
 import { translate } from './translate.js';
 
 export { translate as fromFullCalendar, eventInfo, toEvent } from './translate.js';
+export { Draggable } from './draggable.js';
+export type { DraggableSettings } from './draggable.js';
 export type { Translation, JsEventLike } from './translate.js';
 
 export interface CompatOptions {

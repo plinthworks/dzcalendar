@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Temporal, viewWindow } from '@dzcalendar/core';
-import type { EventInput } from '@dzcalendar/core';
-import { applyFullCalendar, createFromFullCalendar, fromFullCalendar } from '../src/index.js';
+import type { EventInput, ZonedDateTime } from '@dzcalendar/core';
+import { Draggable, applyFullCalendar, createFromFullCalendar, fromFullCalendar } from '../src/index.js';
 
 // Expectations by hand, from the published zone rules: Paris +02:00 until 25 October 2026 03:00, +01:00 after.
 const P = 'Europe/Paris';
@@ -363,5 +363,44 @@ describe('after the 18f-3 execution review (compat)', () => {
     const t = fromFullCalendar({ timeZone: P, initialView: 'congres', views: { congres: { type: 'timeGrid', visibleRange: { start: '2026-11-03', end: '2026-11-13' }, hiddenDays: [0], slotMinTime: '08:00' } } });
     const v = (t.options as { views: Record<string, { hiddenDays?: number[] }> }).views;
     expect([v['congres']!.hiddenDays, codes(t.problems)]).toEqual([[7], ['compat-unsupported views.congres.slotMinTime per-view']]);
+  });
+});
+
+describe('their Draggable and drop callbacks (18f-4)', () => {
+  const el = () => document.body.appendChild(document.createElement('div'));
+  const key = (k: string) => document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+  it('an item of the list dropped with the keyboard: drop and eventReceive told with their arguments; its "00:30" duration kept; one added later is draggable too', async () => {
+    const list = el();
+    list.innerHTML = '<div class="card">Consultation</div>';
+    const d = new Draggable(list, { itemSelector: '.card', eventData: (e: HTMLElement) => ({ title: e.textContent, duration: '00:30' }) });
+    const got: Record<string, unknown>[] = [];
+    const r = createFromFullCalendar(el(), { timeZone: P, initialView: 'timeGridWeek', initialDate: '2026-10-21', editable: true, droppable: true, drop: (a: Record<string, unknown>) => void got.push({ kind: 'drop', allDay: a['allDay'], el: a['draggedEl'] }), eventReceive: (a: { event: { title: string }; revert: unknown }) => void got.push({ kind: 'receive', title: a.event.title, revert: typeof a.revert }) }, { warn: false });
+    list.querySelector<HTMLElement>('.card')!.focus();
+    key('Enter');
+    r.calendar.element.querySelector<HTMLElement>('.dz-cursor')!.focus();
+    key('Enter');
+    await Promise.resolve();
+    const made = [...r.calendar.kernel.store.snapshot.allEvents()][0]!;
+    const later = list.appendChild(document.createElement('div'));
+    later.className = 'card';
+    await new Promise((res) => setTimeout(res, 0));
+    expect([got.map((g) => g['kind']), (got[0]!['el'] as HTMLElement).className, (got[1] as { title: string }).title, ((made.end as ZonedDateTime).epochMilliseconds - (made.start as ZonedDateTime).epochMilliseconds) / 60000, later.getAttribute('role')]).toEqual([['drop', 'receive'], 'card dz-draggable', 'Consultation', 30, 'button']);
+    d.destroy();
+    r.calendar.destroy();
+  });
+
+  it('create: false — told, nothing made', async () => {
+    const card = el();
+    card.textContent = 'Rappel';
+    new Draggable(card, { eventData: { title: 'Rappel', create: false } });
+    const dropped: unknown[] = [];
+    const r = createFromFullCalendar(el(), { timeZone: P, initialView: 'timeGridWeek', initialDate: '2026-10-21', editable: true, droppable: true, drop: (a: unknown) => void dropped.push(a) }, { warn: false });
+    card.focus();
+    key('Enter');
+    r.calendar.element.querySelector<HTMLElement>('.dz-cursor')!.focus();
+    key('Enter');
+    await Promise.resolve();
+    expect([dropped.length, [...r.calendar.kernel.store.snapshot.allEvents()].length, card.hasAttribute('aria-pressed')]).toEqual([1, 0, false]);
+    r.calendar.destroy();
   });
 });

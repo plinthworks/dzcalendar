@@ -75,6 +75,8 @@ return {
   deleteEvent: 'حذف',
   dropRefused: 'غير مسموح هنا',
   eventMoved: ({ title, time }) => (time ? `تم نقل «${title}» إلى ${iso(time)}` : `تم نقل «${title}»`),
+  eventReceived: ({ title, when }) => `تمت إضافة «${title}»: ${iso(when)}`,
+  pickedUp: ({ title }) => `تم أخذ «${title}». مفتاح Tab للوصول إلى تقويم، والأسهم لاختيار المكان، وEnter لوضعه، وEscape للإلغاء.`,
   eventResized: ({ title, time }) => (time ? `ينتهي «${title}» الآن في ${iso(time)}` : `تم تغيير مدة «${title}»`),
   movedIntoGap: ({ time }) => `هذا الوقت غير موجود في ذلك اليوم؛ تم النقل إلى ${iso(time)}`,
   changeWhich: 'ما الأحداث التي تريد تغييرها؟',

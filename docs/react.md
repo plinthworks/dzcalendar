@@ -113,6 +113,8 @@ export function Agenda() {
 - `onEventOpen`, `onCreateRequest`, `onSlotClick` change what the calendar
   offers ("Open" in the menu…): given only while the prop is.
 
+- **`onDrop`, `onEventReceive`, `onEventLeave`** (props) with `makeDraggable` from `@dzcalendar/dom/drag` on your list's items: dragged in from the page, or between two calendars (`docs/behaviors/external-drag.md`).
+
 ## The Pro
 
 ```tsx

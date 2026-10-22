@@ -45,6 +45,10 @@ export interface DzMessages {
   /** Said when a drop is refused (a constraint, an overlap, not editable). */
   readonly dropRefused: string;
   eventMoved(parts: { title: string; time: string }): string;
+  /** Something dropped in (from the page, another calendar) and made here: when — an hour, or a day. */
+  eventReceived(parts: { title: string; when: string }): string;
+  /** An element of the page taken with the keyboard: what to do next. */
+  pickedUp(parts: { title: string }): string;
   eventResized(parts: { title: string; time: string }): string;
   /** A drop snapped into a skipped hour, moved on to the next that exists. */
   movedIntoGap(parts: { time: string }): string;
@@ -149,6 +153,8 @@ export const EN: DzMessages = {
   deleteEvent: 'Delete',
   dropRefused: 'Not allowed here',
   eventMoved: ({ title, time }) => (time ? `${title} moved to ${time}` : `${title} moved`),
+  eventReceived: ({ title, when }) => `${title} placed: ${when}`,
+  pickedUp: ({ title }) => `${title} picked up. Tab to a calendar, arrows to choose the place, Enter to put it down, Escape to cancel.`,
   eventResized: ({ title, time }) => (time ? `${title} now ends at ${time}` : `${title} resized`),
   movedIntoGap: ({ time }) => `That time does not exist today; moved to ${time}`,
   changeWhich: 'Change which events?',
@@ -224,6 +230,8 @@ export const FR: DzMessages = {
   deleteEvent: 'Supprimer',
   dropRefused: 'Impossible ici',
   eventMoved: ({ title, time }) => (time ? `« ${title} » déplacé à ${time}` : `« ${title} » déplacé`),
+  eventReceived: ({ title, when }) => `« ${title} » placé : ${when}`,
+  pickedUp: ({ title }) => `« ${title} » pris. Tab jusqu'à un calendrier, les flèches pour choisir la place, Entrée pour le poser, Échap pour annuler.`,
   eventResized: ({ title, time }) => (time ? `« ${title} » finit maintenant à ${time}` : `« ${title} » redimensionné`),
   movedIntoGap: ({ time }) => `Cette heure n’existe pas ce jour-là : déplacé à ${time}`,
   changeWhich: 'Modifier quels événements ?',

@@ -34,6 +34,8 @@ return {
   deleteEvent: 'Eliminar',
   dropRefused: 'No se permite aquí',
   eventMoved: ({ title, time }) => (time ? `«${title}» movido a ${time}` : `«${title}» movido`),
+  eventReceived: ({ title, when }) => `«${title}» colocado: ${when}`,
+  pickedUp: ({ title }) => `«${title}» tomado. Tab hasta un calendario, las flechas para elegir el lugar, Intro para dejarlo, Escape para cancelar.`,
   eventResized: ({ title, time }) => (time ? `Nuevo final de «${title}»: ${time}` : `Duración de «${title}» cambiada`),
   movedIntoGap: ({ time }) => `Esa hora no existe ese día; se movió a ${time}`,
   changeWhich: '¿Qué eventos quieres cambiar?',

@@ -1,6 +1,6 @@
 import { BUILTIN_VIEWS, Temporal, fnSource, jsonSource, registeredViewSpecs } from '@dzcalendar/core';
 import type { CalEvent, EventInput, Series, EventInstance, EventSourceSpec, Instant, PlainDate, Problem, ResourceInput, StoreChange, ZonedDateTime, ZoneId } from '@dzcalendar/core';
-import type { CalendarInstance, CalendarOptions, DateClick } from '@dzcalendar/dom';
+import type { CalendarInstance, CalendarOptions, DateClick, DropInfo, EventChange, EventLeave } from '@dzcalendar/dom';
 import { icalSource } from '@dzcalendar/ical';
 import { dateOf10, duration, minutesOf, momentOf, said, weekday, weekdays, zoneOf } from './dates.js';
 import { toEvent, toEvents } from './events.js';
@@ -550,6 +550,17 @@ export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}):
   const unselect = fn('unselect');
   used.add('eventClick').add('dateClick').add('select').add('unselect');
   // A click on an event with a url follows it, unless eventClick said no (returned false, or prevented the stand-in).
+  // Dropping from the page (their Draggable) and between calendars: their arguments rebuilt.
+  if (fc['droppable'] !== undefined) out['droppable'] = Boolean(take('droppable'));
+  const drop = fn('drop');
+  const receive = fn('eventReceive');
+  const leave = fn('eventLeave');
+  used.add('drop').add('eventReceive').add('eventLeave');
+  if (drop)
+    out['onDrop'] = (d: DropInfo) =>
+      drop({ date: dateOf(d.date, zone), dateStr: strOf(d.date, zone), allDay: d.allDay, draggedEl: d.element, jsEvent: jsEvent('pointerup'), resource: d.resourceId ? { id: d.resourceId } : undefined, view: view() });
+  if (receive) out['onEventReceive'] = (c: EventChange) => c.after && receive({ event: eventInfo(c.after, zone), relatedEvents: [], revert: () => void c.revert(), draggedEl: null, view: view() });
+  if (leave) out['onEventLeave'] = (l: EventLeave) => leave({ event: eventInfo(l.event, zone), relatedEvents: [], revert: () => void l.revert(), draggedEl: null, view: view() });
   out['onEventClick'] = (inst: EventInstance) => {
     const e = jsEvent('click');
     const r = eventClick?.({ event: eventInfo(inst.event, zone), el: nodeOf(inst.event.id), jsEvent: e, view: view() });

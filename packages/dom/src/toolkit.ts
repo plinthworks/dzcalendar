@@ -21,6 +21,8 @@ export { altDate } from './render/alt.js';
 export { resourceName, noResourcesNote } from './render/resource-heads.js';
 export { decorate, holder, undecorate, undecorateAll } from './render/hooks.js';
 export { weekWords, written } from './render/formats.js';
+export { anyTarget, heldOn, holdOn, targetAt } from './interact/drop.js';
+export type { Carried, DropTarget, PageHold } from './interact/drop.js';
 export { TEMPLATE_ELEMENTS, templateClass, templateHooks, templateShape } from './render/templates.js';
 export type { TemplateElement, TemplateSource } from './render/templates.js';
 export { handles } from './interact/handles.js';

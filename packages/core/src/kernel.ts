@@ -261,7 +261,8 @@ export interface CalendarKernel {
    * (constraint, overlap, allow, editable) — what a person's gesture asks for;
    * the application's own calls and server pushes are not refused by them.
    */
-  run(cmd: Command, opts?: { readonly validate?: boolean }): CommandResult;
+  /** `validate`: checked as a gesture is; `external`: it comes from outside this calendar (told to the rules' `allow`). */
+  run(cmd: Command, opts?: { readonly validate?: boolean; readonly external?: boolean }): CommandResult;
   /** What gestures are checked against now: the zone, business hours, the rules given. */
   rules(): RulesContext;
   readonly history: History;
@@ -383,6 +384,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
 
   const nav = (): NavContext => ({ firstDay, today: todayIn(timeZone) });
   let validating = false;
+  let externalRun = false;
   /** The command `run` is applying: what its store change came from. */
   let running: Command | null = null;
   const rulesNow = (): RulesContext => ({
@@ -398,6 +400,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       normalize: { displayZone: timeZone, newId: idGen },
       weekStart: firstDay,
       ...(validating && { rules: rulesNow() }),
+      ...(validating && externalRun && { external: true }),
     }),
     { limit: o.historyLimit ?? 200 },
   );
@@ -676,11 +679,13 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     },
     run(cmd, opts = {}) {
       validating = opts.validate === true;
+      externalRun = opts.external === true;
       running = cmd;
       try {
         return history.run(cmd);
       } finally {
         validating = false;
+        externalRun = false;
         running = null;
       }
     },

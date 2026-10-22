@@ -466,6 +466,8 @@ export const DZ_CSS = `
 /* ── gestures: ghosts, handles, the selected event on touch ─────────────── */
 .dz-tg, .dz-dg { position: relative; }
 .dz-ghosts { position: absolute; inset: 0; pointer-events: none; z-index: 30; }
+/* makeDraggable: a press held on it does not select the page's text nor open the touch menu. */
+.dz-draggable { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .dz-ghost {
   position: absolute;
   left: var(--gx);

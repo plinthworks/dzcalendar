@@ -92,6 +92,12 @@ not a circular dependency.
   their compact "9a".
 - **Custom views.** `views: { x: { type, duration, dayCount, dateIncrement,
   visibleRange } }` become ours by settings (`docs/custom-views.md`).
+- **Dragging in.** `new Draggable(el, { itemSelector, eventData })` from
+  their interaction plugin is the compat's (`import { Draggable } from
+  '@dzcalendar/compat-fullcalendar'`; `dz-migrate` rewrites the import);
+  `droppable`, `drop`, `eventReceive`, `eventLeave` keep their arguments
+  (`draggedEl`, `revert`). `eventData.create: false` tells `drop` only.
+  Natively: `makeDraggable` (`docs/behaviors/external-drag.md`).
 - **Render hooks.** `<name>ClassNames`, `<name>Content`, `<name>DidMount`,
   `<name>WillUnmount` for the elements in `docs/behaviors/render-hooks.md`,
   with their arguments' names; a `ClassNames` function gets no `el`.

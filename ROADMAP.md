@@ -28,8 +28,15 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 - **Done:** Phase 18f-3 (formats, custom views with `visibleRange`)
   committed ("Phase 18f-3"); every check green (1 439 tests, test:ci,
   typecheck, build, size, test:browser, perf:browser, test:package) but the
-  known noise (`normalize+index 10k`). **Next: 18f-4** (external and
-  cross-calendar dragging).
+  known noise (`normalize+index 10k`).
+- **Done:** Phase 18f-4 (dragging in from the page, between calendars)
+  committed ("Phase 18f-4") — **Phase 18f is complete**. Every check green
+  (1 455 tests, test:ci, typecheck, build, size, test:browser,
+  perf:browser, test:package) but the known noise (`normalize+index 10k`).
+  **Next** (as planned before 18f): first render and size (indexing at
+  creation, the polyfill only where needed, K.2), then the CSS and a11y
+  pass (with the header's look, disabled buttons, `.dz-tpl*`, the empty
+  day's scroll region), npm publication, licences, Phase 19.
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2696,6 +2703,64 @@ slots", a business view). Decided:
 - Disabled header buttons are not styled yet (the CSS pass).
 - On a shared kernel, the title format is the kernel's: the last calendar
   giving one wins.
+
+### 18f-4 — done (2026-10-22)
+
+**Built**
+- `docs/behaviors/external-drag.md` (CLEANROOM). `makeDraggable(el, {
+  event, data, create })` in its own entry `@dzcalendar/dom/drag` (owner:
+  paid for only when imported): a pointer (a finger holds 300 ms), an
+  avatar, the keyboard (Enter takes it, Tab to a calendar, the arrows,
+  Enter puts it down, Escape anywhere gives it back); its clean-up leaves
+  nothing.
+- Every view's surface is a drop target on its page (a registry per
+  document, shadow roots read through): `droppable` (true, false — default
+  —, a filter), the place shown with ghosts, an autoscroll near the edges,
+  the drop an `event.create` checked as a gesture is, the rules' `allow`
+  told `external` (through `kernel.run({ external })` too). `onDrop`,
+  `onEventReceive` (with `revert()`); a drop is told there only, not to
+  `onEventChange` as well (`ctx.capture`).
+- Between calendars: made there, then taken from here — or nothing at all;
+  told and announced once both are done (`onEventLeave` here,
+  `onEventReceive` there, one revert that never leaves it on both); one
+  store: a move. Releasing an event outside every calendar now puts
+  nothing down (8 px of margin at the edge).
+- Angular `(dropped)`, `(eventReceive)`, `(eventLeave)`; Vue `@dropped`,
+  `@event-receive`, `@event-leave`; React props. compat-fullcalendar:
+  their `Draggable` (delegation with `itemSelector`, `create: false`),
+  `droppable`, `drop`, `eventReceive`, `eventLeave`; `dz-migrate` rewrites
+  the `Draggable` import.
+- `playground/dragdrop.html` (a waiting list, two doctors). Tests: DOM (13),
+  compat (2), migrate (1), Chrome (12 in `test:browser`).
+- Budgets (owner, measured + 3 %): dom 52 944, a new line dom/drag 2 126,
+  locales ar 2 449 and de 1 972 (two new messages), compat-fullcalendar
+  11 292.
+
+**Reviews fixed** (architect + execution in Chrome)
+- A drop told twice (`onEventChange` and `onEventReceive`); across
+  calendars, the target's change told before the source let go, unpaired,
+  and announced before a refusal; a revert that could leave the event on
+  both sides; nothing guarded a calendar destroyed while a chooser was
+  open; the calendar's box measured once (a page scroll made in-calendar
+  places "outside"); shadow roots never reached; seven document listeners
+  per card at rest; the avatar focusable; a card's data that threw retried
+  at every move; Escape only on the card; a click that focused a calendar
+  took the held card; a card removed while held picked up later; another
+  store's event checked under its own id (a false "valid") and its
+  resources kept; Tab inside the calendar lost the place chosen; no
+  autoscroll from the page (hours off-screen unreachable by a finger).
+- Seen by the execution review and older than 18f: Escape during a mouse
+  drag inside a calendar did nothing (the focused event took the key) — the
+  host's Escape now listens first; the Chrome check that should have caught
+  it compared the state with itself (fixed).
+
+**Not done on purpose**
+- A calendar in an iframe is not reached from the page around it.
+- An undo on one calendar alone after a drop between two (each history is
+  its own): `revert()` is the way back for both (the sheet says so).
+- Seen, older than 18f, left for the CSS and a11y pass (owner): an empty
+  day of a time grid fails axe's `scrollable-region-focusable` (the
+  keyboard's cursor rests in the all-day row, not in the scrolling hours).
 
 ### Order
 

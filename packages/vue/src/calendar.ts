@@ -27,9 +27,11 @@ import type {
   DateClick,
   DayCellCtx,
   DayHeaderCtx,
+  DropInfo,
   DzMessages,
   EventChange,
   EventContentCtx,
+  EventLeave,
   HeaderItemCtx,
   ListDayHeaderCtx,
   MonthHeaderCtx,
@@ -52,7 +54,7 @@ import type { DzCalendarDefaults } from './plugin.js';
 import { same } from './same.js';
 
 /** The callbacks the component turns into events: not options (they would silence them). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange', 'onDrop', 'onEventReceive', 'onEventLeave'] as const;
 
 /** What `options` takes: what `update()` takes, less what has a prop or an event of its own. */
 export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | 'headerItems' | 'motion' | (typeof OWN_CALLBACKS)[number]>;
@@ -153,6 +155,12 @@ export interface DzCalendarProps {
   readonly onSlotClick?: (slot: AvailableSlot) => void;
   readonly onEventClick?: (instance: EventInstance) => void;
   readonly onEventChange?: (change: EventChange) => void;
+  /** `@dropped`: an element of the page dropped here (`makeDraggable`), its event made. */
+  readonly onDropped?: (drop: DropInfo) => void;
+  /** `@event-receive`: an event came in; `revert()` takes it back. */
+  readonly onEventReceive?: (change: EventChange) => void;
+  /** `@event-leave`: an event went to another calendar; `revert()` puts it back on both. */
+  readonly onEventLeave?: (leave: EventLeave) => void;
   readonly onEventOpen?: (instance: EventInstance) => void;
   readonly onCreateRequest?: (request: CreateRequest) => void;
   readonly onSelected?: (selection: Selection) => void;
@@ -231,6 +239,9 @@ export const DzCalendar = defineComponent({
     eventClick: (_i: EventInstance) => true,
     /** What a person changed (a drag, a resize, the keyboard, the menu, the editor): persist it; `revert()` if the server refuses. */
     eventChange: (_c: EventChange) => true,
+    dropped: (_d: DropInfo) => true,
+    eventReceive: (_c: EventChange) => true,
+    eventLeave: (_l: EventLeave) => true,
     eventOpen: (_i: EventInstance) => true,
     createRequest: (_r: CreateRequest) => true,
     /** A selection made by a person (`v-model:selection` follows it too). */
@@ -443,6 +454,9 @@ export const DzCalendar = defineComponent({
         onDateClick: (x: DateClick) => emit('dateClick', x),
         onEventClick: (i: EventInstance) => emit('eventClick', i),
         onEventChange: (c: EventChange) => emit('eventChange', c),
+        onDrop: (d: DropInfo) => emit('dropped', d),
+        onEventReceive: (c: EventChange) => emit('eventReceive', c),
+        onEventLeave: (l: EventLeave) => emit('eventLeave', l),
         onResourceProblems: (ps: readonly Problem[]) => emit('resourceProblems', ps),
         onSelect: (s: Selection) => {
           reported.selection = s;

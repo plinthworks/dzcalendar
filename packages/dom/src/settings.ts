@@ -1,3 +1,4 @@
+import type { DropInfo } from './interact/drop.js';
 import type { AvailableSlot, CalEvent, Problem, Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection, Series } from '@dzcalendar/core';
 import type { MenuHook, ScopeRequest } from './host.js';
 
@@ -37,6 +38,15 @@ export interface EventChange {
    * inside the callback itself (a confirm()), it is done as soon as the change
    * is. Not said itself as a change.
    */
+  revert(): boolean;
+}
+
+/** What `onEventLeave` is told: the event that went, the calendar it went to, the way back. */
+export interface EventLeave {
+  readonly event: CalEvent;
+  /** The calendar's element it was dropped on. */
+  readonly to: HTMLElement;
+  /** Both sides undone: the event back here, gone from there. False when either changed since. */
   revert(): boolean;
 }
 
@@ -81,6 +91,17 @@ export interface LiveSettings {
   readonly onProposalRefused?: (proposal: Proposal) => void;
   /** Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo inside the calendar. Default true. */
   readonly keyboardUndo?: boolean;
+  /**
+   * What may be dropped here from the page (`makeDraggable`) or another
+   * calendar: true, false (default), or a filter given the element's data.
+   */
+  readonly droppable?: boolean | ((data: unknown) => boolean);
+  /** An element of the page was dropped and its event made (not on a refusal). */
+  readonly onDrop?: (drop: DropInfo) => void;
+  /** An event came in (dropped from the page or from another calendar): persist it; `revert()` takes it back (both calendars' sides). */
+  readonly onEventReceive?: (change: EventChange) => void;
+  /** An event of this calendar was dropped on another one: `revert()` puts it back on both. */
+  readonly onEventLeave?: (leave: EventLeave) => void;
   /** A person folded or unfolded a resource or a group (a timeline's tree): the state to keep, if the application wants it back. */
   readonly onResourceToggle?: (state: { readonly collapsedResources: readonly string[]; readonly collapsedGroups: readonly string[] }) => void;
   /** What the resources given (option or `update`) could not be read as: refused entries, dropped fields. Called only when there are some. */
@@ -112,6 +133,10 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   eventResizableFromStart: {},
   onProposalRefused: {},
   keyboardUndo: {},
+  droppable: {},
+  onDrop: {},
+  onEventReceive: {},
+  onEventLeave: {},
   snapMinutes: {
     check: (v) => {
       if (!Number.isInteger(v) || v < 1 || v > 1440) throw new RangeError(`snapMinutes must be a whole number of minutes from 1 to 1440: ${v}`);

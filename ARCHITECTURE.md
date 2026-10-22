@@ -82,6 +82,12 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18f-4 — glisser depuis la page et entre calendriers (détail dans ROADMAP.md)
+
+- **D (dom)** : chaque surface de vue est une cible de dépôt de sa page (registre par document) ; `makeDraggable` dans l'entrée `@dzcalendar/dom/drag` ; un dépôt est une commande `event.create` validée comme un geste, dite à `onEventReceive` seulement ; entre deux calendriers, créé là-bas puis retiré ici, ou rien du tout, avec un `revert()` pour les deux. **B (noyau)** : `Placement.external`, `kernel.run({ external })` pour la règle `allow` ; `toInput` exporté.
+- **Compat** : leur `Draggable`, `drop`, `eventReceive`, `eventLeave` ; `dz-migrate` réécrit l'import.
+- **Décisions du propriétaire** : `makeDraggable` dans une entrée à part ; budgets à la mesure + 3 % (dom 52,9 ko, dom/drag 2,1 ko, locales ar 2,4 ko et de 2,0 ko, compat-fullcalendar 11,3 ko) ; l'alerte axe d'une journée vide reportée à la passe CSS/a11y.
+
 ### Ajustements après la Phase 18f-3 — formats et vues personnalisées (détail dans ROADMAP.md)
 
 - **D (dom)** : `formats` (options `Intl` ou une fonction par endroit) ; ce qui est lu garde les mots complets. **B (noyau)** : `titleFormat` / `setTitleFormat` ; `ViewSpec.visibleRange` (période fixe, la navigation ne la déplace pas) ; `views` accepte des réglages complétés et vérifiés à la création ; `setView` et `setOptions` atomiques.

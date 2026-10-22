@@ -8,7 +8,11 @@ import { clearGhosts, syncGhosts } from './ghosts.js';
 import { attachKeyboard } from './keyboard.js';
 import type { Box, InteractionSurface } from './surface.js';
 import { activeIn } from '../focus.js';
+import { dropTarget, registerTarget, tellReceive, targetAt } from './drop.js';
+import type { Carried, DropTarget } from './drop.js';
 
+/** Pixels past the calendar's edge a pointer is still on it (an overshoot, the scrollbar). */
+const OUT_MARGIN = 8;
 /** Pixels a pointer travels before a press becomes a drag: a finger wobbles more than a mouse. */
 const THRESHOLD = { mouse: 4, pen: 4, touch: 8 } as const;
 /** The edge strip a press must hit to resize: wider for a finger. */
@@ -61,6 +65,9 @@ interface Gesture<G> {
   /** The scroller's box and the layer's width, read with the geometry. */
   scrollBox: ScrollBox | null;
   width: number;
+  /** The calendar's box: outside it, the event is over another calendar of the page (`away`) or nowhere. */
+  rootBox: { left: number; top: number; right: number; bottom: number };
+  away: DropTarget | null;
 }
 
 /** The scroller's box in the viewport, and how far it can scroll along (a timeline's autoscroll and edge). */
@@ -78,6 +85,8 @@ const hitKey = (hit: Hit | null) =>
 
 /** What the pointer and the keyboard share on one view. */
 export interface InteractionShared<G = unknown> {
+  /** This view as the page's drop target (set once made). */
+  target?: DropTarget;
   readonly surface: InteractionSurface<G>;
   /** The preview layer (ghosts, the selection). */
   readonly layer: HTMLElement;
@@ -187,6 +196,10 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
   };
   const interaction = shared.interaction;
   const layerOrigin = shared.layerOrigin;
+  // This view on the page's drop targets: what is dragged in from the page or another calendar.
+  const self = dropTarget(ctx, shared);
+  shared.target = self;
+  ctx.scope.add(registerTarget(doc, self));
 
   const select = (node: HTMLElement | null) => {
     if (selected === node) return;
@@ -297,12 +310,19 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
   });
   ctx.scope.on(win, 'blur', () => abandon());
 
-  ctx.scope.on(doc, 'keydown', (e) => {
-    if (gesture && (e as KeyboardEvent).key === 'Escape') {
-      e.preventDefault();
-      cancel();
-    }
-  });
+  // Escape during a pointer gesture cancels it — heard first (capture), before the focused event's own keys take it.
+  ctx.scope.on(
+    doc,
+    'keydown',
+    (e) => {
+      if (gesture && (e as KeyboardEvent).key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        cancel();
+      }
+    },
+    { capture: true },
+  );
   ctx.scope.on(win, 'resize', queueSelection);
 
   // Scroll is followed by events, never read during a move.
@@ -420,6 +440,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       frame: 0,
       edgeSince: 0,
       edgeSide: null,
+      rootBox: root.getBoundingClientRect(),
+      away: null,
       ...boxesRead(),
     };
     try {
@@ -440,10 +462,89 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
       const g = gesture;
       if (!g) return;
       g.frame = 0;
+      // Out of this calendar with an event: over another one of the page, it is shown there; nowhere, nothing lands.
+      if (outside(g)) return;
       if (compute(g)) draw(g);
       autoscroll(g);
       edgeNavigate(g);
     });
+  }
+
+  /** What a moved event is to the page's other calendars. */
+  const carriedOf = (g: Gesture<G>): Carried | null =>
+    g.press.mode.kind === 'move' && g.press.instance ? { kind: 'calendar', instance: g.press.instance, from: { kernel: ctx.kernel } } : null;
+
+  /**
+   * Outside the calendar's box: another calendar of the page under the
+   * pointer shows the event there (this one shows nothing); none, nothing
+   * lands. No autoscroll, no edge navigation from out there. True while out.
+   */
+  function outside(g: Gesture<G>): boolean {
+    const out = isOut(g);
+    const c = carriedOf(g);
+    if (!out || !c) {
+      if (g.away) {
+        g.away.leave();
+        g.away = null;
+        g.hitKey = '';
+      }
+      return false;
+    }
+    const other = targetAt(doc, g.x, g.y, c, self);
+    if (other !== g.away) {
+      g.away?.leave();
+      g.away = other;
+    }
+    other?.over(c, g.x, g.y);
+    g.proposal = null;
+    g.hitKey = '';
+    clearGhosts(g.ghosts);
+    return true;
+  }
+
+  /**
+   * Dropped on another calendar: made there, then taken from here — or
+   * nothing at all (here refusing, there is taken back, never told). Said and
+   * told once both are done: `onEventReceive` there, `onEventLeave` here,
+   * one revert for both. One store (four zones of one agenda): a move there.
+   */
+  async function dropAway(g: Gesture<G>, to: DropTarget): Promise<void> {
+    const c = carriedOf(g)!;
+    const inst = g.press.instance!;
+    const shared1 = to.ctx.kernel.store === ctx.kernel.store;
+    shared.busy = true;
+    try {
+      const received = await to.drop(c, { quiet: !shared1 });
+      if (!received?.change) return;
+      // One store: a move, told there (the event is still the one shown here, in this zone).
+      if (shared1) return tellReceive(to.ctx, received.change);
+      const there = received.change;
+      // This calendar went while the other one asked (a chooser): the event stays here, not made there.
+      if (ctx.scope.isDisposed) {
+        there.revert();
+        return;
+      }
+      const ev = inst.event;
+      const command = ev.ref ? ({ type: 'event.delete', id: ev.ref.seriesId, key: ev.ref.key, scope: 'this' } as const) : ({ type: 'event.delete', id: ev.id } as const);
+      const left = ctx.capture(() => ctx.kernel.run(command, { validate: true }));
+      if (!left.result.ok) {
+        // It cannot leave here: it is not made there either (never told there).
+        there.revert();
+        ctx.refused(left.result, command);
+        return;
+      }
+      // There first: if it cannot be taken back there (changed since), it is not put back here either — never on both.
+      const revert = () => there.revert() && (left.change?.revert() ?? false);
+      if (!to.ctx.scope.isDisposed) to.ctx.announce(received.words);
+      tellReceive(to.ctx, { ...there, revert });
+      try {
+        ctx.live().onEventLeave?.({ event: ev, to: to.root, revert });
+      } catch (err) {
+        void Promise.reject(err);
+      }
+    } finally {
+      shared.busy = false;
+    }
   }
 
   /** The proposal (or selection) for the pointer's place. False when the hit did not change. No side effect. */
@@ -545,8 +646,18 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
 
   function cancel(): void {
     const g = end();
+    g?.away?.leave();
     if (g) clearGhosts(g.ghosts);
   }
+  /**
+   * Out of the calendar: its box read again (the page may have scrolled, a
+   * month grown a row), with a margin — a pointer a few pixels past the
+   * last column or the scrollbar is still on it.
+   */
+  const isOut = (g: Gesture<G>) => {
+    const b = (g.rootBox = root.getBoundingClientRect());
+    return g.x < b.left - OUT_MARGIN || g.x > b.right + OUT_MARGIN || g.y < b.top - OUT_MARGIN || g.y > b.bottom + OUT_MARGIN;
+  };
 
   let dropping = false;
   async function drop(): Promise<void> {
@@ -554,10 +665,17 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     if (!g) return;
     // The last position, computed without the side effects (no autoscroll, no navigation on a drop).
     g.hitKey = '';
-    compute(g);
+    const away = outside(g) ? g.away : null;
+    if (!away && !g.away) compute(g);
     dropping = true;
     end();
     dropping = false;
+    if (away) {
+      clearGhosts(g.ghosts);
+      return dropAway(g, away);
+    }
+    // Released out of every calendar: nothing lands (not the nearest edge).
+    if (g.press.mode.kind === 'move' && isOut(g)) return clearGhosts(g.ghosts);
     if (g.press.mode.kind === 'select') {
       clearGhosts(g.ghosts);
       // The selection stays on screen until a click elsewhere or Escape; a finger's keeps its handles.

@@ -101,6 +101,11 @@ export async function migrateSource(text: string, fileName = 'file.ts'): Promise
       for (const n of imp.getNamedImports()) {
         const name = n.getName();
         const local = n.getAliasNode()?.getText() ?? name;
+        // Their Draggable (an element of the page dropped on a calendar): the compat's, on makeDraggable.
+        if (from === '@fullcalendar/interaction' && name === 'Draggable') {
+          add.push({ module: '@dzcalendar/compat-fullcalendar', names: [local === name ? name : `${name} as ${local}`], types: false });
+          continue;
+        }
         // A type the plugin exports (DateClickArg from interaction…): the same name here.
         if (TYPES.has(name)) {
           types.push(local === name ? name : `${name} as ${local}`);

@@ -20,6 +20,7 @@ export type {
   EpochMs,
 } from './temporal.js';
 export { createIdGenerator } from './ids.js';
+export { toInput } from './commands/patch.js';
 export type { IdGenerator } from './ids.js';
 export { normalizeIntervals, unionSpans, intersectSpans, subtractSpans, spansToIntervals } from './intervals.js';
 export type { Interval, MsSpan } from './intervals.js';

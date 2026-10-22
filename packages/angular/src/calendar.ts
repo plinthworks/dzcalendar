@@ -36,7 +36,7 @@ import type {
   ZoneId,
 } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DzMessages, EventChange, EventContentCtx, MotionAdapter } from '@dzcalendar/dom';
+import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DropInfo, DzMessages, EventChange, EventContentCtx, EventLeave, MotionAdapter } from '@dzcalendar/dom';
 import { templateClass, templateHooks, templateShape } from '@dzcalendar/dom/toolkit';
 import type { TemplateElement, TemplateSource } from '@dzcalendar/dom/toolkit';
 import { CalendarController } from './controller.js';
@@ -60,7 +60,7 @@ import {
 } from './templates.js';
 
 /** The callbacks the component turns into outputs: not options (they would silence the outputs). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange', 'onDrop', 'onEventReceive', 'onEventLeave'] as const;
 
 /** What `[options]` takes: what `update()` takes, less what has an input or an output of its own. */
 export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | 'headerItems' | (typeof OWN_CALLBACKS)[number]>;
@@ -161,6 +161,12 @@ export class DzCalendar implements OnDestroy {
   readonly resourceProblems = output<readonly Problem[]>();
   /** What a person changed (a drag, a resize, the keyboard, the menu, the editor): persist it; `revert()` if the server refuses. */
   readonly eventChange = output<EventChange>();
+  /** An element of the page dropped here (`makeDraggable`), its event made (`dropped`: `drop` would also hear the browser's own drop event). */
+  readonly dropped = output<DropInfo>();
+  /** An event came in (from the page or another calendar): persist it; `revert()` takes it back. */
+  readonly eventReceive = output<EventChange>();
+  /** An event of this calendar went to another one: `revert()` puts it back on both. */
+  readonly eventLeave = output<EventLeave>();
 
   /** Classes and mounts (and a content where no template is given) for any element: merged with the templates. */
   readonly hooks = input<CalendarHooks | undefined>(undefined);
@@ -278,6 +284,9 @@ export class DzCalendar implements OnDestroy {
       onResourceProblems: (ps) => this.emit(() => this.resourceProblems.emit(ps)),
       onEventClick: (i) => this.emit(() => this.eventClick.emit(i)),
       onEventChange: (c) => this.emit(() => this.eventChange.emit(c)),
+      onDrop: (d) => this.emit(() => this.dropped.emit(d)),
+      onEventReceive: (c) => this.emit(() => this.eventReceive.emit(c)),
+      onEventLeave: (l) => this.emit(() => this.eventLeave.emit(l)),
       onEventOpen: (i) => this.emit(() => this.eventOpen.emit(i)),
       onCreateRequest: (r) => this.emit(() => this.createRequest.emit(r)),
       onSelect: (sel) =>

@@ -1,3 +1,5 @@
+import { commitDrop, eventAt, heldOn, proposeDrop, titleOf as carriedTitle } from './drop.js';
+import type { Carried, PageHold } from './drop.js';
 import { Temporal, UNASSIGNED, eventHit, formatTemporal, grabStep, heldEvent, intentFor, isUnchanged, resolveWall, selectionBetween, slotInstant, stepHit } from '@dzcalendar/core';
 import { EVENT_NODE } from './handles.js';
 import type { AvailableSlot, CalEvent, Command, EventInstance, Hit, Intent, PlainDate, Proposal, Selection, Step, ZonedDateTime } from '@dzcalendar/core';
@@ -30,6 +32,8 @@ interface Held {
   resourceId: string | undefined;
   /** How it was taken: to move it (M, "Move…") or to change its length ("Change duration…"). */
   readonly mode: 'move' | 'resize';
+  /** Brought in from the page (an element taken with the keyboard): put down by a drop, not a move. */
+  readonly external?: { readonly carried: Carried; readonly page: PageHold };
 }
 
 const HM = { hour: '2-digit', minute: '2-digit' } as const;
@@ -358,7 +362,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
   /** Alt+Left/Right while holding: the next resource, the same day and time. */
   function across(delta: 1 | -1): void {
     const h = held!;
-    const ic = shared.interaction(h.instance);
+    const ic = icFor(h);
     let landed: Hit | null | undefined = null;
     const p = grabStep(ic, hits(), h.event, { kind: 'move', step: { days: 0, slots: 0 } }, (_to, from) => (landed = keys!.stepAcross?.(from, delta)) ?? null, h.resourceId);
     if (!p) return ctx.announce(m().noFurther);
@@ -380,7 +384,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       const resizable = ev.perms.duration && (edge === 'end' || ctx.live().eventResizableFromStart === true) && (hits() === 'time' || h.event.allDay);
       if (!resizable) return ctx.announce(m().cannotResize);
     }
-    const ic = shared.interaction(h.instance);
+    const ic = icFor(h);
     let landed: Hit | null = null;
     const p = grabStep(ic, hits(), h.event, kind === 'move' ? { kind, step: by } : { kind, edge, step: by }, (to, from) => (landed = land(from, to, by)), h.resourceId);
     if (!p) return ctx.announce(m().noFurther);
@@ -411,17 +415,72 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     if (home) show(home);
   }
 
-  function letGo(said: boolean): void {
+  /**
+   * Holding ends. Brought in from the page: `cancel` (Escape, a press
+   * elsewhere) gives it back to its element; else (Tab, the focus gone) the
+   * page still holds it, for another calendar.
+   */
+  function letGo(said: boolean, cancel = false): void {
     const h = held;
     if (!h) return;
     release(h);
+    if (h.external) {
+      if (cancel) h.external.page.cancel(said);
+      // Still the page's (Tab): the place chosen here is kept, for the focus coming back.
+      else resume = { page: h.external.page, hit: { ...eventHit(h.event, 'start', { displayZone: zone(), grid: hits() }), ...(h.resourceId !== undefined && { resourceId: h.resourceId }) } };
+      return;
+    }
     if (said) ctx.announce(m().grabCancelled);
     refocus(h.instance.event.id, null, h.node);
+  }
+
+  /** A held thing's rules: one brought in is told to `allow` as coming from outside. */
+  const icFor = (h: Held) => (h.external ? { ...shared.interaction(null), external: true } : shared.interaction(h.instance));
+
+  /** The page holds an element taken with the keyboard and the focus came here: it is held here, at the cursor (or the day in view). */
+  function startExternal(page: PageHold, from: Element): void {
+    if (held || shared.busy) return;
+    const back = resume?.page === page ? resume.hit : null;
+    resume = null;
+    // Its element left the page (its list changed) without letting go: it is let go now.
+    if (page.carried.kind === 'outside' && page.carried.element && !page.carried.element.isConnected) return page.cancel(false);
+    if (!shared.target?.accepts(page.carried)) return ctx.announce(m().dropRefused);
+    const at = back ?? keys!.cursorAt(from) ?? keys!.home();
+    if (!at) return;
+    const ev = eventAt(ctx, page.carried, at);
+    if (!ev) return;
+    const instance: EventInstance = { key: ev.id, event: ev, origin: 'single' };
+    held = { instance, event: ev, proposal: proposeDrop(ctx, shared, page.carried, at), kind: 'move', edge: 'end', ghosts: [], sources: [], node: null, mode: 'move', resourceId: at.resourceId, external: { carried: page.carried, page } };
+    shared.holding = true;
+    shared.showSelection(null);
+    anchor = null;
+    root.classList.add('dz-grabbing');
+    drawHeld(held);
+    // Back to it after a Tab: said held again, the help not repeated.
+    ctx.announce(back ? m().grabbed({ title: carriedTitle(ctx, page.carried) }) : `${m().grabbed({ title: carriedTitle(ctx, page.carried) })} ${m().grabHelp}`);
+  }
+  /** Where an element brought in was when a Tab let it go here: taken up again there. */
+  let resume: { readonly page: PageHold; readonly hit: Hit } | null = null;
+
+  /** Put down what the page brought in: made here (the page lets it go, the focus on the new event), or refused (still held, to move again). */
+  async function commitExternal(h: Held, p: Proposal): Promise<void> {
+    const box = h.ghosts[0]?.getBoundingClientRect() ?? root.getBoundingClientRect();
+    const carried = h.external!.carried;
+    const done = await commitDrop(ctx, shared, carried, p, { x: box.left, y: box.bottom });
+    if (ctx.scope.isDisposed) return;
+    // Made (or told only, `create: false`): the page lets it go. Refused: still held, to move again.
+    if (!done) return;
+    release(h);
+    h.external!.page.done();
+    const id = done.change?.after?.id;
+    const at = p.start instanceof Temporal.PlainDate ? p.start : (p.start as ZonedDateTime).withTimeZone(zone()).toPlainDate();
+    if (id) refocus(id, at, null, h.resourceId);
   }
 
   async function commit(): Promise<void> {
     const h = held!;
     const p = h.proposal;
+    if (h.external) return p ? commitExternal(h, p) : undefined;
     if (!p || isUnchanged(p)) return letGo(true);
     shared.busy = true;
     const box = h.ghosts[0]?.getBoundingClientRect() ?? null;
@@ -508,7 +567,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       else if (intent.kind === 'resize') step('resize', intent.edge, intent.step);
       else if (intent.kind === 'across') across(intent.delta);
       else if (intent.kind === 'commit') void commit();
-      else if (intent.kind === 'cancel') letGo(true);
+      else if (intent.kind === 'cancel') letGo(true, true);
     },
     { capture: true },
   );
@@ -521,7 +580,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       const pe = e as PointerEvent;
       if (!held || shared.busy) return;
       const t = pe.target;
-      if (!(t instanceof Element) || !root.contains(t) || !surface.accepts(t) || (pe.pointerType === 'mouse' && pe.button !== 0)) return letGo(true);
+      if (!(t instanceof Element) || !root.contains(t) || !surface.accepts(t) || (pe.pointerType === 'mouse' && pe.button !== 0)) return letGo(true, true);
       pe.preventDefault();
       pe.stopPropagation();
       // The click that follows this press is not a click on what lies there (a "+N" link, a day number).
@@ -534,7 +593,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       const hit = surface.hitAt(surface.measure(shared.layerOrigin()), pe.clientX, pe.clientY, 0);
       if (!hit) return;
       const h = held;
-      const ic = shared.interaction(h.instance);
+      const ic = icFor(h);
       const ev = h.event;
       const p = h.kind === 'resize' ? grabStep(ic, hits(), ev, { kind: 'resize', edge: h.edge, step: { days: 0, slots: 0 } }, () => hit, h.resourceId) : grabStep(ic, hits(), ev, { kind: 'move', step: { days: 0, slots: 0 } }, () => hit, h.resourceId);
       if (!p) return;
@@ -547,9 +606,17 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     { capture: true },
   );
 
+  /** When a pointer last pressed in here: the focus it gives does not take what the page holds. */
+  let pressedAt = -Infinity;
+  ctx.scope.on(root, 'pointerdown', () => (pressedAt = doc.defaultView!.performance.now()), { capture: true });
+
   // Tabbing into the grid: the cursor takes its place (today, at the hour in view) if it has none here.
+  // The page holding an element taken with the keyboard: it is held here, at that place.
   ctx.scope.on(root, 'focusin', (e) => {
     const t = e.target;
+    const page = heldOn(doc);
+    // The keyboard bringing it in (the grid's cursor or an event focused), not a click that focuses.
+    if (page && !held && t instanceof Element && doc.defaultView!.performance.now() - pressedAt > 300 && (keys.isCursor(t) || t.closest('[data-event-id]'))) return startExternal(page, t);
     if (!(t instanceof Element) || held || !keys.isCursor(t)) return;
     const at = keys.cursorAt(t);
     const f = at ? keys.fit(at) : null;

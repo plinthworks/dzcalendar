@@ -69,6 +69,8 @@ export interface CommandContext {
   readonly weekStart?: Weekday;
   /** When given, moves and edits are checked against it (constraint, overlap, allow, editable). */
   readonly rules?: RulesContext;
+  /** What is checked comes from outside the calendar (a drop from the page, another calendar): said to `allow`. */
+  readonly external?: boolean;
 }
 
 export type CommandResult =

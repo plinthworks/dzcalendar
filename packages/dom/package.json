@@ -24,6 +24,10 @@
       "types": "./src/custom.ts",
       "default": "./src/custom.ts"
     },
+    "./drag": {
+      "types": "./src/drag.ts",
+      "default": "./src/drag.ts"
+    },
     "./toolkit": {
       "types": "./src/toolkit.ts",
       "default": "./src/toolkit.ts"

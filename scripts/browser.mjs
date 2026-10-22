@@ -243,14 +243,21 @@ try {
       const design = await ev(p, 'design');
       check('resize: the end follows the pointer, snapped; the start stays', design[0].startsWith('2026-10-19T10:00') && design[1].startsWith('2026-10-19T12:15'), JSON.stringify(design));
       // Escape cancels a drag: nothing moves, no ghost stays.
-      const before = await ev(p, 'focus') ?? await ev(p, 'tokyo');
+      const before = await ev(p, 'tokyo');
+      await p.locator('.dz-ev[data-event-id="tokyo"]').scrollIntoViewIfNeeded();
       const t = await (await p.$('.dz-ev[data-event-id="tokyo"]')).boundingBox();
       await p.mouse.move(t.x + t.width / 2, t.y + 8);
       await p.mouse.down();
       await p.mouse.move(t.x + t.width / 2, t.y + 120, { steps: 6 });
+      // Ghosts are drawn on the next frame.
+      await p.waitForTimeout(60);
+      const shown = (await p.$$('.dz-ghost')).length;
       await p.keyboard.press('Escape');
+      // The ghost goes at Escape, before the release; the release then puts nothing down.
+      const afterEscape = (await p.$$('.dz-ghost')).length;
       await p.mouse.up();
-      check('drag: Escape cancels, nothing moves', JSON.stringify(await ev(p, 'tokyo')) === JSON.stringify(before.length ? await ev(p, 'tokyo') : before) && (await p.$$('.dz-ghost')).length === 0);
+      const now = await ev(p, 'tokyo');
+      check('drag: Escape cancels — the ghost goes at once, nothing moves on release', shown > 0 && afterEscape === 0 && JSON.stringify(now) === JSON.stringify(before), JSON.stringify({ shown, afterEscape, before, now }));
       check('gestures: no console error', errors.length === 0, errors.join(' | '));
       await p.close();
     }
@@ -939,6 +946,93 @@ try {
       check('slots: without onSlotClick a click on one is a date click and a drag from one selects', inert.dates >= 1 && inert.selected !== null, JSON.stringify(inert));
       await p.screenshot({ path: join(root, 'node_modules', '.cache', 'dzcalendar', 'captures', 'slots-week.png'), clip: { x: 0, y: 0, width: 1400, height: 950 } });
       check('slots: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
+    // ── Phase 18f-4: dragging in from the page, and between two calendars ──
+    {
+      const { p, errors } = await page('/dragdrop.html');
+      await p.waitForSelector('#a .dz-tg__col');
+      /** The centre of a calendar's column at a wall time (its gutter's label), scrolled into view. */
+      const at = (cal, hm) =>
+        p.evaluate(([c, t]) => {
+          const tick = [...document.querySelectorAll(`${c} .dz-tick`)].find((x) => x.textContent === t);
+          tick.scrollIntoView({ block: 'center' });
+          const col = document.querySelector(`${c} .dz-tg__col`).getBoundingClientRect();
+          const r = tick.getBoundingClientRect();
+          return { x: col.left + col.width / 2, y: r.top + r.height / 2 + 6 };
+        }, [cal, hm]);
+      const dragTo = async (from, to) => {
+        await p.mouse.move(from.x, from.y);
+        await p.mouse.down();
+        await p.mouse.move(from.x + 10, from.y + 10, { steps: 3 });
+        await p.mouse.move(to.x, to.y, { steps: 14 });
+        await p.waitForTimeout(80);
+        await p.mouse.up();
+        await p.waitForTimeout(150);
+      };
+      const centre = async (sel) => {
+        const b = await p.locator(sel).boundingBox();
+        return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+      };
+      const titles = (k) => p.evaluate((key) => [...window.__dd[key].kernel.store.snapshot.allEvents()].map((e) => `${e.title}@${String(e.start).slice(11, 16)}`).sort(), k);
+      const target = await at('#a', '11:00');
+      await dragTo(await centre('[data-patient="p1"]'), target);
+      const one = { a: await titles('a'), card: await p.locator('[data-patient="p1"]').count(), got: await p.evaluate(() => window.__dd.received.slice()) };
+      check('drag in: a patient dropped on 11:00 becomes an appointment there; onDrop removes the card; onEventReceive told', one.a.includes('M. Benali@11:00') && one.card === 0 && one.got.includes('Dre A:M. Benali'), JSON.stringify(one));
+      const len = await p.evaluate(() => { const e = [...window.__dd.a.kernel.store.snapshot.allEvents()].find((x) => x.title === 'M. Benali'); return e ? (e.end.epochMilliseconds - e.start.epochMilliseconds) / 60000 : null; });
+      check('drag in: the appointment keeps the card’s duration (30 min)', len === 30, String(len));
+      await dragTo(await centre('[data-patient="p2"]'), await at('#b', '08:00'));
+      const refused = { b: await titles('b'), card: await p.locator('[data-patient="p2"]').count() };
+      check('drag in: 08:00 is before Dr B’s hours — refused, nothing made, the card stays', refused.b.length === 1 && refused.card === 1, JSON.stringify(refused));
+      await dragTo(await centre('[data-patient="p2"]'), await centre('h1'));
+      const nowhere = { a: (await titles('a')).length, b: (await titles('b')).length, card: await p.locator('[data-patient="p2"]').count(), ghosts: await p.locator('.dz-ghost, .dz-drag-avatar').count() };
+      check('drag in: released outside every calendar, nothing happens, nothing left on screen', nowhere.a === 2 && nowhere.b === 1 && nowhere.card === 1 && nowhere.ghosts === 0, JSON.stringify(nowhere));
+      await p.locator('#a [data-event-id="r1"]').scrollIntoViewIfNeeded();
+      await dragTo(await centre('#a [data-event-id="r1"]'), await at('#b', '10:00'));
+      const moved = { a: await titles('a'), b: await titles('b'), got: await p.evaluate(() => window.__dd.received.slice()), log: await p.textContent('#log') };
+      check('between calendars: dragged from Dre A to Dr B at 10:00, the appointment is his and no longer hers; both sides told', moved.b.includes('Contrôle@10:00') && !moved.a.some((t) => t.startsWith('Contrôle')) && moved.got.includes('Dr B:Contrôle') && /quitte/.test(moved.log), JSON.stringify(moved));
+      const undone = await p.evaluate(() => window.__dd.lastReceive?.revert());
+      const after = { a: await titles('a'), b: await titles('b') };
+      check('between calendars: one revert puts it back on both', undone === true && after.a.includes('Contrôle@10:00') && !after.b.some((t) => t.startsWith('Contrôle')), JSON.stringify({ undone, ...after }));
+      // Escape while dragging an appointment over the other doctor: nothing moves, nothing left on either side.
+      {
+        const from = await centre('#a [data-event-id="r1"]');
+        const to = await at('#b', '12:00');
+        await p.mouse.move(from.x, from.y);
+        await p.mouse.down();
+        await p.mouse.move(to.x, to.y, { steps: 14 });
+        await p.keyboard.press('Escape');
+        await p.mouse.up();
+        await p.waitForTimeout(120);
+        const still = { a: await titles('a'), b: await titles('b'), ghosts: await p.locator('.dz-ghost').count() };
+        check('between calendars: Escape mid-drag cancels — it stays with Dre A, no ghost on either', still.a.includes('Contrôle@10:00') && !still.b.some((x) => x.startsWith('Contrôle')) && still.ghosts === 0, JSON.stringify(still));
+      }
+      // Moved to Dr B, then renamed there before the server answers: the revert cannot take it back there, so it does not come back here either.
+      {
+        await dragTo(await centre('#a [data-event-id="r1"]'), await at('#b', '11:00'));
+        await p.evaluate(() => window.__dd.b.kernel.run({ type: 'event.update', id: 'r1', patch: { title: 'Renommé' } }));
+        const r = await p.evaluate(() => window.__dd.lastReceive.revert());
+        const both = { r, a: await titles('a'), b: await titles('b') };
+        check('between calendars: a revert after a change there returns false and leaves it on one side only', r === false && !both.a.some((x) => x.startsWith('Contrôle') || x.startsWith('Renommé')) && both.b.some((x) => x.startsWith('Renommé')), JSON.stringify(both));
+      }
+      // Held near the bottom of a doctor's day: the hours scroll up under the card.
+      {
+        const sc = await p.evaluate(() => { const b = document.querySelector('#a .dz-tg__body'); b.scrollTop = 0; const r = b.getBoundingClientRect(); return { top: 0, x: r.left + r.width / 2, y: r.bottom - 10 }; });
+        await p.waitForTimeout(50);
+        const from = await centre('[data-patient="p3"]');
+        await p.mouse.move(from.x, from.y);
+        await p.mouse.down();
+        await p.mouse.move(sc.x, sc.y, { steps: 10 });
+        await p.waitForTimeout(600);
+        const scrolled = await p.evaluate(() => document.querySelector('#a .dz-tg__body').scrollTop);
+        await p.keyboard.press('Escape');
+        await p.mouse.up();
+        check('drag in: held near a calendar’s bottom edge, its hours scroll', scrolled > 40, String(scrolled));
+      }
+      const v = await axeViolations(p, 'main');
+      check('axe: the drag-and-drop page has no violation', v.length === 0, v.join('\n'));
+      check('drag in: no console error', errors.length === 0, errors.join('\n'));
       await p.close();
     }
 

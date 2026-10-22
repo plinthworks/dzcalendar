@@ -68,6 +68,8 @@ function typescript(name) {
         './list': { types: './list.d.ts', default: './list.js' },
         './multimonth': { types: './multimonth.d.ts', default: './multimonth.js' },
         './custom': { types: './custom.d.ts', default: './custom.js' },
+        // Dragging in from the page (owner: paid for only when imported).
+        './drag': { types: './drag.d.ts', default: './drag.js' },
         './toolkit': { types: './toolkit.d.ts', default: './toolkit.js' },
         // Languages, one import each: `import '@dzcalendar/dom/locales/ar'`.
         ...Object.fromEntries(['ar', 'es', 'de'].map((l) => [`./locales/${l}`, { types: `./locales/${l}.d.ts`, default: `./locales/${l}.js` }])),

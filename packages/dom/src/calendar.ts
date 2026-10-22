@@ -409,20 +409,25 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       reverting = false;
     }
   };
+  /** A drop's change, kept while it runs (`ctx.capture`): `onEventReceive` is told it, paired when it came from another calendar. */
+  let captured: EventChange[] | null = null;
   const stopChanges = kernel.subscribe((e) => {
     if (e.type !== 'store' || reverting) return;
     const cause = e.change.cause;
     const person = (cause === 'command' && e.validated && e.command) || cause === 'undo' || cause === 'redo';
     if (!person) return;
     const tell = settings.current.onEventChange;
-    if (!tell) return;
+    if (!tell && !captured) return;
     const applied = e.change.applied;
     if (applied.length === 0) return;
     const changes = applied.map((m) => (m.kind === 'event' ? { kind: 'event' as const, before: m.before ?? null, after: m.after ?? null } : { kind: 'series' as const, before: m.before ?? null, after: m.after ?? null }));
     const first = changes.find((c) => c.kind === 'event') as { before: CalEvent | null; after: CalEvent | null } | undefined;
     // This change by its own entry (an undo's revert redoes that entry, not whatever is on top).
     const revert = () => kernel.history.revert(applied);
-    tell({ cause: cause as EventChange['cause'], ...(e.command && cause === 'command' && { command: e.command }), changes, before: first?.before ?? null, after: first?.after ?? null, revert: revertWith(revert) });
+    const change: EventChange = { cause: cause as EventChange['cause'], ...(e.command && cause === 'command' && { command: e.command }), changes, before: first?.before ?? null, after: first?.after ?? null, revert: revertWith(revert) };
+    // A drop's change is told once, to `onEventReceive` (and paired across calendars): not to `onEventChange` too.
+    if (captured) captured.push(change);
+    else tell?.(change);
   });
   // What a screen reader is told about gestures: moved, refused, moved past a skipped hour.
   const liveRegion = h(doc, 'div', 'dz-live');
@@ -476,6 +481,16 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     easeScroll: false,
     hooks: options.hooks ?? {},
     formats: options.formats ?? {},
+    capture(fn) {
+      const was = captured;
+      const mine: EventChange[] = [];
+      captured = mine;
+      try {
+        return { result: fn(), change: mine[0] ?? null };
+      } finally {
+        captured = was;
+      }
+    },
     epoch: 0,
     snapMinutes: settings.current.snapMinutes ?? 15,
     weekNumbers: options.weekNumbers === true,

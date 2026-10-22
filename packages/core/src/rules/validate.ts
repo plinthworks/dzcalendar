@@ -15,6 +15,8 @@ export interface Placement {
   readonly start: ZonedDateTime | PlainDate;
   readonly end: ZonedDateTime | PlainDate;
   readonly resourceIds: readonly ResourceId[];
+  /** It comes from outside this calendar (an element of the page, another calendar): an `allow` may take it or not. */
+  readonly external?: boolean;
 }
 
 export interface Violation {

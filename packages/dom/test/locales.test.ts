@@ -20,6 +20,8 @@ const SAMPLES: Record<string, unknown> = {
   newEventOn: { date: 'D' },
   dayLabel: { date: 'D', count: 2 },
   eventMoved: { title: 'T', time: '09:00' },
+  eventReceived: { title: 'T', when: '09:00' },
+  pickedUp: { title: 'T' },
   eventResized: { title: 'T', time: '09:00' },
   movedIntoGap: { time: '03:00' },
   whichReading: { time: '02:30' },

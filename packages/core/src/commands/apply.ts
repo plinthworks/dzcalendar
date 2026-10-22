@@ -123,7 +123,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
     if (!pair) return true; // the edit itself will report why
     const found = validateProposal(
       current,
-      { event: pair.before, start: pair.after.start, end: pair.after.end, resourceIds: pair.after.resourceIds },
+      { event: pair.before, start: pair.after.start, end: pair.after.end, resourceIds: pair.after.resourceIds, ...(ctx.external && { external: true }) },
       ctx.rules,
       t.kind === 'occurrence' && t.scope !== 'this' ? { movingSeries: t.ref.seriesId } : {},
     );
@@ -142,7 +142,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
     const d0 = sr.base.allDay ? sr.base.start : sr.base.start.withTimeZone(zone).toPlainDate();
     const { occurrences } = expandSeries(sr, viewWindow(d0, d0.add({ days: 366 }), zone), { limit: 500 });
     for (const occ of occurrences) {
-      const found = validateProposal(current, { event: occ, start: occ.start, end: occ.end, resourceIds: occ.resourceIds }, ctx.rules, { movingSeries: sr.id });
+      const found = validateProposal(current, { event: occ, start: occ.start, end: occ.end, resourceIds: occ.resourceIds, ...(ctx.external && { external: true }) }, ctx.rules, { movingSeries: sr.id });
       if (found.length > 0) {
         violations.push(...found);
         return false;
@@ -184,7 +184,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
           if (!seriesAllowed(item.series)) return false;
         } else if (ctx.rules) {
           const ev = item.event;
-          const found = validateProposal(current, { event: ev, start: ev.start, end: ev.end, resourceIds: ev.resourceIds }, ctx.rules);
+          const found = validateProposal(current, { event: ev, start: ev.start, end: ev.end, resourceIds: ev.resourceIds, ...(ctx.external && { external: true }) }, ctx.rules);
           if (found.length > 0) {
             violations.push(...found);
             return false;

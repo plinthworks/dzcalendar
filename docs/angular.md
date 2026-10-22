@@ -95,6 +95,8 @@ classes and mounts for any element (the holders — a day's column, a
 timeline row — too), merged with the templates: the template gives the
 content, `hooks` the rest.
 
+**Dragging in**: `(dropped)`, `(eventReceive)`, `(eventLeave)` with `makeDraggable` from `@dzcalendar/dom/drag` on your list's items (in `afterNextRender`, its clean-up in `DestroyRef.onDestroy`) and `[options]="{ droppable: true }"` (`docs/behaviors/external-drag.md`). `dropped`, not `drop`: an output named `drop` would also hear the browser's own drop event.
+
 **The controller** (`#cal` then `cal.controller`, or `inject(CalendarController)`
 in a child): signals `state`, `title`, `range`, `view`, `date`, `canUndo`,
 `canRedo`, `loading`, `problems`, `instance`; methods `prev`, `next`,

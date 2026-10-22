@@ -1,3 +1,4 @@
+import type { EventChange } from './settings.js';
 import type { Formats } from './render/formats.js';
 import type { ActionItem, ActionTarget, CalendarKernel, PlainDate, Resource, Command, CommandResult, EditScope, EventInstance, Instant, KernelState, Proposal, RulesContext, Segment, ZoneId } from '@dzcalendar/core';
 import type {
@@ -131,6 +132,8 @@ export interface ViewCtx {
   /** A view's scroll after this paint may be eased (a change, not the calendar's first paint). */
   easeScroll: boolean;
   hooks: CalendarHooks;
+  /** Runs `fn` (a command), keeping the person's change it makes as `onEventChange` would get it (null: none). */
+  capture<T>(fn: () => T): { readonly result: T; readonly change: EventChange | null };
   /** How the application asked each place to be written (`formats`). */
   formats: Formats;
   epoch: number;

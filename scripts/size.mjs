@@ -50,6 +50,7 @@ const results = {
     (await bundle(src('core'), ['@dzcalendar/rrule', ...poly])),
   // The framework wrappers' shared template builder (in @dzcalendar/dom/toolkit, outside the dom entry's bundle).
   'dom/templates (without core)': await bundle(join(root, 'packages/dom/src/render/templates.ts'), ['@dzcalendar/core', ...poly]),
+  'dom/drag (without dom)': await bundle(join(root, 'packages/dom/src/drag.ts'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
   'dom/list (without dom)': await bundle(join(root, 'packages/dom/src/list.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
   'dom/multimonth (without dom)': await bundle(join(root, 'packages/dom/src/multimonth.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
   'dom/custom (without dom)': await bundle(join(root, 'packages/dom/src/custom.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),

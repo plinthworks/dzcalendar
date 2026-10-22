@@ -34,6 +34,8 @@ return {
   deleteEvent: 'Löschen',
   dropRefused: 'Hier nicht erlaubt',
   eventMoved: ({ title, time }) => (time ? `„${title}“ verschoben auf ${time}` : `„${title}“ verschoben`),
+  eventReceived: ({ title, when }) => `„${title}“ eingetragen: ${when}`,
+  pickedUp: ({ title }) => `„${title}“ aufgenommen. Tab bis zu einem Kalender, Pfeiltasten für den Platz, Eingabe zum Ablegen, Escape zum Abbrechen.`,
   eventResized: ({ title, time }) => (time ? `Neues Ende von „${title}“: ${time}` : `Dauer von „${title}“ geändert`),
   movedIntoGap: ({ time }) => `Diese Uhrzeit gibt es an diesem Tag nicht; verschoben auf ${time}`,
   changeWhich: 'Welche Termine ändern?',

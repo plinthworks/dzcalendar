@@ -88,6 +88,8 @@ const events: EventInput[] = [{ id: 'a', title: 'Consultation', start: '2026-10-
 - `@event-open`, `@create-request`, `@slot-click` change what the calendar
   offers: passed only while listened to.
 
+- **`@dropped`, `@event-receive`, `@event-leave`** with `makeDraggable` from `@dzcalendar/dom/drag` (in `onMounted`, its clean-up in `onBeforeUnmount`) and `:options="{ droppable: true }"` (`docs/behaviors/external-drag.md`).
+
 ## The Pro
 
 ```ts

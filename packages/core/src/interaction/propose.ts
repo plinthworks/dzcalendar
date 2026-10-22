@@ -44,6 +44,8 @@ export interface InteractionContext {
    * moment stays all-day and moves by whole days, rather than becoming timed.
    */
   readonly keepAllDay?: boolean;
+  /** What is proposed comes from outside this calendar (dragged in from the page or another calendar): said to the rules' `allow`. */
+  readonly external?: boolean;
 }
 
 /** Where an event would go, and whether it may. The same for every input device. */
@@ -82,7 +84,8 @@ const daysBetween = (a: PlainDate, b: PlainDate) => a.until(b, { largestUnit: 'd
 const elapsedMs = (e: CalEvent) =>
   e.allDay ? 0 : (e.end as ZonedDateTime).epochMilliseconds - (e.start as ZonedDateTime).epochMilliseconds;
 
-function finish(ctx: InteractionContext, p: Omit<Proposal, 'valid' | 'violations'>): Proposal {
+function finish(ctx: InteractionContext, given: Omit<Proposal, 'valid' | 'violations'>): Proposal {
+  const p = ctx.external ? { ...given, external: true } : given;
   const violations = ctx.rules ? validateProposal(ctx.snap, p, ctx.rules, ctx.movingSeries !== undefined ? { movingSeries: ctx.movingSeries } : {}) : [];
   return { ...p, valid: violations.length === 0, violations };
 }

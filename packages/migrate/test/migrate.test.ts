@@ -135,3 +135,10 @@ describe('dz-migrate after Sehhaty’s test', () => {
   });
 });
 
+
+describe('their Draggable (18f-4)', () => {
+  it('is imported from the compat, as a value', async () => {
+    const r = await migrateSource(`import interactionPlugin, { Draggable } from '@fullcalendar/interaction';\nnew Draggable(document.getElementById('list')!, { itemSelector: '.card' });\nexport const p = [interactionPlugin];\n`, 'x.ts');
+    expect([r.text.includes('import { Draggable } from "@dzcalendar/compat-fullcalendar";'), r.text.includes('new Draggable('), r.notes.some((n) => n.includes('Draggable'))]).toEqual([true, true, false]);
+  });
+});

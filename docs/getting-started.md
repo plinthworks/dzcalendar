@@ -58,6 +58,11 @@ const calendar = createCalendar(document.getElementById('agenda')!, {
   (`docs/behaviors/formats.md`).
 - **Custom views**: `views: { congres: { family: 'timeGrid', visibleRange:
   { start, end } } }` and more (`docs/custom-views.md`).
+- **Dragging in** (`import { makeDraggable } from '@dzcalendar/dom/drag'`): `makeDraggable(card, { event: { title, duration },
+  data })` and `droppable: true`, `onDrop`, `onEventReceive` (with
+  `revert()`); an event dragged between two calendars, `onEventLeave` on
+  the one it left; a keyboard path for all of it
+  (`docs/behaviors/external-drag.md`).
 - **Render hooks**: `hooks.<element>` — `class`, `content`, `didMount`,
   `willUnmount` — on events, days, hours, "+N", the now line, resources…
   (`docs/behaviors/render-hooks.md`).

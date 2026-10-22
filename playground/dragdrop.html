@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — glisser depuis la page</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: #52525b; max-width: 80ch; }
+      .layout { display: grid; grid-template-columns: 14rem 1fr 1fr; gap: 1rem; align-items: start; }
+      .waiting { background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; padding: 0.75rem; }
+      .waiting h2, .doctor h2 { font-size: 0.95rem; margin: 0 0 0.5rem; }
+      .card { padding: 0.5rem 0.625rem; margin-bottom: 0.5rem; border: 1px solid #d4d4d8; border-radius: 6px; background: #fafafa; cursor: grab; user-select: none; }
+      .card[aria-pressed='true'] { outline: 2px solid #2563eb; }
+      .doctor .cal { height: 620px; }
+      #log { min-height: 1.4em; font-weight: 600; margin-top: 1rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Glisser depuis la page, et d'un agenda à l'autre</h1>
+      <p>Une liste d'attente : un patient glissé sur une heure devient un rendez-vous de sa durée (au clavier : Entrée sur la carte, Tab jusqu'à un agenda, les flèches, Entrée). Un rendez-vous glissé d'un agenda à l'autre change de médecin. Le Dr B ne consulte pas avant 09:00.</p>
+      <div class="layout">
+        <section class="waiting" aria-labelledby="w">
+          <h2 id="w">Liste d'attente</h2>
+          <div id="cards"></div>
+        </section>
+        <section class="doctor"><h2>Dre A</h2><div id="a" class="cal"></div></section>
+        <section class="doctor"><h2>Dr B</h2><div id="b" class="cal"></div></section>
+      </div>
+      <div id="log" role="status"></div>
+    </main>
+    <script type="module" src="./dragdrop.ts"></script>
+  </body>
+</html>
