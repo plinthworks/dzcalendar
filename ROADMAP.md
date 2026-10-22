@@ -38,6 +38,8 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   size, npm publication, licences, Phase 19.
 - **Done:** 18g-1 (the styling contract) committed ("Phase 18g-1"); every
   check green (1 465 tests, exit codes checked) but the known noise.
+- **Done:** 18g-2 (unstyled mode, the Tailwind 4 bridge) committed
+  ("Phase 18g-2"); every check green, exit codes read.
 - **Done:** 18g-3 (the visual pass) committed ("Phase 18g-3"); every
   check green, exit codes read; before/after screenshots published for the
   owner (`playground/gallery.html` makes them again).
@@ -51,9 +53,9 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   Two doc lines added (`props` vs `extendedProps`; Angular's caches after a
   tarball change). Seen, left: the default day heads' case comes from `Intl`
   (lower case where theirs wrote "LUN. 19/10").
-- **Next:** first render (indexing every event at creation) and size (the
-  polyfill loaded only where Temporal is missing, K.2) — where FullCalendar 7
-  is ahead; then the CSS pass, npm publication, licences; then Phase 19.
+- **After 18g:** first render (indexing every event at creation) and size
+  (the polyfill loaded only where Temporal is missing, K.2) — where
+  FullCalendar 7 is ahead; then npm publication, licences; then Phase 19.
 - **Then, from the benchmark:** first render (the kernel reads and indexes
   every event at creation: 80 % of a 10 000-event month's first render) and
   size (122 kB against FullCalendar 7's 95 kB) — the two numbers where
