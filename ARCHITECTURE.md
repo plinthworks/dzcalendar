@@ -82,6 +82,12 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18f-1b — en-tête (détail dans ROADMAP.md)
+
+- **D (dom)** : `headerToolbar` (`start`, `center`, `end` ou `false`) et `customButtons` (`text`, `hint`, `icon`, `click(event, el)`, `active`), vivants par `update()` ; un bouton n'est redessiné que si son apparence change (les fermetures d'un framework sont prises sans redessiner, le focus reste). L'en-tête par défaut inchangé. Un en-tête étroit passe sur plusieurs lignes.
+- **Compat** : `headerToolbar` traduit entier, `customButtons` avec lui.
+- **Décision du propriétaire** : budgets à la mesure + 3 % (dom 49,0 ko, compat-fullcalendar 9,6 ko).
+
 ### Ajustements après la Phase 18f-1 — crochets de rendu partout (détail dans ROADMAP.md)
 
 - **D (dom)** : `hooks.<élément>` prend quatre membres (`class`, `content`, `didMount`, `willUnmount`) pour 20 éléments (fiche `docs/behaviors/render-hooks.md`) ; un seul mécanisme (`render/hooks.ts`), celui des événements compris. Les conteneurs (colonne de jour, lignes, vue, panneau « +N ») prennent classes et montages, jamais de contenu. `didMount` attend que le dessin soit dans la page ; de nouvelles fonctions par `update` démontent puis remontent. Exportés à la Pro par `@dzcalendar/dom/toolkit`.

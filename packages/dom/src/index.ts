@@ -35,5 +35,6 @@ export type {
   WeekNumberCtx,
 } from './render/hooks.js';
 export type { LiveSettings, DateClick, EventChange } from './settings.js';
+export type { CustomButton, HeaderToolbar } from './toolbar.js';
 // A custom view takes part in gestures with a surface, and in the keyboard with its `keys` (none: no keyboard).
 export type { InteractionSurface, KeyboardSurface, Box } from './interact/surface.js';

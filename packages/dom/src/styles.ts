@@ -45,12 +45,28 @@ export const DZ_CSS = `
   color-scheme: var(--tz-color-scheme, var(--dzp-color-scheme, light dark));
 }
 .dz-toolbar {
+  container: dz-toolbar / inline-size;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.25rem;
 }
 .dz-toolbar__title { margin: 0; margin-inline-start: 0.5rem; font-size: 1.125rem; font-weight: 600; flex: 1; }
+/* Three places: the start and the end share what is left, the centre sits between them (headerToolbar). */
+/* Never narrower than what they hold: a narrow header goes on two lines rather than pieces on top of each other. */
+.dz-toolbar__section { display: flex; align-items: center; gap: 0.5rem; }
+/* A narrow header (a phone, a sidebar): a place too wide for it breaks inside too. */
+@container dz-toolbar (max-width: 40rem) { .dz-toolbar__section { flex-wrap: wrap; } }
+.dz-toolbar__section--start, .dz-toolbar__section--end { flex: 1 1 0; }
+.dz-toolbar__section--end { justify-content: flex-end; }
+.dz-toolbar__section--center:empty { display: none; }
+/* No centre: the end takes what it needs, the start (and its title) the rest — the header as before. */
+.dz-toolbar__section--center:empty + .dz-toolbar__section--end { flex: none; }
+.dz-toolbar__section--center .dz-toolbar__title { flex: none; margin: 0; text-align: center; }
+.dz-toolbar__section--end .dz-toolbar__title { flex: none; }
+.dz-toolbar__custom { display: inline-flex; align-items: center; gap: 0.375rem; }
+.dz-toolbar__custom[aria-pressed='true'] { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); border-color: var(--dz-accent, var(--dzc-accent)); }
 .dz-toolbar__btn {
   border: 1px solid var(--dz-border, var(--dzc-border));
   border-radius: var(--dz-radius, var(--dzc-radius));
@@ -59,6 +75,7 @@ export const DZ_CSS = `
   font: inherit;
   padding: 0.25rem 0.625rem;
   cursor: pointer;
+  white-space: nowrap;
 }
 .dz-toolbar__btn:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: 2px; }
 
@@ -251,10 +268,10 @@ export const DZ_CSS = `
   background: var(--dz-now, var(--dzc-danger));
 }
 /* ── toolbar: view switcher ─────────────────────────────────────────────── */
-.dz-toolbar__views { display: inline-flex; }
-.dz-toolbar__view { border-radius: 0; margin-inline-start: -1px; }
-.dz-toolbar__view:first-child { border-start-start-radius: var(--dz-radius, var(--dzc-radius)); border-end-start-radius: var(--dz-radius, var(--dzc-radius)); }
-.dz-toolbar__view:last-child { border-start-end-radius: var(--dz-radius, var(--dzc-radius)); border-end-end-radius: var(--dz-radius, var(--dzc-radius)); }
+.dz-toolbar__group { display: inline-flex; }
+.dz-toolbar__group > .dz-toolbar__btn { border-radius: 0; margin-inline-start: -1px; }
+.dz-toolbar__group > .dz-toolbar__btn:first-child { border-start-start-radius: var(--dz-radius, var(--dzc-radius)); border-end-start-radius: var(--dz-radius, var(--dzc-radius)); }
+.dz-toolbar__group > .dz-toolbar__btn:last-child { border-start-end-radius: var(--dz-radius, var(--dzc-radius)); border-end-end-radius: var(--dz-radius, var(--dzc-radius)); }
 .dz-toolbar__view[aria-pressed='true'] { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); border-color: var(--dz-accent, var(--dzc-accent)); }
 
 /* ── time grid: free slots (availableSlots), over the hours, under the events ── */
@@ -506,7 +523,7 @@ export const DZ_CSS = `
   .dz-ev:not(.dz-ev--bg), .dz-bar:not(.dz-bar--bg) { border: 1px solid CanvasText; }
   .dz-band--gap, .dz-band--repeat { border: 1px dashed CanvasText; }
   /* What a filled background meant is drawn in system colours (a forced palette drops backgrounds). */
-  .dz-toolbar__view[aria-pressed='true'], .dz-dg__cell--today .dz-dg__num, .dz-list__dot { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  .dz-toolbar__view[aria-pressed='true'], .dz-toolbar__custom[aria-pressed='true'], .dz-dg__cell--today .dz-dg__num, .dz-list__dot { forced-color-adjust: none; background: Highlight; color: HighlightText; }
   .dz-bar--timed::before, .dz-now::before { forced-color-adjust: none; background: CanvasText; }
   .dz-now { border-top-color: CanvasText; }
   .dz-dg__cell--today { outline: 2px solid Highlight; outline-offset: -2px; }

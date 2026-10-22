@@ -286,3 +286,30 @@ describe('after Sehhaty’s test: compat follows a person, not the program', () 
   });
 });
 
+
+describe('the header (18f-1b)', () => {
+  it('their three places become ours (left / right: start / end), the years by the arrows said and left out', () => {
+    const t = fromFullCalendar({ timeZone: P, headerToolbar: { left: 'prevYear,prev,next,nextYear today', center: 'title', right: 'reload dayGridMonth,timeGridWeek' }, customButtons: { reload: { text: 'Recharger', click: () => {} } } });
+    const o = t.options as Record<string, unknown>;
+    expect([o['headerToolbar'], o['headerViews'], codes(t.problems)]).toEqual([
+      { start: 'prev,next today', center: 'title', end: 'reload dayGridMonth,timeGridWeek' },
+      ['dayGridMonth', 'timeGridWeek'],
+      ['compat-unsupported headerToolbar prevYear', 'compat-unsupported headerToolbar nextYear'],
+    ]);
+  });
+
+  it('their buttons: words, hint, the icon as their class, click(event, el); false: no header', () => {
+    const seen: string[] = [];
+    const t = fromFullCalendar({ timeZone: P, headerToolbar: false, customButtons: { lock: { hint: 'Bloqués', icon: 'lock', click: (e: { type: string }, el: { id: string }) => void seen.push(`${e.type} ${el.id}`) }, broken: { text: 'x' } } });
+    const o = t.options as { headerToolbar: unknown; customButtons: Record<string, { hint?: string; icon?: string; click(e: unknown, el: unknown): void }> };
+    o.customButtons['lock']!.click({ type: 'click' }, { id: 'b' });
+    expect([o.headerToolbar, o.customButtons['lock']!.hint, o.customButtons['lock']!.icon, Object.keys(o.customButtons), seen, codes(t.problems)]).toEqual([
+      false,
+      'Bloqués',
+      'fc-icon fc-icon-lock',
+      ['lock'],
+      ['click b'],
+      ['invalid-option customButtons.broken undefined'],
+    ]);
+  });
+});

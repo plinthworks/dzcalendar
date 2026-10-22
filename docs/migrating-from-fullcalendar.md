@@ -79,5 +79,13 @@ not a circular dependency.
   follow a person's change (a gesture, the keyboard, the menu, the editor);
   your own `calendar.run()` is not reported — theirs reports `addEvent` and
   `setProp` too. Persist from where your code makes the change.
+- **The header.** `headerToolbar` is kept whole (`left` / `right` are
+  `start` / `end`; `false`, no header) and `customButtons` with it (their
+  `icon` becomes the class `fc-icon fc-icon-<name>`: bring its icon in your
+  CSS). `prevYear` / `nextYear` are said and left out
+  (`docs/behaviors/header-toolbar.md`).
+- **Render hooks.** `<name>ClassNames`, `<name>Content`, `<name>DidMount`,
+  `<name>WillUnmount` for the elements in `docs/behaviors/render-hooks.md`,
+  with their arguments' names; a `ClassNames` function gets no `el`.
 - **Types**: `view` is never null in the callbacks' arguments.
 

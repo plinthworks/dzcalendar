@@ -17,8 +17,11 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   18f-1"); every check green (1 375 tests, test:ci, typecheck, build, size,
   test:browser, test:package) but the known noise (`normalize+index 10k`
   73 ms against 70, `timeGridWeek:U` 28 ms against 27 — both as at HEAD).
-  **Next: 18f-1b, the header's buttons** (`headerToolbar`, `customButtons`;
-  section 5 of Phase 18f), then 18f-2 (templates in every framework).
+- **Done:** Phase 18f-1b (the header's layout and buttons) committed
+  ("Phase 18f-1b"); every check green (1 391 tests, test:ci, typecheck,
+  build, size, test:browser, perf:browser, test:package) but the known
+  noise (`normalize+index 10k`). **Next: 18f-2** (templates in every
+  framework, the header's free place with them).
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2521,6 +2524,54 @@ slots", a business view). Decided:
 - **The look** (grouped buttons, centred title, the active view filled)
   waits for the CSS pass, with everything else visual.
 - Placed as **18f-1b**, right after 18f-1.
+
+### 18f-1b — done (2026-10-22)
+
+**Built**
+- `docs/behaviors/header-toolbar.md` (CLEANROOM).
+- `headerToolbar: { start, center, end } | false` (a space between groups,
+  a comma inside one; names `prev`, `next`, `today`, `title`, views, the
+  application's buttons, which win over a built-in name) and
+  `customButtons: { name: { text?, hint?, icon?, click(event, el),
+  active? } }`; both live through `update()`. Without `headerToolbar`, the
+  header as before (`defaultLayout`, `headerViews`). `<dz-calendar>` takes
+  both live.
+- Joined views are the view switcher (a named group); other joined buttons
+  are one piece to the eye only. A narrow header goes on several lines
+  (a container query below 40 rem lets a place break inside too).
+- compat-fullcalendar: `headerToolbar` kept whole (`left` / `right` →
+  `start` / `end`, `prevYear` / `nextYear` said), `customButtons`
+  (`icon` → `fc-icon fc-icon-<name>`); `applyFullCalendar` gives the layout
+  and its buttons in one change.
+- Tests: `packages/dom/test/header-toolbar.test.ts` (14), compat (2).
+- Budgets (owner, measured + 3 %): dom 48 951, compat-fullcalendar 9 623.
+
+**Reviews fixed** (architect + execution in Chrome)
+- A framework's new closures at each render rebuilt the header (focus lost):
+  only a button's look (words, hint, icon, toggle or not) rebuilds it, its
+  `click` / `active` are read at the click; a focused piece moved by a new
+  layout keeps the focus.
+- A toggle's `aria-pressed` waited for the next drawing: re-read at the click.
+- `<dz-calendar>` remade the calendar for these two options.
+- Below ~900 px the three places overlapped (Sehhaty's layout unusable on a
+  phone): they wrap now, no overlap, nothing off-screen, no sideways scroll
+  (measured in Chrome at 390, 640, 900, 1 200 px, French and Arabic);
+  a button's words no longer break inside it.
+- Bad input said once and left out, never thrown: a button without `click`,
+  a `null` one, a non-string icon or place, a `headerToolbar` that is not an
+  object or `false`; a button with neither words nor hint said; a view this
+  page cannot draw said once, not at each layout; `role="group"` without a
+  name on non-view groups removed.
+- `applyFullCalendar` warned "nothing called reload" (layout applied before
+  its buttons). Stale compat doc line.
+
+**Not done on purpose**
+- The look of the header (grouped buttons, centred title, the pressed view
+  filled, Sehhaty's screenshot): the CSS pass. What was added is structural
+  (places, groups, wrapping, the pressed state).
+- The header's free place for rich content: with the templates, 18f-2.
+- A React prop going back to `undefined` keeps the calendar's layout (said
+  in the sheet).
 
 ### Order
 

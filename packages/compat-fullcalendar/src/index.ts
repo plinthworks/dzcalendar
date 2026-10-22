@@ -113,6 +113,10 @@ export function applyFullCalendar(calendar: CalendarInstance, fullCalendarOption
   if (how.initial !== false && (initialView !== undefined || initialDate !== undefined)) tryUpdate(initialView !== undefined ? 'initialView' : 'initialDate', { ...(initialView !== undefined && { view: initialView }), ...(initialDate !== undefined && { date: initialDate }) });
   // The options own the events: none given is none.
   rest['events'] ??= [];
+  // The header's layout and its buttons in one change: a layout naming buttons not yet given would say them unknown.
+  const header: Record<string, unknown> = {};
+  for (const k of ['customButtons', 'headerToolbar']) if (k in rest) (header[k] = rest[k]), delete rest[k];
+  if (Object.keys(header).length > 0) tryUpdate('headerToolbar', header);
   for (const [k, v] of Object.entries(rest)) {
     if (AT_CREATION.includes(k)) problems.push(said('compat-unsupported', k, 'at-creation'));
     else tryUpdate(k, { [k]: v });

@@ -48,6 +48,14 @@ const calendar = createCalendar(document.getElementById('agenda')!, {
 - **`calendar.update({ … })`** — what can change live: view, date, zone,
   locale, events, sources, resources, business hours, hidden days, theme…
   A refused value throws a `RangeError` and changes nothing.
+- **The header**: `headerToolbar: { start: 'prev,next today', center:
+  'title', end: 'reload dayGridMonth,timeGridWeek' }` (a space between
+  groups, a comma inside one; `false`: none) and the application's buttons,
+  `customButtons: { reload: { text, hint?, icon?, click, active? } }`
+  (`docs/behaviors/header-toolbar.md`).
+- **Render hooks**: `hooks.<element>` — `class`, `content`, `didMount`,
+  `willUnmount` — on events, days, hours, "+N", the now line, resources…
+  (`docs/behaviors/render-hooks.md`).
 - **`calendar.navigate('prev' | 'next' | 'today')`**, `calendar.select(…)`,
   `calendar.refetch()`, `calendar.destroy()`.
 - **`calendar.kernel`** — the model without the screen: `getState()` (view,

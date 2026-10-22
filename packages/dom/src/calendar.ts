@@ -20,7 +20,8 @@ import { h } from './render/reconcile.js';
 import { Scope } from './render/scope.js';
 import { DZ_CSS, ensureStyles } from './styles.js';
 import { THEME_NAMES, ensureTheme, isKnownTheme } from './themes.js';
-import { createToolbar } from './toolbar.js';
+import { createToolbar, defaultLayout, sameLook } from './toolbar.js';
+import type { CustomButton, HeaderToolbar } from './toolbar.js';
 // Built-in views register themselves.
 import './views/timegrid.js';
 import './views/daygrid.js';
@@ -48,8 +49,12 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly scrollTime?: DurationLike;
   /** The line at the current time, refreshed every minute. Default true. */
   readonly nowIndicator?: boolean;
-  /** The view switcher's buttons. Default: month, week, day — those this renderer draws. */
+  /** The view switcher's buttons. Default: month, week, day — those this renderer draws. Without `headerToolbar`. */
   readonly headerViews?: readonly string[];
+  /** What the header holds and where (`'prev,next today'`: a space between groups, a comma inside one); false: no header. Default: the arrows, "today" and the title at the start, `headerViews` at the end. */
+  readonly headerToolbar?: HeaderToolbar | false;
+  /** The application's buttons, named in `headerToolbar`. */
+  readonly customButtons?: Readonly<Record<string, CustomButton>>;
   /** Lanes a month day shows before "+N": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default 'auto'. */
   readonly dayMaxLanes?: number | 'auto' | null;
   readonly hooks?: CalendarHooks;
@@ -142,6 +147,10 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly multiMonthMaxColumns?: number;
   /** The view switcher's buttons; equal lists change nothing. */
   readonly headerViews?: readonly string[];
+  /** Equal layouts change nothing. */
+  readonly headerToolbar?: HeaderToolbar | false;
+  /** Compared by name, member by member: the same functions again redraw nothing. */
+  readonly customButtons?: Readonly<Record<string, CustomButton>>;
   readonly theme?: string;
   readonly scheme?: 'auto' | 'light' | 'dark';
   readonly density?: 'compact' | 'comfortable' | 'spacious';
@@ -565,9 +574,22 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       return false;
     });
   let headerAsked = options.headerViews;
-  const headerViews = tabsOf(headerAsked);
-  const toolbar = createToolbar(doc, scope, kernel, headerViews, (dir) => kernel.navigate(dir), (v) => kernel.setView(v));
-  root.append(toolbar.element);
+  let layoutAsked = options.headerToolbar;
+  let buttonsAsked = options.customButtons ?? {};
+  // A header view this renderer cannot draw: said once, not at each new layout.
+  const saidViews = new Set<string>();
+  const toolbar = createToolbar(doc, scope, kernel, (v) => drawable(v) || (!saidViews.has(v) && saidViews.add(v) && tabsOf([v]).length > 0), (dir) => kernel.navigate(dir), (v) => kernel.setView(v));
+  // Where the header goes: `headerToolbar: false` takes it out, a layout puts it back in the same place.
+  const toolbarSpot = doc.createComment('dz-header');
+  root.append(toolbarSpot);
+  const layOut = () => {
+    if (layoutAsked === false) return toolbar.element.remove();
+    const given = layoutAsked !== undefined && layoutAsked !== null && typeof layoutAsked === 'object' && !Array.isArray(layoutAsked) ? layoutAsked : null;
+    if (layoutAsked !== undefined && !given) console.warn('dzcalendar: headerToolbar is { start, center, end } or false: the header as by default');
+    toolbar.setLayout(given ?? defaultLayout(tabsOf(headerAsked)), buttonsAsked && typeof buttonsAsked === 'object' ? buttonsAsked : {});
+    if (!toolbar.element.isConnected) toolbarSpot.before(toolbar.element);
+  };
+  layOut();
 
   let view: ViewController | null = null;
   let interactions: Interactions | null = null;
@@ -1152,9 +1174,25 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             ctx.epoch++;
             dirty = true;
           }
+          // The header: redrawn only when its layout or its buttons changed (by their contents and members).
+          let relayOut = false;
           if (changes.headerViews && changes.headerViews.join() !== (headerAsked ?? []).join()) {
             headerAsked = changes.headerViews;
-            toolbar.setViews(tabsOf(headerAsked));
+            relayOut = true;
+          }
+          if ('headerToolbar' in changes && JSON.stringify(changes.headerToolbar) !== JSON.stringify(layoutAsked)) {
+            layoutAsked = changes.headerToolbar;
+            relayOut = true;
+          }
+          // New closures that look the same (a framework's render): the nodes stay, the new functions are used.
+          if (changes.customButtons && changes.customButtons !== buttonsAsked) {
+            const same = sameLook(changes.customButtons, buttonsAsked);
+            buttonsAsked = changes.customButtons;
+            if (same) toolbar.setButtons(buttonsAsked);
+            else relayOut = true;
+          }
+          if (relayOut) {
+            layOut();
             dirty = true;
           }
           // Read at creation once; now changed at any time.

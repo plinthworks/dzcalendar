@@ -193,10 +193,51 @@ export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}):
   }
   if (Object.keys(rules).length > 0) out['rules'] = rules;
   // The toolbar's views: the view switch (whether each can be drawn is checked on the calendar).
+  // The header: their three places (left / right are start / end), names kept; `false`, no header.
   const bar = take('headerToolbar');
-  if (bar && typeof bar === 'object') {
-    const named = Object.values(bar as Rec).flatMap((v) => (typeof v === 'string' ? v.split(/[ ,]+/) : [])).filter((x) => x && !['prev', 'next', 'today', 'title', 'prevYear', 'nextYear'].includes(x));
+  const buttons = take('customButtons');
+  const own = buttons && typeof buttons === 'object' ? Object.keys(buttons as Rec) : [];
+  if (bar === false) out['headerToolbar'] = false;
+  else if (bar && typeof bar === 'object') {
+    const b = bar as Rec;
+    const layout: Record<string, string> = {};
+    for (const [where, keys] of [['start', ['start', 'left']], ['center', ['center']], ['end', ['end', 'right']]] as const) {
+      const v = keys.map((k) => b[k]).find((x) => typeof x === 'string') as string | undefined;
+      if (v === undefined) continue;
+      // Years by the arrows are not names here: said, left out (an empty group goes with them).
+      layout[where] = v
+        .split(/\s+/)
+        .map((g) => g.split(',').filter((n) => {
+          if (n !== 'prevYear' && n !== 'nextYear') return true;
+          problems.push(said('compat-unsupported', 'headerToolbar', n));
+          return false;
+        }).join(','))
+        .filter(Boolean)
+        .join(' ');
+    }
+    out['headerToolbar'] = layout;
+    // The views it names, checked against what this page can draw (said with the import that draws them).
+    const named = Object.values(layout).flatMap((v) => v.split(/[ ,]+/)).filter((x) => x && !['prev', 'next', 'today', 'title'].includes(x) && !own.includes(x));
     if (named.length > 0) out['headerViews'] = named;
+  }
+  // Their buttons: words, hint, icon (their icon's name kept as a class: `fc-icon fc-icon-<name>`), click(event, el).
+  if (own.length > 0) {
+    const mine: Record<string, unknown> = {};
+    for (const [name, spec] of Object.entries(buttons as Rec)) {
+      const c = spec as Rec | null;
+      if (!c || typeof c !== 'object' || typeof c['click'] !== 'function') {
+        problems.push(said('invalid-option', `customButtons.${name}`, typeof c?.['click'], 'error'));
+        continue;
+      }
+      const click = c['click'] as Fn;
+      mine[name] = {
+        ...(typeof c['text'] === 'string' && { text: c['text'] }),
+        ...(typeof c['hint'] === 'string' && { hint: c['hint'] }),
+        ...(typeof c['icon'] === 'string' && { icon: `fc-icon fc-icon-${c['icon']}` }),
+        click: (event: MouseEvent, el: HTMLElement) => void click(event, el),
+      };
+    }
+    out['customButtons'] = mine;
   }
   // What every event takes when it does not say.
   const defaults: { -readonly [K in keyof EventDefaults]: EventDefaults[K] } = {};
