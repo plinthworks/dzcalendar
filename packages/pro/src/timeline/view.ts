@@ -499,7 +499,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       const hooks = ctx.hooks.resourceGroupHeader;
       const gctx = { view, field: groupField(), value: row.value };
       decorate(ctx, holder(hooks), cell, gctx);
-      if (hooks?.content) decorate(ctx, { content: hooks.content }, name, gctx);
+      const content = hooks?.content;
+      if (content) decorate(ctx, { content: (x) => content(x, cell) }, name, gctx);
       p.lane.removeAttribute('aria-label');
       return;
     }
@@ -530,7 +531,9 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
           else {
             const rctx = { resource: r, view: ctx.kernel.getState().view.type };
             decorate(ctx, holder(hooks), cell, rctx);
-            if (hooks.content) decorate(ctx, { content: hooks.content }, title, rctx, ours);
+            // The content is the cell's (its `el`), let go with it.
+            const content = hooks.content;
+            if (content) decorate(ctx, { content: (x) => content(x, cell) }, title, rctx, ours);
             else ours();
           }
         } else cell.textContent = textOf(r, c.field);

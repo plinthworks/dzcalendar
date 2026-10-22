@@ -56,6 +56,18 @@ customButtons: {
 - React: a prop given `undefined` leaves the calendar's value; give the
   layout you want back (`{ start: 'prev today next title', end: '…' }`).
 
+## The application's places (`headerItems`)
+
+`headerItems: { filter: { content, class, didMount, willUnmount } }` and the
+name in `headerToolbar`: a place of the application's (a menu, a filter, a
+badge) — React `headerItems`, Vue `#header-item-<name>`, Angular
+`<ng-template dzHeaderItem="name">`. Its context: `name`, `view`, `title`;
+`content` is asked again when the view or the title changes — return the
+same node to keep a control's focus and value (the frameworks do). A
+place is kept by name across layouts; its name leaving the layout lets it
+go. Order of names: a button of the application's, then a place, then the
+calendar's own (`prev`, `title`, a view).
+
 ## Where we differ on purpose
 
 - No icon font of ours: `icon` is a class of the application's.

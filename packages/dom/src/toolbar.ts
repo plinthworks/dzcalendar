@@ -3,6 +3,8 @@ import type { DzMessages } from './messages.js';
 import type { Scope } from './render/scope.js';
 import { h } from './render/reconcile.js';
 import { guard } from './render/event.js';
+import { decorate, undecorate } from './render/hooks.js';
+import type { ElementHooks, HeaderItemCtx } from './render/hooks.js';
 
 /** What the header holds, in three places: names separated by a space for separate groups, by a comma for buttons joined into one (docs/behaviors/header-toolbar.md). */
 export interface HeaderToolbar {
@@ -31,7 +33,9 @@ export interface Toolbar {
   /** Words, direction, the pressed buttons. */
   draw(state: KernelState, messages: DzMessages, rtl: boolean): void;
   /** Another layout and buttons (drawn at the next `draw`). */
-  setLayout(layout: HeaderToolbar, buttons: Readonly<Record<string, CustomButton>>): void;
+  setLayout(layout: HeaderToolbar, buttons: Readonly<Record<string, CustomButton>>, items?: Readonly<Record<string, ElementHooks<HeaderItemCtx>>>): void;
+  /** Before the calendar goes: the application's places let go. */
+  destroy(): void;
   /** The same buttons with other functions (a framework's new closures): nothing redrawn, the new `click` and `active` used from now on. */
   setButtons(buttons: Readonly<Record<string, CustomButton>>): void;
 }
@@ -81,6 +85,24 @@ export function createToolbar(
   let customs: { b: HTMLButtonElement; name: string }[] = [];
   /** The buttons in force: a click reads its function here, so new closures need no new node. */
   let specs: Readonly<Record<string, CustomButton>> = {};
+  /** The application's places, kept by name across layouts (its content is not made again for a new layout). */
+  const itemNodes = new Map<string, HTMLElement>();
+  let itemHooks: Readonly<Record<string, ElementHooks<HeaderItemCtx>>> = {};
+  /** What the places were last told: they are asked again only when the view or the title changed. */
+  let itemsSaw = '';
+  let state: KernelState | null = null;
+  const itemCtx = (name: string): HeaderItemCtx => ({ name, view: state?.view.type ?? '', title: state?.title ?? '' });
+  const item = (name: string) => {
+    let el = itemNodes.get(name);
+    if (!el) {
+      el = h(doc, 'div', 'dz-toolbar__item');
+      el.dataset['item'] = name;
+      itemNodes.set(name, el);
+    }
+    // Before the first drawing there is no title yet: the place is told at `draw`.
+    if (state) decorate({ doc }, itemHooks[name], el, itemCtx(name));
+    return el;
+  };
   const said = new Set<string>();
   const sayOnce = (key: string, message: string) => {
     if (said.has(key)) return;
@@ -141,20 +163,26 @@ export function createToolbar(
     return false;
   };
 
-  const setLayout = (layout: HeaderToolbar, buttons: Readonly<Record<string, CustomButton>>) => {
+  const setLayout = (layout: HeaderToolbar, buttons: Readonly<Record<string, CustomButton>>, items: Readonly<Record<string, ElementHooks<HeaderItemCtx>>> = {}) => {
     viewButtons = [];
     switchers = [];
     customs = [];
     specs = buttons;
+    itemHooks = items;
+    const placed = new Set<string>();
     const piece = (name: string): HTMLElement | null => {
       if (Object.hasOwn(buttons, name)) return usable(name, buttons[name]) ? customButton(name, buttons[name]) : null;
+      if (Object.hasOwn(items, name) && items[name] && typeof items[name] === 'object') {
+        placed.add(name);
+        return item(name);
+      }
       if (name === 'prev') return prev;
       if (name === 'next') return next;
       if (name === 'today') return today;
       if (name === 'title') return title;
       if (kernel.getViewSpec(name) && drawable(name)) return viewButton(name);
       // A view known to the kernel but not drawn here is said by the caller, with its import.
-      if (!kernel.getViewSpec(name)) sayOnce(`unknown:${name}`, `nothing called ${name} for the header (a view, prev, next, today, title, or one of customButtons)`);
+      if (!kernel.getViewSpec(name)) sayOnce(`unknown:${name}`, `nothing called ${name} for the header (a view, prev, next, today, title, one of customButtons or headerItems)`);
       return null;
     };
     const place = (where: 'start' | 'center' | 'end') => {
@@ -186,9 +214,19 @@ export function createToolbar(
     const focused = bar.contains(doc.activeElement) ? (doc.activeElement as HTMLElement) : null;
     bar.replaceChildren(place('start'), place('center'), place('end'));
     if (focused?.isConnected && doc.activeElement !== focused) focused.focus();
+    // A place no longer in the layout: the application lets go of it.
+    for (const [name, el] of itemNodes) {
+      if (placed.has(name)) continue;
+      undecorate(el);
+      itemNodes.delete(name);
+    }
   };
 
   return {
+    destroy() {
+      for (const el of itemNodes.values()) undecorate(el);
+      itemNodes.clear();
+    },
     element: bar,
     title,
     setLayout,
@@ -196,9 +234,16 @@ export function createToolbar(
       specs = buttons;
       pressed();
     },
-    draw(state, messages, rtl) {
+    draw(now, messages, rtl) {
+      state = now;
+      // The application's places told the view and the title when they change.
+      const saw = `${now.view.type}|${now.title}`;
+      if (saw !== itemsSaw) {
+        itemsSaw = saw;
+        for (const [name, el] of itemNodes) decorate({ doc }, itemHooks[name], el, itemCtx(name));
+      }
       // Rewriting an aria-live title, even with the same words, announces it again.
-      if (title.textContent !== state.title) title.textContent = state.title;
+      if (title.textContent !== now.title) title.textContent = now.title;
       prev.textContent = rtl ? '›' : '‹';
       prev.setAttribute('aria-label', messages.previous);
       next.textContent = rtl ? '‹' : '›';
@@ -208,7 +253,7 @@ export function createToolbar(
       for (const b of viewButtons) {
         const v = b.dataset['view']!;
         b.textContent = messages.views[v] ?? kernel.getViewSpec(v)?.type ?? v;
-        b.setAttribute('aria-pressed', String(v === state.view.type));
+        b.setAttribute('aria-pressed', String(v === now.view.type));
       }
       pressed();
     },

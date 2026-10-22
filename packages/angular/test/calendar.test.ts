@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import type { ComponentFixture } from '@angular/core/testing';
 import { Temporal, fnSource } from '@dzcalendar/core';
 import type { EventInput, EventInstance, PlainDate, Selection } from '@dzcalendar/core';
-import { CalendarController, DzCalendar, DzEventContent, provideDzCalendar } from '../src/index.js';
+import { CalendarController, DZ_CALENDAR, DzCalendar, DzEventContent, provideDzCalendar } from '../src/index.js';
 
 const now = () => Temporal.Instant.from('2026-10-21T08:00:00Z');
 const d = (s: string) => Temporal.PlainDate.from(s);
@@ -47,6 +47,9 @@ async function mount(setup: (h: Host) => void = () => {}): Promise<ComponentFixt
   return f;
 }
 const kernelOf = (f: ComponentFixture<Host>) => f.componentInstance.cal().instance.kernel;
+
+/** Every template's embedded views the component holds (one map per element since 18f-2). */
+const viewsOf = (cal: unknown) => [...(cal as { views: Map<string, Map<unknown, { view: { destroyed: boolean } }>> }).views.values()].flatMap((m) => [...m.values()].map((x) => x.view));
 
 describe('<dz-calendar> under provideZonelessChangeDetection', () => {
   it('draws the bound view, date and events', async () => {
@@ -199,7 +202,7 @@ describe('dzEventContent', () => {
     // Leaving the period destroys the views of the events that left.
     cal.instance.navigate('next');
     await f.whenStable();
-    expect((cal as unknown as { views: Map<unknown, unknown> }).views.size).toBe(0);
+    expect(viewsOf(cal)).toHaveLength(0);
   });
 });
 
@@ -245,12 +248,12 @@ describe('review fixes', () => {
 
   it('a template removed then added: no view left behind, the new one used', async () => {
     const f = await mount((h) => h.templated.set(true));
-    const cal = f.componentInstance.cal() as unknown as { views: Map<unknown, { destroyed: boolean }> };
-    const first = [...cal.views.values()];
+    const cal = f.componentInstance.cal();
+    const first = viewsOf(cal);
     expect(first.length).toBeGreaterThan(0);
     f.componentInstance.templated.set(false);
     await f.whenStable();
-    expect(cal.views.size).toBe(0);
+    expect(viewsOf(cal)).toHaveLength(0);
     expect(first.every((v) => v.destroyed)).toBe(true);
     expect((f.nativeElement as HTMLElement).querySelector('.tpl')).toBeNull();
     f.componentInstance.templated.set(true);
@@ -327,5 +330,77 @@ describe('code review fixes', () => {
     f.componentInstance.view.set('dayGridMonth');
     await f.whenStable();
     expect(f.componentInstance.selection()).toBeNull();
+  });
+});
+
+describe('templates for every element (18f-2, Angular)', () => {
+  @Component({
+    standalone: true,
+    imports: [DZ_CALENDAR],
+    template: `
+      <dz-calendar [view]="view()" [date]="date" timeZone="Europe/Paris" locale="fr-FR" [options]="opts" [hooks]="hooks">
+        <ng-template dzSlotLabel let-ctx><b class="lbl">{{ ctx.time.hour === 9 && ctx.time.minute === 0 ? ctx.text + ' ' + who() : ctx.text }}</b></ng-template>
+        <ng-template dzDayCell let-ctx><em>j{{ ctx.date.day }}</em></ng-template>
+        <ng-template dzHeaderItem="filter" let-ctx><select aria-label="Médecin"><option>Tous ({{ ctx.name }})</option></select></ng-template>
+      </dz-calendar>`,
+  })
+  class Templated {
+    readonly view = signal('timeGridWeek');
+    readonly date = d('2026-10-21');
+    readonly who = signal('ctx');
+    readonly opts = { now, headerToolbar: { start: 'title', end: 'filter' } };
+    readonly hooks = { dayCell: { class: (c: { outside: boolean }) => (c.outside ? 'muted' : null) } };
+  }
+
+  it('dzSlotLabel and dzHeaderItem in the week; dzDayCell with [hooks] classes in the month', async () => {
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection()] });
+    const f = TestBed.createComponent(Templated);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    const nine = [...el.querySelectorAll('.dz-tick .lbl')].map((b) => b.textContent).find((t) => t?.startsWith('09:00'));
+    expect([nine, el.querySelector('.dz-toolbar__item select option')?.textContent]).toEqual(['09:00 ctx', 'Tous (filter)']);
+    f.componentInstance.view.set('dayGridMonth');
+    await f.whenStable();
+    const cell = el.querySelector('.dz-dg__cell[data-date="2026-10-21"]')!;
+    expect([cell.querySelector('.dz-dg__num em')?.textContent, el.querySelector('.dz-dg__cell[data-date="2026-09-28"]')?.classList.contains('muted')]).toEqual(['j21', true]);
+  });
+});
+
+describe('after the 18f-2 execution review (Angular)', () => {
+  @Component({
+    standalone: true,
+    imports: [DZ_CALENDAR],
+    template: `
+      <dz-calendar #cal view="dayGridMonth" [date]="date" timeZone="Europe/Paris" locale="fr-FR" [options]="opts" [hooks]="hooks()">
+        <ng-template dzDayCell let-ctx><em>{{ ctx.date.day }}</em></ng-template>
+        <ng-template dzHeaderItem="filter"><select id="sel"><option>a</option></select></ng-template>
+      </dz-calendar>`,
+  })
+  class Leaky {
+    readonly date = d('2026-10-21');
+    readonly opts = { now, headerToolbar: { start: 'title', end: 'filter' } };
+    readonly hooks = signal<Record<string, unknown>>({ slotLabel: { class: 'w1' } });
+    readonly cal = viewChild.required(DzCalendar);
+  }
+
+  it('day cells keep one view each across navigations; the header place survives other hooks changing, focused', async () => {
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection()] });
+    const f = TestBed.createComponent(Leaky);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    const cal = f.componentInstance.cal();
+    for (let i = 0; i < 5; i++) {
+      cal.instance.navigate('next');
+      await f.whenStable();
+    }
+    // One view per cell shown, and the header place's.
+    expect(viewsOf(cal)).toHaveLength(el.querySelectorAll('.dz-dg__cell').length + 1);
+    const sel = el.querySelector<HTMLSelectElement>('#sel')!;
+    sel.focus();
+    f.componentInstance.hooks.set({ slotLabel: { class: 'w2' } });
+    await f.whenStable();
+    cal.instance.navigate('next');
+    await f.whenStable();
+    expect([el.querySelector('#sel') === sel, document.activeElement === sel]).toEqual([true, true]);
   });
 });

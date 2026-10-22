@@ -3,11 +3,14 @@ import type { CSSProperties, ForwardedRef, ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import type { AvailableSlot, CalEvent, CreateRequest, EventInstance, NormalizationReport, PlainDate, Problem, Selection, SourceNotice } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DayHeaderCtx, EventChange, EventContentCtx, MotionAdapter } from '@dzcalendar/dom';
+import type { CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, EventChange, EventContentCtx, HeaderItemCtx, MotionAdapter } from '@dzcalendar/dom';
 import { DzCalendarContext } from './context.js';
 import type { DzCalendarDefaults } from './context.js';
 import { CalendarController, CalendarControllerContext } from './controller.js';
 import { same } from './same.js';
+import { templateClass, templateHooks, templateShape } from '@dzcalendar/dom/toolkit';
+import { TEMPLATES, sourceOf } from './templates.js';
+import type { Portal, TemplateElement, TemplateProps } from './templates.js';
 
 /** Layout effects in a browser; on a server (where nothing is drawn) plain effects, which React does not warn about. */
 const useBrowserLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
@@ -15,12 +18,12 @@ const useBrowserLayoutEffect = typeof document === 'undefined' ? useEffect : use
 /** The callbacks the component takes as its own props (with what the calendar reports). */
 const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange'] as const;
 /** Props that are not options of the calendar. */
-const NOT_OPTIONS = new Set<string>([...OWN_CALLBACKS, 'controller', 'renderEventContent', 'renderDayHeader', 'defaultView', 'defaultDate', 'onViewChange', 'onDateChange', 'selection', 'onSelectionChange', 'onSourceNotice', 'onProblems', 'onError', 'axis', 'className', 'style', 'id', 'motion', 'initial']);
+const NOT_OPTIONS = new Set<string>([...OWN_CALLBACKS, 'controller', 'renderEventContent', ...Object.values(TEMPLATES), 'hooks', 'headerItems', 'defaultView', 'defaultDate', 'onViewChange', 'onDateChange', 'selection', 'onSelectionChange', 'onSourceNotice', 'onProblems', 'onError', 'axis', 'className', 'style', 'id', 'motion', 'initial']);
 
 /** Everything `update()` takes, less what has a prop of its own below. */
-export type DzCalendarOptions = Omit<CalendarUpdate, 'hooks' | 'motion' | (typeof OWN_CALLBACKS)[number]>;
+export type DzCalendarOptions = Omit<CalendarUpdate, 'hooks' | 'headerItems' | 'motion' | (typeof OWN_CALLBACKS)[number]>;
 
-export interface DzCalendarProps extends DzCalendarOptions {
+export interface DzCalendarProps extends DzCalendarOptions, TemplateProps {
   /** Read with `useCalendarState(controller)`; driven with its methods. Keep the same one (`useCalendarController()`). */
   readonly controller?: CalendarController;
   /** The view shown: given, the calendar follows it; `onViewChange` says when a person changes it. */
@@ -40,10 +43,6 @@ export interface DzCalendarProps extends DzCalendarOptions {
   readonly initial?: DzCalendarDefaults;
   /** Made at creation, not changed after (`DzCalendarProvider`'s `motion` makes one per calendar). */
   readonly motion?: MotionAdapter;
-  /** Each event's content, drawn by the application's components (in its tree: its context, state and router reach them). */
-  readonly renderEventContent?: (event: CalEvent, ctx: EventContentCtx) => ReactNode;
-  /** Each day's head (a week's or a day's date, a month's weekday), by the application's components: a mark, a count, a button. */
-  readonly renderDayHeader?: (day: DayHeaderCtx) => ReactNode;
   readonly onDateClick?: (click: DateClick) => void;
   /** A free slot clicked (or Enter on it): the slot as given. Book it; the server checks it again. */
   readonly onSlotClick?: (slot: AvailableSlot) => void;
@@ -81,12 +80,15 @@ function defined(o: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 }
 
-/** One event's content: where it goes, what it shows. */
-interface Portal {
-  readonly key: string;
-  readonly span: HTMLElement;
-  event: CalEvent;
-  ctx: EventContentCtx;
+/** What a template draws for an element (undefined: no template for it now). */
+function drawOf(p: DzCalendarProps, element: string, ctx: unknown): ReactNode | undefined {
+  if (element === 'event') return p.renderEventContent ? p.renderEventContent((ctx as EventContentCtx).instance.event, ctx as EventContentCtx) : undefined;
+  if (element.startsWith('header:')) {
+    const item = p.headerItems?.[element.slice(7)];
+    return item === undefined ? undefined : typeof item === 'function' ? (item as (c: HeaderItemCtx) => ReactNode)(ctx as HeaderItemCtx) : item;
+  }
+  const render = p[TEMPLATES[element as TemplateElement]] as ((c: unknown) => ReactNode) | undefined;
+  return render ? render(ctx) : undefined;
 }
 
 function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
@@ -99,8 +101,7 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
   const latest = useRef(props);
   latest.current = props;
 
-  // ── event content: one portal per event node, rendered in this component's tree ──
-  const portals = useRef(new Map<HTMLElement, Portal>());
+  // ── templates: one portal per drawn node, rendered in this component's tree ──
   const [, bump] = useReducer((n: number) => n + 1, 0);
   const queued = useRef(false);
   /**
@@ -122,59 +123,34 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
     });
   };
   const seq = useRef(0);
-  const rendering = Boolean(props.renderEventContent);
-  const heading = Boolean(props.renderDayHeader);
-  const dayPortals = useRef(new Map<HTMLElement, { readonly key: string; readonly span: HTMLElement; day: DayHeaderCtx }>());
-  /** One hooks object while there is a renderer: `update()` compares hooks member by member. */
-  const hooks = useMemo(
-    (): CalendarHooks => ({
-      ...(heading && {
-        dayHeader: {
-          content: (day: DayHeaderCtx, el: HTMLElement) => {
-            let p = dayPortals.current.get(el);
-            if (!p) {
-              const span = el.ownerDocument.createElement('span');
-              span.className = 'dz-dayhead__content';
-              p = { key: `d${seq.current++}`, span, day };
-              dayPortals.current.set(el, p);
-            } else p.day = day;
-            refresh();
-            return p.span;
-          },
-          willUnmount: ({ el }: { el: HTMLElement }) => {
-            if (dayPortals.current.delete(el)) refresh();
-          },
+  /** Each element's templates: the node it is drawn for → its span and what it is told. */
+  const portals = useRef(new Map<string, Map<HTMLElement, Portal>>());
+  const source = useMemo(() => sourceOf(latest), []);
+  const shape = templateShape(source);
+  /** One set of hooks while the shape stays: `update()` compares them member by member. */
+  const built = useMemo(
+    () =>
+      templateHooks(
+        source,
+        (element, el, ctx) => {
+          let of = portals.current.get(element);
+          if (!of) portals.current.set(element, (of = new Map()));
+          let p = of.get(el);
+          if (!p) {
+            const span = el.ownerDocument.createElement('span');
+            span.className = templateClass(element);
+            p = { key: `t${seq.current++}`, span, ctx };
+            of.set(el, p);
+          } else p.ctx = ctx;
+          refresh();
+          return p.span;
         },
-      }),
-      ...(rendering && {
-            event: {
-              content: (ctx: EventContentCtx, el: HTMLElement) => {
-                // A background is drawn only when the application gives it something: asked now, not after the portal renders.
-                if (ctx.background) {
-                  const out = latest.current.renderEventContent?.(ctx.instance.event, ctx);
-                  if (out === null || out === undefined || out === false) return null;
-                }
-                let p = portals.current.get(el);
-                if (!p) {
-                  const span = el.ownerDocument.createElement('span');
-                  span.className = 'dz-ev__content';
-                  p = { key: `e${seq.current++}`, span, event: ctx.instance.event, ctx };
-                  portals.current.set(el, p);
-                } else {
-                  p.event = ctx.instance.event;
-                  p.ctx = ctx;
-                }
-                refresh();
-                return p.span;
-              },
-              willUnmount: ({ el }: { el: HTMLElement }) => {
-                if (portals.current.delete(el)) refresh();
-              },
-            },
-      }),
-    }),
+        (element, el) => {
+          if (portals.current.get(element)?.delete(el)) refresh();
+        },
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rendering, heading],
+    [shape],
   );
 
   // ── the options: what changed since the last render goes to the calendar ──
@@ -186,7 +162,8 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
     else if (!NOT_OPTIONS.has(k)) settings[k] = v;
   }
   if (props.axis) settings['timeGrid'] = { ...props.timeGrid, axis: props.axis };
-  settings['hooks'] = hooks;
+  settings['hooks'] = built.hooks;
+  settings['headerItems'] = built.headerItems;
   const sent = useRef<Record<string, unknown>>({});
   const refused = useRef<{ view?: string; date?: PlainDate }>({});
   const reported = useRef<{ view?: string; date?: PlainDate; selection?: Selection | null; problems?: NormalizationReport | null }>({});
@@ -355,7 +332,6 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
       cal.current = null;
       c.destroy();
       portals.current.clear();
-      dayPortals.current.clear();
       ctl.current.onReoffer(null);
       ctl.current.detach(c);
     };
@@ -378,10 +354,7 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
     if (changes['date'] !== undefined) reported.current.date = changes['date'] as PlainDate;
     // Everything seen is recorded — a view or date dropped above as no change too, or the parent setting it back later would look like nothing.
     for (const [k, v] of Object.entries(settings)) if (v !== undefined) sent.current[k] = v;
-    if ('hooks' in changes) {
-      portals.current.clear();
-      dayPortals.current.clear();
-    }
+    // Other hooks: nothing is dropped here — an element whose hooks changed is let go by the calendar (its willUnmount releases its portal); the others keep theirs.
     if (offered !== lastOffered.current) {
       lastOffered.current = offered;
       Object.assign(changes, offers());
@@ -415,21 +388,19 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
     controller,
   }), [controller]);
 
-  const draw = props.renderEventContent;
-  const drawDay = props.renderDayHeader;
+  // Every template's portals, in this component's tree: they see this calendar's controller (`useParentCalendarController()`).
+  const drawn: ReactNode[] = [];
+  for (const [element, of] of portals.current) {
+    for (const p of of.values()) {
+      const out = drawOf(props, element, p.ctx);
+      if (out !== undefined) drawn.push(createPortal(out, p.span, p.key));
+    }
+  }
   return h(
     Fragment,
     null,
     h('div', { ...attributes, ref: host, className: props.className, style: props.style, id: props.id }),
-    // The events' content sees this calendar's controller (`useParentCalendarController()`).
-    draw || drawDay
-      ? h(
-          CalendarControllerContext.Provider,
-          { value: controller },
-          draw ? [...portals.current.values()].map((p) => createPortal(draw(p.event, p.ctx), p.span, p.key)) : null,
-          drawDay ? [...dayPortals.current.values()].map((p) => createPortal(drawDay(p.day), p.span, p.key)) : null,
-        )
-      : null,
+    drawn.length > 0 ? h(CalendarControllerContext.Provider, { value: controller }, drawn) : null,
   );
 }
 

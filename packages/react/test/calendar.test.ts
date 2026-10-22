@@ -1,12 +1,14 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { StrictMode, act, createContext, createElement as h, useContext, useState } from 'react';
+import { StrictMode, act, createContext, createElement as h, createRef, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { Temporal } from '@dzcalendar/core';
-import type { EventInput } from '@dzcalendar/core';
+import type { EventInput, PlainDate } from '@dzcalendar/core';
 import { CalendarController, DzCalendar, DzCalendarProvider, useCalendarController, useCalendarState, useParentCalendarController } from '../src/index.js';
 import { same } from '../src/same.js';
+import '@dzcalendar/dom/list';
+import '@dzcalendar/dom/multimonth';
 import type { DzCalendarHandle, DzCalendarProps } from '../src/index.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -285,5 +287,205 @@ describe('after Sehhaty’s test (React)', () => {
     await act(async () => render(h(App)));
     const labels = [...el.querySelectorAll('.dz-tg__col .dz-ev--bg')].map((b) => b.textContent ?? '').sort();
     expect([el.querySelector('.dz-tg__dayhead .mark')?.textContent, labels]).toEqual(['Fermé · ven. 23', ['', 'Vacances', 'Vacances']]);
+  });
+});
+
+describe('templates for every element (18f-2)', () => {
+  it('renderSlotLabel, renderAllDayLabel, renderNowIndicator: the application’s components in their place, in its tree', async () => {
+    const Ctx = createContext('');
+    function App() {
+      return h(
+        Ctx.Provider,
+        { value: 'ctx' },
+        h(DzCalendar, {
+          ...base,
+          renderSlotLabel: (s) => (s.time.hour === 9 && s.time.minute === 0 ? h(Label, { text: s.text }) : s.text),
+          renderAllDayLabel: () => h('i', null, 'Journée entière'),
+          renderNowIndicator: (n) => h('span', { className: 'now' }, n.now.toPlainTime().toString().slice(0, 5)),
+        }),
+      );
+    }
+    function Label({ text }: { text: string }) {
+      return h('b', null, `${text} ${useContext(Ctx)}`);
+    }
+    await act(async () => render(h(App)));
+    expect([el.querySelector('.dz-tick b')?.textContent, el.querySelector('.dz-tg__allday-label i')?.textContent, el.querySelector('.dz-now .now')?.textContent]).toEqual(['09:00 ctx', 'Journée entière', '10:00']);
+  });
+
+  it('renderDayCell in a month: in place of the number, the events kept; hooks merged give the classes', async () => {
+    await act(async () =>
+      render(
+        h(DzCalendar, {
+          ...base,
+          defaultView: 'dayGridMonth',
+          renderDayCell: (c) => h('em', null, `j${c.date.day}`),
+          hooks: { dayCell: { class: (c) => (c.outside ? 'muted' : null) } },
+        }),
+      ),
+    );
+    const cell = el.querySelector('.dz-dg__cell[data-date="2026-10-21"]')!;
+    // 28 September opens October's grid: a day of another month.
+    expect([cell.querySelector('.dz-dg__num em')?.textContent, cell.querySelectorAll('.dz-dg__item').length, el.querySelector('.dz-dg__cell[data-date="2026-09-28"]')?.classList.contains('muted')]).toEqual(['j21', 1, true]);
+  });
+
+  it('headerItems: a node in its named place; a re-render with new closures neither redraws nor remounts', async () => {
+    const mounts: string[] = [];
+    let set!: (n: number) => void;
+    function App() {
+      const [n, setN] = useState(0);
+      set = setN;
+      return h(DzCalendar, {
+        ...base,
+        headerToolbar: { start: 'title', end: 'filter' },
+        headerItems: { filter: h('select', { 'aria-label': 'Médecin' }, h('option', null, `Tous ${n}`)) },
+        hooks: { dayLane: { didMount: () => void mounts.push('lane'), class: () => `n${n}` } },
+      });
+    }
+    await act(async () => render(h(App)));
+    const first = mounts.length;
+    const select = el.querySelector('.dz-toolbar__item select');
+    await act(async () => set(1));
+    expect([select?.textContent, el.querySelector('.dz-toolbar__item select') === select, mounts.length, first]).toEqual(['Tous 1', true, first, 7]);
+  });
+});
+
+describe('templates for every element, the rest (after the 18f-2 review)', () => {
+  it('renderMoreLink, renderWeekNumber in a month; renderMonthHeader in a year', async () => {
+    const four = ['a', 'b', 'c', 'd'].map((id) => ({ id, title: id, start: '2026-10-21', allDay: true }));
+    function App({ view }: { view: string }) {
+      return h(DzCalendar, {
+        ...base,
+        events: four,
+        view,
+        dayMaxLanes: 2,
+        weekNumbers: true,
+        renderMoreLink: (m) => h('b', { className: 'more' }, `et ${m.count}`),
+        renderWeekNumber: (w) => h('i', { className: 'wk' }, `S${w.week}`),
+        renderMonthHeader: (m) => h('u', { className: 'mh' }, String(m.month).slice(0, 7)),
+      });
+    }
+    await act(async () => render(h(App, { view: 'dayGridMonth' })));
+    const month = [el.querySelector('.more')?.textContent?.startsWith('et '), [...el.querySelectorAll('.wk')].map((w) => w.textContent).includes('S43')];
+    await act(async () => root!.render(h(App, { view: 'multiMonthYear' })));
+    expect([...month, el.querySelectorAll('.mh').length, el.querySelector('.mh')?.textContent]).toEqual([true, true, 12, '2026-01']);
+  });
+
+  it('renderNoEvents and renderListDayHeader in a list', async () => {
+    function App({ list }: { list: EventInput[] }) {
+      return h(DzCalendar, {
+        ...base,
+        defaultView: 'listWeek',
+        events: list,
+        renderNoEvents: () => h('p', { className: 'none' }, 'Rien cette semaine'),
+        renderListDayHeader: (dd) => h('b', { className: 'day' }, `${dd.date} ${dd.lengthMinutes}`),
+      });
+    }
+    await act(async () => render(h(App, { list: [] })));
+    const none = el.querySelector('.none')?.textContent;
+    await act(async () => root!.render(h(App, { list: [{ id: 's', title: 'S', start: '2026-10-25T10:00[Europe/Paris]', duration: { hours: 1 } }] })));
+    // Sunday 25 October in Paris: the clocks fall back, 1 500 minutes.
+    expect([none, el.querySelector('.day')?.textContent, el.querySelector('.none')]).toEqual(['Rien cette semaine', '2026-10-25 1500', null]);
+  });
+
+  it('renderResource and renderResourceGroupHeader in resource columns', async () => {
+    await act(async () =>
+      render(
+        h(DzCalendar, {
+          ...base,
+          defaultView: 'resourceTimeGridDay',
+          resources: [
+            { id: 'a', title: 'Dre A', service: 'Médecine' },
+            { id: 'b', title: 'Dr B', service: 'Chirurgie' },
+          ],
+          resourceGroupField: 'service',
+          renderResource: (r) => h('b', { className: 'who' }, r.resource.title.toUpperCase()),
+          renderResourceGroupHeader: (g) => h('i', { className: 'grp' }, g.value),
+        }),
+      ),
+    );
+    expect([[...el.querySelectorAll('.who')].map((x) => x.textContent), [...el.querySelectorAll('.grp')].map((x) => x.textContent).sort()]).toEqual([['DRE A', 'DR B'], ['Chirurgie', 'Médecine']]);
+  });
+
+  it('a template taken away leaves no portal; unmounting leaves none either', async () => {
+    function App({ on }: { on: boolean }) {
+      return h(DzCalendar, { ...base, ...(on && { renderSlotLabel: (s: { text: string }) => h('b', { className: 'lbl' }, s.text) }) });
+    }
+    await act(async () => render(h(App, { on: true })));
+    const first = el.querySelectorAll('.lbl').length;
+    await act(async () => root!.render(h(App, { on: false })));
+    const after = [el.querySelectorAll('.lbl').length, el.querySelectorAll('.dz-tpl--slotLabel').length];
+    await act(async () => root!.render(h(App, { on: true })));
+    const again = el.querySelectorAll('.lbl').length;
+    await act(async () => root!.unmount());
+    root = null;
+    expect([first > 20, after, again, el.querySelectorAll('.lbl').length]).toEqual([true, [0, 0], first, 0]);
+  });
+});
+
+describe('header places stay (after the 18f-2 review)', () => {
+  it('a template toggled elsewhere neither remounts the header place nor replaces its node', async () => {
+    let mounts = 0;
+    function Filter() {
+      useState(() => void mounts++);
+      return h('select', { 'aria-label': 'Médecin' }, h('option', null, 'Tous'));
+    }
+    function App({ cells }: { cells: boolean }) {
+      return h(DzCalendar, {
+        ...base,
+        headerToolbar: { start: 'title', end: 'filter' },
+        headerItems: { filter: h(Filter) },
+        ...(cells && { renderSlotLabel: (s: { text: string }) => s.text }),
+      });
+    }
+    await act(async () => render(h(App, { cells: false })));
+    const select = el.querySelector('.dz-toolbar__item select');
+    await act(async () => root!.render(h(App, { cells: true })));
+    expect([el.querySelector('.dz-toolbar__item select') === select, mounts]).toEqual([true, 1]);
+  });
+});
+
+describe('after the 18f-2 execution review', () => {
+  it('a day cell’s component is not kept alive after its month: 10 navigations leave as many as are shown', async () => {
+    let alive = 0;
+    function Cell({ day }: { day: number }) {
+      useEffect(() => {
+        alive++;
+        return () => void alive--;
+      }, []);
+      return h('em', null, day);
+    }
+    let set!: (dd: PlainDate) => void;
+    function App() {
+      const [date, setDate] = useState(d('2026-10-21'));
+      set = setDate;
+      return h(DzCalendar, { ...base, defaultView: 'dayGridMonth', date, renderDayCell: (c) => h(Cell, { day: c.date.day }) });
+    }
+    await act(async () => render(h(App)));
+    for (let i = 1; i <= 10; i++) await act(async () => set(d('2026-10-01').add({ months: i })));
+    expect(alive).toBe(el.querySelectorAll('.dz-dg__cell').length);
+  });
+
+  it('a focused control in a header place keeps the focus across navigations', async () => {
+    const ref = createRef<{ next(): void } & DzCalendarHandle>();
+    await act(async () => render(h(DzCalendar, { ...base, ref, headerToolbar: { start: 'title', end: 'filter' }, headerItems: { filter: h('select', { id: 'sel' }, h('option', null, 'a')) } })));
+    el.querySelector<HTMLSelectElement>('#sel')!.focus();
+    await act(async () => ref.current!.instance!.navigate('next'));
+    expect(document.activeElement?.id).toBe('sel');
+  });
+
+  it('another element’s class words changed: the day cells are not mounted again', async () => {
+    let mounts = 0;
+    function App({ word }: { word: string }) {
+      return h(DzCalendar, { ...base, defaultView: 'dayGridMonth', hooks: { dayCell: { didMount: () => void mounts++ }, weekNumber: { class: word } }, weekNumbers: true });
+    }
+    await act(async () => render(h(App, { word: 'a' })));
+    const first = mounts;
+    await act(async () => root!.render(h(App, { word: 'b' })));
+    expect([first > 0, mounts]).toEqual([true, first]);
+  });
+
+  it('labels the application fills are read: the gutter is no longer hidden', async () => {
+    await act(async () => render(h(DzCalendar, { ...base, renderSlotLabel: (s) => h('b', { className: 'my' }, s.text) })));
+    expect(el.querySelector('.my')?.closest('[aria-hidden="true"]')).toBeNull();
   });
 });

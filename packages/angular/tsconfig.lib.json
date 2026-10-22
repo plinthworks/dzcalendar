@@ -11,6 +11,7 @@
     "paths": {
       "@dzcalendar/core": ["../core/dist/index.d.ts"],
       "@dzcalendar/dom": ["../dom/dist/index.d.ts"],
+      "@dzcalendar/dom/toolkit": ["../dom/dist/toolkit.d.ts"],
       "@dzcalendar/ical": ["../ical/dist/index.d.ts"],
       "@dzcalendar/compat-fullcalendar": ["../compat-fullcalendar/dist/index.d.ts"]
     },

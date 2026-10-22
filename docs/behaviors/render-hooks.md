@@ -75,6 +75,21 @@ for a day that did not exist). `text` is what the calendar would write.
 - An element the calendar keeps and uses again (the "+N" panel) loses the
   application's classes when it is let go.
 
+## In a framework (React, Vue, Angular)
+
+- A template draws an element's content; the `hooks` prop / input gives
+  the rest (classes, mounts) and is merged with it. Where a template exists,
+  a `hooks.<element>.content` is not used.
+- The calendar's hooks are made again only when their shape changes: a
+  template added or taken away, a member of `hooks` added or removed, a
+  class given as words changed. New closures at each render redraw nothing
+  — a function in `hooks` is read when its element is drawn again (a
+  navigation, a change of its data). For a class that must follow the
+  application's state at once, give it as words: `class: busy ? 'busy' :
+  ''` is re-read at each render.
+- `hooks` and `headerItems` are each calendar's own: not in a provider's or
+  plugin's defaults.
+
 ## The other library's names (`@dzcalendar/compat-fullcalendar`)
 
 `<name>ClassNames`, `<name>Content`, `<name>DidMount`, `<name>WillUnmount`

@@ -9,6 +9,7 @@
   "pro (without core, dom)": 14525,
   "pro/editor (without core, dom, tzslot dom)": 10600,
   "pro/slots (without core, slots)": 1740,
+  "dom/templates (without core)": 1017,
   "dom/list (without dom)": 5007,
   "dom/multimonth (without dom)": 3000,
   "dom/custom (without dom)": 1500,
@@ -25,8 +26,8 @@
   "pro/print (without core, dom)": 4400,
   "element (without core, dom)": 3000,
   "compat-fullcalendar (without core, dom, ical)": 9623,
-  "react (without React, core, dom)": 3550,
-  "vue (without Vue, core, dom)": 3750,
+  "react (without React, core, dom)": 3819,
+  "vue (without Vue, core, dom)": 4010,
   "pro-react (without React, core, dom, pro)": 760,
   "pro-vue (without Vue, core, dom, pro)": 700
 }

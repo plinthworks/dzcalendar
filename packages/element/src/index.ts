@@ -64,7 +64,7 @@ const Base = (typeof HTMLElement === 'undefined' ? class {} : HTMLElement) as ty
  * it in place — events, edits and the undo history stay. Any other key makes
  * the calendar again (on its store: events and edits kept), with `dz-remade`.
  */
-const LIVE = new Set(['messages', 'locale', 'timeZone', 'motion', 'hooks', 'businessHours', 'availableSlots', 'hiddenDays', 'resourceOrder', 'resourceGroupField', 'showUnassigned', 'timeline', 'collapsedResources', 'collapsedGroups', 'timeGrid', 'weekends', 'weekNumbers', 'multiMonthMaxColumns', 'headerViews', 'headerToolbar', 'customButtons', 'theme', 'scheme', 'density', 'displayCalendar', 'secondaryCalendar', 'viewOptions', 'editable', 'contextMenu', 'snapMinutes', 'selectable', 'chooseScope', 'dragEdgeNavigate', 'eventResizableFromStart', 'keyboardUndo']);
+const LIVE = new Set(['messages', 'locale', 'timeZone', 'motion', 'hooks', 'businessHours', 'availableSlots', 'hiddenDays', 'resourceOrder', 'resourceGroupField', 'showUnassigned', 'timeline', 'collapsedResources', 'collapsedGroups', 'timeGrid', 'weekends', 'weekNumbers', 'multiMonthMaxColumns', 'headerViews', 'headerToolbar', 'customButtons', 'headerItems', 'theme', 'scheme', 'density', 'displayCalendar', 'secondaryCalendar', 'viewOptions', 'editable', 'contextMenu', 'snapMinutes', 'selectable', 'chooseScope', 'dragEdgeNavigate', 'eventResizableFromStart', 'keyboardUndo']);
 
 /**
  * The callbacks whose presence changes what the calendar offers ("Open" in

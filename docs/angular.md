@@ -83,6 +83,18 @@ tint); `<ng-template dzDayHeader let-day>` for each day's head (`day.date`,
 `day.text`, the calendar's own words). Both are your components, in your
 injector, checked when your signals change.
 
+The same for every element with a content, `let-ctx` (its context,
+docs/behaviors/render-hooks.md): `dzDayCell`, `dzSlotLabel`,
+`dzAllDayLabel`, `dzMoreLink`, `dzNowIndicator`, `dzWeekNumber`,
+`dzNoEvents`, `dzListDayHeader`, `dzMonthHeader`, `dzResource`,
+`dzResourceGroupHeader`, `dzResourceAreaHeader` (all in `DZ_CALENDAR`).
+`<ng-template dzHeaderItem="filter" let-ctx>` is your place in the header,
+named in `headerToolbar` (`[options]="{ headerToolbar: { end: 'filter
+timeGridWeek' } }"`); `customButtons` for plain buttons. `[hooks]` gives
+classes and mounts for any element (the holders — a day's column, a
+timeline row — too), merged with the templates: the template gives the
+content, `hooks` the rest.
+
 **The controller** (`#cal` then `cal.controller`, or `inject(CalendarController)`
 in a child): signals `state`, `title`, `range`, `view`, `date`, `canUndo`,
 `canRedo`, `loading`, `problems`, `instance`; methods `prev`, `next`,

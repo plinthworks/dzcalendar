@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createApp, defineComponent, h, inject, nextTick, provide, ref, shallowRef } from 'vue';
 import type { App } from 'vue';
 import { Temporal } from '@dzcalendar/core';
-import type { EventInput, PlainDate } from '@dzcalendar/core';
+import type { EventInput, PlainDate, PlainTime, ZonedDateTime } from '@dzcalendar/core';
 import { DzCalendar, DzCalendarPlugin, createCalendarController, injectCalendarController } from '../src/index.js';
 import type { CalendarController } from '../src/index.js';
 
@@ -201,5 +201,50 @@ describe('after Sehhaty’s test (Vue)', () => {
     await nextTick();
     const labels = [...el.querySelectorAll('.dz-tg__col .dz-ev--bg')].map((b) => b.textContent ?? '').sort();
     expect([el.querySelector('.dz-tg__dayhead .mark')?.textContent, labels]).toEqual(['Fermé · ven. 23', ['', 'Vacances', 'Vacances']]);
+  });
+});
+
+describe('slots for every element (18f-2, Vue)', () => {
+  it('#slot-label, #all-day-label, #now-indicator: the application’s nodes in their place, its provides reach them', async () => {
+    const Label = defineComponent({ props: { text: String }, setup: (p) => () => h('b', `${p.text} ${inject('who', '')}`) });
+    await mount(
+      defineComponent({
+        setup: () => {
+          provide('who', 'ctx');
+          return () =>
+            h(DzCalendar, { ...base }, {
+              'slot-label': ({ ctx }: { ctx: { time: PlainTime; text: string } }) => (ctx.time.hour === 9 && ctx.time.minute === 0 ? [h(Label, { text: ctx.text })] : [ctx.text as never]),
+              'all-day-label': () => [h('i', 'Journée entière')],
+              'now-indicator': ({ ctx }: { ctx: { now: ZonedDateTime } }) => [h('span', { class: 'now' }, ctx.now.toPlainTime().toString().slice(0, 5))],
+            });
+        },
+      }),
+    );
+    await nextTick();
+    expect([el.querySelector('.dz-tick b')?.textContent, el.querySelector('.dz-tg__allday-label i')?.textContent, el.querySelector('.dz-now .now')?.textContent]).toEqual(['09:00 ctx', 'Journée entière', '10:00']);
+  });
+
+  it('#day-cell in a month, :hooks merged give the classes; #header-item-filter in its named place', async () => {
+    await mount(
+      defineComponent({
+        setup: () => () =>
+          h(
+            DzCalendar,
+            { ...base, view: 'dayGridMonth', options: { headerToolbar: { start: 'title', end: 'filter' } }, hooks: { dayCell: { class: (c: { outside: boolean }) => (c.outside ? 'muted' : null) } } },
+            {
+              'day-cell': ({ ctx }: { ctx: { date: PlainDate } }) => [h('em', `j${ctx.date.day}`)],
+              'header-item-filter': ({ ctx }: { ctx: { name: string } }) => [h('select', { 'aria-label': 'Médecin' }, [h('option', `Tous (${ctx.name})`)])],
+            },
+          ),
+      }),
+    );
+    await nextTick();
+    const cell = el.querySelector('.dz-dg__cell[data-date="2026-10-21"]')!;
+    expect([
+      cell.querySelector('.dz-dg__num em')?.textContent,
+      cell.querySelectorAll('.dz-dg__item').length,
+      el.querySelector('.dz-dg__cell[data-date="2026-09-28"]')?.classList.contains('muted'),
+      el.querySelector('.dz-toolbar__item select option')?.textContent,
+    ]).toEqual(['j21', 1, true, 'Tous (filter)']);
   });
 });

@@ -166,3 +166,51 @@ describe('after the 18f-1b review', () => {
     }
   });
 });
+
+describe('the application’s places in the header (headerItems)', () => {
+  it('content in its place, mounted in the page, told the view and title when they change; let go when its name leaves the layout', () => {
+    const log: string[] = [];
+    const c = make({
+      headerToolbar: { start: 'title', end: 'filter next' },
+      headerItems: {
+        filter: {
+          class: 'mine',
+          content: (x: { name: string; title: string }) => (log.push(`draw ${x.title}`), `Filtre (${x.name})`),
+          didMount: ({ el }: { el: HTMLElement }) => void log.push(`in ${el.isConnected}`),
+          willUnmount: () => void log.push('out'),
+        },
+      },
+    });
+    const place = () => c.element.querySelector<HTMLElement>('.dz-toolbar__item[data-item="filter"]');
+    const first = [place()?.textContent, place()?.classList.contains('mine')];
+    const titles = [c.kernel.getState().title];
+    const node = place();
+    c.update({ timeZone: 'Europe/Paris' });
+    const kept = place() === node;
+    c.navigate('next');
+    titles.push(c.kernel.getState().title);
+    c.update({ headerToolbar: { start: 'title' } });
+    expect([first, kept, place()]).toEqual([['Filtre (filter)', true], true, null]);
+    // The week's title, then the next week's (as the header writes them).
+    expect(log).toEqual([`draw ${titles[0]}`, 'in true', `draw ${titles[1]}`, 'out']);
+  });
+
+  it('let go when the calendar goes', () => {
+    const log: string[] = [];
+    const c = make({ headerToolbar: { end: 'x' }, headerItems: { x: { content: () => 'X', willUnmount: () => void log.push('out') } } });
+    c.destroy();
+    cal = null;
+    expect(log).toEqual(['out']);
+  });
+});
+
+describe('after the 18f-2 execution review (DOM)', () => {
+  it('a header place returning the same node keeps a focused control focused across navigations', () => {
+    const select = document.createElement('select');
+    const c = make({ headerToolbar: { start: 'title', end: 'f' }, headerItems: { f: { content: () => select } } });
+    select.focus();
+    c.navigate('next');
+    c.update({ view: 'dayGridMonth' });
+    expect(document.activeElement).toBe(select);
+  });
+});

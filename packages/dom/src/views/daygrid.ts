@@ -182,8 +182,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       // What is drawn across the days is seen, not read: each cell lists its own events.
       const barsHost = contentsHost(doc, 'dz-dg__bars');
       barsHost.setAttribute('aria-hidden', 'true');
+      // Each "+N" is hidden link by link (below): one the application fills is read.
       const more = contentsHost(doc, 'dz-dg__mores');
-      more.setAttribute('aria-hidden', 'true');
       el.append(cells, barsHost, more);
       const p: WeekParts = {
         week: null,
@@ -430,7 +430,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     link.style.setProperty('--col', String(m.col));
     link.style.setProperty('--lane', String(m.lane));
     link.setAttribute('aria-label', ctx.messages.moreLabel({ count: m.count, date: formatTemporal(m.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale) }));
-    decorate(ctx, ctx.hooks.moreLink, link, { view: state?.view.type ?? '', date: m.date, resource: m.resource, count: m.count, text: link.textContent ?? '' });
+    link.setAttribute('aria-hidden', 'true');
+    decorate(ctx, ctx.hooks.moreLink, link, { view: state?.view.type ?? '', date: m.date, resource: m.resource, count: m.count, text: link.textContent ?? '' }, undefined, true);
   }
 
   function piecesOf(bar: DayGridBar): BarItem[] {
@@ -488,7 +489,9 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       const resource = c.resourceId !== undefined ? (ctx.kernel.getResources().byId.get(c.resourceId)?.resource ?? null) : null;
       const dayCtx = { view: state?.view.type ?? '', date: c.date, resource, today: c.today, outside: c.outside, lengthMinutes: dayInfo(c.date, ctx.zone).lengthMinutes, text: num.textContent ?? '' };
       decorate(ctx, holder(cellHooks), cell, dayCtx);
-      if (cellHooks.content) decorate(ctx, { content: cellHooks.content }, num, dayCtx);
+      // The content is the cell's (its `el`): kept by the cell across its number drawn anew, let go with the cell.
+      const content = cellHooks.content;
+      if (content) decorate(ctx, { content: (c) => content(c, cell) }, num, dayCtx);
     } else decorate(ctx, undefined, cell, null);
     let items = itemLists.get(cell);
     if (!items) {

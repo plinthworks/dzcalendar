@@ -95,6 +95,8 @@ void [LIST_CSS, MULTIMONTH_CSS, buildListModel, parseICal, findSlots, CalendarCo
     <h1>{{ cal.controller.title() }}</h1>
     <dz-calendar #cal dzEventEditor [events]="events()" [(view)]="view" [(date)]="date" [(selection)]="selection" [editable]="true" [options]="options">
       <ng-template dzEventContent let-event="event" let-ctx="ctx"><b>{{ event.title }}</b> {{ ctx.timeText }}</ng-template>
+      <ng-template dzDayCell let-ctx><em>{{ ctx.date.day }}</em></ng-template>
+      <ng-template dzHeaderItem="filter" let-ctx><span>{{ ctx.title }}</span></ng-template>
     </dz-calendar>\`,
 })
 class App {
@@ -102,7 +104,7 @@ class App {
   readonly view = signal<string | undefined>('listWeek');
   readonly date = signal<PlainDate | undefined>(Temporal.PlainDate.from('2026-10-21'));
   readonly selection = signal<Selection | null>(null);
-  readonly options: DzCalendarOptions = { headerViews: ['listWeek', 'agenda', 'multiMonthYear', 'resourceTimelineDay'], weekNumbers: true, resources: [{ id: 'r', title: 'Salle' }], viewOptions: { timeline: { areaColumns: [{ field: 'title' }] } } };
+  readonly options: DzCalendarOptions = { headerToolbar: { start: 'prev,next today', center: 'title', end: 'filter reload listWeek,agenda,multiMonthYear,resourceTimelineDay' }, customButtons: { reload: { text: 'Recharger', click: () => undefined } }, weekNumbers: true, resources: [{ id: 'r', title: 'Salle' }], viewOptions: { timeline: { areaColumns: [{ field: 'title' }] } } };
 }
 
 // Angular 19 names it experimental; 20.2 and later, stable.
@@ -331,6 +333,10 @@ function App() {
         events={events}
         initial={{ firstDay: 1 }}
         renderEventContent={(event) => <Badge event={event} />}
+        renderDayCell={(day) => <em>{day.date.day}</em>}
+        headerToolbar={{ start: 'title', end: 'filter' }}
+        headerItems={{ filter: (ctx) => <span>{ctx.view}</span> }}
+        hooks={{ dayCell: { class: (day) => (day.outside ? 'muted' : null) } }}
         onEventClick={(i) => console.log(i.event.id)}
         onProblems={(r) => console.log(r.problems.length)}
       />
@@ -391,11 +397,19 @@ const exports = useDzExport(cal);
     editable
     :events="events"
     :initial="{ firstDay: 1 }"
+    :options="{ headerToolbar: { start: 'title', end: 'filter' } }"
+    :hooks="{ dayCell: { class: 'cell' } }"
     @event-click="(i) => console.log(i.event.id)"
     @problems="(r) => console.log(r.problems.length)"
   >
     <template #event-content="{ event }">
       <b>{{ event.title }}</b>
+    </template>
+    <template #day-cell="{ ctx }">
+      <em>{{ ctx.date.day }}</em>
+    </template>
+    <template #header-item-filter="{ ctx }">
+      <span>{{ ctx.view }}</span>
     </template>
   </DzCalendar>
 </template>

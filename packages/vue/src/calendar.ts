@@ -18,7 +18,33 @@ import type {
   ZoneId,
 } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DayHeaderCtx, DzMessages, EventChange, EventContentCtx, MotionAdapter } from '@dzcalendar/dom';
+import type {
+  AllDayLabelCtx,
+  CalendarHooks,
+  CalendarInstance,
+  CalendarOptions,
+  CalendarUpdate,
+  DateClick,
+  DayCellCtx,
+  DayHeaderCtx,
+  DzMessages,
+  EventChange,
+  EventContentCtx,
+  HeaderItemCtx,
+  ListDayHeaderCtx,
+  MonthHeaderCtx,
+  MoreLinkCtx,
+  MotionAdapter,
+  NoEventsCtx,
+  NowIndicatorCtx,
+  ResourceAreaHeaderCtx,
+  ResourceContentCtx,
+  ResourceGroupCtx,
+  SlotLabelCtx,
+  WeekNumberCtx,
+} from '@dzcalendar/dom';
+import { templateClass, templateHooks, templateShape } from '@dzcalendar/dom/toolkit';
+import type { TemplateElement, TemplateSource } from '@dzcalendar/dom/toolkit';
 import { CALENDAR_CONTROLLER, createCalendarController, writesOf } from './controller.js';
 import type { CalendarController } from './controller.js';
 import { DZ_CALENDAR_SETTLED } from './plugin.js';
@@ -29,11 +55,49 @@ import { same } from './same.js';
 const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange'] as const;
 
 /** What `options` takes: what `update()` takes, less what has a prop or an event of its own. */
-export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | 'motion' | (typeof OWN_CALLBACKS)[number]>;
+export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | 'headerItems' | 'motion' | (typeof OWN_CALLBACKS)[number]>;
 
 /** What the `#day-header` slot receives: the day (its date, resource, length, the calendar's words). */
 export interface DayHeaderSlotProps {
   readonly day: DayHeaderCtx;
+  readonly ctx: DayHeaderCtx;
+}
+
+/** Each element with a content and its slot (docs/behaviors/render-hooks.md); a header place is `#header-item-<name>`. */
+export const SLOTS: Record<TemplateElement, string> = {
+  event: 'event-content',
+  dayHeader: 'day-header',
+  dayCell: 'day-cell',
+  slotLabel: 'slot-label',
+  allDayLabel: 'all-day-label',
+  moreLink: 'more-link',
+  nowIndicator: 'now-indicator',
+  weekNumber: 'week-number',
+  noEvents: 'no-events',
+  listDayHeader: 'list-day-header',
+  monthHeader: 'month-header',
+  resource: 'resource',
+  resourceGroupHeader: 'resource-group-header',
+  resourceAreaHeader: 'resource-area-header',
+};
+
+/** The slots, each with what it receives (`{ ctx }` for those added in 18f-2). */
+export interface DzCalendarSlots {
+  'event-content'?: (props: EventContentSlotProps) => VNode[];
+  'day-header'?: (props: DayHeaderSlotProps) => VNode[];
+  'day-cell'?: (props: { readonly ctx: DayCellCtx }) => VNode[];
+  'slot-label'?: (props: { readonly ctx: SlotLabelCtx }) => VNode[];
+  'all-day-label'?: (props: { readonly ctx: AllDayLabelCtx }) => VNode[];
+  'more-link'?: (props: { readonly ctx: MoreLinkCtx }) => VNode[];
+  'now-indicator'?: (props: { readonly ctx: NowIndicatorCtx }) => VNode[];
+  'week-number'?: (props: { readonly ctx: WeekNumberCtx }) => VNode[];
+  'no-events'?: (props: { readonly ctx: NoEventsCtx }) => VNode[];
+  'list-day-header'?: (props: { readonly ctx: ListDayHeaderCtx }) => VNode[];
+  'month-header'?: (props: { readonly ctx: MonthHeaderCtx }) => VNode[];
+  resource?: (props: { readonly ctx: ResourceContentCtx }) => VNode[];
+  'resource-group-header'?: (props: { readonly ctx: ResourceGroupCtx }) => VNode[];
+  'resource-area-header'?: (props: { readonly ctx: ResourceAreaHeaderCtx }) => VNode[];
+  [headerItem: `header-item-${string}`]: ((props: { readonly ctx: HeaderItemCtx }) => VNode[]) | undefined;
 }
 
 /** What the `#event-content` slot receives. */
@@ -80,6 +144,8 @@ export interface DzCalendarProps {
   readonly initial?: DzCalendarDefaults;
   readonly controller?: CalendarController;
   readonly motion?: MotionAdapter;
+  /** Classes and mounts (and a content where no slot is given) for any element: merged with the slots. */
+  readonly hooks?: CalendarHooks;
   readonly 'onUpdate:view'?: (view: string) => void;
   readonly 'onUpdate:date'?: (date: PlainDate) => void;
   readonly 'onUpdate:selection'?: (selection: Selection | null) => void;
@@ -103,7 +169,7 @@ export interface DzCalendarProps {
  */
 export type DzCalendarComponent = new () => ComponentPublicInstance & {
   $props: DzCalendarProps;
-  $slots: { 'event-content'?: (props: EventContentSlotProps) => VNode[]; 'day-header'?: (props: DayHeaderSlotProps) => VNode[] };
+  $slots: DzCalendarSlots;
 };
 
 /**
@@ -152,6 +218,8 @@ export const DzCalendar = defineComponent({
     initial: any<DzCalendarDefaults | undefined>(),
     /** Made at creation, not changed after (the plugin's `motion` makes one per calendar). */
     motion: any<MotionAdapter | undefined>(),
+    /** Classes and mounts (and a content where no slot is given) for any element: merged with the slots. */
+    hooks: any<CalendarHooks | undefined>(),
   },
   emits: {
     'update:view': (_v: string) => true,
@@ -174,7 +242,7 @@ export const DzCalendar = defineComponent({
     /** A value the calendar refused (an unknown view, every day hidden): the others are applied. */
     error: (_e: unknown) => true,
   },
-  slots: Object as SlotsType<{ 'event-content'?: (props: EventContentSlotProps) => VNode[]; 'day-header'?: (props: DayHeaderSlotProps) => VNode[] }>,
+  slots: Object as SlotsType<DzCalendarSlots>,
   setup(props, { emit, slots, expose, attrs }) {
     const settled = inject(DZ_CALENDAR_SETTLED, {});
     const self = getCurrentInstance()!;
@@ -193,58 +261,50 @@ export const DzCalendar = defineComponent({
     };
     let cal: CalendarInstance | null = null;
 
-    // ── event content: one teleport per event node, rendered in this component's tree ──
-    const portals = new Map<HTMLElement, { key: string; span: HTMLElement; event: CalEvent; ctx: EventContentCtx }>();
+    // ── templates: one teleport per drawn node, rendered in this component's tree ──
+    /** Each template's nodes (`event`, `dayCell`…, `header:<name>`): the node drawn → its span and what it is told. */
+    const portals = new Map<string, Map<HTMLElement, { key: string; span: HTMLElement; ctx: unknown }>>();
     const drawn = shallowRef(0);
     let seq = 0;
-    const hasSlot = () => Boolean(slots['event-content']);
-    const hasDaySlot = () => Boolean(slots['day-header']);
-    const dayPortals = new Map<HTMLElement, { key: string; span: HTMLElement; day: DayHeaderCtx }>();
     /** A slot's output that draws nothing (an empty `v-if`): comments and blank text only. */
     const blank = (nodes: VNode[] | undefined) => !nodes || nodes.every((n) => n.type === Comment || (n.type === Text && !String(n.children ?? '').trim()));
-    const dayHooks: NonNullable<CalendarHooks['dayHeader']> = {
-      content: (day, el) => {
-        let p = dayPortals.get(el);
-        if (!p) {
-          const span = el.ownerDocument.createElement('span');
-          span.className = 'dz-dayhead__content';
-          p = { key: `d${seq++}`, span, day };
-          dayPortals.set(el, p);
-        } else p.day = day;
-        drawn.value++;
-        return p.span;
-      },
-      willUnmount: ({ el }) => {
-        if (dayPortals.delete(el)) drawn.value++;
-      },
+    const named = slots as unknown as Record<string, ((p: unknown) => VNode[]) | undefined>;
+    const source: TemplateSource = {
+      has: (el) => Boolean(named[SLOTS[el]]),
+      app: () => props.hooks,
+      items: () => Object.keys(slots).filter((k) => k.startsWith('header-item-')).map((k) => k.slice(12)),
+      blankBackground: (ctx) => blank(named['event-content']?.({ event: ctx.instance.event, ctx })),
     };
-    const contentHooks: CalendarHooks = {
-      event: {
-        content: (ctx, el) => {
-          // A background is drawn only when the slot gives it something: asked now, not after the teleport renders.
-          if (ctx.background && blank(slots['event-content']?.({ event: ctx.instance.event, ctx }))) return null;
-          let p = portals.get(el);
-          if (!p) {
-            const span = el.ownerDocument.createElement('span');
-            span.className = 'dz-ev__content';
-            p = { key: `e${seq++}`, span, event: ctx.instance.event, ctx };
-            portals.set(el, p);
-          } else {
-            p.event = ctx.instance.event;
-            p.ctx = ctx;
-          }
-          // Vue renders in a microtask: before the browser paints.
-          drawn.value++;
-          return p.span;
-        },
-        willUnmount: ({ el }) => {
-          if (portals.delete(el)) drawn.value++;
-        },
-      },
+    const portal = (key: string, el: HTMLElement, ctx: unknown) => {
+      let of = portals.get(key);
+      if (!of) portals.set(key, (of = new Map()));
+      let p = of.get(el);
+      if (!p) {
+        const span = el.ownerDocument.createElement('span');
+        span.className = templateClass(key);
+        p = { key: `t${seq++}`, span, ctx };
+        of.set(el, p);
+      } else p.ctx = ctx;
+      // Vue renders in a microtask: before the browser paints.
+      drawn.value++;
+      return p.span;
+    };
+    const release = (key: string, el: HTMLElement) => {
+      if (portals.get(key)?.delete(el)) drawn.value++;
     };
     let hooksFor: string | null = null;
-    const hooksKey = () => `${hasSlot()}|${hasDaySlot()}`;
-    const hooks = (): CalendarHooks => ({ ...(hasSlot() && contentHooks), ...(hasDaySlot() && { dayHeader: dayHooks }) });
+    const hooksKey = () => templateShape(source);
+    /** Made again only when the shape changes: the functions read the latest slots and `hooks`. */
+    const hooks = () => templateHooks(source, portal, release);
+    /** What a template draws for a node: the slot's own props (`{ event, ctx }`, `{ day }`), `{ ctx }` for the others. */
+    const drawOf = (key: string, ctx: unknown): VNode[] | undefined => {
+      if (key.startsWith('header:')) return named[`header-item-${key.slice(7)}`]?.({ ctx });
+      const slot = named[SLOTS[key as TemplateElement]];
+      if (!slot) return undefined;
+      if (key === 'event') return slot({ event: (ctx as EventContentCtx).instance.event, ctx });
+      if (key === 'dayHeader') return slot({ day: ctx, ctx });
+      return slot({ ctx });
+    };
 
     const settings = computed((): Record<string, unknown> => {
       const options: Record<string, unknown> = { ...props.options };
@@ -337,9 +397,10 @@ export const DzCalendar = defineComponent({
       sent = s;
       if (hooksKey() !== hooksFor) {
         hooksFor = hooksKey();
-        portals.clear();
-        dayPortals.clear();
-        changes['hooks'] = hooks();
+        // Nothing dropped here: an element whose hooks changed is let go by the calendar (its willUnmount releases its teleport); the others keep theirs.
+        const made = hooks();
+        changes['hooks'] = made.hooks;
+        changes['headerItems'] = made.headerItems;
       }
       const o = offeredNow();
       if (o !== offered) {
@@ -377,7 +438,7 @@ export const DzCalendar = defineComponent({
         ...rest,
         ...(view !== undefined && { initialView: view }),
         ...(date !== undefined && { initialDate: date }),
-        hooks: hooks(),
+        ...(({ hooks: hk, headerItems }) => ({ hooks: hk, headerItems }))(hooks()),
         ...defined(offers()),
         onDateClick: (x: DateClick) => emit('dateClick', x),
         onEventClick: (i: EventInstance) => emit('eventClick', i),
@@ -470,7 +531,6 @@ export const DzCalendar = defineComponent({
       const c = cal;
       cal = null;
       portals.clear();
-      dayPortals.clear();
       if (c) {
         c.destroy();
         writes.onReoffer(null);
@@ -491,13 +551,14 @@ export const DzCalendar = defineComponent({
       // A slot added or taken away (`v-if`) changes the hooks: after this render too.
       if (cal && (offeredNow() !== offered || hooksKey() !== hooksFor)) void nextTick(sync);
       void drawn.value;
-      const draw = slots['event-content'];
-      const drawDay = slots['day-header'];
-      return [
-        h('div', { ...attrs, ref: host }),
-        ...(draw ? [...portals.values()].map((p) => h(Teleport, { to: p.span, key: p.key }, draw({ event: p.event, ctx: p.ctx }))) : []),
-        ...(drawDay ? [...dayPortals.values()].map((p) => h(Teleport, { to: p.span, key: p.key }, drawDay({ day: p.day }))) : []),
-      ];
+      const teleports: VNode[] = [];
+      for (const [key, of] of portals) {
+        for (const p of of.values()) {
+          const out = drawOf(key, p.ctx);
+          if (out !== undefined) teleports.push(h(Teleport, { to: p.span, key: p.key }, out));
+        }
+      }
+      return [h('div', { ...attrs, ref: host }), ...teleports];
     };
   },
 }) as unknown as DzCalendarComponent;

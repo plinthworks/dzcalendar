@@ -9,12 +9,15 @@ import {
   type OnDestroy,
   computed,
   contentChild,
+  contentChildren,
   effect,
   inject,
   input,
   model,
   output,
   untracked,
+  type Signal,
+  type TemplateRef,
 } from '@angular/core';
 import type {
   AvailableSlot,
@@ -33,17 +36,34 @@ import type {
   ZoneId,
 } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DzMessages, EventChange, MotionAdapter } from '@dzcalendar/dom';
+import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DzMessages, EventChange, EventContentCtx, MotionAdapter } from '@dzcalendar/dom';
+import { templateClass, templateHooks, templateShape } from '@dzcalendar/dom/toolkit';
+import type { TemplateElement, TemplateSource } from '@dzcalendar/dom/toolkit';
 import { CalendarController } from './controller.js';
 import { DZ_CALENDAR_DEFAULTS, DZ_MOTION } from './providers.js';
-import { DzDayHeader, DzEventContent } from './templates.js';
-import type { DayHeaderContext, EventContentContext } from './templates.js';
+import {
+  DzAllDayLabel,
+  DzDayCell,
+  DzDayHeader,
+  DzEventContent,
+  DzHeaderItem,
+  DzListDayHeader,
+  DzMonthHeader,
+  DzMoreLink,
+  DzNoEvents,
+  DzNowIndicator,
+  DzResource,
+  DzResourceAreaHeader,
+  DzResourceGroupHeader,
+  DzSlotLabel,
+  DzWeekNumber,
+} from './templates.js';
 
 /** The callbacks the component turns into outputs: not options (they would silence the outputs). */
 const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange'] as const;
 
 /** What `[options]` takes: what `update()` takes, less what has an input or an output of its own. */
-export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | (typeof OWN_CALLBACKS)[number]>;
+export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | 'headerItems' | (typeof OWN_CALLBACKS)[number]>;
 
 /** Keys whose value is undefined are left out: an unbound input changes nothing. */
 function defined<T extends object>(o: T): Partial<T> {
@@ -142,14 +162,67 @@ export class DzCalendar implements OnDestroy {
   /** What a person changed (a drag, a resize, the keyboard, the menu, the editor): persist it; `revert()` if the server refuses. */
   readonly eventChange = output<EventChange>();
 
-  private readonly eventTemplate = contentChild(DzEventContent);
-  private readonly dayTemplate = contentChild(DzDayHeader);
+  /** Classes and mounts (and a content where no template is given) for any element: merged with the templates. */
+  readonly hooks = input<CalendarHooks | undefined>(undefined);
 
-  /** One hooks object per template: `update()` compares hooks member by member. */
-  private readonly hooks = computed((): CalendarHooks => {
-    const dir = this.eventTemplate();
-    const day = this.dayTemplate();
-    return { ...(dir && { event: this.templateHooks(dir) }), ...(day && { dayHeader: this.dayHeaderHooks(day) }) };
+  // ── templates: one per element with a content, and the header's places ──
+  // Angular reads a query only as a class member's initializer: one each, gathered below.
+  private readonly eventTemplate = contentChild(DzEventContent);
+  private readonly dayHeaderTemplate = contentChild(DzDayHeader);
+  private readonly dayCellTemplate = contentChild(DzDayCell);
+  private readonly slotLabelTemplate = contentChild(DzSlotLabel);
+  private readonly allDayLabelTemplate = contentChild(DzAllDayLabel);
+  private readonly moreLinkTemplate = contentChild(DzMoreLink);
+  private readonly nowIndicatorTemplate = contentChild(DzNowIndicator);
+  private readonly weekNumberTemplate = contentChild(DzWeekNumber);
+  private readonly noEventsTemplate = contentChild(DzNoEvents);
+  private readonly listDayHeaderTemplate = contentChild(DzListDayHeader);
+  private readonly monthHeaderTemplate = contentChild(DzMonthHeader);
+  private readonly resourceTemplate = contentChild(DzResource);
+  private readonly resourceGroupHeaderTemplate = contentChild(DzResourceGroupHeader);
+  private readonly resourceAreaHeaderTemplate = contentChild(DzResourceAreaHeader);
+  private readonly templates: Record<TemplateElement, Signal<{ readonly template: TemplateRef<unknown> } | undefined>> = {
+    event: this.eventTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    dayHeader: this.dayHeaderTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    dayCell: this.dayCellTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    slotLabel: this.slotLabelTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    allDayLabel: this.allDayLabelTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    moreLink: this.moreLinkTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    nowIndicator: this.nowIndicatorTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    weekNumber: this.weekNumberTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    noEvents: this.noEventsTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    listDayHeader: this.listDayHeaderTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    monthHeader: this.monthHeaderTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    resource: this.resourceTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    resourceGroupHeader: this.resourceGroupHeaderTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+    resourceAreaHeader: this.resourceAreaHeaderTemplate as Signal<{ readonly template: TemplateRef<unknown> } | undefined>,
+  };
+  private readonly headerItemTemplates = contentChildren(DzHeaderItem);
+  private readonly source: TemplateSource = {
+    has: (el) => Boolean(this.templates[el]()),
+    app: () => this.hooks(),
+    items: () => this.headerItemTemplates().map((d) => d.name()),
+    blankBackground: (ctx) => {
+      // A background (a closed day): drawn only when the template gives it something (`@if (ctx.background)`).
+      const dir = this.templates.event();
+      if (!dir) return true;
+      const probe = this.vcr.createEmbeddedView(dir.template, { $implicit: ctx.instance.event, event: ctx.instance.event, ctx });
+      probe.detectChanges();
+      const empty = probe.rootNodes.every((n: Node) => n.nodeType === 8 || (n.nodeType === 3 && !n.textContent?.trim()) || (n instanceof Element && !n.childNodes.length && !n.textContent?.trim() && n.tagName !== 'IMG'));
+      probe.destroy();
+      return empty;
+    },
+  };
+  private shape = '';
+  private made: ReturnType<typeof templateHooks> | null = null;
+  /** Made again only when the shape changes (which templates, which members of `hooks`): `update()` then redraws nothing. */
+  private readonly built = computed(() => {
+    const shape = templateShape(this.source);
+    if (shape !== this.shape || !this.made) {
+      this.shape = shape;
+      this.made = templateHooks(this.source, (key, el, ctx) => this.portal(key, el, ctx), (key, el) => this.release(key, el));
+    }
+    return this.made;
   });
 
   private readonly settings = computed((): CalendarUpdate => {
@@ -181,7 +254,8 @@ export class DzCalendar implements OnDestroy {
         resources: this.resources(),
         timeGrid: axis ? { ...this.options().timeGrid, axis } : undefined,
       }),
-      hooks: this.hooks(),
+      hooks: this.built().hooks,
+      headerItems: this.built().headerItems,
     };
   });
 
@@ -269,7 +343,7 @@ export class DzCalendar implements OnDestroy {
         for (const [k, v] of Object.entries(s)) if (sent[k] !== v) changes[k] = v;
         // Another template (or none): the views made from the last one go; the
         // calendar redraws every event's content with the new hooks.
-        if ('hooks' in changes) this.dropViews();
+        // Other templates: nothing dropped here — an element whose hooks changed is let go by the calendar (its willUnmount destroys its view); the others keep theirs.
         sent = s;
         if (Object.keys(changes).length > 0) this.apply(changes as CalendarUpdate);
       });
@@ -297,10 +371,8 @@ export class DzCalendar implements OnDestroy {
   }
 
   private dropViews(): void {
-    for (const v of this.views.values()) v.destroy();
+    for (const of of this.views.values()) for (const v of of.values()) v.view.destroy();
     this.views.clear();
-    for (const v of this.dayViews.values()) v.destroy();
-    this.dayViews.clear();
   }
 
   /** The DOM calendar, for what the inputs and the controller do not cover. */
@@ -352,67 +424,49 @@ export class DzCalendar implements OnDestroy {
     }
   }
 
-  // ── event templates: one embedded view per event node, checked alone ──
-  private readonly views = new Map<HTMLElement, EmbeddedViewRef<EventContentContext>>();
+  // ── templates: one embedded view per drawn node, checked alone ──
+  private readonly views = new Map<string, Map<HTMLElement, { view: EmbeddedViewRef<unknown>; host: HTMLElement }>>();
   /** How many times an event's view was checked: a test reads it. @internal */
   checks = 0;
 
-  private templateHooks(dir: DzEventContent): NonNullable<CalendarHooks['event']> {
-    return {
-      content: (ctx, el) => {
-        // A background (a closed day): drawn only when the template gives it something (`@if (ctx.background)`).
-        if (ctx.background) {
-          const probe = this.vcr.createEmbeddedView(dir.template, { $implicit: ctx.instance.event, event: ctx.instance.event, ctx });
-          probe.detectChanges();
-          const empty = probe.rootNodes.every((n: Node) => n.nodeType === 8 || (n.nodeType === 3 && !n.textContent?.trim()) || (n instanceof Element && !n.childNodes.length && !n.textContent?.trim() && n.tagName !== 'IMG'));
-          probe.destroy();
-          if (empty) return null;
-        }
-        const context: EventContentContext = { $implicit: ctx.instance.event, event: ctx.instance.event, ctx };
-        let view = this.views.get(el);
-        if (!view || view.destroyed) {
-          // In the component's own container, so a signal its template reads
-          // (the application's, not the event's) refreshes that view alone;
-          // its nodes are moved into the event's node, as a portal does.
-          view = this.vcr.createEmbeddedView(dir.template, context);
-          this.views.set(el, view);
-        } else Object.assign(view.context, context);
-        view.detectChanges();
-        this.checks++;
-        const host = this.host.ownerDocument.createElement('span');
-        host.className = 'dz-ev__content';
-        host.append(...(view.rootNodes as Node[]));
-        return host;
-      },
-      willUnmount: ({ el }) => {
-        this.views.get(el)?.destroy();
-        this.views.delete(el);
-      },
-    };
+  /** The node drawn for `el` by its template: made once, its context updated after. */
+  private portal(key: string, el: HTMLElement, ctx: unknown): HTMLElement {
+    const dir = key.startsWith('header:') ? this.headerItemTemplates().find((d) => d.name() === key.slice(7)) : this.templates[key as TemplateElement]();
+    if (!dir) {
+      const none = this.host.ownerDocument.createElement('span');
+      none.className = templateClass(key);
+      return none;
+    }
+    // The context each template's `let-` reads: an event's `event` and `ctx`, a day head's `day`, the others' `ctx`.
+    const context: Record<string, unknown> =
+      key === 'event'
+        ? { $implicit: (ctx as EventContentCtx).instance.event, event: (ctx as EventContentCtx).instance.event, ctx }
+        : key === 'dayHeader'
+          ? { $implicit: ctx, day: ctx, ctx }
+          : { $implicit: ctx, ctx };
+    let of = this.views.get(key);
+    if (!of) this.views.set(key, (of = new Map()));
+    let made = of.get(el);
+    if (!made || made.view.destroyed) {
+      // In the component's own container, so a signal its template reads
+      // (the application's) refreshes that view alone; its nodes are moved
+      // into the element's node, as a portal does — into one host kept for
+      // that node, so a control focused in it (a header's select) stays.
+      const host = this.host.ownerDocument.createElement('span');
+      host.className = templateClass(key);
+      made = { view: this.vcr.createEmbeddedView(dir.template, context), host };
+      of.set(el, made);
+    } else Object.assign(made.view.context as object, context);
+    made.view.detectChanges();
+    if (key === 'event') this.checks++;
+    // Nodes a structural directive added since are taken in too; those already there stay put.
+    for (const n of made.view.rootNodes as Node[]) if (n.parentNode !== made.host) made.host.append(n);
+    return made.host;
   }
 
-  // ── day-head templates: one embedded view per head, checked alone ──
-  private readonly dayViews = new Map<HTMLElement, EmbeddedViewRef<DayHeaderContext>>();
-
-  private dayHeaderHooks(dir: DzDayHeader): NonNullable<CalendarHooks['dayHeader']> {
-    return {
-      content: (day, el) => {
-        const context: DayHeaderContext = { $implicit: day, day };
-        let view = this.dayViews.get(el);
-        if (!view || view.destroyed) {
-          view = this.vcr.createEmbeddedView(dir.template, context);
-          this.dayViews.set(el, view);
-        } else Object.assign(view.context, context);
-        view.detectChanges();
-        const host = this.host.ownerDocument.createElement('span');
-        host.className = 'dz-dayhead__content';
-        host.append(...(view.rootNodes as Node[]));
-        return host;
-      },
-      willUnmount: ({ el }) => {
-        this.dayViews.get(el)?.destroy();
-        this.dayViews.delete(el);
-      },
-    };
+  private release(key: string, el: HTMLElement): void {
+    const of = this.views.get(key);
+    of?.get(el)?.view.destroy();
+    of?.delete(el);
   }
 }

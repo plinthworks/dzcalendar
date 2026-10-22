@@ -6,6 +6,7 @@
  */
 export { DzCalendar } from './calendar.js';
 export type { DzCalendarProps, DzCalendarHandle, DzCalendarOptions } from './calendar.js';
+export type { TemplateProps } from './templates.js';
 export { CalendarController, useCalendarController, useCalendarState, useParentCalendarController } from './controller.js';
 export type { CalendarSnapshot } from './controller.js';
 export { DzCalendarProvider, DzCalendarContext } from './context.js';

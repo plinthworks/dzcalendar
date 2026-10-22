@@ -62,6 +62,17 @@ const events: EventInput[] = [{ id: 'a', title: 'Consultation', start: '2026-10-
   label at the top of its column, nothing (an empty `v-if`) for a tint.
 - **`#day-header="{ day }"`**: each day's head (`day.date`, `day.resource`,
   `day.lengthMinutes`, `day.text`) — a mark, a count, a button.
+- **A slot for every element with a content**, each given `{ ctx }` (its
+  element's context, docs/behaviors/render-hooks.md): `#day-cell`,
+  `#slot-label`, `#all-day-label`, `#more-link`, `#now-indicator`,
+  `#week-number`, `#no-events`, `#list-day-header`, `#month-header`,
+  `#resource`, `#resource-group-header`, `#resource-area-header`.
+- **`:hooks="{ dayCell: { class: … } }"`**: classes and mounts for any
+  element (the holders too), merged with the slots: the slot gives the
+  content, `hooks` the rest.
+- **`#header-item-<name>="{ ctx }"`**: your place in the header, named in
+  `headerToolbar` (`:options="{ headerToolbar: { end: 'filter timeGridWeek' } }"`
+  → `#header-item-filter`); `customButtons` for plain buttons.
 - **`@event-change`**: what a person changed (a drag, a resize, the
   keyboard, the menu, the editor) — persist it, `change.revert()` if the
   server refuses (exactly that change; false when the event changed again).

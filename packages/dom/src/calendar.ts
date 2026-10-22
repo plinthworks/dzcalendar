@@ -1,4 +1,5 @@
 import { decorate, flushMounts, holder, undecorate } from './render/hooks.js';
+import type { ElementHooks, HeaderItemCtx } from './render/hooks.js';
 import { actionsFor, assertBusinessHours, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, Temporal } from '@dzcalendar/core';
 import type { CalEvent, Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
@@ -55,6 +56,8 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly headerToolbar?: HeaderToolbar | false;
   /** The application's buttons, named in `headerToolbar`. */
   readonly customButtons?: Readonly<Record<string, CustomButton>>;
+  /** The application's places in the header (a menu, a filter, a badge), named in `headerToolbar`: its content, classes and mounts. */
+  readonly headerItems?: Readonly<Record<string, ElementHooks<HeaderItemCtx>>>;
   /** Lanes a month day shows before "+N": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default 'auto'. */
   readonly dayMaxLanes?: number | 'auto' | null;
   readonly hooks?: CalendarHooks;
@@ -151,6 +154,8 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly headerToolbar?: HeaderToolbar | false;
   /** Compared by name, member by member: the same functions again redraw nothing. */
   readonly customButtons?: Readonly<Record<string, CustomButton>>;
+  /** Compared by name, member by member. */
+  readonly headerItems?: Readonly<Record<string, ElementHooks<HeaderItemCtx>>>;
   readonly theme?: string;
   readonly scheme?: 'auto' | 'light' | 'dark';
   readonly density?: 'compact' | 'comfortable' | 'spacious';
@@ -576,6 +581,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   let headerAsked = options.headerViews;
   let layoutAsked = options.headerToolbar;
   let buttonsAsked = options.customButtons ?? {};
+  let itemsAsked = options.headerItems ?? {};
   // A header view this renderer cannot draw: said once, not at each new layout.
   const saidViews = new Set<string>();
   const toolbar = createToolbar(doc, scope, kernel, (v) => drawable(v) || (!saidViews.has(v) && saidViews.add(v) && tabsOf([v]).length > 0), (dir) => kernel.navigate(dir), (v) => kernel.setView(v));
@@ -586,7 +592,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     if (layoutAsked === false) return toolbar.element.remove();
     const given = layoutAsked !== undefined && layoutAsked !== null && typeof layoutAsked === 'object' && !Array.isArray(layoutAsked) ? layoutAsked : null;
     if (layoutAsked !== undefined && !given) console.warn('dzcalendar: headerToolbar is { start, center, end } or false: the header as by default');
-    toolbar.setLayout(given ?? defaultLayout(tabsOf(headerAsked)), buttonsAsked && typeof buttonsAsked === 'object' ? buttonsAsked : {});
+    toolbar.setLayout(given ?? defaultLayout(tabsOf(headerAsked)), buttonsAsked && typeof buttonsAsked === 'object' ? buttonsAsked : {}, itemsAsked && typeof itemsAsked === 'object' ? itemsAsked : {});
     if (!toolbar.element.isConnected) toolbarSpot.before(toolbar.element);
   };
   layOut();
@@ -1191,6 +1197,10 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             if (same) toolbar.setButtons(buttonsAsked);
             else relayOut = true;
           }
+          if (changes.headerItems && !sameHooks(changes.headerItems as CalendarHooks, itemsAsked as CalendarHooks)) {
+            itemsAsked = changes.headerItems;
+            relayOut = true;
+          }
           if (relayOut) {
             layOut();
             dirty = true;
@@ -1255,6 +1265,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     },
     destroy() {
       stopChanges();
+      toolbar.destroy();
       for (const fn of [...destroyHooks]) {
         try {
           fn();

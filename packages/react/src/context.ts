@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import type { CalendarOptions, MotionAdapter } from '@dzcalendar/dom';
 
 /** What an application settles once: the zone, the locale, the words, any other option. A `<DzCalendar>`'s own props still win. */
-export type DzCalendarDefaults = Omit<CalendarOptions, 'kernel'>;
+/** Each calendar's `hooks` and `headerItems` are its own (its templates and its `hooks`): not settled for all. */
+export type DzCalendarDefaults = Omit<CalendarOptions, 'kernel' | 'hooks' | 'headerItems'>;
 
 interface Settled {
   readonly defaults: DzCalendarDefaults;

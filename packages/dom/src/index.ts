@@ -20,6 +20,7 @@ export type {
   DayHeaderCtx,
   DayLaneCtx,
   ElementHooks,
+  HeaderItemCtx,
   ListDayHeaderCtx,
   MonthHeaderCtx,
   MoreLinkCtx,

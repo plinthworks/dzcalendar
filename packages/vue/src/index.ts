@@ -6,7 +6,7 @@
  * once.
  */
 export { DzCalendar } from './calendar.js';
-export type { DayHeaderSlotProps, DzCalendarComponent, DzCalendarOptions, DzCalendarProps, EventContentSlotProps } from './calendar.js';
+export type { DayHeaderSlotProps, DzCalendarComponent, DzCalendarOptions, DzCalendarProps, DzCalendarSlots, EventContentSlotProps } from './calendar.js';
 export { CALENDAR_CONTROLLER, createCalendarController, injectCalendarController } from './controller.js';
 export type { CalendarController } from './controller.js';
 export { DzCalendarPlugin, DZ_CALENDAR_SETTLED, provideDzCalendar } from './plugin.js';

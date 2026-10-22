@@ -207,6 +207,18 @@ tint); `<ng-template dzDayHeader let-day>` for each day's head (`day.date`,
 `day.text`, the calendar's own words). Both are your components, in your
 injector, checked when your signals change.
 
+The same for every element with a content, `let-ctx` (its context,
+docs/behaviors/render-hooks.md): `dzDayCell`, `dzSlotLabel`,
+`dzAllDayLabel`, `dzMoreLink`, `dzNowIndicator`, `dzWeekNumber`,
+`dzNoEvents`, `dzListDayHeader`, `dzMonthHeader`, `dzResource`,
+`dzResourceGroupHeader`, `dzResourceAreaHeader` (all in `DZ_CALENDAR`).
+`<ng-template dzHeaderItem="filter" let-ctx>` is your place in the header,
+named in `headerToolbar` (`[options]="{ headerToolbar: { end: 'filter
+timeGridWeek' } }"`); `customButtons` for plain buttons. `[hooks]` gives
+classes and mounts for any element (the holders — a day's column, a
+timeline row — too), merged with the templates: the template gives the
+content, `hooks` the rest.
+
 **The controller** (`#cal` then `cal.controller`, or `inject(CalendarController)`
 in a child): signals `state`, `title`, `range`, `view`, `date`, `canUndo`,
 `canRedo`, `loading`, `problems`, `instance`; methods `prev`, `next`,
@@ -379,6 +391,21 @@ export function Agenda() {
 - **`renderDayHeader={(day) => …}`**: each day's head by your components
   (`day.date`, `day.resource`, `day.lengthMinutes`, `day.text`) — a mark, a
   count, a button.
+- **A template for every element with a content**: `renderDayCell`,
+  `renderSlotLabel`, `renderAllDayLabel`, `renderMoreLink`,
+  `renderNowIndicator`, `renderWeekNumber`, `renderNoEvents`,
+  `renderListDayHeader`, `renderMonthHeader`, `renderResource`,
+  `renderResourceGroupHeader`, `renderResourceAreaHeader` — each given its
+  element's context (docs/behaviors/render-hooks.md), drawn by portals in
+  your tree.
+- **`hooks={{ dayCell: { class: (d) => d.outside ? 'muted' : null } }}`**:
+  classes and mounts for any element (the holders — a day's column, a
+  timeline row, the view — too), merged with the templates: the template
+  gives the content, `hooks` the rest. New closures at each render redraw
+  nothing; a function is read when the element is drawn again.
+- **`headerItems={{ filter: <DoctorFilter /> }}`** with `headerToolbar={{
+  end: 'filter timeGridWeek' }}`: your components in the header (a node, or
+  `(ctx) => …` with the view and title); `customButtons` for plain buttons.
 - A background event (a closed day) reaches `renderEventContent` with
   `ctx.background`: return something for a label at the top of its column,
   null for a plain tint.
@@ -510,6 +537,17 @@ const events: EventInput[] = [{ id: 'a', title: 'Consultation', start: '2026-10-
   label at the top of its column, nothing (an empty `v-if`) for a tint.
 - **`#day-header="{ day }"`**: each day's head (`day.date`, `day.resource`,
   `day.lengthMinutes`, `day.text`) — a mark, a count, a button.
+- **A slot for every element with a content**, each given `{ ctx }` (its
+  element's context, docs/behaviors/render-hooks.md): `#day-cell`,
+  `#slot-label`, `#all-day-label`, `#more-link`, `#now-indicator`,
+  `#week-number`, `#no-events`, `#list-day-header`, `#month-header`,
+  `#resource`, `#resource-group-header`, `#resource-area-header`.
+- **`:hooks="{ dayCell: { class: … } }"`**: classes and mounts for any
+  element (the holders too), merged with the slots: the slot gives the
+  content, `hooks` the rest.
+- **`#header-item-<name>="{ ctx }"`**: your place in the header, named in
+  `headerToolbar` (`:options="{ headerToolbar: { end: 'filter timeGridWeek' } }"`
+  → `#header-item-filter`); `customButtons` for plain buttons.
 - **`@event-change`**: what a person changed (a drag, a resize, the
   keyboard, the menu, the editor) — persist it, `change.revert()` if the
   server refuses (exactly that change; false when the event changed again).

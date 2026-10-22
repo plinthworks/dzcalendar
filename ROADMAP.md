@@ -20,8 +20,12 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 - **Done:** Phase 18f-1b (the header's layout and buttons) committed
   ("Phase 18f-1b"); every check green (1 391 tests, test:ci, typecheck,
   build, size, test:browser, perf:browser, test:package) but the known
-  noise (`normalize+index 10k`). **Next: 18f-2** (templates in every
-  framework, the header's free place with them).
+  noise (`normalize+index 10k`).
+- **Done:** Phase 18f-2 (templates in every framework, the header's places)
+  committed ("Phase 18f-2"); every check green (1 410 tests, test:ci,
+  typecheck, build, size, bench, test:browser, perf:browser,
+  test:package). **Next: 18f-3** (formats, custom views with
+  `visibleRange`).
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2572,6 +2576,76 @@ slots", a business view). Decided:
 - The header's free place for rich content: with the templates, 18f-2.
 - A React prop going back to `undefined` keeps the calendar's layout (said
   in the sheet).
+
+### 18f-2 — decisions (owner, 2026-10-22)
+
+- **The header's free place, one per name**: `headerItems: { name: { content,
+  didMount, willUnmount, class } }` in the DOM, the name placed in
+  `headerToolbar` like a button; React `headerItems={{ name: <X/> }}`, Vue
+  `#header-item-<name>`, Angular `<ng-template dzHeaderItem="name">`.
+- **Classes and mounts in the frameworks through `hooks`**, merged with the
+  templates: the template gives the content, `hooks` the rest (one entry,
+  the same documentation everywhere; no per-element class inputs).
+- Templates for the 14 elements with a content (event, dayHeader, dayCell,
+  slotLabel, allDayLabel, moreLink, nowIndicator, weekNumber, noEvents,
+  listDayHeader, monthHeader, resource, resourceGroupHeader,
+  resourceAreaHeader); the holders (dayLane, slotLane, morePopover, view,
+  resourceLane, resourceGroupLane) take `hooks` only.
+
+### 18f-2 — done (2026-10-22)
+
+**Built**
+- A shared builder in `@dzcalendar/dom/toolkit` (`render/templates.ts`:
+  `TEMPLATE_ELEMENTS`, `templateShape`, `templateHooks`, `templateClass`):
+  each framework says only whether it has a template for an element, gives
+  the application's `hooks` and its portals. Hooks are made again element by
+  element, only when that element's part of the shape changes (a template
+  added or taken away, a member of `hooks`, a class given as words): new
+  closures at each render redraw and remount nothing.
+- React: `render<Element>` props for the 14 elements with a content,
+  `headerItems={{ name: node | (ctx) => node }}`, a `hooks` prop. Vue: slots
+  `#day-cell`, `#slot-label`… (`{ ctx }`), `#header-item-<name>`, `:hooks`.
+  Angular: directives `dzDayCell`, `dzSlotLabel`… (`let-ctx`, all in
+  `DZ_CALENDAR`), `dzHeaderItem="name"`, `[hooks]`. `#event-content`,
+  `#day-header`, `dzEventContent`, `dzDayHeader` kept as they were (a day
+  head's context has `ctx` too now).
+- DOM: `headerItems` (places kept by name, told the view and the title when
+  they change; a node returned again is left in place: a focused control
+  stays focused). `<dz-calendar>` takes it live.
+- `hooks` / `headerItems` taken out of the providers' defaults' types (each
+  calendar's own; the wrappers set them already).
+- Tests: React (12 new), Vue (2), Angular (2), DOM (3);
+  `scripts/package-smoke.mjs` uses a day cell template, a header place and
+  `hooks` in the Angular, React and Vue apps (types checked strictly).
+- Budgets (owner, measured + 3 %): react 3 819, vue 4 010, a new line
+  `dom/templates` 1 017 (the shared builder, counted nowhere before).
+
+**Reviews fixed** (architect + execution in Chrome and TestBed)
+- A day cell's (and a timeline resource's or group's) template kept one
+  portal / embedded view alive per redraw (462 components for 42 cells after
+  ten navigations): the content is now the cell's (its `el`), kept by it and
+  let go with it.
+- A focused control in a header place lost the focus at each navigation
+  (the node detached and put back; Angular made a new host each time).
+- Any template or class change remounted every element and the header
+  places (Angular even dropped the header's view): hooks are kept element by
+  element, the header record while its names stay; the wrappers no longer
+  drop portals on a hooks change (the calendar lets go what changed).
+- Templates for "+N", the gutter's labels and the now line sat inside
+  `aria-hidden`: read once the application fills them.
+- The shared builder counted nowhere in `size`; the Angular build compiled
+  the dom sources (`@dzcalendar/dom/toolkit` mapped to `dist`); `contentChild`
+  outside a class member's initializer (NG8110).
+
+**Not done on purpose**
+- A function in `hooks` is read when its element is drawn again (new
+  closures do not redraw); a class that must follow state at once is given
+  as words (docs).
+- Angular: two templates for one element swapped with `@if` / `@else` keep
+  the first's views until the element is drawn again.
+- `.dz-tpl*` spans have no CSS yet (the CSS pass).
+- Seen outside 18f-2, not checked at HEAD: in Vue with `v-model:view`,
+  `controller.changeView` reports the view three times.
 
 ### Order
 

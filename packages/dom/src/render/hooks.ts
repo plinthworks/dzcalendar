@@ -1,5 +1,4 @@
 import type { Instant, PlainDate, PlainTime, Resource, ViewRange, ZonedDateTime } from '@dzcalendar/core';
-import type { ViewCtx } from '../host.js';
 import { guard } from './event.js';
 
 /**
@@ -105,6 +104,12 @@ export interface ResourceGroupCtx extends Base {
   readonly field: string;
   readonly value: string;
 }
+/** A place of the application's in the header (`headerItems`), named in `headerToolbar`. */
+export interface HeaderItemCtx extends Base {
+  readonly name: string;
+  /** The title the header shows. */
+  readonly title: string;
+}
 export interface ResourceAreaHeaderCtx extends Base {
   readonly field: string;
   readonly text: string;
@@ -166,7 +171,7 @@ export function flushMounts(): void {
  * application fills — or touches in `didMount` — is read then. True when
  * the application's content was used.
  */
-export function decorate<C>(ctx: ViewCtx, hooks: ElementHooks<C> | undefined, el: HTMLElement, c: C, draw?: () => void, readable = false): boolean {
+export function decorate<C>(ctx: { readonly doc: Document }, hooks: ElementHooks<C> | undefined, el: HTMLElement, c: C, draw?: () => void, readable = false): boolean {
   if (!hooks) {
     if (live > 0 && MOUNTED.has(el)) undecorate(el);
     draw?.();
@@ -179,8 +184,11 @@ export function decorate<C>(ctx: ViewCtx, hooks: ElementHooks<C> | undefined, el
   }
   const own = hooks.content ? guard(() => hooks.content!(c, el), null) : null;
   const used = own !== null && own !== undefined;
-  if (used) el.replaceChildren(typeof own === 'string' ? ctx.doc.createTextNode(own) : own);
-  else draw?.();
+  // The same node again (a framework's portal, an application's kept control): left in place, so a focused control stays focused.
+  if (used) {
+    const inPlace = typeof own !== 'string' && el.childNodes.length === 1 && el.firstChild === own;
+    if (!inPlace) el.replaceChildren(typeof own === 'string' ? ctx.doc.createTextNode(own) : own);
+  } else draw?.();
   const next = classesOf(hooks, c);
   swapClasses(el, had?.classes ?? [], next);
   if (had) {

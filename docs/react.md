@@ -73,6 +73,21 @@ export function Agenda() {
 - **`renderDayHeader={(day) => …}`**: each day's head by your components
   (`day.date`, `day.resource`, `day.lengthMinutes`, `day.text`) — a mark, a
   count, a button.
+- **A template for every element with a content**: `renderDayCell`,
+  `renderSlotLabel`, `renderAllDayLabel`, `renderMoreLink`,
+  `renderNowIndicator`, `renderWeekNumber`, `renderNoEvents`,
+  `renderListDayHeader`, `renderMonthHeader`, `renderResource`,
+  `renderResourceGroupHeader`, `renderResourceAreaHeader` — each given its
+  element's context (docs/behaviors/render-hooks.md), drawn by portals in
+  your tree.
+- **`hooks={{ dayCell: { class: (d) => d.outside ? 'muted' : null } }}`**:
+  classes and mounts for any element (the holders — a day's column, a
+  timeline row, the view — too), merged with the templates: the template
+  gives the content, `hooks` the rest. New closures at each render redraw
+  nothing; a function is read when the element is drawn again.
+- **`headerItems={{ filter: <DoctorFilter /> }}`** with `headerToolbar={{
+  end: 'filter timeGridWeek' }}`: your components in the header (a node, or
+  `(ctx) => …` with the view and title); `customButtons` for plain buttons.
 - A background event (a closed day) reaches `renderEventContent` with
   `ctx.background`: return something for a label at the top of its column,
   null for a plain tint.

@@ -20,6 +20,8 @@ export { NodePool } from './render/pool.js';
 export { altDate } from './render/alt.js';
 export { resourceName, noResourcesNote } from './render/resource-heads.js';
 export { decorate, holder, undecorate, undecorateAll } from './render/hooks.js';
+export { TEMPLATE_ELEMENTS, templateClass, templateHooks, templateShape } from './render/templates.js';
+export type { TemplateElement, TemplateSource } from './render/templates.js';
 export { handles } from './interact/handles.js';
 export type { ResourceContentCtx, ResourceHooks } from './host.js';
 export { activeIn, targetOf } from './focus.js';

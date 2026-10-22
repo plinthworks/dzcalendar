@@ -507,6 +507,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   function drawGutter(m: TimeGridModel): void {
     const first = m.columns.find((c) => !c.folded);
     gutter.style.setProperty('--dz-len', String(first ? first.axis.length : 0));
+    // Drawn for the eye (the hours are said in each slot's name), unless the application fills its labels: then read.
+    if (ctx.hooks.slotLabel?.content) gutter.removeAttribute('aria-hidden');
+    else gutter.setAttribute('aria-hidden', 'true');
     for (const old of gutter.children) undecorate(old as HTMLElement);
     gutter.replaceChildren(
       ...m.gutter.map((t) => {
@@ -960,10 +963,11 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       }
       homes.forEach((colEl, i) => {
         const el = (nowEls[i] ??= h(doc, 'div', 'dz-now'));
-        el.setAttribute('aria-hidden', 'true');
+        // A line for the eye, unless the application gives it a content (read then).
+        if (!ctx.hooks.nowIndicator?.content) el.setAttribute('aria-hidden', 'true');
         el.style.setProperty('--t', String(at!.position));
         if (el.parentElement !== colEl) colEl.append(el);
-        decorate(ctx, ctx.hooks.nowIndicator, el, { view: viewType, now: now.toZonedDateTimeISO(ctx.zone), instant: now });
+        decorate(ctx, ctx.hooks.nowIndicator, el, { view: viewType, now: now.toZonedDateTimeISO(ctx.zone), instant: now }, undefined, true);
       });
     },
 
