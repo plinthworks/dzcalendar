@@ -1,7 +1,7 @@
 /** The editor's look, from the calendar's tokens. `EDITOR_CSS`: include it yourself under `injectStyles: false`. */
 export const EDITOR_CSS = `
 .dz-editor-backdrop[hidden] { display: none; }
-.dz-editor-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1rem; background: color-mix(in srgb, var(--dz-fg, var(--dzc-fg, #000)) 35%, transparent); }
+.dz-editor-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1rem; background-color: color-mix(in srgb, CanvasText 35%, transparent); background: color-mix(in srgb, var(--dz-fg, var(--dzc-fg, #000)) 35%, transparent); }
 .dz-editor-backdrop {
   /* Outside .dz-cal (on the body): the palette resolved here as .dz-cal does — the page's --tz-* first. */
   --dzc-fg: var(--tz-fg, var(--dzp-fg, CanvasText));
@@ -16,6 +16,9 @@ export const EDITOR_CSS = `
   color-scheme: var(--tz-color-scheme, var(--dzp-color-scheme, light dark));
 }
 .dz-editor {
+  /* A dialog over the page: filled with the page's colour even unstyled (look: 'none'; the theme's, styled). */
+  background-color: Canvas;
+  color: CanvasText;
   /* …and handed to tzslot's widget, which passes its --tz-* to its pickers (one level down: no cycle). */
   --tz-fg: var(--dz-fg, var(--dzc-fg));
   --tz-bg: var(--dz-bg, var(--dzc-bg));

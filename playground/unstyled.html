@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — sans décor</title>
+    <style>
+      body { margin: 0; padding: 1rem; font: 14px/1.4 system-ui, sans-serif; }
+      .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+      .cal { height: 560px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Habillé et sans décor (<code>look: 'none'</code>), sans aucun CSS de l'application</h1>
+      <div class="pair"><div id="styled" class="cal"></div><div id="bare" class="cal"></div></div>
+      <div class="pair"><div id="month" class="cal"></div><div id="list" class="cal"></div></div>
+    </main>
+    <script type="module" src="./unstyled.ts"></script>
+  </body>
+</html>

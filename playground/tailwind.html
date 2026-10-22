@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — Tailwind 4</title>
+    <link rel="stylesheet" href="./tailwind.css" />
+  </head>
+  <body class="bg-slate-50 p-6 font-sans text-slate-900">
+    <main class="grid gap-6 lg:grid-cols-2">
+      <section>
+        <h1 class="mb-2 text-lg font-semibold">Habillé, et des utilitaires Tailwind par-dessus</h1>
+        <div id="styled" class="h-[640px] rounded-xl bg-white shadow-sm"></div>
+      </section>
+      <section>
+        <h2 class="mb-2 text-lg font-semibold">Sans décor (<code>look: 'none'</code>), tout en Tailwind</h2>
+        <div id="bare" class="h-[640px] rounded-xl bg-white shadow-sm"></div>
+      </section>
+    </main>
+    <script type="module" src="./tailwind.ts"></script>
+  </body>
+</html>

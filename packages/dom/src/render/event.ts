@@ -85,6 +85,18 @@ export function startReadingOf(ev: CalEvent, zone: string): Reading | undefined 
 }
 
 /** The event's own classes, swapped as a set; its tone as its own variable (no cycle). */
+/** The calendar's now, read once per drawing (a microtask): not once per event drawn. */
+const NOWS = new WeakMap<object, Instant>();
+export function drawNow(ctx: ViewCtx): Instant {
+  let now = NOWS.get(ctx.kernel);
+  if (!now) {
+    now = ctx.kernel.now();
+    NOWS.set(ctx.kernel, now);
+    queueMicrotask(() => NOWS.delete(ctx.kernel));
+  }
+  return now;
+}
+
 /** A state as an attribute (`data-today`…, docs/styling.md): present when true, gone when not — for `[data-today]` and Tailwind's `data-[today]:`. */
 export function state(el: HTMLElement, name: string, on: boolean): void {
   // Nothing written when nothing changed (no style invalidation, no mutation record).

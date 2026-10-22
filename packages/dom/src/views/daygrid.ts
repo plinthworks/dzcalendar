@@ -1,4 +1,4 @@
-import { dayStates } from '../render/event.js';
+import { dayStates, drawNow } from '../render/event.js';
 import { weekWords, written } from '../render/formats.js';
 import { Temporal, formatTemporal, dayInfo } from '@dzcalendar/core';
 import { weekNumber, weekRulesFor } from '@dzcalendar/core';
@@ -570,7 +570,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     el.toggleAttribute('data-continues-before', !(s.startsHere && it.first));
     el.toggleAttribute('data-continues-after', !(s.endsHere && it.last));
     el.classList.toggle('dz-bar--timed', !ev.allDay);
-    applyEventLook(el, ev, ctx.kernel.now());
+    applyEventLook(el, ev, drawNow(ctx));
     // Days are pulled by their edges where the event really starts or ends in this row; timed events in a month only move.
     const resizable = !it.bg && ev.allDay && ev.perms.duration;
     if (resizable && s.endsHere && it.last) el.dataset['resizeEnd'] = '1';
@@ -602,7 +602,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     const nodes = segs.map((sg) => {
       const ev = sg.instance.event;
       const item = h(doc, 'div', 'dz-bar dz-bar--in-popover');
-      applyEventLook(item, ev, ctx.kernel.now());
+      applyEventLook(item, ev, drawNow(ctx));
       item.dataset['segment'] = sg.key;
       const title = ev.title || ctx.messages.untitled;
       const reading = startReadingOf(ev, ctx.zone);

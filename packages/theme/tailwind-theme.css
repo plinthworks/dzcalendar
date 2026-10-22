@@ -1,0 +1,35 @@
+/*
+ * @dzcalendar/theme/tailwind-theme.css — the calendar's tokens in Tailwind CSS v4's theme.
+ *
+ *   @import 'tailwindcss';
+ *   @import '@dzcalendar/theme/tailwind-theme.css';
+ *
+ * Then `bg-dz-accent`, `text-dz-fg`, `text-dz-muted`, `border-dz-border`,
+ * `bg-dz-raised`, `rounded-dz`… on your own markup — a toolbar of yours, an
+ * event's template, a classed part (`hooks.<element>.class`) — follow the
+ * calendar's theme and scheme. `inline`: the utilities read the calendar's
+ * custom properties where they are used, so inside a calendar they take its
+ * theme (light, dark, `contrast`…); outside one, the platform's colours
+ * (Canvas, Highlight…) unless you set the `--dz-*` tokens (`:root { --dz-accent: … }`).
+ *
+ * The other way — Tailwind's colours feeding the calendar — is a rule of
+ * yours: `.dz-cal { --dz-accent: var(--color-emerald-600); }`
+ * (docs/styling.md).
+ */
+@theme inline {
+  --color-dz-bg: var(--dz-bg, var(--dzc-bg, Canvas));
+  --color-dz-raised: var(--dz-bg-raised, var(--dzc-bg-raised, Canvas));
+  --color-dz-fg: var(--dz-fg, var(--dzc-fg, CanvasText));
+  --color-dz-muted: var(--dz-fg-muted, var(--dzc-fg-muted, GrayText));
+  --color-dz-line: var(--dz-line, var(--dz-border, var(--dzc-border, GrayText)));
+  --color-dz-border: var(--dz-border, var(--dzc-border, GrayText));
+  --color-dz-accent: var(--dz-accent, var(--dzc-accent, Highlight));
+  --color-dz-accent-fg: var(--dz-accent-fg, var(--dzc-accent-fg, HighlightText));
+  --color-dz-danger: var(--dz-danger, var(--dzc-danger, #b91c1c));
+  --color-dz-warning: var(--dz-warning, var(--dzc-warning, #b45309));
+  --color-dz-event: var(--dz-event-accent, var(--dz-accent, var(--dzc-accent, Highlight)));
+  --color-dz-on-tone: var(--dz-tone-on, var(--dz-on-tone, var(--dz-bg, var(--dzc-bg, Canvas))));
+  --radius-dz: var(--dz-radius, var(--dzc-radius, 0.375rem));
+  --radius-dz-event: var(--dz-event-radius, var(--dz-radius, var(--dzc-radius, 0.375rem)));
+  --font-dz: var(--dz-font, var(--dzc-font, inherit));
+}

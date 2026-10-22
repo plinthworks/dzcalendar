@@ -949,6 +949,77 @@ try {
       await p.close();
     }
 
+    // ── Phase 18g-2: Tailwind 4 (the real one, compiled by Vite) and the unstyled look ──
+    {
+      const { p, errors } = await page('/tailwind.html');
+      await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      await p.waitForTimeout(300);
+      const tw = await p.evaluate(() => {
+        const cs = (el, k) => el && getComputedStyle(el)[k];
+        const s = document.querySelector('#styled .dz-ev[data-event-id="b"]');
+        const n = document.querySelector('#bare .dz-ev[data-event-id="b"]');
+        /** The event's place in its column: the same structure in both looks. */
+        const inCol = (el) => { const r = el.getBoundingClientRect(); const c = el.closest('.dz-tg__col').getBoundingClientRect(); return [Math.round(r.top - c.top), Math.round(r.height), Math.round(r.left - c.left)]; };
+        const ours = getComputedStyle(document.querySelector('#styled .dz-cal')).getPropertyValue('--dzc-accent').trim();
+        const accent = (() => { const t = document.createElement('i'); t.style.color = ours; document.body.append(t); const c = getComputedStyle(t).color; t.remove(); return c; })();
+        return {
+          utilityWins: cs(s, 'borderTopLeftRadius'),
+          themed: cs(document.querySelector('#styled .note'), 'backgroundColor') === accent,
+          bare: { look: document.querySelector('#bare .dz-cal').getAttribute('data-dz-look'), bg: cs(n, 'backgroundColor'), radius: cs(n, 'borderTopLeftRadius'), colLine: cs(document.querySelector('#bare .dz-tg__col'), 'borderLeftColor') },
+          // Tailwind's preflight gives every element `border: 0 solid`: none of ours is a 0-px width.
+          ourBorderGone: cs(document.querySelector('#bare .dz-toolbar__btn'), 'borderTopWidth'),
+          sameGeometry: JSON.stringify(inCol(s)) === JSON.stringify(inCol(n)),
+          places: [inCol(s), inCol(n)],
+        };
+      });
+      check('tailwind 4: a utility on a part (hooks.class) wins over the calendar’s layer (rounded-none: 0 px)', tw.utilityWins === '0px', JSON.stringify(tw));
+      check('tailwind 4: bg-dz-accent on markup of yours is the calendar’s theme accent', tw.themed, JSON.stringify(tw));
+      check('unstyled: data-dz-look="none"; the colours are Tailwind’s (sky-50, rounded-md), none of ours (a button keeps no border)', tw.bare.look === 'none' && /oklch/.test(tw.bare.bg) && tw.bare.radius === '6px' && tw.ourBorderGone === '0px', JSON.stringify(tw.bare) + tw.ourBorderGone);
+      check('unstyled: the structure is the same — the event at the same place in its column as in the styled calendar', tw.sameGeometry, JSON.stringify(tw.places));
+      check('tailwind 4: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
+    // ── Phase 18g-2: unstyled, with no CSS of the application at all ──
+    {
+      const { p, errors } = await page('/unstyled.html');
+      await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      await p.waitForTimeout(300);
+      const un = await p.evaluate(() => {
+        const cs = (sel, k) => { const e = document.querySelector(sel); return e && getComputedStyle(e)[k]; };
+        const inCol = (sel) => { const e = document.querySelector(sel); const r = e.getBoundingClientRect(); const c = e.closest('.dz-tg__col').getBoundingClientRect(); return [Math.round(r.top - c.top), Math.round(r.height), Math.round(r.left - c.left), Math.round(r.width)]; };
+        return {
+          evBg: cs('#bare .dz-ev[data-event-id="b"]', 'backgroundColor'),
+          evRadius: cs('#bare .dz-ev[data-event-id="b"]', 'borderTopLeftRadius'),
+          nowLine: cs('#bare .dz-now', 'borderTopWidth'),
+          numBorder: cs('#month .dz-dg__num', 'borderTopWidth'),
+          numBg: cs('#month .dz-dg__num', 'backgroundColor'),
+          listHeadBg: cs('#list .dz-list__head', 'backgroundColor'),
+          // Borders are the look: a column's 1-px line is room again unstyled, nothing more.
+          same: inCol('#styled .dz-ev[data-event-id="b"]').every((v, i) => Math.abs(v - inCol('#bare .dz-ev[data-event-id="b"]')[i]) <= 1),
+          places: [inCol('#styled .dz-ev[data-event-id="b"]'), inCol('#bare .dz-ev[data-event-id="b"]')],
+          styledBg: cs('#styled .dz-ev[data-event-id="b"]', 'backgroundColor'),
+        };
+      });
+      check('unstyled, no app CSS: no colour or radius of ours on an event; the now line drawn by nobody', un.evBg === 'rgba(0, 0, 0, 0)' && un.evRadius === '0px' && un.nowLine === '0px' && un.styledBg !== 'rgba(0, 0, 0, 0)', JSON.stringify(un));
+      check('unstyled: a day number stays a reset button (no native border or grey)', un.numBorder === '0px' && un.numBg === 'rgba(0, 0, 0, 0)', JSON.stringify(un));
+      check('unstyled: the list’s sticky day head keeps an opaque fill (the page’s Canvas)', un.listHeadBg !== 'rgba(0, 0, 0, 0)', un.listHeadBg);
+      check('unstyled: the same structure — the event at the same place and size in its column (within a border’s pixel)', un.same, JSON.stringify(un.places));
+      const more = await p.evaluate(() => ({
+        title: getComputedStyle(document.querySelector('#bare .dz-toolbar__title')).fontWeight,
+        btn: getComputedStyle(document.querySelector('#bare .dz-toolbar__btn')).borderTopWidth,
+      }));
+      check('unstyled: no weight of ours (the title is the browser’s heading, not 600); a header button keeps no native border', more.title !== '600' && more.btn === '0px', JSON.stringify(more));
+      check('unstyled: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+      // The system in dark, the page light: what the calendar fills with the page's colour stays readable.
+      const { p: dark } = await page('/unstyled.html', { colorScheme: 'dark' });
+      await dark.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      const pair = await dark.evaluate(() => { const h = getComputedStyle(document.querySelector('#list .dz-list__head')); return [h.backgroundColor, h.color]; });
+      check('unstyled, the system dark and the page light: the list’s sticky head is not dark on dark', pair[0] !== pair[1] && pair[0] !== 'rgb(18, 18, 18)', JSON.stringify(pair));
+      await dark.close();
+    }
+
     // ── Phase 18f-4: dragging in from the page, and between two calendars ──
     {
       const { p, errors } = await page('/dragdrop.html');

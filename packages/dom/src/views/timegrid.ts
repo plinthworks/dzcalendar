@@ -1,4 +1,4 @@
-import { dayStates } from '../render/event.js';
+import { dayStates, drawNow } from '../render/event.js';
 import { weekWords } from '../render/formats.js';
 import { written } from '../render/formats.js';
 import { Temporal, formatTemporal, locateNow, weekNumber, weekRulesFor } from '@dzcalendar/core';
@@ -193,7 +193,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       if (it.resourceId !== undefined) el.dataset['resource'] = it.resourceId;
       else delete el.dataset['resource'];
       if (!changed.content) return;
-      applyEventLook(el, ev, ctx.kernel.now());
+      applyEventLook(el, ev, drawNow(ctx));
       handles(el, s, it.bg);
       if (it.bg) {
         el.replaceChildren();
@@ -364,7 +364,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const nodes = more.events.map((p) => {
       const ev = p.segment.instance.event;
       const item = h(doc, 'div', 'dz-bar dz-bar--in-popover');
-      applyEventLook(item, ev, ctx.kernel.now());
+      applyEventLook(item, ev, drawNow(ctx));
       item.dataset['segment'] = p.segment.key;
       const title = ev.title || ctx.messages.untitled;
       const labels = timeLabels(ctx, ev, { ...(p.startReading && { start: p.startReading }), ...(p.endReading && { end: p.endReading }) });
@@ -495,7 +495,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     el.classList.toggle('dz-ev--cont-end', !seg.endsHere);
     el.toggleAttribute('data-continues-before', !seg.startsHere);
     el.toggleAttribute('data-continues-after', !seg.endsHere);
-    applyEventLook(el, ev, ctx.kernel.now());
+    applyEventLook(el, ev, drawNow(ctx));
     handles(el, seg, bg);
     if (bg && ctx.hooks.event) {
       // A background's own content (a "Vacances" label), if the hook gives one: drawn, read; none: mute as before.

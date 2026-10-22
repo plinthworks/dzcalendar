@@ -62,6 +62,17 @@ page's **global reset**, which touches every element:
 | Bootstrap 5, normalize.css, older CSS | unlayered | `cssLayers: false` + `@dzcalendar/theme/unlayered.css` |
 | Plain modern CSS | none | nothing |
 
+- **Tailwind's utilities from the calendar's tokens**: after `@import
+  'tailwindcss'`, `@import '@dzcalendar/theme/tailwind-theme.css'` gives
+  `bg-dz-accent`, `text-dz-fg`, `text-dz-muted`, `border-dz-border`,
+  `bg-dz-raised`, `rounded-dz`… that follow the calendar's theme and scheme
+  (inside a calendar; elsewhere set the `--dz-*` tokens yourself). The
+  other way, a rule of yours: `.dz-cal { --dz-accent:
+  var(--color-emerald-600); }`.
+- **All of the look yours**: `look: 'none'` keeps the structure and drops
+  the calendar's colours, borders, radii, fonts and shadows; your Tailwind
+  classes go on its parts through `hooks.<element>.class`
+  (`playground/tailwind.html` shows both, checked in Chrome).
 - Layered (the default), the calendar's sheet is appended, so its layers come
   after any the page declared first (Tailwind 4's `base`): the preflight does
   not reset it. `tailwind.css` also puts it *before* Tailwind's utilities, so
@@ -78,7 +89,7 @@ page's **global reset**, which touches every element:
 
 **Under a Content-Security-Policy without inline styles** (`injectStyles:
 false`): include `DZ_CSS`, `LIST_CSS`, `MULTIMONTH_CSS` (from their entries)
-and, for a `defineTheme` theme, `themeCss('clinic')` in your own stylesheet.
+and, for a `defineTheme` theme, `themeCss('clinic')` in your own stylesheet. With an unstyled calendar (`look: 'none'`), give each of them through `lookGuardedCss(…)` (from `@dzcalendar/dom` or `@dzcalendar/dom/toolkit`).
 
 **In a shadow root**, load the theme CSS inside the root; its sizes are on `:root, :host`.
 

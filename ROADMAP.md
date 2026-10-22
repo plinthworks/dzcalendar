@@ -38,7 +38,10 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   size, npm publication, licences, Phase 19.
 - **Done:** 18g-1 (the styling contract) committed ("Phase 18g-1"); every
   check green (1 465 tests, exit codes checked) but the known noise.
-  **Next: 18g-2** (unstyled mode, the Tailwind 4 bridge).
+- **Done:** 18g-2 (unstyled mode, the Tailwind 4 bridge) committed ("Phase
+  18g-2"); every check green, exit codes read, `perf:browser` included.
+  **Next: 18g-3** (the visual pass, modern and sober; screenshots for the
+  owner).
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2837,6 +2840,56 @@ as automated checks.
   `@theme` (`bg-dz-accent`, `text-dz-muted`…) and the application's
   Tailwind colours able to feed ours; a playground page built with
   Tailwind 4, checked in Chrome (utilities win, nothing reset).
+
+### 18g-2 — done (2026-10-22)
+
+**Built**
+- `look: 'styled' | 'none'` (live, `data-dz-look`): every rule of the
+  calendar's CSS split, declaration by declaration, into its structure
+  (layout, sizes, scrolling, resets, opacity, the page's own colours) and
+  its look, the look kept from an unstyled calendar by `:where(:not(...))`
+  (no weight). Lazy: a page with no unstyled calendar pays nothing; the
+  first one guards its document's (or shadow root's) sheets
+  (`packages/dom/src/render/look.ts`, `guardLook`). `lookGuardedCss` for
+  pages that include the CSS themselves (a warning once otherwise).
+- The theme's CSS built by `scripts/build-theme.mjs` (Sass, then the same
+  guard); `npm run build:theme` runs it, the theme's test compares.
+- `@dzcalendar/theme/tailwind-theme.css`: the tokens in Tailwind 4's
+  `@theme inline` (`bg-dz-accent`, `text-dz-muted`, `rounded-dz`…, the
+  platform's colours outside a calendar).
+- Tailwind 4.3.3 (`tailwindcss`, `@tailwindcss/vite`, dev only) in the
+  playground; `playground/tailwind.html` (styled + utilities, unstyled +
+  Tailwind) and `playground/unstyled.html` (no CSS of the application),
+  checked in Chrome (`test:browser`).
+- Tests: `packages/dom/test/look.test.ts` (8), Chrome (12).
+- Budgets (owner, measured + 3 %): dom 54 803, pro/editor 10 948, and the
+  first frame of `timeGridWeek:U` 30 ms (27 before, over it as known noise
+  for several phases).
+
+**Reviews fixed** (architect + execution in Chrome)
+- Unstyled was unusable in places: sticky heads (the list's, the
+  timeline's) and the editor lost their fill (content through them) —
+  now the page's `Canvas`; buttons became the browser's grey ones — resets
+  kept; disabled entries and moved events lost their opacity — kept.
+- Dark text on a dark fill (the system dark, the page light): the scheme is
+  the look again, `Canvas` follows the page. A weight (600) and a radius
+  (50 %) in digits were taken for neutral values — neutral counts only for
+  colours, fills, borders and a font reset.
+- A string with a semicolon cut a declaration; a single-colon
+  pseudo-element got the guard after it (an invalid selector); a sheet
+  guarded twice; a `defineTheme` sheet written back unguarded at each
+  update; the bridge without fallbacks outside a calendar and without the
+  calendar's on-tone chain; checks that Tailwind's preflight made pass
+  whatever the guard did.
+- Measured: the guard on every sheet cost ~2 ms at first render for every
+  page — made lazy; `kernel.now()` read for every event drawn (since
+  18g-1) — once per drawing.
+
+**Not done on purpose**
+- Type is the look: heads and rows that size to their text follow the
+  application's font sizes (the time scale does not move); borders are the
+  look (a column's 1-px line).
+- The editor's buttons and fields are the browser's own when unstyled.
 
 ### 18g-3 — the visual pass
 - Header, buttons and groups, the title, the active view, events (tinted

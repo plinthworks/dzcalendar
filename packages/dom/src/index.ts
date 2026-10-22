@@ -6,6 +6,8 @@ export type { CalendarOptions, CalendarInstance, CalendarUpdate } from './calend
 export { EN, FR, defineLocale, messagesForLocale } from './messages.js';
 export type { DzMessages } from './messages.js';
 export { DZ_CSS, ensureStyles } from './styles.js';
+/** For a page that includes the CSS itself (`injectStyles: false`, a CSP) and has an unstyled calendar: `lookGuardedCss(DZ_CSS)`. */
+export { withLookGuard as lookGuardedCss } from './render/look.js';
 export { defineTheme, themeCss, THEME_NAMES } from './themes.js';
 export type { ThemeTokens, ThemeColor, ThemeName } from './themes.js';
 export { NO_MOTION } from './motion.js';

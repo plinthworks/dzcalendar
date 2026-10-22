@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import angular from '@analogjs/vite-plugin-angular';
+import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath } from 'node:url';
 
 /** Compiled by Angular; everything else by Vite. */
@@ -13,6 +14,8 @@ export default defineConfig({
   // Vue's compile-time flags (its esm-bundler build asks for them): the playground's React and Vue pages.
   define: { __VUE_OPTIONS_API__: 'true', __VUE_PROD_DEVTOOLS__: 'false', __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: 'false' },
   plugins: [
+    // Only for the CSS that imports Tailwind (playground/tailwind.css): the Tailwind 4 page.
+    tailwindcss(),
     angular({
       tsconfig: fileURLToPath(new URL('./playground/tsconfig.angular.json', import.meta.url)),
       transformFilter: (_code: string, id: string) => ANGULAR.test(id),
@@ -73,6 +76,9 @@ export default defineConfig({
         vue: fileURLToPath(new URL('./playground/vue.html', import.meta.url)),
         sehhaty: fileURLToPath(new URL('./playground/sehhaty.html', import.meta.url)),
         timeline: fileURLToPath(new URL('./playground/timeline.html', import.meta.url)),
+        dragdrop: fileURLToPath(new URL('./playground/dragdrop.html', import.meta.url)),
+        tailwind: fileURLToPath(new URL('./playground/tailwind.html', import.meta.url)),
+        unstyled: fileURLToPath(new URL('./playground/unstyled.html', import.meta.url)),
       },
     },
   },

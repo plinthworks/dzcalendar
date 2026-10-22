@@ -2,7 +2,7 @@ import { formatTemporal, registerModelFamily } from '@dzcalendar/core';
 import type { CalEvent, Command, EventInstance, KernelState, Segment } from '@dzcalendar/core';
 import { buildListModel } from '@dzcalendar/core/views';
 import type { ListDay, ListEntry, ListModel } from '@dzcalendar/core/views';
-import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, dayStates, decorate, ensureStyles, written, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
+import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, dayStates, drawNow, decorate, ensureStyles, written, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
 import type { ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
 import { activeIn } from '../focus.js';
 
@@ -11,7 +11,7 @@ export const LIST_CSS = `
 @layer dzcalendar.base, dzcalendar.theme;
 @layer dzcalendar.base {
 .dz-list { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--dz-border, var(--dzc-border)); border-radius: var(--dz-radius, var(--dzc-radius)); }
-.dz-list__head { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; gap: 0.5rem; margin: 0; padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 600; background: var(--dz-bg-raised, var(--dzc-bg-raised)); border-block-end: 1px solid var(--dz-border, var(--dzc-border)); }
+.dz-list__head { position: sticky; top: 0; z-index: 1; background-color: Canvas; display: flex; justify-content: space-between; gap: 0.5rem; margin: 0; padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 600; background: var(--dz-bg-raised, var(--dzc-bg-raised)); border-block-end: 1px solid var(--dz-border, var(--dzc-border)); }
 .dz-list__date { all: unset; cursor: pointer; }
 .dz-list__date:focus-visible, .dz-list__ev:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: -2px; }
 .dz-list__len { font-weight: 400; color: var(--dzc-fg-muted); }
@@ -201,7 +201,7 @@ export function createListView(ctx: ViewCtx): ViewController {
     const e = it.entry;
     const ev = e.instance.event;
     byKey.set(e.key, e);
-    applyEventLook(el, ev, ctx.kernel.now());
+    applyEventLook(el, ev, drawNow(ctx));
     el.dataset['segment'] = e.key;
     el.tabIndex = e.key === cursorKey ? 0 : -1;
     const title = ev.title || ctx.messages.untitled;

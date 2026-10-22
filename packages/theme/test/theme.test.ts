@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { execFileSync } from 'node:child_process';
+// @ts-expect-error -- a plain script, no types
+import { themeCss } from '../../../scripts/build-theme.mjs';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -8,9 +9,9 @@ const css = readFileSync(`${dir}/dzcalendar.css`, 'utf8');
 const tzslotPalette = ['bg', 'bg-raised', 'fg', 'fg-muted', 'border', 'accent', 'accent-fg', 'danger', 'warning'];
 
 describe('@dzcalendar/theme', () => {
-  it('the compiled CSS is what the SCSS produces — one theme, not two', () => {
-    const fresh = execFileSync(`${dir}/../../node_modules/.bin/sass`, ['--no-source-map', '--style=expanded', `${dir}/dzcalendar.scss`], { encoding: 'utf8' });
-    expect(css.trim()).toBe(fresh.trim());
+  it('the compiled CSS is what the SCSS produces — one theme, not two', async () => {
+    // The SCSS compiled, its look guarded for `look: 'none'` (scripts/build-theme.mjs).
+    expect(css.trim()).toBe((await themeCss('dzcalendar')).trim());
   });
 
   // The family's values are defaults (--dzp-*): the calendar reads --tz-* first, so a page's own palette wins.
@@ -47,10 +48,9 @@ describe('@dzcalendar/theme', () => {
     expect(css).toContain('[data-theme=dark] .dz-cal[data-dz-theme=standard]:not([data-dz-scheme=light])');
   });
 
-  it('unlayered.css is what unlayered.scss produces: the same rules, outside any layer', () => {
+  it('unlayered.css is what unlayered.scss produces: the same rules, outside any layer', async () => {
     const plain = readFileSync(`${dir}/unlayered.css`, 'utf8');
-    const fresh = execFileSync(`${dir}/../../node_modules/.bin/sass`, ['--no-source-map', '--style=expanded', `${dir}/unlayered.scss`], { encoding: 'utf8' });
-    expect(plain.trim()).toBe(fresh.trim());
+    expect(plain.trim()).toBe((await themeCss('unlayered')).trim());
     expect(plain).not.toContain('@layer');
     expect(plain).toContain('.dz-cal[data-dz-theme=slate] {');
     expect(readFileSync(`${dir}/tailwind3.css`, 'utf8')).toContain("@import './unlayered.css';");

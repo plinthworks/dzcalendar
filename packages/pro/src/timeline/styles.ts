@@ -17,9 +17,9 @@ export const TIMELINE_CSS = `
 .dz-tl--days { --dz-tl-slot: 2.25rem; }
 .dz-tl__scroller { flex: 1; min-height: 0; overflow: auto; position: relative; overscroll-behavior: contain; }
 .dz-tl__sheet { position: relative; width: calc(var(--dz-tl-area, 0px) + var(--dz-tl-len, 0) * var(--dz-tl-slot)); }
-.dz-tl__head { position: sticky; top: 0; z-index: 4; display: flex; background: var(--dz-bg, var(--dzc-bg)); border-bottom: 1px solid var(--dz-border, var(--dzc-border)); }
+.dz-tl__head { position: sticky; top: 0; z-index: 4; display: flex; background-color: Canvas; background: var(--dz-bg, var(--dzc-bg)); border-bottom: 1px solid var(--dz-border, var(--dzc-border)); }
 .dz-tl__corner {
-  position: sticky; inset-inline-start: 0; z-index: 5; flex: none; width: var(--dz-tl-area, 0px);
+  position: sticky; inset-inline-start: 0; z-index: 5; flex: none; width: var(--dz-tl-area, 0px); background-color: Canvas;
   display: grid; grid-template-columns: var(--dz-tl-area-cols, 0px); align-items: end;
   background: var(--dz-bg, var(--dzc-bg)); border-inline-end: 1px solid var(--dz-border, var(--dzc-border)); box-sizing: border-box;
 }
@@ -43,7 +43,7 @@ export const TIMELINE_CSS = `
 .dz-tl__row--group { height: var(--dz-tl-grouprow, calc(var(--dz-tl-lane) + 8px)); background: var(--dz-bg-raised, var(--dzc-bg-raised)); }
 .dz-tl:not(.dz-tl--resources) .dz-tl__row { height: 100%; min-height: calc(var(--dz-tl-lanes, 3) * var(--dz-tl-lane) + 8px); border-bottom: 0; }
 .dz-tl__area {
-  position: sticky; inset-inline-start: 0; z-index: 3; flex: none; width: var(--dz-tl-area, 0px);
+  position: sticky; inset-inline-start: 0; z-index: 3; flex: none; width: var(--dz-tl-area, 0px); background-color: Canvas;
   display: grid; grid-template-columns: var(--dz-tl-area-cols, 0px); box-sizing: border-box;
   background: var(--dz-bg, var(--dzc-bg)); border-inline-end: 1px solid var(--dz-border, var(--dzc-border));
 }

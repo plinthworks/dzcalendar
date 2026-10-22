@@ -1,0 +1,5 @@
+/* The recipe of docs/theming.md for Tailwind 4: the calendar's layer between preflight and the utilities, then its tokens in Tailwind's theme. */
+@import '../packages/theme/tailwind.css';
+@import 'tailwindcss';
+@import '../packages/theme/tailwind-theme.css';
+@source './tailwind.ts';

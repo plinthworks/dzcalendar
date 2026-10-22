@@ -14,12 +14,14 @@
     },
     "./tailwind.css": "./tailwind.css",
     "./unlayered.css": "./unlayered.css",
-    "./tailwind3.css": "./tailwind3.css"
+    "./tailwind3.css": "./tailwind3.css",
+    "./tailwind-theme.css": "./tailwind-theme.css"
   },
   "files": [
     "dzcalendar.css",
     "dzcalendar.scss",
     "tailwind.css",
+    "tailwind-theme.css",
     "unlayered.css",
     "unlayered.scss",
     "tailwind3.css"

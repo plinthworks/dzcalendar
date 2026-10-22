@@ -21,7 +21,7 @@ import { createPopover } from './popover.js';
 import { FrameScheduler } from './render/frame.js';
 import { h } from './render/reconcile.js';
 import { Scope } from './render/scope.js';
-import { DZ_CSS, ensureStyles } from './styles.js';
+import { DZ_CSS, ensureStyles, guardLook } from './styles.js';
 import { THEME_NAMES, ensureTheme, isKnownTheme } from './themes.js';
 import { createToolbar, defaultLayout, sameLook } from './toolbar.js';
 import type { CustomButton, HeaderToolbar } from './toolbar.js';
@@ -90,6 +90,8 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly density?: 'compact' | 'comfortable' | 'spacious';
   /** Events tinted with their tone's edge ('tinted', the default) or filled blocks of their tone ('solid'). */
   readonly eventStyle?: 'tinted' | 'solid';
+  /** 'none': the structure only (grids, positions, sizes) — every colour, border, shadow and type yours (Tailwind, a design system). Default 'styled'. */
+  readonly look?: 'styled' | 'none';
   /**
    * The calendar dates are written in ('islamic-umalqura', 'persian'…; Intl's
    * names). The data and the grids stay Gregorian; titles, numbers and
@@ -166,6 +168,8 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly scheme?: 'auto' | 'light' | 'dark';
   readonly density?: 'compact' | 'comfortable' | 'spacious';
   readonly eventStyle?: 'tinted' | 'solid';
+  /** 'none': the structure only (grids, positions, sizes) — every colour, border, shadow and type yours (Tailwind, a design system). Default 'styled'. */
+  readonly look?: 'styled' | 'none';
   readonly displayCalendar?: string | null;
   readonly secondaryCalendar?: string | null;
   /** Options of a plugin's views, by family; compared family by family (a new object for one redraws it). */
@@ -285,7 +289,8 @@ function withoutCalendar(locale: string): string {
 }
 
 /** A bad theme, scheme or density is a configuration error, said before anything changes. */
-function checkLook(o: { theme?: string | undefined; scheme?: string | undefined; density?: string | undefined; eventStyle?: string | undefined }): void {
+function checkLook(o: { theme?: string | undefined; scheme?: string | undefined; density?: string | undefined; eventStyle?: string | undefined; look?: string | undefined }): void {
+  if (o.look !== undefined && !['styled', 'none'].includes(o.look)) throw new RangeError(`look is 'styled' or 'none': ${o.look}`);
   if (o.eventStyle !== undefined && !['tinted', 'solid'].includes(o.eventStyle)) throw new RangeError(`eventStyle is 'tinted' or 'solid': ${o.eventStyle}`);
   if (o.theme !== undefined && !isKnownTheme(o.theme)) throw new RangeError(`unknown theme: ${o.theme} (${THEME_NAMES.join(', ')}, or defineTheme first)`);
   if (o.scheme !== undefined && !['auto', 'light', 'dark'].includes(o.scheme)) throw new RangeError(`scheme is 'auto', 'light' or 'dark': ${o.scheme}`);
@@ -367,8 +372,9 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   const root = h(doc, 'div', 'dz-cal');
   root.dir = directionOf(kernel.getState().locale);
   // Theme, scheme, density: attributes the stylesheets read.
-  const look = { theme: options.theme ?? 'standard', scheme: options.scheme ?? 'auto', density: options.density ?? 'comfortable', eventStyle: options.eventStyle ?? 'tinted' };
+  const look = { theme: options.theme ?? 'standard', scheme: options.scheme ?? 'auto', density: options.density ?? 'comfortable', eventStyle: options.eventStyle ?? 'tinted', look: options.look ?? 'styled' };
   checkLook(look);
+  let saidUnguarded = false;
   const applyLook = () => {
     // Always set: the theme's families (the standard one too) are keyed on it.
     root.dataset['dzTheme'] = look.theme;
@@ -378,6 +384,17 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     else root.dataset['dzDensity'] = look.density;
     if (look.eventStyle === 'tinted') delete root.dataset['dzEventStyle'];
     else root.dataset['dzEventStyle'] = look.eventStyle;
+    // Unstyled: the structure only, the look the application's (docs/styling.md).
+    if (look.look === 'styled') delete root.dataset['dzLook'];
+    else {
+      root.dataset['dzLook'] = look.look;
+      // This page's sheets guarded from now on (a page without an unstyled calendar never pays for it).
+      if (options.injectStyles !== false) guardLook(host);
+      else if (!saidUnguarded) {
+        saidUnguarded = true;
+        console.warn("dzcalendar: look 'none' with injectStyles: false — include lookGuardedCss(DZ_CSS) (and the other sheets) for the look to go");
+      }
+    }
     if (options.injectStyles !== false) ensureTheme(host, look.theme, cssLayers);
   };
   applyLook();
@@ -1156,7 +1173,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
               dirty = true;
             }
           }
-          if ((changes.theme && changes.theme !== look.theme) || (changes.scheme && changes.scheme !== look.scheme) || (changes.density && changes.density !== look.density) || (changes.eventStyle && changes.eventStyle !== look.eventStyle)) {
+          if ((changes.theme && changes.theme !== look.theme) || (changes.scheme && changes.scheme !== look.scheme) || (changes.density && changes.density !== look.density) || (changes.eventStyle && changes.eventStyle !== look.eventStyle) || (changes.look && changes.look !== look.look)) {
+            look.look = changes.look ?? look.look;
             look.theme = changes.theme ?? look.theme;
             look.scheme = changes.scheme ?? look.scheme;
             look.density = changes.density ?? look.density;

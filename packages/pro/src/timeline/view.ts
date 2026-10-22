@@ -20,7 +20,7 @@ import {
   activeIn,
 } from '@dzcalendar/dom/toolkit';
 import type { Box, InteractionSurface, KeyboardSurface, ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
-import { decorate, holder, undecorate, undecorateAll, written } from '@dzcalendar/dom/toolkit';
+import { decorate, drawNow, holder, undecorate, undecorateAll, written } from '@dzcalendar/dom/toolkit';
 import type { TimelineBar, TimelineModel, TimelineMore, TimelineRow } from './model.js';
 import { timelineNow } from './model.js';
 import { TIMELINE_CSS } from './styles.js';
@@ -608,7 +608,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     el.classList.toggle('dz-tl__ev--cont-end', !seg.endsHere);
     el.toggleAttribute('data-continues-before', !seg.startsHere);
     el.toggleAttribute('data-continues-after', !seg.endsHere);
-    applyEventLook(el, ev, ctx.kernel.now());
+    applyEventLook(el, ev, drawNow(ctx));
     handles(el, seg, it.bg);
     if (it.bg) {
       el.replaceChildren();
@@ -659,7 +659,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     const nodes = m.events.map((e) => {
       const ev = e.segment.instance.event;
       const item = h(doc, 'div', 'dz-bar dz-bar--in-popover');
-      applyEventLook(item, ev, ctx.kernel.now());
+      applyEventLook(item, ev, drawNow(ctx));
       item.dataset['segment'] = e.segment.key;
       const title = ev.title || ctx.messages.untitled;
       const labels = timeLabels(ctx, ev, {});

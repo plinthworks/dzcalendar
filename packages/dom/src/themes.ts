@@ -1,4 +1,5 @@
-import { ensureStyles, unlayered } from './styles.js';
+import { withLookGuard } from './render/look.js';
+import { ensureStyles, unlayered, isGuarded } from './styles.js';
 
 /** A colour, or a (light, dark) pair that follows the calendar's scheme. */
 export type ThemeColor = string | readonly [light: string, dark: string];
@@ -121,6 +122,8 @@ export function ensureTheme(host: HTMLElement, name: string, layers = true): voi
 
 /** A theme's sheet given its CSS again, in the form it was put in (layered or not). */
 function refresh(style: HTMLStyleElement, css: string): void {
-  const text = style.dataset['dzLayers'] === 'off' ? unlayered(css) : css;
+  // Where an unstyled calendar is, its sheets are guarded: compared, and written again, guarded.
+  const guarded = isGuarded(style.parentNode) ? withLookGuard(css) : css;
+  const text = style.dataset['dzLayers'] === 'off' ? unlayered(guarded) : guarded;
   if (style.textContent !== text) style.textContent = text;
 }

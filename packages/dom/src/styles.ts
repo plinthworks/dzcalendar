@@ -1,3 +1,4 @@
+import { withLookGuard } from './render/look.js';
 /**
  * The layout the calendar needs to be usable at all: grids, positions, the
  * reset that turns a <button> into a toolbar control. Taste lives in
@@ -68,6 +69,8 @@ export const DZ_CSS = `
 .dz-toolbar__custom { display: inline-flex; align-items: center; gap: 0.375rem; }
 .dz-toolbar__custom[aria-pressed='true'] { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); border-color: var(--dz-accent, var(--dzc-accent)); }
 .dz-toolbar__btn {
+  /* Reset first (kept unstyled: a header button is not the browser's grey one), then the theme's line. */
+  border: 0;
   border: 1px solid var(--dz-border, var(--dzc-border));
   border-radius: var(--dz-radius, var(--dzc-radius));
   background: transparent;
@@ -581,6 +584,26 @@ export function unlayered(css: string): string {
   return (css.slice(0, open.index) + css.slice(open.index + open[0].length, end) + css.slice(end + 1)).replace(/@layer\s+dzcalendar\.base\s*,\s*dzcalendar\.theme\s*;/, '');
 }
 
+/** Roots (a document's head, a shadow root) where an unstyled calendar was drawn: their sheets carry the look's guard. */
+const GUARDED = new WeakSet<ParentNode>();
+
+/**
+ * The first unstyled calendar (`look: 'none'`) of a document or shadow root:
+ * the calendar's sheets there are written again with their look guarded
+ * (once; those added later are guarded as they come). A page without one
+ * pays nothing.
+ */
+/** Whether a root's sheets carry the look's guard. */
+export const isGuarded = (root: ParentNode | null): boolean => root !== null && GUARDED.has(root);
+
+export function guardLook(host: HTMLElement): void {
+  const root = host.getRootNode();
+  const target = root instanceof ShadowRoot ? root : host.ownerDocument.head;
+  if (GUARDED.has(target)) return;
+  GUARDED.add(target);
+  for (const style of target.querySelectorAll<HTMLStyleElement>('style[data-dzcalendar]')) style.textContent = withLookGuard(style.textContent ?? '');
+}
+
 /**
  * Inserts the stylesheet once per document or shadow root.
  * Layered (the default), it goes last: the page's own rules win by the
@@ -594,6 +617,8 @@ export function ensureStyles(host: HTMLElement, id: string, css: string, layers 
   if (target.querySelector(`style[data-dzcalendar="${id}"]`)) return;
   const style = host.ownerDocument.createElement('style');
   style.dataset['dzcalendar'] = id;
+  // A root with an unstyled calendar (`look: 'none'`) has its sheets guarded; elsewhere they go as they are (no cost).
+  if (GUARDED.has(target)) css = withLookGuard(css);
   if (layers) {
     style.textContent = css;
     target.append(style);

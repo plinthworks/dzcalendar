@@ -10,7 +10,7 @@ removed is a major version**; one added is a minor version.
 
 `docs/theming.md` says how to use the themes; this page is the reference.
 
-## Five ways to change it, lightest first
+## Six ways to change it, lightest first
 
 1. **Tokens** — `.agenda { --dz-accent: #0f766e; --dz-radius: 10px; }`.
 2. **Your own rules** — any rule of yours outside a cascade layer wins over
@@ -23,6 +23,24 @@ removed is a major version**; one added is a minor version.
    system's) on the calendar's own elements.
 5. **Your own content** — `hooks.<element>.content` and the frameworks'
    templates replace what a part shows.
+6. **No look at all** — `look: 'none'` keeps the structure (grids,
+   positions, sizes, scrolling, what a layout needs) and drops every colour,
+   border, shadow, radius, font and transition, for that calendar only:
+   your classes (`hooks.<element>.class`, Tailwind) or your design system
+   draw it. The theme's CSS may stay imported: its look is kept from an
+   unstyled calendar too. What is drawn only by colour is then yours to
+   draw: the now line (`hooks.nowIndicator`), today, the grid's lines, a
+   ghost's place, the focus ring of the keyboard's cursor.
+   Borders are the look too: a 1-px line's room goes back to the content.
+   Kept (no colour of ours): resets (a button as plain text), the page's
+   own colour (`Canvas`, the page's scheme) under what sticks or floats (a
+   list's day head, the timeline's heads and resource column, the editor),
+   opacity (a disabled entry, an event being moved); the editor's buttons and
+   fields are the browser's own. Type is the look: heads and rows that size
+   to their text follow your font sizes.
+   A page with no unstyled calendar pays nothing for this; the first one
+   guards the sheets of its document (or shadow root). A page that includes
+   the CSS itself (`injectStyles: false`) uses `lookGuardedCss(DZ_CSS)`.
 
 ## States (`data-*`)
 
@@ -36,7 +54,7 @@ contract test fails, as for a part.
 | an event, every view: `.dz-ev`, `.dz-bar`, `.dz-list__ev`, `.dz-tl__ev` (the "+N" panel's bars too) | `data-event-id`, `data-series-id`, `data-tone` (its tone's name), `data-all-day`, `data-background`, `data-past` / `data-future`, `data-selected` (touch), `data-moving` (being moved by a pointer or the keyboard); on a grid's blocks and bars (`.dz-ev`, `.dz-bar` in a grid, `.dz-tl__ev` — not a list's entries nor the panel's bars): `data-continues-before` / `data-continues-after`, the same as the classes ending in `--cont-start` / `--cont-end` (cut by the period's edge) |
 | a preview: `.dz-ghost` | `data-invalid` (the rules refuse that place); `data-time` holds the time shown (a value, not a state) |
 | a free slot: `.dz-slot` | `data-seats` (seats left, a group session) |
-| the calendar: `.dz-cal` | `data-view` (the view's type), `data-dz-theme`, `data-dz-scheme` (`light` / `dark` when forced), `data-dz-density`, `data-dz-event-style`, `data-editable`, `data-loading` |
+| the calendar: `.dz-cal` | `data-view` (the view's type), `data-dz-theme`, `data-dz-scheme` (`light` / `dark` when forced), `data-dz-density`, `data-dz-event-style`, `data-dz-look` (`none` when unstyled), `data-editable`, `data-loading` |
 | a view's surface: `.dz-tg`, `.dz-dg`, `.dz-tl` | `data-dragging`, `data-selecting`, `data-grabbing` (the keyboard holds an event), `data-dropping` (something dragged in is over it) |
 | a header button | `aria-pressed` (the view shown, a toggle on: Tailwind's `aria-pressed:`); a view button's `data-view` names the view it shows |
 | an ancestor of yours | `data-theme="dark"` / `"light"` on any ancestor is read as the scheme when `scheme` is `'auto'` |
