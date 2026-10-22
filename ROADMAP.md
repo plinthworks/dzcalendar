@@ -33,10 +33,9 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   committed ("Phase 18f-4") — **Phase 18f is complete**. Every check green
   (1 455 tests, test:ci, typecheck, build, size, test:browser,
   perf:browser, test:package) but the known noise (`normalize+index 10k`).
-  **Next** (as planned before 18f): first render and size (indexing at
-  creation, the polyfill only where needed, K.2), then the CSS and a11y
-  pass (with the header's look, disabled buttons, `.dz-tpl*`, the empty
-  day's scroll region), npm publication, licences, Phase 19.
+  **Next: Phase 18g, the CSS and accessibility pass** (owner, 2026-10-22,
+  before first render and size) — see "Phase 18g" below; then first render
+  and size, npm publication, licences, Phase 19.
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2768,3 +2767,50 @@ slots", a business view). Decided:
 buttons (`headerToolbar`, `customButtons`) → 18f-2 the framework
 templates for each → 18f-3 formats and custom views (`visibleRange`, the docs page, compat) →
 18f-4 external and cross-calendar dragging. Reviews and a commit at the end of each.
+
+## Phase 18g — the CSS and accessibility pass (planned)
+
+Owner's decisions (2026-10-22): the CSS must be easy to override with
+Tailwind or any other mechanism; the look **modern and sober** (the spirit
+of Sehhaty's screenshot: grouped buttons with rounded corners, a centred
+title, the active view filled, soft borders, rounded tinted events, today
+marked without shouting; the seven themes follow); four override
+mechanisms beside the layers, the `--dz-*` tokens and `hooks.class`:
+**states as `data-*`**, a **Tailwind 4 `@theme` bridge**, an **unstyled
+mode**, a **stable class contract**; accessibility: **WCAG 2.2 AA in full**,
+as automated checks.
+
+### 18g-1 — the contract
+- Every part (`.dz-*`) and token (`--dz-*`) listed in `docs/styling.md`
+  (what it is, where, which states), versioned as an API (a rename is a
+  major version); a test that the list and the CSS agree.
+- States as attributes on the parts that have them: `data-today`,
+  `data-past`, `data-outside`, `data-selected`, `data-dragging`,
+  `data-all-day`, `data-tone`, `data-invalid`… (Tailwind variants
+  `data-[today]:…`; plain selectors elsewhere); the classes kept.
+
+### 18g-2 — unstyled mode and the Tailwind bridge
+- `look: 'none'`: the structure only (grids, positions, sizes, what a
+  layout needs), no colour, border or shadow — the CSS split in two
+  layers (`dzcalendar.structure`, `dzcalendar.look`).
+- `@dzcalendar/theme/tailwind-theme.css`: our tokens in Tailwind 4's
+  `@theme` (`bg-dz-accent`, `text-dz-muted`…) and the application's
+  Tailwind colours able to feed ours; a playground page built with
+  Tailwind 4, checked in Chrome (utilities win, nothing reset).
+
+### 18g-3 — the visual pass
+- Header, buttons and groups, the title, the active view, events (tinted
+  and solid), today, grid lines, the month, the list, the multi-month
+  year, the timeline, "+N" and its panel, menus, the editor's surfaces,
+  focus rings, disabled states, `.dz-tpl*`; light and dark, the seven
+  themes; before/after screenshots for the owner.
+
+### 18g-4 — WCAG 2.2 AA
+- axe in Chrome on every view × theme × scheme; the keyboard end to end;
+  reflow at 320 px and zoom 200 %; text spacing (1.4.12); targets ≥ 24 px
+  (2.5.8, compact density included); focus never hidden (2.4.11) under the
+  sticky heads; forced colours; reduced motion; the empty day's scroll
+  region (a decision on the grid's tab stops, asked first).
+
+Reviews and a commit at the end of each step.
+
