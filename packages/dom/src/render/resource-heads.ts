@@ -1,3 +1,4 @@
+import { decorate, undecorate } from './hooks.js';
 import { UNASSIGNED } from '@dzcalendar/core';
 import type { Resource, ResourceGroupHead, ResourceHead } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
@@ -59,7 +60,9 @@ export function drawResourceHeads(ctx: ViewCtx, groupsHost: HTMLElement, resourc
     (el, it) => {
       el.textContent = it.group.value;
       place(el, 1, it.from, it.count);
+      decorate(ctx, ctx.hooks.resourceGroupHeader, el, { view: ctx.kernel.getState().view.type, field: String(ctx.kernel.getOptions().resourceGroupField ?? ''), value: it.group.value }, undefined, true);
     },
+    (el) => undecorate(el),
   );
   const heads = new KeyedList<HeadItem>(
     resourcesHost,
@@ -74,17 +77,17 @@ export function drawResourceHeads(ctx: ViewCtx, groupsHost: HTMLElement, resourc
       const r = it.head.resource;
       el.dataset['resource'] = r.id;
       el.className = [`${block}__resource`, ...r.classNames].join(' ');
-      const own = ctx.hooks.resource?.content?.({ resource: r }, el);
-      if (own === null || own === undefined) el.replaceChildren(h(doc, 'span', `${block}__resource-title`, resourceName(ctx, r)));
-      else el.replaceChildren(typeof own === 'string' ? doc.createTextNode(own) : own);
+      // The application's head (content, classes, mounts), else the title; read once the application fills it.
+      decorate(ctx, ctx.hooks.resource, el, { resource: r, view: ctx.kernel.getState().view.type }, () => el.replaceChildren(h(doc, 'span', `${block}__resource-title`, resourceName(ctx, r))), true);
     },
+    (el) => undecorate(el),
   );
   return {
     sync(resources: readonly ResourceHead[], grouped: readonly ResourceGroupHead[], epoch: number): void {
       const row = grouped.length > 0 ? 2 : 1;
       // A group spans its resources' cells: each resource's head says how many it has.
       const per = resources[0]?.count ?? 1;
-      groups.sync(grouped.map((group) => ({ key: `${group.value}|${group.from}`, sig: `${group.from}|${group.count}|${per}`, group, from: group.from * per, count: group.count * per })));
+      groups.sync(grouped.map((group) => ({ key: `${group.value}|${group.from}`, sig: `${group.from}|${group.count}|${per}|${epoch}`, group, from: group.from * per, count: group.count * per })));
       heads.sync(
         resources.map((head) => ({
           key: head.resource.id,

@@ -20,6 +20,7 @@ import {
   activeIn,
 } from '@dzcalendar/dom/toolkit';
 import type { Box, InteractionSurface, KeyboardSurface, ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
+import { decorate, holder, undecorate, undecorateAll } from '@dzcalendar/dom/toolkit';
 import type { TimelineBar, TimelineModel, TimelineMore, TimelineRow } from './model.js';
 import { timelineNow } from './model.js';
 import { TIMELINE_CSS } from './styles.js';
@@ -187,6 +188,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     const resourced = Boolean(model?.options.rows);
     const cols = resourced ? columnsOf() : [];
     const grips: HTMLElement[] = [];
+    undecorateAll(corner);
     corner.replaceChildren(
       ...cols.map((c, i) => {
         // The title column is named "Resource" when the application gives it no head: a column header needs a name.
@@ -194,6 +196,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         const cell = h(doc, 'div', 'dz-tl__colhead', name);
         cell.setAttribute('role', 'columnheader');
         cell.setAttribute('aria-colindex', String(i + 1));
+        decorate(ctx, ctx.hooks.resourceAreaHeader, cell, { view: ctx.kernel.getState().view.type, field: c.field, text: name });
         const grip = h(doc, 'div', 'dz-tl__resizer');
         grip.setAttribute('role', 'separator');
         grip.setAttribute('aria-orientation', 'vertical');
@@ -394,7 +397,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
             });
             return b;
           },
-          (b, it) => drawMore(b, it.more),
+          (b, it) => drawMore(b, p.row, it.more),
+          (b) => undecorate(b),
         ),
       };
       parts.set(it.key, p);
@@ -402,6 +406,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     },
     (el, it, changed) => drawRow(el, it, changed),
     (el) => {
+      undecorateAll(el);
       const p = parts.get(el.dataset['key'] ?? '');
       p?.bars.clear();
       p?.bgs.clear();
@@ -467,6 +472,12 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   });
 
   function drawArea(el: HTMLElement, p: RowParts, row: TimelineRow): void {
+    // The cells are drawn anew: the application lets go of the old ones.
+    undecorateAll(p.area);
+    const view = ctx.kernel.getState().view.type;
+    if (row.kind === 'group') decorate(ctx, holder(ctx.hooks.resourceGroupLane), p.lane, { view, field: groupField(), value: row.value });
+    else if (row.kind === 'resource' && row.resource.id !== UNASSIGNED) decorate(ctx, holder(ctx.hooks.resourceLane), p.lane, { view, resource: row.resource });
+    else undecorate(p.lane);
     if (row.kind === 'all') {
       el.removeAttribute('aria-level');
       el.removeAttribute('aria-expanded');
@@ -481,8 +492,14 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       cell.setAttribute('role', 'rowheader');
       cell.tabIndex = -1;
       const toggle = expander(row.expanded, () => toggleGroup(row.value));
-      cell.append(toggle, h(doc, 'span', 'dz-tl__group-name', `${row.value || '—'} (${new Intl.NumberFormat(ctx.locale).format(row.count)})`));
+      const name = h(doc, 'span', 'dz-tl__group-name', `${row.value || '—'} (${new Intl.NumberFormat(ctx.locale).format(row.count)})`);
+      cell.append(toggle, name);
       p.area.replaceChildren(cell);
+      // The application's group head: classes and mounts on the cell, its content in place of the name.
+      const hooks = ctx.hooks.resourceGroupHeader;
+      const gctx = { view, field: groupField(), value: row.value };
+      decorate(ctx, holder(hooks), cell, gctx);
+      if (hooks?.content) decorate(ctx, { content: hooks.content }, name, gctx);
       p.lane.removeAttribute('aria-label');
       return;
     }
@@ -502,11 +519,20 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
           cell.style.setProperty('--depth', String(row.depth));
           if (row.expanded !== null) cell.append(expander(row.expanded, () => toggleResource(r.id)));
           // "Unassigned" is the calendar's own row: an application's hook draws its resources, not it.
-          const own = c.field === 'title' && r.id !== UNASSIGNED ? ctx.hooks.resource?.content?.({ resource: r }, cell) : null;
           const title = h(doc, 'span', 'dz-tl__title');
-          if (own === null || own === undefined) title.textContent = c.field === 'title' ? resourceName(ctx, r) : textOf(r, c.field);
-          else title.replaceChildren(typeof own === 'string' ? doc.createTextNode(own) : own);
           cell.append(title);
+          const ours = () => {
+            title.textContent = c.field === 'title' ? resourceName(ctx, r) : textOf(r, c.field);
+          };
+          // "Unassigned" is the calendar's own row: an application's hooks draw its resources, not it.
+          const hooks = c.field === 'title' && r.id !== UNASSIGNED ? ctx.hooks.resource : undefined;
+          if (!hooks) ours();
+          else {
+            const rctx = { resource: r, view: ctx.kernel.getState().view.type };
+            decorate(ctx, holder(hooks), cell, rctx);
+            if (hooks.content) decorate(ctx, { content: hooks.content }, title, rctx, ours);
+            else ours();
+          }
         } else cell.textContent = textOf(r, c.field);
         return cell;
       }),
@@ -515,6 +541,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     p.lane.setAttribute('aria-label', resourceName(ctx, r));
     p.lane.setAttribute('aria-colindex', String(cols.length + 1));
   }
+  const groupField = () => String(ctx.kernel.getOptions().resourceGroupField ?? '');
   const textOf = (r: Resource, field: string) => {
     const v = r.id === UNASSIGNED ? '' : fieldOf(r, field);
     return v === undefined || v === null ? '' : String(v);
@@ -593,7 +620,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   // ── "+N" ─────────────────────────────────────────────────────────────────
   const moreOf = new WeakMap<HTMLElement, TimelineMore>();
   let panelEvents = new Map<string, TimelineBar>();
-  function drawMore(b: HTMLElement, m: TimelineMore): void {
+  function drawMore(b: HTMLElement, row: TimelineRow | null, m: TimelineMore): void {
     moreOf.set(b, m);
     place(b, m.from, m.to);
     b.style.setProperty('--lane', String((model?.maxLanes ?? 1) - 1));
@@ -606,6 +633,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         date: `${formatTemporal(first.toZonedDateTimeISO(ctx.zone).toPlainDate(), DAY, ctx.locale)}, ${formatTemporal(first.toZonedDateTimeISO(ctx.zone).toPlainTime(), HM, ctx.locale)}`,
       }),
     );
+    const resource = row?.kind === 'resource' && row.resource.id !== UNASSIGNED ? row.resource : null;
+    decorate(ctx, ctx.hooks.moreLink, b, { view: ctx.kernel.getState().view.type, date: first.toZonedDateTimeISO(ctx.zone).toPlainDate(), resource, count: m.events.length, text: b.textContent ?? '' });
   }
   function openMoreTl(link: HTMLElement, m: TimelineMore, row: TimelineRow): void {
     panelEvents = new Map(m.events.map((e) => [e.segment.key, e]));
@@ -636,9 +665,16 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     });
     const first = m.events[0]!.segment.from as Instant;
     const owner = row.kind === 'resource' ? `${resourceName(ctx, row.resource)}, ` : '';
-    ctx.openMore(link, owner + formatTemporal(first.toZonedDateTimeISO(ctx.zone).toPlainDate(), DAY, ctx.locale), nodes, () => {
-      for (const n of nodes) unmountEvent(ctx, n);
-    });
+    const date = first.toZonedDateTimeISO(ctx.zone).toPlainDate();
+    ctx.openMore(
+      link,
+      owner + formatTemporal(date, DAY, ctx.locale),
+      nodes,
+      () => {
+        for (const n of nodes) unmountEvent(ctx, n);
+      },
+      { date, resource: row.kind === 'resource' && row.resource.id !== UNASSIGNED ? row.resource : null },
+    );
   }
   const panelEvent = (target: EventTarget | null) => {
     const item = (target as Element | null)?.closest<HTMLElement>('.dz-bar');
@@ -1199,6 +1235,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       // Another period or scale: the scroll offset means another moment now — back to the hour asked, today if shown.
       const rescroll = prev !== null && (!prev.axis.start.equals(m.axis.start) || prev.axis.slotMinutes !== m.axis.slotMinutes);
       root.classList.toggle('dz-tl--days', m.axis.unit === 'day');
+      const st = ctx.kernel.getState();
+      decorate(ctx, holder(ctx.hooks.view), root, { view: st.view.type, family: st.view.family, range: st.range, title: st.title });
       root.classList.toggle('dz-tl--resources', Boolean(m.options.rows));
       root.style.setProperty('--dz-tl-len', String(m.axis.length));
       grouped = m.rows.some((r) => r.kind === 'group');
@@ -1254,11 +1292,13 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       const m = model;
       const x = m ? timelineNow(m, now) : null;
       if (x === null) {
+        undecorate(nowEl);
         nowEl.remove();
         return;
       }
       nowEl.style.setProperty('--x', String(x));
       if (nowEl.parentElement !== body) body.append(nowEl);
+      decorate(ctx, ctx.hooks.nowIndicator, nowEl, { view: ctx.kernel.getState().view.type, now: now.toZonedDateTimeISO(ctx.zone), instant: now });
     },
 
     scrollTo(minutes) {
@@ -1273,6 +1313,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     },
 
     destroy() {
+      undecorateAll(root);
       for (const p of parts.values()) {
         p.bars.clear();
         p.bgs.clear();

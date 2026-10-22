@@ -1,3 +1,4 @@
+import { decorate, flushMounts, holder, undecorate } from './render/hooks.js';
 import { actionsFor, assertBusinessHours, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, Temporal } from '@dzcalendar/core';
 import type { CalEvent, Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
@@ -209,11 +210,12 @@ function shallowSame(a: object, b: object): boolean {
   return ka.length === kb.length && ka.every((k) => (a as Record<string, unknown>)[k] === (b as Record<string, unknown>)[k]);
 }
 
+/** Hooks compared element by element, member by member: a wrapper rebuilding the same functions redraws nothing. */
 function sameHooks(a: CalendarHooks, b: CalendarHooks): boolean {
   if (a === b) return true;
-  const ea = a.event ?? {};
-  const eb = b.event ?? {};
-  return shallowSame(ea, eb) && shallowSame(a.resource ?? {}, b.resource ?? {}) && Object.keys(a).length === Object.keys(b).length;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof CalendarHooks>;
+  for (const k of keys) if (!shallowSame((a[k] ?? {}) as object, (b[k] ?? {}) as object)) return false;
+  return true;
 }
 
 /** Where a built-in family's renderer is imported from, for an error that says what to do. */
@@ -539,9 +541,19 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       settings.current.onCommandRefused?.(result, command);
       ctx.announce(ctx.messages.dropRefused);
     },
-    openMore(anchor, title, nodes, onClose) {
-      popover.open(anchor, title, nodes, ctx.messages.closePopover, onClose);
-      ctx.motion.overlayOpen?.(popover.element, anchor.getBoundingClientRect());
+    openMore(anchor, title, nodes, onClose, about) {
+      const panel = popover.element;
+      // The application's classes and mounts on the panel (its content is the day's events: never replaced); let go when it closes.
+      const hooks = holder(ctx.hooks.morePopover);
+      const closed = () => {
+        undecorate(panel);
+        onClose?.();
+      };
+      popover.open(anchor, title, nodes, ctx.messages.closePopover, closed);
+      if (hooks && about) decorate(ctx, hooks, panel, { view: kernel.getState().view.type, date: about.date, resource: about.resource });
+      // Its events' didMount (drawn outside a render), now that they are in the page.
+      flushMounts();
+      ctx.motion.overlayOpen?.(panel, anchor.getBoundingClientRect());
     },
   };
 
@@ -622,6 +634,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     const created = v.render(vm.model, state);
     interactions?.refresh();
     if (nowOn) v.tick(kernel.now(), state);
+    // The application's didMount, now that the drawing is in the page.
+    flushMounts();
     // The adapter animates the change itself, or the plain hooks do.
     const change = pendingChange;
     pendingChange = null;
@@ -1055,6 +1069,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
           // Compared member by member: a wrapper that rebuilds the same object
           // on every change must not redraw every event.
           if (changes.hooks && !sameHooks(changes.hooks, ctx.hooks)) {
+            // An open "+N" panel was drawn with the old hooks: it closes (its events and itself let go by them).
+            popover.close(false);
             ctx.hooks = changes.hooks;
             ctx.epoch++;
             dirty = true;

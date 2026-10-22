@@ -1,5 +1,24 @@
-import type { ActionItem, ActionTarget, CalendarKernel, Resource, Command, CommandResult, EditScope, EventInstance, Instant, KernelState, Proposal, RulesContext, Segment, ZoneId } from '@dzcalendar/core';
-import type { DayHeaderHooks } from './render/day-head.js';
+import type { ActionItem, ActionTarget, CalendarKernel, PlainDate, Resource, Command, CommandResult, EditScope, EventInstance, Instant, KernelState, Proposal, RulesContext, Segment, ZoneId } from '@dzcalendar/core';
+import type {
+  AllDayLabelCtx,
+  DayCellCtx,
+  DayHeaderCtx,
+  DayLaneCtx,
+  ElementHooks,
+  ListDayHeaderCtx,
+  MonthHeaderCtx,
+  MoreLinkCtx,
+  MorePopoverCtx,
+  NoEventsCtx,
+  NowIndicatorCtx,
+  ResourceAreaHeaderCtx,
+  ResourceGroupCtx,
+  ResourceLaneCtx,
+  SlotLabelCtx,
+  SlotLaneCtx,
+  ViewHookCtx,
+  WeekNumberCtx,
+} from './render/hooks.js';
 import type { InteractionSurface } from './interact/surface.js';
 import type { LiveSettings } from './settings.js';
 
@@ -23,25 +42,27 @@ export interface EventContentCtx {
   readonly background?: boolean;
 }
 
-export interface EventHooks {
+/** An event's hooks, in every view: the four members every element takes (docs/behaviors/render-hooks.md). */
+export interface EventHooks extends ElementHooks<EventContentCtx> {
   /**
    * Replace the default content. Null keeps it. Runs only when the event's
    * content changed; `el` is the event's node (the same one across reruns),
    * so a framework can keep and update what it rendered there.
    */
-  content?: (ctx: EventContentCtx, el: HTMLElement) => string | Node | null;
-  /** After the node is created; a returned function runs before it is removed. */
+  content?: (ctx: EventContentCtx, el: HTMLElement) => string | Node | null | undefined;
+  /** Once the node is in the page; a returned function runs before it is removed. */
   didMount?: (arg: { el: HTMLElement; ctx: EventContentCtx }) => void | (() => void);
-  willUnmount?: (arg: { el: HTMLElement; ctx: EventContentCtx }) => void;
 }
 
 /** What a resource's head is drawn from (the timeline's rows will add their depth and state). */
 export interface ResourceContentCtx {
   readonly resource: Resource;
+  /** The view's type. */
+  readonly view: string;
 }
 
 /** A resource view's head: what an application puts there (a photo, a specialty) instead of the title. */
-export interface ResourceHooks {
+export interface ResourceHooks extends ElementHooks<ResourceContentCtx> {
   /** Null keeps the title. Runs when the resource (or the words in force) changed. */
   content?: (ctx: ResourceContentCtx, el: HTMLElement) => string | Node | null;
 }
@@ -50,7 +71,40 @@ export interface CalendarHooks {
   readonly event?: EventHooks;
   readonly resource?: ResourceHooks;
   /** A day's head (a week's or a day's date, a month's weekday): a mark, a count, a button. */
-  readonly dayHeader?: DayHeaderHooks;
+  readonly dayHeader?: ElementHooks<DayHeaderCtx>;
+  /** A day's cell (a month, a day grid's week). */
+  readonly dayCell?: ElementHooks<DayCellCtx>;
+  /** A time grid's column for a day. */
+  readonly dayLane?: ElementHooks<DayLaneCtx>;
+  /** A time label in a time grid's gutter. */
+  readonly slotLabel?: ElementHooks<SlotLabelCtx>;
+  /** A slot's row across a time grid (drawn as elements only when this hook is given). */
+  readonly slotLane?: ElementHooks<SlotLaneCtx>;
+  /** The all-day row's label. */
+  readonly allDayLabel?: ElementHooks<AllDayLabelCtx>;
+  /** "+N". */
+  readonly moreLink?: ElementHooks<MoreLinkCtx>;
+  /** The panel "+N" opens. */
+  readonly morePopover?: ElementHooks<MorePopoverCtx>;
+  /** The line at the current time. */
+  readonly nowIndicator?: ElementHooks<NowIndicatorCtx>;
+  /** A week's number. */
+  readonly weekNumber?: ElementHooks<WeekNumberCtx>;
+  /** The list's "nothing to show". */
+  readonly noEvents?: ElementHooks<NoEventsCtx>;
+  /** A list's day heading. */
+  readonly listDayHeader?: ElementHooks<ListDayHeaderCtx>;
+  /** The view's root. */
+  readonly view?: ElementHooks<ViewHookCtx>;
+  /** A month's title in a multi-month view. */
+  readonly monthHeader?: ElementHooks<MonthHeaderCtx>;
+  /** A resource's row in a timeline. */
+  readonly resourceLane?: ElementHooks<ResourceLaneCtx>;
+  /** A group's head (resource views) and its row (a timeline). */
+  readonly resourceGroupHeader?: ElementHooks<ResourceGroupCtx>;
+  readonly resourceGroupLane?: ElementHooks<ResourceGroupCtx>;
+  /** A timeline's resource column head. */
+  readonly resourceAreaHeader?: ElementHooks<ResourceAreaHeaderCtx>;
 }
 
 export interface ContextMenuCtx {
@@ -125,7 +179,8 @@ export interface ViewCtx {
   /** A gesture's command was refused by the calendar. */
   refused(result: CommandResult, command: Command): void;
   /** Lists a day's events (`nodes`, drawn by the view) in the panel behind a "+N" link; `onClose` runs when it closes. */
-  openMore(anchor: HTMLElement, title: string, nodes: Node[], onClose?: () => void): void;
+  /** `about`: the day (and resource) the panel is for — what `hooks.morePopover` is told. */
+  openMore(anchor: HTMLElement, title: string, nodes: Node[], onClose?: () => void, about?: { readonly date: PlainDate; readonly resource: Resource | null }): void;
 }
 
 /** One family of views, mounted while the current view belongs to it. */

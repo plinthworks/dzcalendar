@@ -82,6 +82,12 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18f-1 — crochets de rendu partout (détail dans ROADMAP.md)
+
+- **D (dom)** : `hooks.<élément>` prend quatre membres (`class`, `content`, `didMount`, `willUnmount`) pour 20 éléments (fiche `docs/behaviors/render-hooks.md`) ; un seul mécanisme (`render/hooks.ts`), celui des événements compris. Les conteneurs (colonne de jour, lignes, vue, panneau « +N ») prennent classes et montages, jamais de contenu. `didMount` attend que le dessin soit dans la page ; de nouvelles fonctions par `update` démontent puis remontent. Exportés à la Pro par `@dzcalendar/dom/toolkit`.
+- **Compat** : les 17 familles de crochets FullCalendar traduites par une table.
+- **Décision du propriétaire** : boutons de l'en-tête comme FullCalendar plus un gabarit (18f-1b) ; le look de l'en-tête attend la passe CSS. Budgets à la mesure + 3 % (pro 14,5 ko, dom/list 5,0 ko).
+
 ### Ajustements après la Phase 18e — retours de Sehhaty (détail dans ROADMAP.md)
 
 - **D (dom)** : crochet `hooks.dayHeader` (contenu, montage, démontage ; date, ressource, longueur du jour, mots du calendrier), gabarits Angular `dzDayHeader`, React `renderDayHeader`, Vue `#day-header`. Les fonds reçoivent le crochet de contenu dans les colonnes horaires (`ctx.background`, étiquette collante). `allDaySlot`, `displayEventTime`, `eventStyle: 'tinted' | 'solid'` (texte `--dz-on-tone`, AA vérifié par test pour chaque ton), `--dz-event-radius`, `dayMaxLanes: null` (les semaines grandissent). Échelle par défaut 1,2 px la minute (densités 0,8 / 1,2 / 1,6). Toutes les options lues à la création deviennent vivantes (`firstDay`, `rules`, `nowIndicator`, `scrollTime`, `dayMaxLanes`, `eventMaxStack`).

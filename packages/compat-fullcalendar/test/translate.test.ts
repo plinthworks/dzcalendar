@@ -48,7 +48,7 @@ describe('options', () => {
 
   it('every guess and every option without an equivalent is said; what is built in is not', () => {
     const t = fromFullCalendar({ height: 600, plugins: [], schedulerLicenseKey: 'x', dayCellContent: () => '', timeZone: 'local' });
-    expect(codes(t.problems).map((c) => c.replace(/local:.*/, 'local:…'))).toEqual(['zone-guessed timeZone local:…', 'compat-unsupported height css', 'compat-unsupported dayCellContent none']);
+    expect(codes(t.problems).map((c) => c.replace(/local:.*/, 'local:…'))).toEqual(['zone-guessed timeZone local:…', 'compat-unsupported height css']);
     expect(t.problems.map((p) => p.code)).toContain('compat-unsupported');
     expect(codes(fromFullCalendar({}).problems)[0]).toMatch(/^zone-guessed timeZone browser:/);
     expect(codes(fromFullCalendar({ timeZone: 'Mars/Olympus' }).problems)[0]).toBe('unknown-zone timeZone Mars/Olympus');

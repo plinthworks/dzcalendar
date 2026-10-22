@@ -2,7 +2,7 @@ import { formatTemporal, registerModelFamily } from '@dzcalendar/core';
 import type { CalEvent, Command, EventInstance, KernelState, Segment } from '@dzcalendar/core';
 import { buildListModel } from '@dzcalendar/core/views';
 import type { ListDay, ListEntry, ListModel } from '@dzcalendar/core/views';
-import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, ensureStyles, fillEvent, formatMinutes, h, registerView, startReadingOf, timeLabels, unmountEvent } from '@dzcalendar/dom/toolkit';
+import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, decorate, ensureStyles, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
 import type { ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
 import { activeIn } from '../focus.js';
 
@@ -77,6 +77,8 @@ export function createListView(ctx: ViewCtx): ViewController {
   const { doc } = ctx;
   if (ctx.injectStyles) ensureStyles(ctx.popoverElement, 'list', LIST_CSS, ctx.cssLayers);
   const root = h(doc, 'div', 'dz-list');
+  /** The view's type, for the hooks' contexts. */
+  let viewType = '';
   const body = h(doc, 'div', 'dz-list__body');
   const empty = h(doc, 'p', 'dz-list__empty');
   /** The entries' keys in order at the last render: where a vanished entry stood. */
@@ -149,6 +151,7 @@ export function createListView(ctx: ViewCtx): ViewController {
       else drawDay(section, it);
     },
     (section) => {
+      undecorateAll(section);
       const key = section.dataset['key'] ?? '';
       entryLists.get(key)?.clear();
       entryLists.delete(key);
@@ -171,6 +174,7 @@ export function createListView(ctx: ViewCtx): ViewController {
     if (ctx.altLocale) head.append(h(doc, 'span', 'dz-list__alt', altDate(day.date, ctx.altLocale).long));
     // A 23- or 25-hour day says how long it really is.
     if (day.lengthMinutes !== 1440) head.append(h(doc, 'span', 'dz-list__len', formatMinutes(day.lengthMinutes, ctx.locale)));
+    decorate(ctx, ctx.hooks.listDayHeader, head, { view: viewType, date: day.date, lengthMinutes: day.lengthMinutes, text: longDate(day) });
   }
 
   /** The hours of the part on this day, with offsets where a repeated hour makes them ambiguous. */
@@ -517,6 +521,8 @@ export function createListView(ctx: ViewCtx): ViewController {
     body,
     render(next: unknown, s: KernelState) {
       const m = next as ListModel;
+      viewType = s.view.type;
+      decorate(ctx, holder(ctx.hooks.view), root, { view: s.view.type, family: s.view.family, range: s.range, title: s.title });
       model = m;
       created = [];
       root.setAttribute('aria-label', s.title);
@@ -555,8 +561,12 @@ export function createListView(ctx: ViewCtx): ViewController {
       draw();
       if (m.days.length === 0) {
         empty.textContent = ctx.messages.noEvents;
+        decorate(ctx, ctx.hooks.noEvents, empty, { view: s.view.type, text: ctx.messages.noEvents });
         if (!empty.isConnected) root.append(empty);
-      } else empty.remove();
+      } else {
+        decorate(ctx, undefined, empty, null);
+        empty.remove();
+      }
       const lost = focused && !root.contains(activeIn(root));
       rove(cursorKey, refocus || lost);
       // Nothing left to focus: the empty message holds it, so it does not fall to the page.
@@ -581,6 +591,7 @@ export function createListView(ctx: ViewCtx): ViewController {
       /* nothing moves with the minute */
     },
     destroy() {
+      undecorateAll(root);
       days.clear();
       root.remove();
     },

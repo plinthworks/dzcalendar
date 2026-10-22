@@ -201,11 +201,11 @@ export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}):
   // What every event takes when it does not say.
   const defaults: { -readonly [K in keyof EventDefaults]: EventDefaults[K] } = {};
   for (const [k, field] of [['eventStartEditable', 'startEditable'], ['eventDurationEditable', 'durationEditable'], ['eventResourceEditable', 'resourceEditable']] as const) if (fc[k] !== undefined) defaults[field] = Boolean(take(k));
-  if (fc['eventClassNames'] !== undefined) {
+  // Classes for every event: theirs by default; a function is a hook (below).
+  if (fc['eventClassNames'] !== undefined && typeof fc['eventClassNames'] !== 'function') {
     const c = take('eventClassNames');
     if (typeof c === 'string') defaults.classNames = c.split(/\s+/).filter(Boolean);
     else if (Array.isArray(c)) defaults.classNames = c.filter((x): x is string => typeof x === 'string');
-    else problems.push(said('compat-unsupported', 'eventClassNames', 'function'));
   }
   if (typeof fc['eventDisplay'] === 'string') defaults.display = DISPLAY[take('eventDisplay') as string] ?? 'auto';
   // Events and sources.
@@ -297,20 +297,23 @@ export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}):
     problems.push(said('invalid-option', k, typeof v, 'error'));
     return null;
   };
-  const content = hook('eventContent');
-  const didMount = hook('eventDidMount');
-  const willUnmount = hook('eventWillUnmount');
-  const label = hook('resourceLabelContent');
-  const dayContent = hook('dayHeaderContent');
-  const dayDidMount = hook('dayHeaderDidMount');
-  const dayWillUnmount = hook('dayHeaderWillUnmount');
-  /** A day head's argument, as the other library gives it. */
-  const dayArg = (d: { date: PlainDate; text: string; today: boolean; resource: { id: string } | null }, el: HTMLElement) => {
+  /** A day's argument, as the other library gives it (a head, a cell). */
+  const dayArg = (d: { date: PlainDate; text?: string; today: boolean; resource: { id: string } | null; outside?: boolean }, el: HTMLElement) => {
     const today = cal?.kernel.getState().today ?? Temporal.Now.plainDateISO(zone);
     const c = Temporal.PlainDate.compare(d.date, today);
-    return { date: dateOf(d.date, zone), text: d.text, isToday: d.today, isPast: c < 0, isFuture: c > 0, resource: d.resource ? { id: d.resource.id } : undefined, el, view: view() };
+    return {
+      date: dateOf(d.date, zone),
+      text: d.text ?? '',
+      dayNumberText: d.text ?? '',
+      isToday: d.today,
+      isPast: c < 0,
+      isFuture: c > 0,
+      isOther: d.outside ?? false,
+      resource: d.resource ? { id: d.resource.id } : undefined,
+      el,
+      view: view(),
+    };
   };
-  const arg = (inst: EventInstance, el: HTMLElement, timeText: string) => ({ event: eventInfo(inst.event, zone), el, timeText, view: view(), isStart: true, isEnd: true });
   const rendered = (r: unknown): string | Node | null => {
     if (r === undefined || r === null || r === true || r === false) return null;
     if (typeof r === 'string') return r;
@@ -329,26 +332,50 @@ export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}):
     }
     return null;
   };
-  if (content || didMount || willUnmount || label || dayContent || dayDidMount || dayWillUnmount) {
-    type Ctx = { instance: EventInstance; timeText: string };
-    out['hooks'] = {
-      ...((content || didMount || willUnmount) && {
-        event: {
-          ...(content && { content: (ctx: Ctx, el: HTMLElement) => rendered(content(arg(ctx.instance, el, ctx.timeText))) }),
-          ...(didMount && { didMount: ({ el, ctx }: { el: HTMLElement; ctx: Ctx }) => void didMount(arg(ctx.instance, el, ctx.timeText)) }),
-          ...(willUnmount && { willUnmount: ({ el, ctx }: { el: HTMLElement; ctx: Ctx }) => void willUnmount(arg(ctx.instance, el, ctx.timeText)) }),
-        },
-      }),
-      ...((dayContent || dayDidMount || dayWillUnmount) && {
-        dayHeader: {
-          ...(dayContent && { content: (d: never, el: HTMLElement) => rendered(dayContent(dayArg(d, el))) }),
-          ...(dayDidMount && { didMount: ({ el, ctx }: { el: HTMLElement; ctx: never }) => void dayDidMount(dayArg(ctx, el)) }),
-          ...(dayWillUnmount && { willUnmount: ({ el, ctx }: { el: HTMLElement; ctx: never }) => void dayWillUnmount(dayArg(ctx, el)) }),
-        },
-      }),
-      ...(label && { resource: { content: (ctx: { resource: { id: string; title: string } }) => rendered(label({ resource: { id: ctx.resource.id, title: ctx.resource.title }, fieldValue: ctx.resource.title })) } }),
+  type Ctx = Rec & { instance?: EventInstance; timeText?: string };
+  /** Each family of the other library's hooks (`<prefix>ClassNames`, `…Content`, `…DidMount`, `…WillUnmount`), our element, the argument it is given. */
+  const FAMILIES: readonly (readonly [string, string, (c: Ctx, el: HTMLElement) => Rec])[] = [
+    ['event', 'event', (c, el) => ({ event: eventInfo(c.instance!.event, zone), el, timeText: c.timeText ?? '', view: view(), isStart: (c['segment'] as { startsHere?: boolean } | undefined)?.startsHere ?? true, isEnd: (c['segment'] as { endsHere?: boolean } | undefined)?.endsHere ?? true, isMirror: false })],
+    ['dayHeader', 'dayHeader', (c, el) => dayArg(c as never, el)],
+    ['dayCell', 'dayCell', (c, el) => dayArg(c as never, el)],
+    ['slotLabel', 'slotLabel', (c, el) => ({ text: c['text'], time: String(c['time']), el, view: view() })],
+    ['slotLane', 'slotLane', (c, el) => ({ time: String(c['time']), el, view: view() })],
+    ['allDay', 'allDayLabel', (c, el) => ({ text: c['text'], el, view: view() })],
+    ['moreLink', 'moreLink', (c, el) => ({ num: c['count'], text: c['text'], shortText: `+${String(c['count'])}`, el, view: view() })],
+    ['dayPopover', 'morePopover', (c, el) => ({ date: dateOf(c['date'] as PlainDate, zone), el, view: view() })],
+    ['nowIndicator', 'nowIndicator', (c, el) => ({ date: new Date((c['instant'] as { epochMilliseconds: number }).epochMilliseconds), isAxis: false, el, view: view() })],
+    ['weekNumber', 'weekNumber', (c, el) => ({ num: c['week'], text: c['text'], date: dateOf(c['date'] as PlainDate, zone), el, view: view() })],
+    ['noEvents', 'noEvents', (c, el) => ({ text: c['text'], el, view: view() })],
+    ['view', 'view', (_c, el) => ({ el, view: view() })],
+    ['resourceLabel', 'resource', (c, el) => {
+      const r = c['resource'] as { id: string; title: string };
+      return { resource: { id: r.id, title: r.title }, fieldValue: r.title, el, view: view() };
+    }],
+    ['resourceLane', 'resourceLane', (c, el) => ({ resource: { id: (c['resource'] as { id: string }).id }, el, view: view() })],
+    ['resourceGroupLabel', 'resourceGroupHeader', (c, el) => ({ groupValue: c['value'], el, view: view() })],
+    ['resourceGroupLane', 'resourceGroupLane', (c, el) => ({ groupValue: c['value'], el, view: view() })],
+    ['resourceAreaHeader', 'resourceAreaHeader', (c, el) => ({ el, view: view() })],
+  ];
+  const hooks: Rec = {};
+  for (const [prefix, ours, argOf] of FAMILIES) {
+    // Their classes are worked out before the element exists: the argument has no `el`.
+    const classes = take(`${prefix}ClassNames`);
+    const content = hook(`${prefix}Content`);
+    const didMount = hook(`${prefix}DidMount`);
+    const willUnmount = hook(`${prefix}WillUnmount`);
+    let classHook: unknown;
+    if (typeof classes === 'function') classHook = (c: Ctx) => (classes as Fn)({ ...argOf(c, undefined as never), el: undefined });
+    else if (typeof classes === 'string' || Array.isArray(classes)) classHook = classes;
+    else if (classes !== undefined) problems.push(said('invalid-option', `${prefix}ClassNames`, typeof classes, 'error'));
+    if (classHook === undefined && !content && !didMount && !willUnmount) continue;
+    hooks[ours] = {
+      ...(classHook !== undefined && { class: classHook }),
+      ...(content && { content: (c: Ctx, el: HTMLElement) => rendered(content(argOf(c, el))) }),
+      ...(didMount && { didMount: ({ el, ctx }: { el: HTMLElement; ctx: Ctx }) => void didMount(argOf(ctx, el)) }),
+      ...(willUnmount && { willUnmount: ({ el, ctx }: { el: HTMLElement; ctx: Ctx }) => void willUnmount(argOf(ctx, el)) }),
     };
   }
+  if (Object.keys(hooks).length > 0) out['hooks'] = hooks;
   // Callbacks the calendar calls.
   const eventClick = fn('eventClick');
   const dateClick = fn('dateClick');

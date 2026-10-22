@@ -13,6 +13,12 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 - **Done:** Phase 18e (Sehhaty's feedback) committed ("Phase 18e"); every
   check green (1 344 tests, typecheck, build, size, test:browser,
   test:package) but the known noise (`normalize+index 10k`).
+- **Done:** Phase 18f-1 (render hooks on every element) committed ("Phase
+  18f-1"); every check green (1 375 tests, test:ci, typecheck, build, size,
+  test:browser, test:package) but the known noise (`normalize+index 10k`
+  73 ms against 70, `timeGridWeek:U` 28 ms against 27 — both as at HEAD).
+  **Next: 18f-1b, the header's buttons** (`headerToolbar`, `customButtons`;
+  section 5 of Phase 18f), then 18f-2 (templates in every framework).
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2450,8 +2456,75 @@ three gaps worth closing, owner's decisions (2026-10-22).
   compat translating their custom views (`type` + `duration` / `dayCount` /
   `visibleRange`).
 
+### 18f-1 — done (2026-10-22)
+
+**Built**
+- `docs/behaviors/render-hooks.md` (CLEANROOM: their behaviour in our words).
+- `packages/dom/src/render/hooks.ts`: `ElementHooks<C>` (`class`, `content`,
+  `didMount`, `willUnmount`) and one context type per element; `decorate` /
+  `undecorate` / `undecorateAll` / `holder`, `flushMounts` (a `didMount`
+  waits until the drawing is in the page; the calendar empties the queue
+  after each render and after opening "+N"; a microtask otherwise).
+- Elements: `event` (now through the same path), `dayHeader`, `dayCell`,
+  `dayLane`, `slotLabel`, `slotLane` (drawn only when asked),
+  `allDayLabel`, `moreLink`, `morePopover`, `nowIndicator`, `weekNumber`,
+  `noEvents`, `listDayHeader`, `view`, `monthHeader`, `resource`,
+  `resourceLane`, `resourceGroupHeader`, `resourceGroupLane`,
+  `resourceAreaHeader` — in the time grid, day grid, multi-month, list,
+  resource views and the Pro timeline (exported to it by `dom/toolkit`).
+- `update({ hooks })` compares element by element, member by member; new
+  `didMount` / `willUnmount` functions let each element go and mount it
+  again; a hook taken away takes its classes. An open "+N" closes when the
+  hooks change.
+- compat-fullcalendar: one table for their 17 families
+  (`<name>ClassNames / Content / DidMount / WillUnmount`), arguments rebuilt
+  with their field names; `eventClassNames` as a function is now a hook.
+- Tests: `packages/dom/test/render-hooks.test.ts` (27),
+  `packages/pro/test/dom/timeline-hooks.test.ts` (4).
+- Budgets (owner, measured + 3 %): pro 14 525, dom/list 5 007.
+
+**Reviews fixed** (architect + execution in Chrome)
+- Teardown: a month's cells, week numbers and "+N" when the month goes; a
+  year's month titles; the now line (time grid, timeline); the list's
+  "nothing" message — none was let go; the page-wide `live` counter leaked.
+- `didMount` ran before the element was in the page (every element, events
+  included): now queued.
+- Events' `willUnmount` came from the current hooks, not the mounting ones.
+- Stale hooks kept after `update`; a removed hook left its classes; the
+  reused "+N" panel kept the application's classes; a group head did not
+  redraw on new hooks; a month's "+N" had no resource; `view` missing from
+  the resource context; `['a b']` threw; a class of ours given back was
+  removed; background events honoured only `content`; an empty 24:00 slot
+  lane; the list imported `hooks.ts` beside the toolkit (+0.4 kB).
+
+**Not done on purpose**
+- Background events in the all-day row, the month and the timeline stay
+  plain tints (no event hooks), as in 18e.
+- `slotLabel` in a timeline's time head; their `slotLabel` argument's
+  `date` (we give the time).
+- An application's content in an `aria-hidden` place stays hidden where the
+  parent is hidden (the gutter, "+N" hosts, the now line).
+
+### 5. The header's buttons (owner's decision, 2026-10-22, from Sehhaty's screenshot)
+
+Today our header is fixed (‹ today › title, the view tabs): it cannot be
+hidden, reordered, or given an application's button (reload, "blocked
+slots", a business view). Decided:
+
+- **Like FullCalendar, plus a template**: `headerToolbar: { start, center,
+  end }` (names: `prev`, `next`, `today`, `title`, views, the application's
+  buttons; `false` hides the header) and `customButtons: { name: { text,
+  icon?, hint?, click, active? } }` (`active`: a pressed state, re-read at
+  each drawing); plus a free place for rich content (a menu, a badge): an
+  Angular directive, a React prop, a Vue slot (done with 18f-2). The compat
+  translates `headerToolbar` whole and `customButtons`.
+- **The look** (grouped buttons, centred title, the active view filled)
+  waits for the CSS pass, with everything else visual.
+- Placed as **18f-1b**, right after 18f-1.
+
 ### Order
 
-18f-1 the hooks in the DOM (all elements, four forms) → 18f-2 the framework
+18f-1 the hooks in the DOM (all elements, four forms) → 18f-1b the header's
+buttons (`headerToolbar`, `customButtons`) → 18f-2 the framework
 templates for each → 18f-3 formats and custom views (`visibleRange`, the docs page, compat) →
 18f-4 external and cross-calendar dragging. Reviews and a commit at the end of each.

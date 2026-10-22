@@ -7,6 +7,8 @@ import { registerView, scrollEased } from '../host.js';
 import { attachMenuTriggers } from '../menu.js';
 import { applyEventLook, fillEvent, formatMinutes, timeLabels, timedContent, unmountEvent } from '../render/event.js';
 import { ownDayHead, unmountDayHead } from '../render/day-head.js';
+import { decorate, holder, undecorate, undecorateAll } from '../render/hooks.js';
+import type { Resource } from '@dzcalendar/core';
 import { KeyedList, contentsHost, h } from '../render/reconcile.js';
 import { onScrollFrame } from '../render/window.js';
 import { NodePool } from '../render/pool.js';
@@ -63,6 +65,7 @@ interface MoreItem {
   readonly sig: string;
   readonly more: MoreTimed;
   readonly date: PlainDate;
+  readonly resource: Resource | null;
 }
 
 export interface TimeGridController extends ViewController {
@@ -89,7 +92,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   gutter.setAttribute('aria-hidden', 'true');
   // Columns get their own host after the gutter: a KeyedList owns its container.
   const colsHost = contentsHost(doc, 'dz-tg__cols');
-  grid.append(gutter, colsHost);
+  // Slots' rows across the columns, drawn only when `hooks.slotLane` asks (under the events).
+  const lanesHost = h(doc, 'div', 'dz-tg__lanes');
+  grid.append(gutter, lanesHost, colsHost);
   body.append(grid);
   root.append(head, allday, body);
 
@@ -220,6 +225,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
             return b;
           },
           (b, m) => drawMore(b, m),
+          (b) => undecorate(b),
         ),
         // Free slots: buttons out of the tab order (the grid keeps one tab stop; the cursor's Enter books them).
         slots: new KeyedList<SlotItem>(
@@ -242,6 +248,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     (el, it) => drawColumn(el, it),
     // A column leaving (navigation) takes its events' hooks with it.
     (el) => {
+      undecorate(el);
       const p = parts.get(el.dataset['key'] ?? '');
       p?.events.clear();
       p?.background.clear();
@@ -252,6 +259,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
 
   function drawColumn(el: HTMLElement, it: ColumnItem): void {
     const { column } = it;
+    decorate(ctx, holder(ctx.hooks.dayLane), el, { view: viewType, date: column.date, resource: column.resource, today: it.today, lengthMinutes: column.axis.day.lengthMinutes });
     const p = parts.get(it.key)!;
     el.dataset['key'] = column.key;
     el.dataset['date'] = column.date.toString();
@@ -292,7 +300,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const bookable = Boolean(ctx.live().onSlotClick);
     p.slots.sync(column.slots.map((placed) => ({ key: placed.key, sig: `${placed.top}|${placed.height}|${idOf(placed.slot)}|${bookable}|${ctx.epoch}`, placed })));
     created.push(...p.events.sync(shown(column).map(itemOf)));
-    p.more.sync(column.more.map((m) => ({ key: m.key, sig: `${m.top}|${m.height}|${m.left}|${m.width}|${m.events.length}|${ctx.epoch}`, more: m, date: column.date })));
+    p.more.sync(column.more.map((m) => ({ key: m.key, sig: `${m.top}|${m.height}|${m.left}|${m.width}|${m.events.length}|${ctx.epoch}`, more: m, date: column.date, resource: column.resource })));
   }
 
   // ── free slots (availableSlots) ──
@@ -332,6 +340,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const first = m.more.events[0]!.segment.from.toZonedDateTimeISO(ctx.zone);
     const when = `${formatTemporal(m.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale)}, ${formatTemporal(first.toPlainTime(), HM, ctx.locale)}`;
     b.setAttribute('aria-label', ctx.messages.moreLabel({ count: m.more.events.length, date: when }));
+    decorate(ctx, ctx.hooks.moreLink, b, { view: viewType, date: m.date, resource: m.resource, count: m.more.events.length, text: b.textContent ?? '' });
   }
   function openMoreTimed(link: HTMLElement, more: MoreTimed, date: PlainDate): void {
     panelEvents = new Map(more.events.map((p) => [p.segment.key, p]));
@@ -348,9 +357,15 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       item.setAttribute('aria-label', ctx.messages.eventLabel({ title, time: labels.spoken }));
       return item;
     });
-    ctx.openMore(link, formatTemporal(date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale), nodes, () => {
-      for (const n of nodes) unmountEvent(ctx, n);
-    });
+    ctx.openMore(
+      link,
+      formatTemporal(date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale),
+      nodes,
+      () => {
+        for (const n of nodes) unmountEvent(ctx, n);
+      },
+      { date, resource: moreOf.get(link)?.resource ?? null },
+    );
   }
   const panelEvent = (target: EventTarget | null) => {
     const item = (target as Element | null)?.closest<HTMLElement>('.dz-bar');
@@ -463,7 +478,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     el.classList.toggle('dz-ev--cont-end', !seg.endsHere);
     applyEventLook(el, ev);
     handles(el, seg, bg);
-    if (bg && ctx.hooks.event?.content) {
+    if (bg && ctx.hooks.event) {
       // A background's own content (a "Vacances" label), if the hook gives one: drawn, read; none: mute as before.
       fillEvent(ctx, el, { instance: seg.instance, segment: seg, timeText: '', displayZone: ctx.zone, family: 'timeGrid', background: true }, () => [], changed.created);
       const labelled = el.childNodes.length > 0;
@@ -492,12 +507,32 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   function drawGutter(m: TimeGridModel): void {
     const first = m.columns.find((c) => !c.folded);
     gutter.style.setProperty('--dz-len', String(first ? first.axis.length : 0));
+    for (const old of gutter.children) undecorate(old as HTMLElement);
     gutter.replaceChildren(
       ...m.gutter.map((t) => {
         const el = h(doc, 'span', 'dz-tick', t.major ? formatTemporal(t.label, HM, ctx.locale) : '');
         el.style.setProperty('--t', String(t.position));
+        decorate(ctx, ctx.hooks.slotLabel, el, { view: viewType, time: t.label, position: t.position, pass: t.note === 'second-pass' ? 2 : 1, text: el.textContent ?? '' });
         return el;
       }),
+    );
+    // A slot's row across the grid: drawn only for an application that asks (the lines are a background otherwise).
+    for (const old of lanesHost.children) undecorate(old as HTMLElement);
+    const lanes = ctx.hooks.slotLane;
+    lanesHost.replaceChildren(
+      ...(lanes
+        ? m.gutter.flatMap((t, i) => {
+            const el = h(doc, 'div', 'dz-tg__slotlane');
+            const next = m.gutter[i + 1]?.position ?? (first ? first.axis.length : t.position);
+            el.style.setProperty('--t', String(t.position));
+            el.style.setProperty('--h', String(Math.max(0, next - t.position)));
+            el.setAttribute('aria-hidden', 'true');
+            // The axis' last tick (24:00) starts no slot.
+            if (next <= t.position) return [];
+            decorate(ctx, holder(lanes), el, { view: viewType, time: t.label, position: t.position });
+            return [el];
+          })
+        : []),
     );
   }
 
@@ -849,11 +884,15 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       emptyNote(m.options.resources !== undefined && m.options.resources.length === 0);
       root.style.setProperty('--dz-cols', String(m.columns.length));
       alldayLabel.textContent = ctx.messages.allDay;
+      decorate(ctx, ctx.hooks.allDayLabel, alldayLabel, { view: viewType, text: ctx.messages.allDay });
+      decorate(ctx, holder(ctx.hooks.view), root, { view: viewType, family: 'timeGrid', range: state.range, title: state.title });
       // allDaySlot false: the row folds to nothing (it still holds the keyboard's cursor, which goes home when focused), no all-day event in it.
       allday.classList.toggle('dz-tg__allday--none', !ctx.allDaySlot);
       // The week's number in the corner (the head is drawn, not read: the columns say their dates).
       const first = m.columns[0]?.date;
-      corner.textContent = ctx.weekNumbers && first ? ctx.messages.weekShort({ week: weekNumber(first, { ...weekRulesFor(ctx.locale), firstDay: state.firstDay }) }) : '';
+      const week = first ? weekNumber(first, { ...weekRulesFor(ctx.locale), firstDay: state.firstDay }) : 0;
+      corner.textContent = ctx.weekNumbers && first ? ctx.messages.weekShort({ week }) : '';
+      if (ctx.weekNumbers && first) decorate(ctx, ctx.hooks.weekNumber, corner, { view: viewType, week, date: first, text: corner.textContent });
       if (!cursorHits.has(cursorNode)) cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
       heads.sync(withDates ? cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${c.today}|${epoch}|${c.index}|${dateRow}` })) : []);
       bars.sync(!ctx.allDaySlot ? [] : [
@@ -914,12 +953,17 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const m = model;
       const homes = at && m ? at.columns.flatMap((i) => columns.get(m.columns[i]!.key) ?? []) : [];
       // One line per column of today (each resource's); the extra ones go.
-      while (nowEls.length > homes.length) nowEls.pop()!.remove();
+      while (nowEls.length > homes.length) {
+        const gone = nowEls.pop()!;
+        undecorate(gone);
+        gone.remove();
+      }
       homes.forEach((colEl, i) => {
         const el = (nowEls[i] ??= h(doc, 'div', 'dz-now'));
         el.setAttribute('aria-hidden', 'true');
         el.style.setProperty('--t', String(at!.position));
         if (el.parentElement !== colEl) colEl.append(el);
+        decorate(ctx, ctx.hooks.nowIndicator, el, { view: viewType, now: now.toZonedDateTimeISO(ctx.zone), instant: now });
       });
     },
 
@@ -940,6 +984,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     },
 
     destroy() {
+      if (Object.keys(ctx.hooks).length > 0) undecorateAll(root);
       bars.clear();
       // The heads the application filled let go of what it put there.
       heads.clear();

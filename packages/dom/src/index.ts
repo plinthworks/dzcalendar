@@ -13,7 +13,27 @@ export type { MotionAdapter, MotionChange, MotionSide, MotionEnter } from './mot
 export { WAAPI_MOTION, createWaapiMotion } from './motion-waapi.js';
 export { registerView, hasRenderer } from './host.js';
 export type { ViewController, ViewCtx, ViewFactory, CalendarHooks, EventHooks, EventContentCtx, ResourceHooks, ResourceContentCtx, ContextMenuCtx, MenuHook, ScopeRequest } from './host.js';
-export type { DayHeaderCtx, DayHeaderHooks } from './render/day-head.js';
+export type { DayHeaderHooks } from './render/day-head.js';
+export type {
+  AllDayLabelCtx,
+  DayCellCtx,
+  DayHeaderCtx,
+  DayLaneCtx,
+  ElementHooks,
+  ListDayHeaderCtx,
+  MonthHeaderCtx,
+  MoreLinkCtx,
+  MorePopoverCtx,
+  NoEventsCtx,
+  NowIndicatorCtx,
+  ResourceAreaHeaderCtx,
+  ResourceGroupCtx,
+  ResourceLaneCtx,
+  SlotLabelCtx,
+  SlotLaneCtx,
+  ViewHookCtx,
+  WeekNumberCtx,
+} from './render/hooks.js';
 export type { LiveSettings, DateClick, EventChange } from './settings.js';
 // A custom view takes part in gestures with a surface, and in the keyboard with its `keys` (none: no keyboard).
 export type { InteractionSurface, KeyboardSurface, Box } from './interact/surface.js';

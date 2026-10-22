@@ -1,6 +1,6 @@
 import { Temporal, formatTemporal, dayInfo } from '@dzcalendar/core';
 import { weekNumber, weekRulesFor } from '@dzcalendar/core';
-import type { DayGridBar, DayGridModel, DayGridWeek, Hit, KernelState, PlainDate, Segment, ZonedDateTime } from '@dzcalendar/core';
+import type { DayGridBar, DayGridModel, DayGridWeek, Hit, KernelState, PlainDate, Resource, Segment, ZonedDateTime } from '@dzcalendar/core';
 
 /** The shape of `@dzcalendar/core/views`' multi-month model, named here so the month view does not import that entry. */
 interface MonthsModel {
@@ -18,6 +18,7 @@ import { NodePool } from '../render/pool.js';
 import { drawResourceHeads, noResourcesNote, resourceName } from '../render/resource-heads.js';
 import { activeIn } from '../focus.js';
 import { ownDayHead, unmountDayHead } from '../render/day-head.js';
+import { decorate, holder, undecorate, undecorateAll } from '../render/hooks.js';
 
 /** A cell's key: its date, and its resource in a resource view (the same date shows once per resource). */
 const cellKey = (date: PlainDate, resourceId: string | undefined) => (resourceId === undefined ? date.toString() : `${date.toString()}|${resourceId}`);
@@ -91,6 +92,7 @@ interface MoreItem {
   readonly count: number;
   readonly lane: number;
   readonly date: PlainDate;
+  readonly resource: Resource | null;
 }
 
 interface WeekParts {
@@ -185,7 +187,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       el.append(cells, barsHost, more);
       const p: WeekParts = {
         week: null,
-        cells: new KeyedList<CellItem>(cells, () => h(doc, 'div', 'dz-dg__cell'), (n, c) => drawCell(n, c)),
+        cells: new KeyedList<CellItem>(cells, () => h(doc, 'div', 'dz-dg__cell'), (n, c) => drawCell(n, c), (n) => undecorateAll(n)),
         bars: new KeyedList<BarItem>(barsHost, () => barPool.take(), (n, b, c) => drawBar(n, b, c), (n) => unmountEvent(ctx, n), (n) => barPool.release(n)),
         more: new KeyedList<MoreItem>(
           more,
@@ -199,6 +201,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
             return link;
           },
           (link, m) => drawMore(link, m),
+          (link) => undecorate(link),
         ),
       };
       parts.set(it.key, p);
@@ -209,6 +212,9 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     (el) => {
       const p = parts.get(el.dataset['key'] ?? '');
       p?.bars.clear();
+      // Its cells and "+N" let go of the application's hooks with it.
+      p?.cells.clear();
+      p?.more.clear();
     },
   );
   /** The single grid's rows, or each month's. */
@@ -231,6 +237,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     },
     (el, it) => drawMonth(el, it.section),
     (el) => {
+      undecorateAll(el);
       monthWeeks.get(el.dataset['key'] ?? '')?.clear();
       monthWeeks.delete(el.dataset['key'] ?? '');
     },
@@ -279,7 +286,10 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     go.type = 'button';
     go.setAttribute('aria-label', `${ctx.messages.goToMonth}, ${name}`);
     go.addEventListener('click', () => ctx.kernel.getViewSpec('dayGridMonth') && ctx.kernel.setView('dayGridMonth', x.month!));
+    const was = title.firstElementChild as HTMLElement | null;
+    if (was) undecorate(was);
     title.replaceChildren(go);
+    decorate(ctx, ctx.hooks.monthHeader, go, { view: state?.view.type ?? '', month: x.month!, text: name });
     const grid = el.querySelector<HTMLElement>('.dz-mm__grid')!;
     grid.setAttribute('aria-label', name);
     grid.style.setProperty('--dz-cols', String(x.model.weeks[0]?.dates.length ?? 7));
@@ -410,7 +420,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     // "+N" links, where a day hides something: keyed by date, so a link keeps its node (and focus).
     const lane = Math.max(0, (max ?? 1) - 1);
     p.more.sync(
-      week.hiddenPerDay.flatMap((n, i) => (n === 0 ? [] : [{ key: cellKey(week.dates[i]!, week.resources[i]?.id), sig: `${n}|${i}|${lane}|${ctx.epoch}`, col: i, count: n, lane, date: week.dates[i]! }])),
+      week.hiddenPerDay.flatMap((n, i) => (n === 0 ? [] : [{ key: cellKey(week.dates[i]!, week.resources[i]?.id), sig: `${n}|${i}|${lane}|${ctx.epoch}`, col: i, count: n, lane, date: week.dates[i]!, resource: week.resources[i] ?? null }])),
     );
   }
 
@@ -420,6 +430,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     link.style.setProperty('--col', String(m.col));
     link.style.setProperty('--lane', String(m.lane));
     link.setAttribute('aria-label', ctx.messages.moreLabel({ count: m.count, date: formatTemporal(m.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale) }));
+    decorate(ctx, ctx.hooks.moreLink, link, { view: state?.view.type ?? '', date: m.date, resource: m.resource, count: m.count, text: link.textContent ?? '' });
   }
 
   function piecesOf(bar: DayGridBar): BarItem[] {
@@ -471,6 +482,14 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       num.setAttribute('aria-label', `${ctx.messages.goToDay}, ${long}`);
       num.addEventListener('click', () => ctx.kernel.setView(dayView, c.date));
     }
+    // The application's cell: its classes and mounts on the cell, its content in place of the day's number.
+    const cellHooks = ctx.hooks.dayCell;
+    if (cellHooks) {
+      const resource = c.resourceId !== undefined ? (ctx.kernel.getResources().byId.get(c.resourceId)?.resource ?? null) : null;
+      const dayCtx = { view: state?.view.type ?? '', date: c.date, resource, today: c.today, outside: c.outside, lengthMinutes: dayInfo(c.date, ctx.zone).lengthMinutes, text: num.textContent ?? '' };
+      decorate(ctx, holder(cellHooks), cell, dayCtx);
+      if (cellHooks.content) decorate(ctx, { content: cellHooks.content }, num, dayCtx);
+    } else decorate(ctx, undefined, cell, null);
     let items = itemLists.get(cell);
     if (!items) {
       const host = h(doc, 'div', 'dz-dg__items');
@@ -479,7 +498,8 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       cell.append(host);
     }
     // The number is redrawn; the list keeps its nodes (and the focus on one of them).
-    const old = cell.querySelector(':scope > .dz-dg__num');
+    const old = cell.querySelector<HTMLElement>(':scope > .dz-dg__num');
+    if (old) undecorate(old);
     if (old) old.replaceWith(num);
     else cell.prepend(num);
     // The second calendar's day beside the number (said in the cell's name, so hidden here).
@@ -489,7 +509,9 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       a.setAttribute('aria-hidden', 'true');
       num.after(a);
     }
-    cell.querySelector(':scope > .dz-dg__wk')?.remove();
+    const oldWk = cell.querySelector<HTMLElement>(':scope > .dz-dg__wk');
+    if (oldWk) undecorate(oldWk);
+    oldWk?.remove();
     if (c.week !== null) {
       // The week's number, leading to that week where a week view exists.
       const weekView = ctx.kernel.getViewSpec('timeGridWeek') ? 'timeGridWeek' : ctx.kernel.getViewSpec('dayGridWeek') ? 'dayGridWeek' : null;
@@ -501,6 +523,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
         wk.addEventListener('click', () => ctx.kernel.setView(weekView, c.date));
       }
       cell.prepend(wk);
+      decorate(ctx, ctx.hooks.weekNumber, wk, { view: state?.view.type ?? '', week: c.week, date: c.date, text: wk.textContent ?? '' });
     }
     cellItems.set(cell, c);
     syncItems(cell, c, expanded === c.key);
@@ -582,9 +605,15 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       item.setAttribute('aria-label', ctx.messages.eventLabel({ title, time: labels.spoken }));
       return item;
     });
-    ctx.openMore(link, formatTemporal(date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale), nodes, () => {
-      for (const n of nodes) unmountEvent(ctx, n);
-    });
+    ctx.openMore(
+      link,
+      formatTemporal(date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale),
+      nodes,
+      () => {
+        for (const n of nodes) unmountEvent(ctx, n);
+      },
+      { date, resource: week.resources[col] ?? null },
+    );
   }
 
   const segmentByKey = (key: string): Segment | undefined => {
@@ -885,6 +914,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       if (heads.length === 0) cursorResource = undefined;
       else if (!heads.some((x) => x.resource.id === cursorResource)) cursorResource = heads[0]!.resource.id;
       root.classList.toggle('dz-dg--month', s.view.alignment === 'month' || multi);
+      decorate(ctx, holder(ctx.hooks.view), root, { view: s.view.type, family: s.view.family, range: s.range, title: s.title });
       // No cap (dayMaxLanes: null): every event shown, the weeks grow, the month scrolls.
       root.classList.toggle('dz-dg--grow', !multi && (next as DayGridModel).maxLanes === null);
       if (multi) {
@@ -938,6 +968,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       wake();
     },
     destroy() {
+      if (Object.keys(ctx.hooks).length > 0) undecorateAll(root);
       for (const p of parts.values()) p.bars.clear();
       // The weekday heads the application filled let go of what it put there.
       for (const el of root.querySelectorAll<HTMLElement>('.dz-dg__weekday')) unmountDayHead(ctx, el);

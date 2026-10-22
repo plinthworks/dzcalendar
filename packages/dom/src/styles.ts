@@ -224,6 +224,10 @@ export const DZ_CSS = `
 }
 .dz-cal[data-dz-event-style='solid'] .dz-bar--timed { padding-inline-start: 0.375rem; }
 .dz-cal[data-dz-event-style='solid'] .dz-bar--timed::before { display: none; }
+/* hooks.slotLane: a slot's row across the columns, under the events. */
+.dz-tg__lanes { position: absolute; inset-block: 0; inset-inline: var(--dz-gutter-width, 3.75rem) 0; pointer-events: none; z-index: 0; }
+.dz-tg__lanes:empty { display: none; }
+.dz-tg__slotlane { position: absolute; inset-inline: 0; top: calc(var(--t) * var(--dz-minute, 1.2px)); height: calc(var(--h) * var(--dz-minute, 1.2px)); }
 /* allDaySlot: false — the row folds (its keyboard cursor stays focusable). */
 .dz-tg__allday--none { min-height: 0; height: 0; padding-block: 0; border-block-width: 0; overflow: hidden; }
 /* nowIndicator: false, at any time (the timeline's line too). */

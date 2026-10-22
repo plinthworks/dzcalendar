@@ -1,3 +1,4 @@
+import { decorate, undecorate } from './hooks.js';
 import { formatTemporal, resolveWall } from '@dzcalendar/core';
 import type { CalEvent, PlainDateTime, Reading, Segment } from '@dzcalendar/core';
 import type { EventContentCtx, ViewCtx } from '../host.js';
@@ -94,7 +95,6 @@ export function applyEventLook(el: HTMLElement, ev: CalEvent): void {
   else delete el.dataset['seriesId'];
 }
 
-const mounted = new WeakMap<HTMLElement, { cleanup?: () => void; ctx: EventContentCtx }>();
 
 /**
  * Fills an event node: the application's content if its hook returns one,
@@ -112,29 +112,14 @@ export function guard<T>(fn: () => T, fallback: T): T {
   }
 }
 
-export function fillEvent(ctx: ViewCtx, el: HTMLElement, content: EventContentCtx, fallback: () => Node[], created: boolean): void {
-  const custom = guard(() => ctx.hooks.event?.content?.(content, el), null);
-  if (custom === null || custom === undefined) el.replaceChildren(...fallback());
-  else el.replaceChildren(typeof custom === 'string' ? ctx.doc.createTextNode(custom) : custom);
-  const prev = mounted.get(el);
-  if (created && ctx.hooks.event?.didMount) {
-    const hook = ctx.hooks.event.didMount;
-    const cleanup = guard(() => hook({ el, ctx: content }), undefined);
-    mounted.set(el, { ...(typeof cleanup === 'function' && { cleanup }), ctx: content });
-  } else if (prev) {
-    prev.ctx = content;
-  } else if (ctx.hooks.event?.willUnmount) {
-    mounted.set(el, { ctx: content });
-  }
+export function fillEvent(ctx: ViewCtx, el: HTMLElement, content: EventContentCtx, fallback: () => Node[], _created: boolean): void {
+  // The same four members as every element: mounted once in the page, let go with the hooks that mounted it.
+  decorate(ctx, ctx.hooks.event, el, content, () => el.replaceChildren(...fallback()));
 }
 
-/** Before an event node leaves the DOM. */
-export function unmountEvent(ctx: ViewCtx, el: HTMLElement): void {
-  const m = mounted.get(el);
-  if (!m) return;
-  guard(() => m.cleanup?.(), undefined);
-  guard(() => ctx.hooks.event?.willUnmount?.({ el, ctx: m.ctx }), undefined);
-  mounted.delete(el);
+/** Before an event node leaves the DOM (or goes back to a pool). */
+export function unmountEvent(_ctx: ViewCtx, el: HTMLElement): void {
+  undecorate(el);
 }
 
 /** The default content of a timed event: hours (with badges) and title. */
