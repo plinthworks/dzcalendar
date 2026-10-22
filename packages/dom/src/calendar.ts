@@ -54,7 +54,7 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly nowIndicator?: boolean;
   /** The view switcher's buttons. Default: month, week, day — those this renderer draws. Without `headerToolbar`. */
   readonly headerViews?: readonly string[];
-  /** What the header holds and where (`'prev,next today'`: a space between groups, a comma inside one); false: no header. Default: the arrows, "today" and the title at the start, `headerViews` at the end. */
+  /** What the header holds and where (`'prev,next today'`: a space between groups, a comma inside one); false: no header. Default: the arrows joined and "today" at the start, the title in the centre, `headerViews` at the end. */
   readonly headerToolbar?: HeaderToolbar | false;
   /** The application's buttons, named in `headerToolbar`. */
   readonly customButtons?: Readonly<Record<string, CustomButton>>;

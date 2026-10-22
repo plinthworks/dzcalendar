@@ -53,12 +53,18 @@ export const DZ_CSS = `
   gap: 0.5rem;
   padding: 0.5rem 0.25rem;
 }
-.dz-toolbar__title { margin: 0; margin-inline-start: 0.5rem; font-size: 1.125rem; font-weight: 600; flex: 1; }
+.dz-toolbar__title { margin: 0; margin-inline-start: 0.5rem; font-size: var(--dz-title-size, 1.375rem); font-weight: var(--dz-title-weight, 600); line-height: 1.2; flex: 1; }
 /* Three places: the start and the end share what is left, the centre sits between them (headerToolbar). */
 /* Never narrower than what they hold: a narrow header goes on two lines rather than pieces on top of each other. */
 .dz-toolbar__section { display: flex; align-items: center; gap: 0.5rem; }
 /* A narrow header (a phone, a sidebar): a place too wide for it breaks inside too. */
-@container dz-toolbar (max-width: 40rem) { .dz-toolbar__section { flex-wrap: wrap; } }
+@container dz-toolbar (max-width: 40rem) {
+  .dz-toolbar__section { flex-wrap: wrap; }
+  /* The title alone on the first line, centred; the buttons share the next. */
+  .dz-toolbar__section--center:not(:empty) { order: -1; flex-basis: 100%; justify-content: center; }
+}
+/* A title among buttons (start or end) keeps room for a few words: the section wraps rather than squeeze it to a word a line. */
+.dz-toolbar__section--start .dz-toolbar__title, .dz-toolbar__section--end .dz-toolbar__title { min-width: min(9rem, 100%); }
 .dz-toolbar__section--start, .dz-toolbar__section--end { flex: 1 1 0; }
 .dz-toolbar__section--end { justify-content: flex-end; }
 .dz-toolbar__section--center:empty { display: none; }
@@ -67,19 +73,30 @@ export const DZ_CSS = `
 .dz-toolbar__section--center .dz-toolbar__title { flex: none; margin: 0; text-align: center; }
 .dz-toolbar__section--end .dz-toolbar__title { flex: none; }
 .dz-toolbar__custom { display: inline-flex; align-items: center; gap: 0.375rem; }
-.dz-toolbar__custom[aria-pressed='true'] { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); border-color: var(--dz-accent, var(--dzc-accent)); }
+.dz-toolbar__custom[aria-pressed='true'] { background: var(--dz-button-active-bg, var(--dz-accent, var(--dzc-accent))); color: var(--dz-button-active-fg, var(--dz-accent-fg, var(--dzc-accent-fg))); border-color: var(--dz-button-active-bg, var(--dz-accent, var(--dzc-accent))); }
 .dz-toolbar__btn {
   /* Reset first (kept unstyled: a header button is not the browser's grey one), then the theme's line. */
   border: 0;
-  border: 1px solid var(--dz-border, var(--dzc-border));
-  border-radius: var(--dz-radius, var(--dzc-radius));
+  border: 1px solid var(--dz-button-border, var(--dz-border, var(--dzc-border)));
+  border-radius: var(--dz-button-radius, var(--dz-radius, var(--dzc-radius)));
   background: transparent;
+  background: var(--dz-button-bg, transparent);
   color: inherit;
+  color: var(--dz-button-fg, inherit);
   font: inherit;
-  padding: 0.25rem 0.625rem;
+  font-size: var(--dz-button-font-size, 0.875rem);
+  font-weight: var(--dz-button-weight, 500);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--dz-button-height, 2rem);
+  padding: 0 0.75rem;
   cursor: pointer;
   white-space: nowrap;
 }
+/* The arrows: square, their sign larger. */
+.dz-toolbar__prev, .dz-toolbar__next { min-width: var(--dz-button-height, 2rem); padding: 0 0.5rem; font-size: var(--dz-arrow-size, 1.25rem); line-height: 1; }
+.dz-toolbar__btn:disabled { opacity: 0.5; cursor: default; }
 .dz-toolbar__btn:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: 2px; }
 
 .dz-tg { display: flex; flex-direction: column; flex: 1; min-height: 0; border: 1px solid var(--dz-border, var(--dzc-border)); border-radius: var(--dz-radius, var(--dzc-radius)); overflow: hidden; }
@@ -131,9 +148,10 @@ export const DZ_CSS = `
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: var(--dz-event-bg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 18%, var(--dz-bg, var(--dzc-bg))));
-  color: var(--dz-event-fg, var(--dz-fg, var(--dzc-fg)));
-  border-inline-start: 3px solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
+  background: var(--dz-event-bg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) var(--dz-event-tint, 16%), var(--dz-bg, var(--dzc-bg))));
+  /* The tone's dark shade (its light one on a dark scheme), as much as the theme says (45%, checked AA for every family and tone); with no theme the plain text (the system accent may be translucent). */
+  color: var(--dz-event-fg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) var(--dz-event-shade, var(--dzp-event-shade, 0%)), var(--dz-fg, var(--dzc-fg))));
+  border-inline-start: var(--dz-event-edge, 3px) solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
 }
 .dz-bar--cont-start { border-start-start-radius: 0; border-end-start-radius: 0; margin-inline-start: 0; }
 .dz-bar--cont-end { border-start-end-radius: 0; border-end-end-radius: 0; margin-inline-end: 0; }
@@ -155,7 +173,7 @@ export const DZ_CSS = `
 .dz-tg__col {
   position: relative;
   height: calc(var(--dz-len) * var(--dz-minute, 1.2px));
-  border-inline-start: 1px solid var(--dz-border, var(--dzc-border));
+  border-inline-start: 1px solid var(--dz-line, color-mix(in srgb, var(--dz-border, var(--dzc-border)) 70%, transparent));
   background-image: repeating-linear-gradient(
     to bottom,
     var(--dz-line, color-mix(in srgb, var(--dz-border, var(--dzc-border)) 70%, transparent)) 0 1px,
@@ -212,9 +230,10 @@ export const DZ_CSS = `
   overflow: hidden;
   font-size: 0.75rem;
   line-height: 1.25;
-  background: var(--dz-event-bg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 18%, var(--dz-bg, var(--dzc-bg))));
-  color: var(--dz-event-fg, var(--dz-fg, var(--dzc-fg)));
-  border-inline-start: 3px solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
+  background: var(--dz-event-bg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) var(--dz-event-tint, 16%), var(--dz-bg, var(--dzc-bg))));
+  /* The tone's dark shade (its light one on a dark scheme), as much as the theme says (45%, checked AA for every family and tone); with no theme the plain text (the system accent may be translucent). */
+  color: var(--dz-event-fg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) var(--dz-event-shade, var(--dzp-event-shade, 0%)), var(--dz-fg, var(--dzc-fg))));
+  border-inline-start: var(--dz-event-edge, 3px) solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
   z-index: 1;
   cursor: default;
 }
@@ -226,8 +245,23 @@ export const DZ_CSS = `
 .dz-ev--bg.dz-ev--labelled { overflow: visible; opacity: 1; background: color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 22%, transparent); color: var(--dz-fg, var(--dzc-fg)); pointer-events: none; }
 /* Its label stays at the top of what is shown: the column starts at midnight, the grid is scrolled to the morning. */
 .dz-ev--bg.dz-ev--labelled > * { position: sticky; top: 0; }
-.dz-ev__time { display: block; font-size: 0.6875rem; opacity: 0.85; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.dz-ev__title { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.dz-ev__time { display: block; font-size: 0.6875rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Too short for two lines (a 20-minute visit): the time and the title on one, the time giving way first. */
+.dz-ev:not(.dz-ev--bg) { container: dz-ev / size; }
+@container dz-ev (max-height: 1.875rem) {
+  /* The time gives way first (at most 60 %); the gap on the title, so it holds whatever the time's own direction. */
+  .dz-ev__time { float: inline-start; max-width: 40%; overflow: hidden; text-overflow: ellipsis; line-height: inherit; }
+  .dz-ev__time:empty { display: none; }
+  .dz-ev__title { white-space: nowrap; text-overflow: ellipsis; }
+  .dz-ev__time:not(:empty) + .dz-ev__title { padding-inline-start: 0.25rem; }
+}
+/* Short and narrow (overlaps in a week): the title alone. */
+@container dz-ev (max-height: 1.875rem) and (max-width: 7rem) {
+  .dz-ev__time { display: none; }
+  .dz-ev__time:not(:empty) + .dz-ev__title { padding-inline-start: 0; }
+}
+/* A narrow column: a word cut anywhere rather than an ellipsis on every line; --dz-event-hyphens: auto cuts where the page's language allows (a few ms at the first drawing: its dictionary). */
+.dz-ev__title { display: block; font-weight: var(--dz-event-title-weight, 600); overflow: hidden; overflow-wrap: anywhere; hyphens: var(--dz-event-hyphens, manual); }
 .dz-ev__offset, .dz-ev__real {
   display: inline-block;
   margin-inline-start: 0.25rem;
@@ -239,11 +273,9 @@ export const DZ_CSS = `
 }
 /* eventStyle: 'solid' — a block of its tone, its text the theme's colour for text on a tone. */
 .dz-cal[data-dz-event-style='solid'] :is(.dz-ev:not(.dz-ev--bg), .dz-bar:not(.dz-bar--bg)) {
-  --dz-event-bg: var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
-  /* A tone of the application's may say its own text colour (--dz-tone-<name>-on); else the theme's (--dz-on-tone). */
-  --dz-event-fg: var(--dz-tone-on, var(--dz-on-tone, var(--dz-bg, var(--dzc-bg))));
-  background: var(--dz-event-bg);
-  color: var(--dz-event-fg);
+  /* The application's --dz-event-bg / --dz-event-fg still win; else the tone, and the text a tone of the application's says (--dz-tone-<name>-on), else the theme's (--dz-on-tone). */
+  background: var(--dz-event-bg, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))));
+  color: var(--dz-event-fg, var(--dz-tone-on, var(--dz-on-tone, var(--dz-bg, var(--dzc-bg)))));
 }
 .dz-cal[data-dz-event-style='solid'] .dz-bar--timed { padding-inline-start: 0.375rem; }
 .dz-cal[data-dz-event-style='solid'] .dz-bar--timed::before { display: none; }
@@ -276,9 +308,11 @@ export const DZ_CSS = `
 /* ── toolbar: view switcher ─────────────────────────────────────────────── */
 .dz-toolbar__group { display: inline-flex; }
 .dz-toolbar__group > .dz-toolbar__btn { border-radius: 0; margin-inline-start: -1px; }
-.dz-toolbar__group > .dz-toolbar__btn:first-child { border-start-start-radius: var(--dz-radius, var(--dzc-radius)); border-end-start-radius: var(--dz-radius, var(--dzc-radius)); }
-.dz-toolbar__group > .dz-toolbar__btn:last-child { border-start-end-radius: var(--dz-radius, var(--dzc-radius)); border-end-end-radius: var(--dz-radius, var(--dzc-radius)); }
-.dz-toolbar__view[aria-pressed='true'] { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); border-color: var(--dz-accent, var(--dzc-accent)); }
+.dz-toolbar__group > .dz-toolbar__btn:first-child { margin-inline-start: 0; border-start-start-radius: var(--dz-button-radius, var(--dz-radius, var(--dzc-radius))); border-end-start-radius: var(--dz-button-radius, var(--dz-radius, var(--dzc-radius))); }
+.dz-toolbar__group > .dz-toolbar__btn:last-child { border-start-end-radius: var(--dz-button-radius, var(--dz-radius, var(--dzc-radius))); border-end-end-radius: var(--dz-button-radius, var(--dz-radius, var(--dzc-radius))); }
+/* A focused button's ring above its neighbours'. */
+.dz-toolbar__group > .dz-toolbar__btn:focus-visible { position: relative; z-index: 1; }
+.dz-toolbar__view[aria-pressed='true'] { background: var(--dz-button-active-bg, var(--dz-accent, var(--dzc-accent))); color: var(--dz-button-active-fg, var(--dz-accent-fg, var(--dzc-accent-fg))); border-color: var(--dz-button-active-bg, var(--dz-accent, var(--dzc-accent))); position: relative; }
 
 /* ── time grid: free slots (availableSlots), over the hours, under the events ── */
 .dz-slot {
@@ -314,7 +348,7 @@ export const DZ_CSS = `
   inset-inline: 0;
   top: calc(var(--t) * var(--dz-minute, 1.2px));
   height: calc(var(--h) * var(--dz-minute, 1.2px));
-  background: var(--dz-off-bg, color-mix(in srgb, var(--dz-fg-muted, var(--dzc-fg-muted)) 9%, transparent));
+  background: var(--dz-off-bg, color-mix(in srgb, var(--dz-fg-muted, var(--dzc-fg-muted)) 6%, transparent));
   pointer-events: none;
   z-index: 0;
 }
@@ -332,21 +366,23 @@ export const DZ_CSS = `
   grid-template-columns: repeat(var(--dz-cols, 7), minmax(0, 1fr));
   grid-template-rows: var(--dz-day-head, 1.75rem) repeat(var(--lanes, 1), var(--dz-bar-height, 1.375rem)) 1fr;
   row-gap: 2px;
-  border-bottom: 1px solid var(--dz-border, var(--dzc-border));
+  border-bottom: 1px solid var(--dz-line, color-mix(in srgb, var(--dz-border, var(--dzc-border)) 70%, transparent));
 }
 .dz-dg__week:last-child { border-bottom: 0; }
 .dz-dg__cell {
   grid-row: 1 / -1;
   grid-column: calc(var(--col) + 1);
-  border-inline-start: 1px solid var(--dz-border, var(--dzc-border));
+  border-inline-start: 1px solid var(--dz-line, color-mix(in srgb, var(--dz-border, var(--dzc-border)) 70%, transparent));
   padding: 0.125rem 0.25rem;
   min-width: 0;
   z-index: 0;
 }
 .dz-dg__cell:first-child { border-inline-start: 0; }
-.dz-dg__cell--outside { background: var(--dz-outside-bg, color-mix(in srgb, var(--dz-fg-muted, var(--dzc-fg-muted)) 6%, transparent)); }
-.dz-dg__cell--outside .dz-dg__num { opacity: 0.45; }
-.dz-dg__cell--closed { background-image: repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--dz-border, var(--dzc-border)) 45%, transparent) 7px 8px); }
+/* A month's padding days: a muted number, no fill (--dz-outside-bg to give one). */
+.dz-dg__cell--outside { background: var(--dz-outside-bg, transparent); }
+.dz-dg__cell--outside .dz-dg__num { color: var(--dz-outside-fg, color-mix(in srgb, var(--dz-fg-muted, var(--dzc-fg-muted)) 75%, transparent)); }
+/* Days out of service (businessHours): pale hatching; set --dz-closed-image to none to drop it, or to another image. */
+.dz-dg__cell--closed { background-image: var(--dz-closed-image, repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--dz-border, var(--dzc-border)) 28%, transparent) 7px 8px)); }
 .dz-dg__cell--today { background-color: var(--dz-today-bg, color-mix(in srgb, var(--dz-accent, var(--dzc-accent)) 7%, transparent)); }
 .dz-dg__num {
   display: inline-block;
@@ -379,7 +415,7 @@ export const DZ_CSS = `
   border-radius: 50%;
   background: var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
 }
-.dz-bar__time { font-variant-numeric: tabular-nums; opacity: 0.85; }
+.dz-bar__time { font-variant-numeric: tabular-nums; }
 .dz-more {
   grid-row: calc(var(--lane) + 2);
   grid-column: calc(var(--col) + 1);
@@ -396,6 +432,10 @@ export const DZ_CSS = `
   text-align: start;
   cursor: pointer;
   white-space: nowrap;
+  /* A narrow day (a year's months): "+3 au…" in its own cell, never over the next one's. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* In a time grid: where the hidden events are, in the cluster's last lane. */
 .dz-more--tg {
@@ -481,9 +521,10 @@ export const DZ_CSS = `
   overflow: hidden;
   padding: 2px 6px;
   border-radius: var(--dz-radius, var(--dzc-radius));
-  border-inline-start: 3px solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
-  background: color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 24%, var(--dz-bg, var(--dzc-bg)));
-  color: var(--dz-fg, var(--dzc-fg));
+  /* What it shows looks like the event: the same tokens, a little stronger. */
+  border-inline-start: var(--dz-event-edge, 3px) solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
+  background: var(--dz-event-bg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) calc(var(--dz-event-tint, 16%) + 8%), var(--dz-bg, var(--dzc-bg))));
+  color: var(--dz-event-fg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) var(--dz-event-shade, var(--dzp-event-shade, 0%)), var(--dz-fg, var(--dzc-fg))));
   box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.5);
   font-size: 0.75rem;
   line-height: 1.25;
@@ -535,7 +576,7 @@ export const DZ_CSS = `
   .dz-bar--timed::before, .dz-now::before { forced-color-adjust: none; background: CanvasText; }
   .dz-now { border-top-color: CanvasText; }
   .dz-dg__cell--today { outline: 2px solid Highlight; outline-offset: -2px; }
-  .dz-dg__cell--outside .dz-dg__num { opacity: 1; color: GrayText; }
+  .dz-dg__cell--outside .dz-dg__num { color: GrayText; }
   .dz-slot { border: 1px dashed ButtonText; }
 }
 /* Without color-mix() (Safari before 16.2): plain palette colours instead of the tints, never nothing. */
@@ -549,7 +590,7 @@ export const DZ_CSS = `
   .dz-ev__offset, .dz-ev__real { background: var(--dz-badge-bg, var(--dz-bg-raised, var(--dzc-bg-raised))); }
   .dz-off { background: var(--dz-off-bg, var(--dz-bg-raised, var(--dzc-bg-raised))); }
   .dz-dg__cell--outside { background: var(--dz-outside-bg, var(--dz-bg-raised, var(--dzc-bg-raised))); }
-  .dz-dg__cell--closed { background-image: repeating-linear-gradient(135deg, transparent 0 7px, var(--dz-border, var(--dzc-border)) 7px 8px); }
+  .dz-dg__cell--closed { background-image: var(--dz-closed-image, repeating-linear-gradient(135deg, transparent 0 7px, var(--dz-border, var(--dzc-border)) 7px 8px)); }
   .dz-ghost, .dz-ghost--select, .dz-ghost.dz-event--invalid { background: var(--dz-bg-raised, var(--dzc-bg-raised)); }
   .dz-cursor:focus { background: transparent; }
   .dz-slot, .dz-slot:hover { background: var(--dz-slot-bg, var(--dz-bg-raised, var(--dzc-bg-raised))); }
@@ -587,14 +628,15 @@ export function unlayered(css: string): string {
 /** Roots (a document's head, a shadow root) where an unstyled calendar was drawn: their sheets carry the look's guard. */
 const GUARDED = new WeakSet<ParentNode>();
 
+/** Whether a root's sheets carry the look's guard. */
+export const isGuarded = (root: ParentNode | null): boolean => root !== null && GUARDED.has(root);
+
 /**
  * The first unstyled calendar (`look: 'none'`) of a document or shadow root:
  * the calendar's sheets there are written again with their look guarded
  * (once; those added later are guarded as they come). A page without one
  * pays nothing.
  */
-/** Whether a root's sheets carry the look's guard. */
-export const isGuarded = (root: ParentNode | null): boolean => root !== null && GUARDED.has(root);
 
 export function guardLook(host: HTMLElement): void {
   const root = host.getRootNode();

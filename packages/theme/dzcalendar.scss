@@ -55,6 +55,9 @@ $tones: (
 /// not the theme's background, which on an off-white family falls under AA (checked by test for every family and tone).
 $on-tone: (#ffffff, #111827) !default;
 
+/// A tinted event's text: this much of its tone in the text colour (its dark shade on light, light on dark) — 45% keeps AA on every family and tone (checked in Chrome).
+$event-shade: 45% !default;
+
 /// Ready-made families (`theme: 'slate'` → data-dz-theme): each a (light, dark) palette,
 /// chosen for AA contrast and checked by axe in Chrome. Names are ours; palettes are
 /// inspired by well-loved editor themes (GitHub Primer, One Dark/Tokyo Night,
@@ -113,6 +116,7 @@ $layer: true !default;
     --dz-tone-#{$name}: #{side($colour, $i)};
   }
   --dz-on-tone: #{side($on-tone, $i)};
+  --dzp-event-shade: #{$event-shade};
 }
 @mixin family($sel, $palette) {
   #{$sel} { @include vars($palette, 1); }
@@ -147,10 +151,10 @@ $layer: true !default;
   }
 
   // Not the pressed view button: its accent background carries white text.
-  .dz-toolbar__btn:hover:not(:disabled):not([aria-pressed='true']) { background: var(--dzc-bg-raised); }
+  .dz-toolbar__btn:hover:not(:disabled):not([aria-pressed='true']) { background: var(--dz-button-hover-bg, var(--dz-bg-raised, var(--dzc-bg-raised))); }
   .dz-ev:hover { filter: brightness(0.97); }
   .dz-tg__head,
-  .dz-tg__allday { background: var(--dzc-bg); }
+  .dz-tg__allday { background: var(--dz-bg, var(--dzc-bg)); }
 
   @media (forced-colors: active) {
     .dz-tg__dayhead--today .dz-tg__dayhead-date { forced-color-adjust: none; background: Highlight; color: HighlightText; }

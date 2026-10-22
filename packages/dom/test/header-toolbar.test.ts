@@ -29,8 +29,8 @@ const layout = (c: CalendarInstance) =>
   );
 
 describe('the header', () => {
-  it('without headerToolbar: as before — arrows, today, the title at the start; month, week, day joined at the end', () => {
-    expect(layout(make())).toEqual(["‹ Aujourd'hui › T", '', '[Mois,Semaine,Jour]']);
+  it('without headerToolbar: the arrows joined and today at the start, the title in the centre, month, week, day joined at the end (owner, 18g-3)', () => {
+    expect(layout(make())).toEqual(["[‹,›] Aujourd'hui", 'T', '[Mois,Semaine,Jour]']);
   });
 
   it('three places, a space between groups, a comma inside one', () => {

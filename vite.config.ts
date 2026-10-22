@@ -79,6 +79,7 @@ export default defineConfig({
         dragdrop: fileURLToPath(new URL('./playground/dragdrop.html', import.meta.url)),
         tailwind: fileURLToPath(new URL('./playground/tailwind.html', import.meta.url)),
         unstyled: fileURLToPath(new URL('./playground/unstyled.html', import.meta.url)),
+        gallery: fileURLToPath(new URL('./playground/gallery.html', import.meta.url)),
       },
     },
   },

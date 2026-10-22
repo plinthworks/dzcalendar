@@ -32,8 +32,10 @@ customButtons: {
   current view pressed).
 - **`false`**: no header at all (the application draws its own, with
   `calendar.navigate`, `calendar.kernel.getState().title`, …).
-- **Without `headerToolbar`**: the header as before — the arrows and "today"
-  with the title at the start, the views of `headerViews` at the end.
+- **Without `headerToolbar`** (owner, 18g-3, as FullCalendar's look): the
+  arrows joined and "today" at the start (`'prev,next today'`), the title in
+  the centre, the views of `headerViews` joined at the end (a lone view: no
+  switcher).
 - **An application's button**: `text` (its words, its accessible name),
   `hint` (on hover; the accessible name when there is no text), `icon` (a
   class put on an `aria-hidden` span before the words: the application's
@@ -72,5 +74,5 @@ calendar's own (`prev`, `title`, a view).
 
 - No icon font of ours: `icon` is a class of the application's.
 - `prevYear` / `nextYear` are not names here (the compat says so).
-- The look (grouped buttons, a centred title, the pressed view filled)
-  belongs to the CSS pass; the structure is in place for it.
+- The look (grouped buttons, the title's size, the pressed view filled) is
+  the application's: `--dz-title-*`, `--dz-button-*` (docs/styling.md).

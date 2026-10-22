@@ -82,6 +82,12 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18g-3 — passe visuelle (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : en-tête par défaut de FullCalendar (flèches groupées et « aujourd'hui », titre centré, vues) ; événements teintés avec liseré, texte dans le ton (45 % avec le thème, AA vérifié) ; hors service gris pâle, hachures pâles, jours hors mois sans fond. **Chaque choix surchargeable** par l'application : variables `--dz-title-*`, `--dz-button-*`, `--dz-event-*`, `--dz-closed-image`, `--dz-outside-fg`, options `headerToolbar`, `eventStyle`.
+- **D (dom)** : événement court sur une ligne par `@container dz-ev` (l'événement est un conteneur de taille).
+- **Décision du propriétaire** : budgets à la mesure + 3 % (pro 15,0 ko, premier rendu `timeGridWeek:U` 33 ms).
+
 ### Ajustements après la Phase 18g-2 — sans décor et pont Tailwind (détail dans ROADMAP.md)
 
 - **D (dom)** : `look: 'none'` — le CSS découpé déclaration par déclaration en structure et décor ; le décor gardé par `:where(:not([data-dz-look="none"] …))`, sans poids ; paresseux (seulement après un premier calendrier sans décor). Le CSS du thème est construit avec la même garde (`scripts/build-theme.mjs`). `@dzcalendar/theme/tailwind-theme.css` pour Tailwind 4.
@@ -111,7 +117,7 @@ Ils priment sur les sections citées.
 
 ### Ajustements après la Phase 18f-1b — en-tête (détail dans ROADMAP.md)
 
-- **D (dom)** : `headerToolbar` (`start`, `center`, `end` ou `false`) et `customButtons` (`text`, `hint`, `icon`, `click(event, el)`, `active`), vivants par `update()` ; un bouton n'est redessiné que si son apparence change (les fermetures d'un framework sont prises sans redessiner, le focus reste). L'en-tête par défaut inchangé. Un en-tête étroit passe sur plusieurs lignes.
+- **D (dom)** : `headerToolbar` (`start`, `center`, `end` ou `false`) et `customButtons` (`text`, `hint`, `icon`, `click(event, el)`, `active`), vivants par `update()` ; un bouton n'est redessiné que si son apparence change (les fermetures d'un framework sont prises sans redessiner, le focus reste). L'en-tête par défaut inchangé (puis, en 18g-3, celui de FullCalendar : flèches groupées et « aujourd'hui », titre centré, vues). Un en-tête étroit passe sur plusieurs lignes.
 - **Compat** : `headerToolbar` traduit entier, `customButtons` avec lui.
 - **Décision du propriétaire** : budgets à la mesure + 3 % (dom 49,0 ko, compat-fullcalendar 9,6 ko).
 

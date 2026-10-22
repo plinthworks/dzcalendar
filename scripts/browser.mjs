@@ -980,6 +980,96 @@ try {
       await p.close();
     }
 
+    // ── Phase 18g-3: every choice of the look is the application's (the owner: "le client doit pouvoir changer tout ça") ──
+    {
+      const { p, errors } = await page('/gallery.html');
+      await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      await p.waitForTimeout(300);
+      const read = () => p.evaluate(() => {
+        const q = (s) => document.querySelector(s);
+        const cs = (s) => getComputedStyle(q(s));
+        const ev = cs('#v-timeGridWeek .dz-ev[data-event-id="c7"]');
+        return {
+          title: [cs('#v-timeGridWeek .dz-toolbar__title').fontSize, cs('#v-timeGridWeek .dz-toolbar__title').fontWeight],
+          btn: [cs('#v-timeGridWeek .dz-toolbar__today').minHeight, cs('#v-timeGridWeek .dz-toolbar__today').backgroundColor],
+          active: cs('#v-timeGridWeek .dz-toolbar__view[aria-pressed="true"]').backgroundColor,
+          ev: [ev.backgroundColor, ev.color, ev.borderInlineStartWidth],
+          closed: cs('#v-dayGridMonth .dz-dg__cell[data-closed]').backgroundImage,
+          outside: cs('#v-dayGridMonth .dz-dg__cell[data-outside]').backgroundColor,
+          off: cs('#v-timeGridWeek .dz-off').backgroundColor,
+          centre: q('#v-timeGridWeek .dz-toolbar__section--center .dz-toolbar__title') !== null,
+          tlTitle: (() => { const t = q('#v-resourceTimelineWeek .dz-tl__ev[data-event-id="ad2"] .dz-tl__ev-title'); const tm = t.parentElement.querySelector('.dz-tl__ev-time'); const a = q('#v-resourceTimelineWeek .dz-tl__area')?.getBoundingClientRect(); const r = t.getBoundingClientRect(); return (a ? r.left >= a.right - 1 : r.width > 0) && (!tm.textContent || r.right <= tm.getBoundingClientRect().left + 0.5); })(),
+          oneLine: (() => { const e = q('#v-timeGridWeek .dz-ev[data-event-id="c9"]'); return Math.abs(e.querySelector('.dz-ev__time').getBoundingClientRect().top - e.querySelector('.dz-ev__title').getBoundingClientRect().top) < 3; })(),
+          twoLines: (() => { const e = q('#v-timeGridWeek .dz-ev[data-event-id="c1"]'); return e.querySelector('.dz-ev__title').getBoundingClientRect().top - e.querySelector('.dz-ev__time').getBoundingClientRect().top > 8; })(),
+        };
+      });
+      // rgb() or color(srgb 0–1): the same colour written two ways (a mix computes to the second).
+      const rgbOf = (c) => { const n = c.match(/[\d.]+/g).map(Number); return c.startsWith('color(') ? n.slice(0, 3).map((x) => Math.round(x * 255)) : n.slice(0, 3); };
+      const sameColour = (a, b) => rgbOf(a).every((v, i) => Math.abs(v - rgbOf(b)[i]) <= 1);
+      const before = await read();
+      check('18g-3 defaults: the title in the centre, 22px and 600; buttons 32px high; a 3px edge; padding days without a fill', before.centre && before.title[0] === '22px' && before.title[1] === '600' && before.btn[0] === '32px' && before.ev[2] === '3px' && before.outside === 'rgba(0, 0, 0, 0)' && before.closed !== 'none', JSON.stringify(before));
+      check('18g-3: a 20-minute event on one line (time, title); a 30-minute one on two', before.oneLine && before.twoLines, JSON.stringify([before.oneLine, before.twoLines]));
+      check('18g-3: a timeline bar begun before the view shows its title beside the resource column, not over its time', before.tlTitle, '');
+      await p.evaluate(() => {
+        for (const c of document.querySelectorAll('.dz-cal')) c.style.cssText += ';--dz-title-size:14px;--dz-title-weight:400;--dz-button-height:40px;--dz-button-bg:rgb(1, 2, 3);--dz-button-active-bg:rgb(4, 5, 6);--dz-event-tint:100%;--dz-event-shade:0%;--dz-event-edge:0px;--dz-closed-image:none;--dz-outside-bg:rgb(7, 8, 9);--dz-off-bg:rgb(10, 11, 12)';
+      });
+      const after = await read();
+      const fg = await p.evaluate(() => getComputedStyle(document.querySelector('#v-timeGridWeek .dz-cal, #v-timeGridWeek.dz-cal') ?? document.querySelector('#v-timeGridWeek > div')).color);
+      check('18g-3: every look token is the application’s — title, buttons, the pressed view, an event’s tint, shade and edge, hatching, padding days, closed hours',
+        after.title[0] === '14px' && after.title[1] === '400' && after.btn[0] === '40px' && after.btn[1] === 'rgb(1, 2, 3)' && after.active === 'rgb(4, 5, 6)' && after.ev[2] === '0px' && sameColour(after.ev[1], fg) && after.ev[0] !== before.ev[0] && after.closed === 'none' && after.outside === 'rgb(7, 8, 9)' && after.off === 'rgb(10, 11, 12)',
+        JSON.stringify({ after, fg }));
+      // Solid: the application's surface and text still win (the style does not redefine its tokens).
+      const solid = await p.evaluate(async () => {
+        const c = window.cals.timeGridWeek;
+        c.update({ eventStyle: 'solid' });
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const cal = document.querySelector('#v-timeGridWeek .dz-cal');
+        cal.style.setProperty('--dz-event-bg', 'rgb(20, 30, 40)');
+        cal.style.setProperty('--dz-event-fg', 'rgb(250, 240, 230)');
+        const ev = getComputedStyle(document.querySelector('#v-timeGridWeek .dz-ev[data-event-id="c7"]'));
+        return [ev.backgroundColor, ev.color];
+      });
+      check('18g-3: eventStyle solid keeps the application’s --dz-event-bg / --dz-event-fg', solid[0] === 'rgb(20, 30, 40)' && solid[1] === 'rgb(250, 240, 230)', JSON.stringify(solid));
+      check('18g-3: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
+    // ── Phase 18g-3: an event's text on its tint, AA for every tone × family × scheme (axe leaves colour-mix() backgrounds "incomplete") ──
+    {
+      const low = [];
+      for (const theme of ['standard', 'slate', 'night', 'pastel', 'frost', 'solar', 'contrast']) {
+        for (const scheme of ['light', 'dark']) {
+          const { p } = await page(`/gallery.html?theme=${theme}&scheme=${scheme}`);
+          await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+          await p.waitForTimeout(150);
+          low.push(...(await p.evaluate((label) => {
+            // Any CSS colour to sRGB bytes through a canvas (rgb(), color(srgb …), names).
+            const cv = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+            const rgba = (c) => { cv.clearRect(0, 0, 1, 1); cv.fillStyle = '#000'; cv.fillStyle = c; cv.fillRect(0, 0, 1, 1); return [...cv.getImageData(0, 0, 1, 1).data]; };
+            const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+            const surface = (el) => { for (let e = el; e; e = e.parentElement) { const c = rgba(getComputedStyle(e).backgroundColor); if (c[3] === 255) return c; } return [255, 255, 255, 255]; };
+            const out = [];
+            for (const sel of ['#v-timeGridWeek .dz-ev:not(.dz-ev--bg) .dz-ev__title', '#v-timeGridWeek .dz-ev:not(.dz-ev--bg) .dz-ev__time', '#v-dayGridMonth .dz-bar:not(.dz-bar--bg):not(.dz-bar--timed)', '#v-resourceTimelineWeek .dz-tl__ev:not(.dz-tl__ev--bg) .dz-tl__ev-title', '#v-resourceTimelineWeek .dz-tl__ev:not(.dz-tl__ev--bg) .dz-tl__ev-time']) {
+              for (const el of document.querySelectorAll(sel)) {
+                if (!el.textContent.trim()) continue;
+                const fg = rgba(getComputedStyle(el).color);
+                const bg = surface(el);
+                // Text a little translucent: over its surface.
+                const a = fg[3] / 255;
+                const mixed = fg.slice(0, 3).map((v, i) => v * a + bg[i] * (1 - a));
+                const [l1, l2] = [lum(mixed), lum(bg)].sort((x, y) => y - x);
+                const ratio = (l1 + 0.05) / (l2 + 0.05);
+                if (ratio < 4.5) out.push(`${label} ${sel.split(' ').pop()} "${el.textContent.trim().slice(0, 14)}" ${ratio.toFixed(2)}`);
+              }
+            }
+            return out;
+          }, `${theme}/${scheme}`)));
+          await p.close();
+        }
+      }
+      check('18g-3: every event’s title and time ≥ 4.5:1 on its tint — 6 tones and the accent × 7 families × light and dark (time grid, month bars, timeline)', low.length === 0, low.slice(0, 12).join('\n'));
+    }
+
     // ── Phase 18g-2: unstyled, with no CSS of the application at all ──
     {
       const { p, errors } = await page('/unstyled.html');
@@ -1037,7 +1127,9 @@ try {
         await p.mouse.move(from.x, from.y);
         await p.mouse.down();
         await p.mouse.move(from.x + 10, from.y + 10, { steps: 3 });
-        await p.mouse.move(to.x, to.y, { steps: 14 });
+        // To the target's height first, then across: a straight line could cross a calendar's top edge, whose autoscroll (rightly) moves the hours.
+        await p.mouse.move(from.x + 10, to.y, { steps: 7 });
+        await p.mouse.move(to.x, to.y, { steps: 7 });
         await p.waitForTimeout(80);
         await p.mouse.up();
         await p.waitForTimeout(150);

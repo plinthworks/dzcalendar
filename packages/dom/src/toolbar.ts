@@ -263,5 +263,5 @@ export function createToolbar(
   };
 }
 
-/** The header as it was before `headerToolbar`: the arrows and "today" with the title at the start, the views at the end (a lone view: no switcher). */
-export const defaultLayout = (views: readonly string[]): HeaderToolbar => ({ start: 'prev today next title', end: views.length > 1 ? views.join(',') : '' });
+/** The header by default (owner, 18g-3): the arrows joined and "today" at the start, the title in the centre, the views at the end (a lone view: no switcher). */
+export const defaultLayout = (views: readonly string[]): HeaderToolbar => ({ start: 'prev,next today', center: 'title', end: views.length > 1 ? views.join(',') : '' });

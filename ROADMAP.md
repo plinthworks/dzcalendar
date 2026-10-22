@@ -38,10 +38,11 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   size, npm publication, licences, Phase 19.
 - **Done:** 18g-1 (the styling contract) committed ("Phase 18g-1"); every
   check green (1 465 tests, exit codes checked) but the known noise.
-- **Done:** 18g-2 (unstyled mode, the Tailwind 4 bridge) committed ("Phase
-  18g-2"); every check green, exit codes read, `perf:browser` included.
-  **Next: 18g-3** (the visual pass, modern and sober; screenshots for the
-  owner).
+- **Done:** 18g-3 (the visual pass) committed ("Phase 18g-3"); every
+  check green, exit codes read; before/after screenshots published for the
+  owner (`playground/gallery.html` makes them again).
+  **Next: 18g-4** (WCAG 2.2 AA) — ask the owner first about the empty
+  day's tab stop.
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2892,11 +2893,71 @@ as automated checks.
 - The editor's buttons and fields are the browser's own when unstyled.
 
 ### 18g-3 — the visual pass
+- **Owner's decisions (2026-10-22):** the header as FullCalendar's —
+  `[‹|›] [today]` at the start, the title centred and bold, the views at the
+  end (the new default layout); events tinted with their edge (the default),
+  the title in the tone's dark shade; the background: one pale grey for
+  "out of service" (weekends, closed hours), the month's weekend hatching
+  kept but paler, days outside the month with a muted number and no fill.
+  Before screenshots: `playground/gallery.html` (every view, a fixed now).
 - Header, buttons and groups, the title, the active view, events (tinted
   and solid), today, grid lines, the month, the list, the multi-month
   year, the timeline, "+N" and its panel, menus, the editor's surfaces,
   focus rings, disabled states, `.dz-tpl*`; light and dark, the seven
   themes; before/after screenshots for the owner.
+
+**Built**
+- The header by default as FullCalendar's (`'prev,next today'` | title |
+  views), its title (1.375rem, 600), its buttons (2rem high, the arrows
+  square, joined groups, disabled at half), the pressed view filled.
+- Events tinted with their edge; the text a shade of the tone (45% with
+  the theme, the plain text without one — a system accent can be
+  translucent); the time at full strength. Short events (under ~1.9rem:
+  20 minutes at the default scale) on one line, the time giving way, the
+  title alone when narrow too (`@container dz-ev`); a title in a narrow
+  column cut anywhere rather than an ellipsis on every line.
+- The background: closed hours at 6%, the month's hatching paler, padding
+  days without a fill (a muted number), inner lines `--dz-line`.
+- Every choice the application's: `--dz-title-*`, `--dz-button-*`,
+  `--dz-arrow-size`, `--dz-event-tint|shade|edge|title-weight|hyphens`,
+  `--dz-closed-image`, `--dz-outside-fg` (docs/styling.md); `headerToolbar`
+  and `eventStyle` as before. A narrow header: the title alone on the first
+  line, centred.
+- Fixed on the way: a timeline bar begun before the view had no title
+  (now sticky, with its time); "+N" spilt over the next day in a year's
+  months; `eventStyle: 'solid'` did not reach the timeline.
+- Chrome: the defaults, every token applied, one-line/two-line events, the
+  sticky timeline label, solid keeping `--dz-event-bg/fg`, and every
+  event's text ≥ 4.5:1 on its tint (6 tones and the accent × 7 families ×
+  light/dark, time grid, month bars, timeline).
+- Budgets (owner, measured + 3 %): pro 15 032, `timeGridWeek:U` first
+  frame 33 ms (the container of short events, the narrow-column cut).
+
+**Reviews fixed** (architect + execution in Chrome)
+- AA: the tone's text at 60% fell under 4.5:1 in 4 families (titles) and
+  5 (times, at 85% opacity) — 45%, the times opaque, measured 0 failures
+  out of 1,344 samples; without the theme, the plain text.
+- `eventStyle: 'solid'` redefined `--dz-event-bg/fg` and ignored the
+  application's; the short-event time pushed the title out (and lost its
+  gap in RTL); the timeline's sticky title slid over its time;
+  `--dz-closed-bg` was an image under a colour's name; chains that skipped
+  `--dz-bg`/`--dz-bg-raised`; the ghost ignored the event tokens; the
+  arrows and the title weight not tokens; a padding day's opacity
+  survived the unstyled mode (now a colour); the old default layout in
+  three docs; a narrow header pushing the centred title aside, or the old
+  layout squeezing it to a word a line.
+- Measured: hyphenation cost ~4 ms at the first drawing (its dictionary) —
+  opt-in (`--dz-event-hyphens: auto`).
+- A drag check went straight across a calendar's top edge, whose autoscroll
+  moved the hours by a quarter: the path goes to the height first.
+
+**Not done on purpose**
+- The popover, the menus, the editor's surfaces, focus rings and `.dz-tpl*`
+  keep their look (already sober); the seven themes' palettes unchanged
+  (only the event shade is the theme's). Focus and targets are 18g-4's.
+- Compact density: an event of 20 minutes or less (16 px) clips its one
+  line; a tooltip of the application's with `position: fixed` inside an
+  event is placed by the event (it is a size container) — documented.
 
 ### 18g-4 — WCAG 2.2 AA
 - axe in Chrome on every view × theme × scheme; the keyboard end to end;

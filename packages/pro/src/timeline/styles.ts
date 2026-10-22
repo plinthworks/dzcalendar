@@ -57,7 +57,7 @@ export const TIMELINE_CSS = `
 .dz-tl__row--unassigned .dz-tl__title { font-style: italic; color: var(--dz-fg-muted, var(--dzc-fg-muted)); }
 .dz-tl__expander { flex: none; width: 1rem; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
 .dz-tl__lane { position: relative; flex: none; width: calc(var(--dz-tl-len, 0) * var(--dz-tl-slot)); }
-.dz-tl__off { position: absolute; inset-block: 0; inset-inline-start: calc(var(--x) * var(--dz-tl-slot)); width: calc(var(--w) * var(--dz-tl-slot)); background: var(--dz-off-bg, color-mix(in srgb, var(--dz-fg-muted, var(--dzc-fg-muted)) 9%, transparent)); pointer-events: none; }
+.dz-tl__off { position: absolute; inset-block: 0; inset-inline-start: calc(var(--x) * var(--dz-tl-slot)); width: calc(var(--w) * var(--dz-tl-slot)); background: var(--dz-off-bg, color-mix(in srgb, var(--dz-fg-muted, var(--dzc-fg-muted)) 6%, transparent)); pointer-events: none; }
 .dz-tl__ev, .dz-more--tl {
   position: absolute; box-sizing: border-box;
   top: calc(4px + var(--lane, 0) * var(--dz-tl-lane)); height: calc(var(--dz-tl-lane) - 2px);
@@ -65,17 +65,22 @@ export const TIMELINE_CSS = `
 }
 .dz-tl__ev {
   display: flex; gap: 0.375rem; align-items: center; z-index: 1;
-  padding: 0 0.375rem; border-radius: var(--dz-radius, var(--dzc-radius));
-  font-size: 0.75rem; white-space: nowrap; overflow: hidden;
-  background: var(--dz-event-bg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 18%, var(--dz-bg, var(--dzc-bg))));
-  color: var(--dz-event-fg, var(--dz-fg, var(--dzc-fg)));
-  border-inline-start: 3px solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
+  padding: 0 0.375rem; border-radius: var(--dz-event-radius, var(--dz-radius, var(--dzc-radius)));
+  /* clip, not hidden: no scroll box of its own, so its title can stick to the lane's start (an event begun before the view). */
+  font-size: 0.75rem; white-space: nowrap; overflow: hidden; overflow: clip;
+  background: var(--dz-event-bg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) var(--dz-event-tint, 16%), var(--dz-bg, var(--dzc-bg))));
+  /* The tone's dark shade (its light one on a dark scheme): --dz-event-shade 0% gives the plain text colour. */
+  color: var(--dz-event-fg, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) var(--dz-event-shade, var(--dzp-event-shade, 0%)), var(--dz-fg, var(--dzc-fg))));
+  border-inline-start: var(--dz-event-edge, 3px) solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
 }
-.dz-tl__ev-title { font-weight: 600; flex: 0 1 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; }
+/* Title and time together, kept in view beside the resource column when the event began before what is shown. */
+.dz-tl__ev-label { display: flex; gap: 0.375rem; align-items: center; min-width: 0; position: sticky; inset-inline-start: calc(var(--dz-tl-area, 0px) + 0.375rem); }
+.dz-tl__ev-title { font-weight: var(--dz-event-title-weight, 600); flex: 0 1 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; }
 /* The time gives way first: a short event keeps its title. */
-.dz-tl__ev-time { color: var(--dz-fg-muted, var(--dzc-fg-muted)); flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dz-tl__ev-time { font-weight: 400; flex: 0 100 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* A day's (a month's) name stays in view while its long head scrolls by. */
 .dz-tl__group-text { position: sticky; inset-inline-start: calc(var(--dz-tl-area, 0px) + 0.375rem); }
+.dz-cal[data-dz-event-style='solid'] .dz-tl__ev:not(.dz-tl__ev--bg) { background: var(--dz-event-bg, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)))); color: var(--dz-event-fg, var(--dz-tone-on, var(--dz-on-tone, var(--dz-bg, var(--dzc-bg))))); }
 .dz-tl__ev--cont-start { border-start-start-radius: 0; border-end-start-radius: 0; }
 .dz-tl__ev--cont-end { border-start-end-radius: 0; border-end-end-radius: 0; }
 .dz-tl__ev--bg { top: 0; height: 100%; opacity: 0.35; border: 0; z-index: 0; border-radius: 0; }

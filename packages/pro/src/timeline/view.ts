@@ -627,7 +627,11 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         displayZone: ctx.zone,
         family: 'timeline',
       },
-      () => [h(doc, 'span', 'dz-tl__ev-title', title), h(doc, 'span', 'dz-tl__ev-time', labels.text)],
+      () => {
+        const label = h(doc, 'span', 'dz-tl__ev-label');
+        label.append(h(doc, 'span', 'dz-tl__ev-title', title), h(doc, 'span', 'dz-tl__ev-time', labels.text));
+        return [label];
+      },
       changed.created,
     );
     el.setAttribute('role', 'button');

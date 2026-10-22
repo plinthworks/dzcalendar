@@ -42,6 +42,11 @@ removed is a major version**; one added is a minor version.
    guards the sheets of its document (or shadow root). A page that includes
    the CSS itself (`injectStyles: false`) uses `lookGuardedCss(DZ_CSS)`.
 
+Note: a timed event (`.dz-ev`) is a size container (`container: dz-ev / size`,
+for its one-line form when short): an element of yours inside it with
+`position: fixed` (a tooltip) is placed and clipped by the event — append
+such a tooltip to the page's `body` instead.
+
 ## States (`data-*`)
 
 Present when true, absent when not (`[data-today]`, `data-[today]:`); the
@@ -87,6 +92,11 @@ calendar) and `dz-calendar::part(toolbar)` (its header).
 | `--dz-accent`, `--dz-accent-fg` | the accent (today, the pressed view, focus rings) and text on it |
 | `--dz-danger`, `--dz-warning` | refusals, warnings |
 | `--dz-radius`, `--dz-event-radius`, `--dz-font` | corners, an event's corners, the font |
+| `--dz-title-size`, `--dz-title-weight`, `--dz-arrow-size` | the header's title (1.375rem, 600), the arrows' sign (1.25rem) |
+| `--dz-button-bg`, `--dz-button-fg`, `--dz-button-border`, `--dz-button-radius`, `--dz-button-height`, `--dz-button-font-size`, `--dz-button-weight`, `--dz-button-hover-bg` | the header's buttons: surface, text, line, corners, least height (2rem), type, under the pointer |
+| `--dz-button-active-bg`, `--dz-button-active-fg` | the pressed view (and a pressed custom button): the accent and its text by default |
+| `--dz-event-tint`, `--dz-event-shade`, `--dz-event-edge`, `--dz-event-title-weight`, `--dz-event-hyphens` | a tinted event: how much of its tone in the surface (16%), in the text (45% with the theme: the tone's dark shade, AA on every family; 0%, the plain text colour, without it), the edge's width (3px; 0 for none), the title's weight (600); `auto` to hyphenate a title in a narrow column in the page's language (cut anywhere by default: hyphenation costs a few ms at the first drawing) |
+| `--dz-closed-image`, `--dz-outside-fg` | a month's days out of service (pale hatching, an image; `none` to drop it), a padding day's number (muted) |
 | `--dz-line`, `--dz-today-bg`, `--dz-outside-bg`, `--dz-off-bg`, `--dz-now` | grid lines, today, a month's padding days, closed hours, the now line |
 | `--dz-gap-stripe`, `--dz-repeat-bg` | a skipped hour's stripes, a repeated hour's band (clock changes) |
 | `--dz-event-bg`, `--dz-event-fg`, `--dz-on-tone`, `--dz-tone-*` | an event's surface and text; text on a solid tone; each tone (the green one is --dz-tone-green; your `defineTheme` tones) |
@@ -179,7 +189,7 @@ The --dzc-… and --dzp-… properties are the theme's own palette, private: the
 | `.dz-tl__head`, `.dz-tl__corner`, `.dz-tl__colhead`, `.dz-tl__resizer`, `.dz-tl__timehead`, `.dz-tl__groups`, `.dz-tl__group`, `.dz-tl__group-text`, `.dz-tl__slots`, `.dz-tl__slot` | the heads: the resource columns' and their resizers, time groups (days, months) and slots |
 | `.dz-tl__rows`, `.dz-tl__row`, `.dz-tl__row--group`, `.dz-tl__row--unassigned`, `.dz-tl__area`, `.dz-tl__cell`, `.dz-tl__cell--group`, `.dz-tl__title`, `.dz-tl__expander`, `.dz-tl__group-name` | a row (a group's, "Unassigned"), its resource cells, title, fold button |
 | `.dz-tl__lane`, `.dz-tl__lines`, `.dz-tl__line`, `.dz-tl__line--major`, `.dz-tl__line-host`, `.dz-tl__offs`, `.dz-tl__off` | a row's lane, the slot lines, closed hours |
-| `.dz-tl__bars`, `.dz-tl__bgs`, `.dz-tl__ev`, `.dz-tl__ev--bg`, `.dz-tl__ev--cont-start`, `.dz-tl__ev--cont-end`, `.dz-tl__ev-title`, `.dz-tl__ev-time`, `.dz-tl__mores` | events, backgrounds, "+N" |
+| `.dz-tl__bars`, `.dz-tl__bgs`, `.dz-tl__ev`, `.dz-tl__ev--bg`, `.dz-tl__ev--cont-start`, `.dz-tl__ev--cont-end`, `.dz-tl__ev-label`, `.dz-tl__ev-title`, `.dz-tl__ev-time`, `.dz-tl__mores` | events, backgrounds, "+N" |
 | `.dz-tl__now`, `.dz-tl__cursor` | the now line, the keyboard's place |
 
 ### Overlays
