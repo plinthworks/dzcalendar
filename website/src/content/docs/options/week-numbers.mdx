@@ -1,0 +1,123 @@
+---
+title: weekNumbers
+description: Week numbers on the month's rows and in the week's corner.
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Shows each week's number: at the start of a month's rows, in a week view's corner.
+
+<OptionFacts name="weekNumbers" />
+
+## What it does
+
+Weeks are numbered by the locale's rules, or by `firstDay` when it is given
+with the locale's minimal days: ISO weeks (Monday, a first week holding 4
+days) in most of Europe, Sunday weeks where the first week holds 1 January
+in the United States. A date before week 1 belongs to the previous year's
+last week.
+
+The number's look is the application's through `hooks.weekNumber` (a link
+to the week, a different label).
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'dayGridMonth', weekNumbers: true });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="dayGridMonth" [weekNumbers]="true" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="dayGridMonth" weekNumbers />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="dayGridMonth" week-numbers />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an input: Angular's `weekNumbers`, React's `weekNumbers`, Vue's `week-numbers`.
+
+## Live demo
+
+The month, each row with its ISO week's number.
+
+<LiveDemo
+  label="A month with its week numbers"
+  height={560}
+  options={{
+    "initialView": "dayGridMonth",
+    "initialDate": "2026-10-21",
+    "weekNumbers": true,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`firstDay`](../first-day/) — the week's first day.
+- [`locale`](../locale/) — the rules come from it.
+- `hooks` — the number's own look (hooks.weekNumber).

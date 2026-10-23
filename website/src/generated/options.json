@@ -26,7 +26,7 @@
     {
       "name": "availableSlots",
       "type": "readonly AvailableSlot[] | null",
-      "resolved": "readonly AvailableSlot[]",
+      "resolved": null,
       "doc": "Bookable slots drawn in the time grid (compared by identity: a new array redraws).",
       "default": {
         "code": "null"
@@ -38,7 +38,7 @@
       "name": "businessHours",
       "type": "BusinessHoursInput",
       "resolved": "boolean | BusinessHoursRule | readonly BusinessHoursRule[]",
-      "doc": "The hours a place is open: shaded outside in the time grid and checked by `rules`. One set (`{ days, start, end }`), several, or `true` for Monday to Friday, 9:00 to 17:00.",
+      "doc": "The hours a place is open: shaded outside in the time grid and checked by `rules`. One rule (`{ daysOfWeek, start, end, timeZone? }`), several, `true` for Monday to Friday 09:00–17:00, or `false` for none.",
       "default": null,
       "source": "packages/core/src/kernel.ts",
       "live": "yes"
@@ -46,7 +46,7 @@
     {
       "name": "chooseScope",
       "type": "(request: ScopeRequest) => EditScope | null | Promise<EditScope | null>",
-      "resolved": "(request: ScopeRequest) => EditScope | Promise<EditScope | null> | null",
+      "resolved": null,
       "doc": "A gesture on an occurrence of a series: how far it reaches. Resolve null to cancel. Default: a \"this / following / all\" menu where it dropped.",
       "default": {
         "token": "scopeMenu"
@@ -110,7 +110,7 @@
     {
       "name": "dayMaxLanes",
       "type": "number | 'auto' | null",
-      "resolved": "number | \"auto\"",
+      "resolved": null,
       "doc": "Lanes a month day shows before \"+N\": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default: null in a month (nothing hidden unless asked), 'auto' in a year's tiny days.",
       "default": {
         "token": "lanesPerView"
@@ -121,7 +121,7 @@
     {
       "name": "density",
       "type": "'compact' | 'comfortable' | 'spacious'",
-      "resolved": "\"compact\" | \"comfortable\" | \"spacious\"",
+      "resolved": null,
       "doc": "Default 'comfortable'.",
       "default": {
         "code": "'comfortable'"
@@ -132,7 +132,7 @@
     {
       "name": "displayCalendar",
       "type": "string | null",
-      "resolved": "string",
+      "resolved": null,
       "doc": "The calendar dates are written in ('islamic-umalqura', 'persian'…; Intl's names). The data and the grids stay Gregorian; titles, numbers and labels follow it. Default: the locale's.",
       "default": {
         "token": "localeCalendar"
@@ -187,7 +187,7 @@
     {
       "name": "eventMaxStack",
       "type": "number | 'auto' | null",
-      "resolved": "number | \"auto\"",
+      "resolved": null,
       "doc": "Overlapping events side by side in a time grid before \"+N\": a number, 'auto' (as many as the column's width allows, about 2.5rem each) or null (all, however thin). Default 'auto'.",
       "default": {
         "code": "'auto'"
@@ -209,7 +209,7 @@
     {
       "name": "eventStyle",
       "type": "'tinted' | 'solid'",
-      "resolved": "\"tinted\" | \"solid\"",
+      "resolved": null,
       "doc": "Events tinted with their tone's edge ('tinted', the default) or filled blocks of their tone ('solid').",
       "default": {
         "code": "'tinted'"
@@ -258,7 +258,7 @@
     {
       "name": "headerToolbar",
       "type": "HeaderToolbar | false",
-      "resolved": "false | HeaderToolbar",
+      "resolved": null,
       "doc": "What the header holds and where (`'prev,next today'`: a space between groups, a comma inside one); false: no header. Default: the arrows joined and \"today\" at the start, the title in the centre, `headerViews` at the end.",
       "default": {
         "token": "defaultHeader"
@@ -335,7 +335,7 @@
         {
           "name": "dayLane",
           "type": "ElementHooks<DayLaneCtx>",
-          "resolved": "ElementHooks<Day>",
+          "resolved": null,
           "doc": "A time grid's column for a day.",
           "default": null,
           "source": "packages/dom/src/host.ts"
@@ -541,7 +541,7 @@
     {
       "name": "look",
       "type": "'styled' | 'none'",
-      "resolved": "\"styled\" | \"none\"",
+      "resolved": null,
       "doc": "'none': the structure only (grids, positions, sizes) — every colour, border, shadow and type yours (Tailwind, a design system). Default 'styled'.",
       "default": {
         "code": "'styled'"
@@ -704,7 +704,7 @@
     {
       "name": "onResourceToggle",
       "type": "(state: { readonly collapsedResources: readonly string[]; readonly collapsedGroups: readonly string[] }) => void",
-      "resolved": "(state: { readonly collapsedResources: readonly string[]; readonly collapsedGroups: readonly string[]; }) => void",
+      "resolved": null,
       "doc": "A person folded or unfolded a resource or a group (a timeline's tree): the state to keep, if the application wants it back.",
       "default": null,
       "source": "packages/dom/src/settings.ts",
@@ -749,7 +749,7 @@
     {
       "name": "resourceGroupField",
       "type": "string | undefined",
-      "resolved": "string",
+      "resolved": null,
       "doc": "Resource views group their columns (a timeline its rows) by this field: a head over each run.",
       "default": null,
       "source": "packages/core/src/kernel.ts",
@@ -758,7 +758,7 @@
     {
       "name": "resourceOrder",
       "type": "ResourceOrder | undefined",
-      "resolved": "string | readonly string[] | ((a: Resource, b: Resource) => number)",
+      "resolved": null,
       "doc": "How sibling resources are ordered after their `order`: field names (`'-title'` descending) or a comparison.",
       "default": null,
       "source": "packages/core/src/kernel.ts",
@@ -785,7 +785,7 @@
     {
       "name": "scheme",
       "type": "'auto' | 'light' | 'dark'",
-      "resolved": "\"auto\" | \"light\" | \"dark\"",
+      "resolved": null,
       "doc": "Light, dark, or the page's ('auto'). Default 'auto'.",
       "default": {
         "code": "'auto'"
@@ -807,7 +807,7 @@
     {
       "name": "secondaryCalendar",
       "type": "string | null",
-      "resolved": "string",
+      "resolved": null,
       "doc": "A second calendar shown beside the dates (a cell's day, a heading's date). Default none.",
       "default": {
         "code": "null"
@@ -991,7 +991,7 @@
         {
           "name": "slot",
           "type": "number | 'day'",
-          "resolved": "number | \"day\"",
+          "resolved": null,
           "doc": "Minutes per slot (dividing a day) or 'day'. Default: 30 for a day, 60 up to a week, days beyond.",
           "default": {
             "token": "slotPerSpan"

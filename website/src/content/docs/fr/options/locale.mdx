@@ -1,0 +1,132 @@
+---
+title: locale
+description: La langue et les conventions dans lesquelles le calendrier est écrit.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+La langue BCP 47 dans laquelle sont écrits les mots, les dates et les nombres du calendrier.
+
+<OptionFacts name="locale" />
+
+## Ce qu'elle fait
+
+`locale` décide comment s'écrivent les dates et les heures (`21 oct.`,
+`Oct 21`), les mots du calendrier lui-même (les boutons, « +N autres », les
+menus), et les conventions de la semaine quand `firstDay` n'est pas donné :
+le premier jour de la semaine et la numérotation des semaines.
+
+Les mots anglais et français sont intégrés. L'arabe, l'espagnol et l'allemand
+s'importent en une ligne chacun (`import '@dzcalendar/dom/locales/ar'`,
+`/es`, `/de`) ; une autre langue prend ses mots de `messages` ou de
+`defineLocale`. Une locale dont les mots ne sont pas chargés reste écrite par
+la plateforme — dates et nombres dans cette langue — avec les mots anglais.
+Sans elle, la langue de la page (`<html lang>`) est utilisée, puis `'en'`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/dom/locales/de';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Berlin', locale: 'de-DE' });
+
+// Later: French, built in.
+calendar.update({ locale: 'fr-FR' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/dom/locales/ar';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Asia/Riyadh" locale="ar-SA" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/dom/locales/es';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Madrid" locale="es-ES" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" locale="fr-FR" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `locale` en Angular, en React et en Vue.
+
+## Démo en direct
+
+La même semaine, ses dates, ses heures et ses boutons en anglais américain.
+
+<LiveDemo
+  label="Une semaine écrite en anglais (États-Unis)"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "locale": "en-US",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`firstDay`](../first-day/) — le premier jour de la semaine, celui de la locale par défaut.
+- [`titleFormat`](../title-format/) — comment s'écrit le titre.
+- [Langues](../../guides/languages/).

@@ -82,7 +82,7 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   committed ("Phase 18j-2, batch 0"): the mechanism below, built and
   reviewed (79 options: `dayGrid.maxLanes` and `timeGrid.maxStack` left out
   of the pages — `createCalendar` sets them from `dayMaxLanes` and
-  `eventMaxStack`); 76 pending. Next the six batches. 18j-2 (owner:
+  `eventMaxStack`); 76 pending. Batch 1 committed ("Phase 18j-2, batch 1": timeZone, locale, initialDate, views, firstDay, hiddenDays, weekends, weekNumbers, businessHours, nowIndicator, scrollTime, allDaySlot, displayEventTime, titleFormat — 62 pending); its review found three library defects, fixed: Angular's `<dz-calendar>` made its calendar before its inputs were bound (a `timeZone` input said `zone-from-browser`, `scrollTime` was not scrolled to — now made in ngOnInit), `hiddenDays`/`firstDay` checked only in `update()` (now at creation too), `messages.views` replacing the built-in labels (now merged). Next batch 2 (data and resources). 18j-2 (owner:
   facts generated + written text; online first, then batches):
   `scripts/gen-options.mjs` → `website/src/generated/options.json`
   (`@default`/`@live`/`@internal` tags in the JSDoc), `<OptionFacts>` and a

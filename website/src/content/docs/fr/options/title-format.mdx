@@ -1,0 +1,137 @@
+---
+title: titleFormat
+description: Comment s'écrit le titre de l'en-tête.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Comment s'écrit le titre de l'en-tête : les options de format de date de la plateforme, ou une fonction.
+
+<OptionFacts name="titleFormat" />
+
+## Ce qu'elle fait
+
+Par défaut le titre est le mois (`octobre 2026`), les jours d'une semaine
+(`19 – 25 oct. 2026`) ou un jour en entier, dans la `locale` du calendrier.
+
+- **Des options** de `Intl.DateTimeFormat` (`{ month: 'long', year: 'numeric' }`) :
+  une plage s'écrit quand le premier et le dernier jour diffèrent.
+- **Une fonction** `({ start, end, view, locale }) => string` : `start` et
+  `end` sont le premier et le dernier jour montrés (des `PlainDate`), `view`
+  est le type de la vue.
+
+`titleFormat` est lu à la création du calendrier. Pour changer le titre
+ensuite, `update({ formats: { title } })` prend les mêmes valeurs —
+`formats.title` l'emporte sur `titleFormat` quand les deux sont donnés.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  titleFormat: ({ start, view }) => (view === 'timeGridWeek' ? `Week of ${start.toLocaleString('en-GB', { day: 'numeric', month: 'long' })}` : start.toLocaleString('en-GB', { month: 'long', year: 'numeric' })),
+});
+
+// Later: the title in another way.
+calendar.update({ formats: { title: { month: 'long', year: 'numeric' } } });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { titleFormat: { month: 'long', year: 'numeric' } } }],
+  template: `<dz-calendar timeZone="Europe/Paris" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" initial={{ titleFormat: { month: 'long', year: 'numeric' } }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :initial="{ titleFormat: { month: 'long', year: 'numeric' } }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+`titleFormat` est lu une fois, à la création du calendrier : en Angular par les valeurs par défaut (`DZ_CALENDAR_DEFAULTS`, `provideDzCalendar`), en React et en Vue par `initial` — ou, à chaud, `formats: { title }` dans chacun.
+
+## Démo en direct
+
+Le titre de la semaine écrit par l'application : le mois en entier et l'année.
+
+<LiveDemo
+  label="Un titre écrit par des options de format"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "titleFormat": {
+      "month": "long",
+      "year": "numeric"
+    },
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`locale`](../locale/) — la langue dans laquelle il s'écrit.
+- `formats` — l'écriture de tous les autres endroits.
+- [`headerToolbar`](../header-toolbar/) — où va le titre.

@@ -1,0 +1,172 @@
+---
+title: businessHours
+description: Les heures d'ouverture d'un lieu.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Les heures d'ouverture d'un lieu : grisées en dehors dans la grille horaire, et ce à quoi `rules` peut tenir les gestes.
+
+<OptionFacts name="businessHours" />
+
+## Ce qu'elle fait
+
+Trois formes :
+
+- `true` : du lundi au vendredi, de 09:00 à 17:00 ; `false` : aucune.
+- Une règle : `{ daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '18:00' }`.
+- Plusieurs règles, pour une pause de midi ou un samedi différent :
+  `[{ daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '12:30' }, { daysOfWeek: [1, 2, 3, 4, 5], start: '14:00', end: '18:00' }]`.
+
+`daysOfWeek` sont des jours ISO (1 lundi … 7 dimanche). `start` et `end` sont
+des heures d'horloge ; `'24:00'` est le minuit suivant, et une fin à ou avant le
+début passe minuit (`22:00`–`06:00`, une garde de nuit). Une règle se lit dans
+le fuseau du calendrier, ou dans son propre `timeZone` : une clinique d'Alger
+garde ses heures sur un calendrier affiché à Paris. Le jour du changement
+d'heure, une garde a sa vraie durée.
+
+En dehors de ces heures, la grille horaire est grisée, et une grille de jours
+marque les jours qui n'en ont aucune. Avec `rules: {
+constraint: 'businessHours' }`, un déplacement ou un redimensionnement en
+dehors est refusé.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  businessHours: [
+    { daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '12:30' },
+    { daysOfWeek: [1, 2, 3, 4, 5], start: '14:00', end: '18:00' },
+  ],
+  editable: true,
+  // A drag or a resize outside the hours is refused.
+  rules: { constraint: 'businessHours' },
+});
+
+// Later: the default hours (Monday to Friday, 9:00–17:00).
+calendar.update({ businessHours: true });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { BusinessHoursInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [businessHours]="hours" />`,
+})
+export class Agenda {
+  // The clinic's hours, kept in Algiers whatever zone the calendar is shown in.
+  readonly hours: BusinessHoursInput = { daysOfWeek: [1, 2, 3, 4, 5], start: '08:00', end: '16:00', timeZone: 'Africa/Algiers' };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" businessHours={{ daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '18:00' }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :business-hours="{ daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '18:00' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `businessHours` en Angular, `businessHours` en React, `business-hours` en Vue.
+
+## Démo en direct
+
+En semaine, ouvert 08:30–12:30 et 14:00–18:00 ; le reste est grisé.
+
+<LiveDemo
+  label="Une clinique ouverte de 8:30 à 12:30 et de 14:00 à 18:00 en semaine"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "businessHours": [
+      {
+        "daysOfWeek": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "start": "08:30",
+        "end": "12:30"
+      },
+      {
+        "daysOfWeek": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "start": "14:00",
+        "end": "18:00"
+      }
+    ],
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`timeZone`](../time-zone/) — le fuseau où se lisent les règles, sauf si elles nomment le leur.
+- [`weekends`](../weekends/) — les jours montrés.
+- [Glisser-déposer](../../guides/drag-and-drop/) — les gestes tenus aux heures.

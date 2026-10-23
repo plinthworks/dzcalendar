@@ -168,3 +168,28 @@ describe('zone-from-browser (Sehhaty, after 18k)', () => {
     expect(told.filter((c) => c.endsWith('zone-from-browser'))).toEqual(['zone-from-browser']);
   });
 });
+
+describe('messages.views (18j: a label for a view of its own)', () => {
+  it('keeps the built-in labels beside it, in the locale', () => {
+    const { host, cal } = mount({
+      views: { threeDays: { family: 'timeGrid', duration: { days: 3 } } },
+      headerViews: ['threeDays', 'timeGridWeek', 'dayGridMonth'],
+      messages: { views: { threeDays: '3 jours' } },
+    } as Partial<CalendarOptions>);
+    expect([...host.querySelectorAll('.dz-toolbar__view')].map((b) => b.textContent)).toEqual(['3 jours', 'Semaine', 'Mois']);
+    cal.destroy();
+  });
+});
+
+describe('the week checked at creation as in update() (18j review)', () => {
+  it('every day hidden, a weekday 8, a first day 9: RangeError at createCalendar, nothing drawn', () => {
+    for (const bad of [{ weekends: false, hiddenDays: [1, 2, 3, 4, 5] }, { hiddenDays: [8] }, { firstDay: 9 }] as Partial<CalendarOptions>[]) {
+      const host = document.body.appendChild(document.createElement('div'));
+      expect(() => createCalendar(host, { timeZone: 'Europe/Paris', ...bad } as CalendarOptions)).toThrow(RangeError);
+      expect(host.querySelector('.dz-cal')).toBeNull();
+    }
+    const { cal } = mount({ hiddenDays: [3] });
+    expect(() => cal.update({ weekends: false, hiddenDays: [1, 2, 3, 4, 5] })).toThrow('every day of the week is hidden');
+    cal.destroy();
+  });
+});

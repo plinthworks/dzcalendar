@@ -1,0 +1,124 @@
+---
+title: weekNumbers
+description: Les numéros de semaine sur les rangées d'un mois et dans le coin d'une semaine.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Montre le numéro de chaque semaine : au début des rangées d'un mois, dans le coin d'une vue semaine.
+
+<OptionFacts name="weekNumbers" />
+
+## Ce qu'elle fait
+
+Les semaines sont numérotées selon les règles de la locale, ou selon
+`firstDay` quand il est donné, avec le nombre minimal de jours de la locale :
+les semaines ISO (lundi, une première semaine qui compte 4 jours) dans la
+plupart de l'Europe, les semaines du dimanche où la première semaine contient
+le 1er janvier aux États-Unis. Une date avant la semaine 1 appartient à la
+dernière semaine de l'année précédente.
+
+L'apparence du numéro est celle de l'application avec `hooks.weekNumber` (un
+lien vers la semaine, un autre libellé).
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'dayGridMonth', weekNumbers: true });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="dayGridMonth" [weekNumbers]="true" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="dayGridMonth" weekNumbers />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="dayGridMonth" week-numbers />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `weekNumbers` en Angular, `weekNumbers` en React, `week-numbers` en Vue.
+
+## Démo en direct
+
+Le mois, chaque rangée avec le numéro de sa semaine ISO.
+
+<LiveDemo
+  label="Un mois avec ses numéros de semaine"
+  height={560}
+  options={{
+    "initialView": "dayGridMonth",
+    "initialDate": "2026-10-21",
+    "weekNumbers": true,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`firstDay`](../first-day/) — le premier jour de la semaine.
+- [`locale`](../locale/) — les règles en viennent.
+- `hooks` — l'apparence du numéro (hooks.weekNumber).

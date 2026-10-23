@@ -46,8 +46,12 @@ export function generate() {
     const d = sym.declarations?.[0];
     return d ? relative(root, d.getSourceFile().fileName) : null;
   };
-  /** The type spelled out when its written name hides the values (`Weekday` → `1 | 2 | … | 7`), if short enough to read. */
+  /**
+   * The type spelled out when it is written as one name that hides its values (`Weekday` → `1 | 2 | … | 7`), if
+   * short enough to read. Only then: a union written out (`number | 'auto' | null`) is already what it is.
+   */
   const resolved = (sym, written) => {
+    if (!/^[A-Z]\w*$/.test(written)) return null;
     const t = checker.typeToString(checker.getNonNullableType(checker.getTypeOfSymbol(sym)), undefined, ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.InTypeAlias);
     return t !== written && t.length <= 120 && !/^\{/.test(t) ? t : null;
   };

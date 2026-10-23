@@ -1,0 +1,163 @@
+---
+title: timeZone
+description: Le fuseau dans lequel le calendrier est dessiné.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Le fuseau IANA dans lequel le calendrier dessine ses jours et ses heures.
+
+<OptionFacts name="timeZone" />
+
+## Ce qu'elle fait
+
+Chaque événement garde son propre fuseau : `2026-10-22T10:00[America/Chicago]`
+est dix heures à Chicago, quoi que montre le calendrier. `timeZone` décide où
+ce moment tombe à l'écran — à 17:00 dans un calendrier réglé sur
+`'Europe/Paris'`, à 10:00 dans un calendrier réglé sur `'America/Chicago'`.
+Les jours sont ceux de ce fuseau : un jour de 23 ou 25 heures quand ses
+horloges changent.
+
+Donnez un nom IANA (`'Europe/Paris'`, `'Africa/Algiers'`, `'UTC'`), jamais un
+simple décalage : un décalage n'a pas de changement d'heure. Sans lui, le
+calendrier prend le fuseau du navigateur et le signale une fois
+(`zone-from-browser`, par `onProblem` ou la console) — un téléphone réglé sur
+Tokyo dessinerait 14:00 à Alger à 22:00. Passez `Temporal.Now.timeZoneId()`
+quand c'est bien le fuseau du navigateur que vous voulez.
+
+<Aside type="caution">
+Un nom qui n'est pas un fuseau lève une `RangeError` à `createCalendar` ou `update()`, et rien ne change.
+</Aside>
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  events: [{ id: 'call', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } }],
+});
+
+// Later: the same events, drawn in Chicago's hours.
+calendar.update({ timeZone: 'America/Chicago' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <select (change)="zone.set($any($event.target).value)">
+      <option value="Europe/Paris">Paris</option>
+      <option value="America/Chicago">Chicago</option>
+    </select>
+    <dz-calendar [timeZone]="zone()" />`,
+})
+export class Agenda {
+  readonly zone = signal('Europe/Paris');
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [zone, setZone] = useState('Europe/Paris');
+  return (
+    <>
+      <select value={zone} onChange={(e) => setZone(e.target.value)}>
+        <option value="Europe/Paris">Paris</option>
+        <option value="America/Chicago">Chicago</option>
+      </select>
+      <DzCalendar timeZone={zone} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const zone = ref('Europe/Paris');
+</script>
+
+<template>
+  <select v-model="zone">
+    <option value="Europe/Paris">Paris</option>
+    <option value="America/Chicago">Chicago</option>
+  </select>
+  <DzCalendar :time-zone="zone" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `timeZone` en Angular, `timeZone` en React, `time-zone` en Vue.
+
+## Démo en direct
+
+L'appel est fixé à 10:00 à Chicago ; le calendrier, à Paris, le dessine à 17:00.
+
+<LiveDemo
+  label="Un événement fixé à Chicago, dessiné dans un calendrier réglé sur Paris"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "scrollTime": "PT8H",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`initialDate`](../initial-date/) — son « aujourd'hui » est dans ce fuseau.
+- [`businessHours`](../business-hours/) — heures lues dans ce fuseau, sauf si une règle nomme le sien.
+- [Fuseaux horaires et changements d'heure](../../guides/time-zones/).

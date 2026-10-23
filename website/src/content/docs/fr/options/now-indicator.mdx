@@ -1,0 +1,123 @@
+---
+title: nowIndicator
+description: La ligne à l'heure actuelle.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Une ligne en travers de la grille horaire à l'heure actuelle, déplacée chaque minute.
+
+<OptionFacts name="nowIndicator" />
+
+## Ce qu'elle fait
+
+Dans une vue semaine ou jour, une ligne marque maintenant en travers de la
+colonne d'aujourd'hui, quand aujourd'hui est montré. Elle avance à chaque
+minute, selon l'horloge de l'appareil. Avec `false`, pas de ligne — dans la
+timeline du Pro non plus.
+
+Son apparence est celle de l'application avec `hooks.nowIndicator` ; sa
+couleur est le jeton `--dz-now` du thème.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'timeGridDay' });
+
+// Later: no line (a printout, a past period).
+calendar.update({ nowIndicator: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ nowIndicator: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" nowIndicator={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ nowIndicator: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Cette semaine, maintenant : la ligne traverse la colonne d'aujourd'hui.
+
+<LiveDemo
+  label="La grille horaire de cette semaine avec la ligne à l'heure actuelle"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`scrollTime`](../scroll-time/) — où la grille défile d'abord.
+- [`timeZone`](../time-zone/) — maintenant, dans les heures de ce fuseau.
+- `hooks` — l'apparence de la ligne (hooks.nowIndicator).

@@ -77,7 +77,7 @@ export interface ModelOptions {
   /** @default [] */
   readonly collapsedGroups?: readonly string[];
   /**
-   * The hours a place is open: shaded outside in the time grid and checked by `rules`. One set (`{ days, start, end }`), several, or `true` for Monday to Friday, 9:00 to 17:00.
+   * The hours a place is open: shaded outside in the time grid and checked by `rules`. One rule (`{ daysOfWeek, start, end, timeZone? }`), several, `true` for Monday to Friday 09:00–17:00, or `false` for none.
    */
   readonly businessHours?: BusinessHoursInput;
   /**

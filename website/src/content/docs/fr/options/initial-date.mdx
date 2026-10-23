@@ -1,0 +1,148 @@
+---
+title: initialDate
+description: La date sur laquelle s'ouvre le calendrier.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+La date dont le calendrier montre la période en premier.
+
+<OptionFacts name="initialDate" />
+
+## Ce qu'elle fait
+
+Le calendrier s'ouvre sur la période qui contient cette date : son mois, sa
+semaine, son jour. Sans elle, c'est aujourd'hui dans `timeZone`. Ensuite la
+personne se déplace avec les flèches de l'en-tête et « aujourd'hui », et votre
+code avec `update({ date })` ou `navigate('prev' | 'next' | 'today')`.
+
+C'est un `Temporal.PlainDate` — une date sans heure ni fuseau, lue comme ce
+jour dans le fuseau du calendrier. Attendez `loadTemporal()` avant d'en créer
+une : sur un navigateur sans Temporal natif, son polyfill arrive à ce moment.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+await loadTemporal();
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialDate: Temporal.PlainDate.from('2026-10-25'),
+});
+
+// Later: another period.
+calendar.update({ date: Temporal.PlainDate.from('2026-12-01') });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { Temporal } from '@dzcalendar/core';
+import type { PlainDate } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" [(date)]="date" />
+    <p>Showing {{ date()?.toString() }}</p>`,
+})
+export class Agenda {
+  // The first date; it follows the person's moves (two-way).
+  readonly date = signal<PlainDate | undefined>(Temporal.PlainDate.from('2026-10-25'));
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { Temporal } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultDate={Temporal.PlainDate.from('2026-10-25')} />;
+}
+// Controlled instead: date={date} onDateChange={setDate}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { shallowRef } from 'vue';
+import { Temporal } from '@dzcalendar/core';
+import type { PlainDate } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const date = shallowRef<PlainDate>(Temporal.PlainDate.from('2026-10-25'));
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" v-model:date="date" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est la date du composant : `[(date)]` en Angular, `defaultDate` en React (ou `date` avec `onDateChange`, contrôlée), `v-model:date` en Vue.
+Leur `Temporal.PlainDate.from(…)` s'exécute avec le composant : sur Safari,
+attendez d'abord `loadTemporal()` une fois au démarrage (le `provideDzCalendar()`
+d'Angular le fait ; [React](../../getting-started/react/#temporal-dabord),
+[Vue](../../getting-started/vue/#temporal-dabord)).
+
+## Démo en direct
+
+Le calendrier s'ouvre sur la semaine du 25 octobre 2026 — le jour de 25 heures de Paris.
+
+<LiveDemo
+  label="Un calendrier qui s'ouvre le 25 octobre 2026, jour où Paris recule ses horloges"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-25",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`initialView`](../initial-view/) — la vue dans laquelle il s'ouvre.
+- [`timeZone`](../time-zone/) — le fuseau où se lit son « aujourd'hui ».
+- [Vues](../../guides/views/).

@@ -1,0 +1,171 @@
+---
+title: businessHours
+description: The hours a place is open.
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The hours a place is open: shaded outside in the time grid, and what `rules` can hold gestures to.
+
+<OptionFacts name="businessHours" />
+
+## What it does
+
+Three shapes:
+
+- `true`: Monday to Friday, 09:00 to 17:00; `false`: none.
+- One rule: `{ daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '18:00' }`.
+- Several rules, for a lunch break or a different Saturday:
+  `[{ daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '12:30' }, { daysOfWeek: [1, 2, 3, 4, 5], start: '14:00', end: '18:00' }]`.
+
+`daysOfWeek` are ISO weekdays (1 Monday … 7 Sunday). `start` and `end` are
+wall times; `'24:00'` is the next midnight, and an end at or before the start
+crosses midnight (`22:00`–`06:00`, a night shift). A rule is read in the
+calendar's zone, or in its own `timeZone`: a clinic in Algiers keeps its
+hours on a calendar shown in Paris. On the day the clocks change, a shift
+has its true length.
+
+Outside these hours the time grid is shaded, and a day grid marks the days
+with none. With `rules: { constraint:
+'businessHours' }`, a drag or a resize outside them is refused.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  businessHours: [
+    { daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '12:30' },
+    { daysOfWeek: [1, 2, 3, 4, 5], start: '14:00', end: '18:00' },
+  ],
+  editable: true,
+  // A drag or a resize outside the hours is refused.
+  rules: { constraint: 'businessHours' },
+});
+
+// Later: the default hours (Monday to Friday, 9:00–17:00).
+calendar.update({ businessHours: true });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { BusinessHoursInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [businessHours]="hours" />`,
+})
+export class Agenda {
+  // The clinic's hours, kept in Algiers whatever zone the calendar is shown in.
+  readonly hours: BusinessHoursInput = { daysOfWeek: [1, 2, 3, 4, 5], start: '08:00', end: '16:00', timeZone: 'Africa/Algiers' };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" businessHours={{ daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '18:00' }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :business-hours="{ daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '18:00' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an input: Angular's `businessHours`, React's `businessHours`, Vue's `business-hours`.
+
+## Live demo
+
+Weekdays open 08:30–12:30 and 14:00–18:00; the rest is shaded.
+
+<LiveDemo
+  label="A clinic open 8:30 to 12:30 and 14:00 to 18:00 on weekdays"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "businessHours": [
+      {
+        "daysOfWeek": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "start": "08:30",
+        "end": "12:30"
+      },
+      {
+        "daysOfWeek": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "start": "14:00",
+        "end": "18:00"
+      }
+    ],
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`timeZone`](../time-zone/) — the zone rules are read in unless they name theirs.
+- [`weekends`](../weekends/) — the days shown.
+- [Drag and drop](../../guides/drag-and-drop/) — gestures held to the hours.

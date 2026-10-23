@@ -1,0 +1,185 @@
+---
+title: views
+description: Vos propres vues, ajoutées aux vues intégrées.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Des vues à vous — trois jours, deux semaines, les dates d'un congrès — à côté des vues intégrées.
+
+<OptionFacts name="views" />
+
+## Ce qu'elle fait
+
+Chaque clé est le type d'une vue (le nom qu'utilisent `initialView`,
+`headerViews` et `update({ view })`) ; chaque valeur est soit des réglages —
+une `family` et ce qui diffère d'une vue simple — soit une spécification de
+vue complète. Une clé égale à un nom intégré le remplace.
+
+- `family` : `'timeGrid'`, `'dayGrid'`, `'list'`, `'multiMonth'`, ou la
+  `'timeline'` du Pro.
+- `duration` et `alignment` (`'day'`, `'week'`, `'month'`, `'year'`,
+  `'none'`) : la longueur d'une période et l'endroit où elle commence.
+- `dateIncrement` : de combien avancent précédent / suivant ; `dayCount` :
+  combien de jours montrés (les jours masqués sautés).
+- `visibleRange` : une période fixe, quelle que soit la date.
+- `hiddenDays` : les jours masqués propres à la vue.
+
+Les réglages sont vérifiés à la création du calendrier : une durée nulle, un
+nombre de jours sous 1 ou une plage qui finit avant de commencer lève une
+`RangeError`. Le libellé du bouton de la vue vient de `messages.views`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'threeDays',
+  headerViews: ['threeDays', 'fortnight', 'timeGridWeek'],
+  views: {
+    // Three days from the date shown; previous / next move by three.
+    threeDays: { family: 'timeGrid', duration: { days: 3 } },
+    // Two weeks from the week's first day, moving one week at a time.
+    fortnight: { family: 'dayGrid', duration: { weeks: 2 }, alignment: 'week', dateIncrement: { weeks: 1 } },
+  },
+  messages: { views: { threeDays: '3 days', fortnight: 'Fortnight' } },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  // Read when the calendar is made: this component's calendars only (provideDzCalendar for the whole application).
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { views: { threeDays: { family: 'timeGrid', duration: { days: 3 } } } } }],
+  template: `<dz-calendar timeZone="Europe/Paris" view="threeDays" [options]="{ headerViews: ['threeDays', 'timeGridWeek'] }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      defaultView="threeDays"
+      headerViews={['threeDays', 'timeGridWeek']}
+      initial={{ views: { threeDays: { family: 'timeGrid', duration: { days: 3 } } } }}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar
+    time-zone="Europe/Paris"
+    view="threeDays"
+    :options="{ headerViews: ['threeDays', 'timeGridWeek'] }"
+    :initial="{ views: { threeDays: { family: 'timeGrid', duration: { days: 3 } } } }"
+  />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+`views` est lu une fois, à la création du calendrier. En Angular il va dans les valeurs par défaut (`provideDzCalendar({ views })` pour l'application, `DZ_CALENDAR_DEFAULTS` pour un composant) ; en React et en Vue, dans `initial`.
+
+## Démo en direct
+
+Deux vues à vous dans l'en-tête : trois jours à la fois, et deux semaines.
+
+<LiveDemo
+  label="Une vue de trois jours et une vue de deux semaines à vous"
+  height={560}
+  options={{
+    "initialView": "threeDays",
+    "initialDate": "2026-10-21",
+    "headerViews": [
+      "threeDays",
+      "fortnight",
+      "timeGridWeek"
+    ],
+    "views": {
+      "threeDays": {
+        "family": "timeGrid",
+        "duration": {
+          "days": 3
+        }
+      },
+      "fortnight": {
+        "family": "dayGrid",
+        "duration": {
+          "weeks": 2
+        },
+        "alignment": "week",
+        "dateIncrement": {
+          "weeks": 1
+        }
+      }
+    },
+    "messages": {
+      "views": {
+        "threeDays": "3 jours",
+        "fortnight": "Quinzaine"
+      }
+    },
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`initialView`](../initial-view/) — la vue montrée en premier.
+- [`hiddenDays`](../hidden-days/) — les jours qu'aucune vue ne montre.
+- [Vues](../../guides/views/) — et un dessin à vous avec defineView.

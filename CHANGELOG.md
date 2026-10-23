@@ -38,6 +38,16 @@
 - `createDayGridView` moved from `@dzcalendar/dom/toolkit` to
   `@dzcalendar/dom/daygrid` (18i-1).
 
+### Fixed
+
+- Angular: `<dz-calendar>` makes its calendar once its inputs are bound: a
+  `timeZone` input no longer says `zone-from-browser`, `scrollTime` in
+  `[options]` scrolls the first grid, the first view and date are the
+  calendar's from its first paint.
+- `createCalendar` checks `firstDay` and `hiddenDays` as `update()` does (a
+  week with no day, a weekday outside 1–7: `RangeError`).
+- `messages: { views }` keeps the built-in views' labels beside the ones given.
+
 ### Added
 
 - `loadTemporal`, `temporalReady` (`@dzcalendar/core`); `calendar.ready`;

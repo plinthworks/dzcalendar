@@ -1,0 +1,124 @@
+---
+title: scrollTime
+description: Où défile d'abord la grille horaire.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+L'heure à laquelle défile une grille horaire quand elle s'affiche.
+
+<OptionFacts name="scrollTime" />
+
+## Ce qu'elle fait
+
+Un jour a 24 heures et l'écran en montre quelques-unes : la grille s'ouvre
+sur cette heure, en durée depuis minuit (`'PT8H'`, `{ hours: 7,
+minutes: 30 }`). Avec `timeGrid: { slotMin }`, les heures d'avant ne sont pas
+dessinées et le défilement compte à partir de là.
+
+L'option s'applique quand une grille horaire (ou la timeline du Pro) s'affiche :
+d'abord, puis de nouveau quand elle revient après un autre genre de vue — un
+mois, une liste. Passer d'une semaine à un jour garde là où la personne a
+défilé.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', scrollTime: { hours: 7, minutes: 30 } });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ scrollTime: 'PT7H' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" scrollTime="PT7H" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ scrollTime: 'PT7H' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue il va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+La semaine s'ouvre sur 07:00.
+
+<LiveDemo
+  label="Une semaine qui s'ouvre à 7:00"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "scrollTime": "PT7H",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`nowIndicator`](../now-indicator/) — la ligne à l'heure actuelle.
+- `timeGrid` — les heures dessinées (slotMin, slotMax).
+- [`initialView`](../initial-view/) — la vue dans laquelle il s'ouvre.

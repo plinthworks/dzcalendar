@@ -1,0 +1,122 @@
+---
+title: nowIndicator
+description: The line at the current time.
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+A line across the time grid at the current time, moved every minute.
+
+<OptionFacts name="nowIndicator" />
+
+## What it does
+
+In a week or a day view, a line marks now across today's column, when
+today is shown. It moves on every minute, from the device's clock. With
+`false`, no line — in the Pro's timeline either.
+
+Its look is the application's through `hooks.nowIndicator`; its colour is
+the theme's `--dz-now` token.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'timeGridDay' });
+
+// Later: no line (a printout, a past period).
+calendar.update({ nowIndicator: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ nowIndicator: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" nowIndicator={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ nowIndicator: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+This week, now: the line crosses today's column.
+
+<LiveDemo
+  label="This week's time grid with the line at the current time"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`scrollTime`](../scroll-time/) — where the grid is scrolled to first.
+- [`timeZone`](../time-zone/) — now, in this zone's hours.
+- `hooks` — the line's own look (hooks.nowIndicator).

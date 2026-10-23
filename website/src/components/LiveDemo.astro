@@ -20,7 +20,8 @@ interface Props {
 }
 const { options = {}, height = 560, label } = Astro.props;
 const lang = Astro.currentLocale ?? 'en';
-const given = { timeZone: 'Europe/Paris', locale: lang === 'fr' ? 'fr-FR' : 'en-US', ...options };
+// Set in Paris: a British reader's conventions (Monday first, 24 h) on the English pages, French ones on the French.
+const given = { timeZone: 'Europe/Paris', locale: lang === 'fr' ? 'fr-FR' : 'en-GB', ...options };
 ---
 
 <dz-live-demo class="not-content" data-options={JSON.stringify(given)} aria-label={label}>

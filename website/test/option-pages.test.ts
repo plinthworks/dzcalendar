@@ -58,6 +58,19 @@ describe('the option pages (18j)', () => {
     expect(wrong).toEqual([]);
   });
 
+  it('a link from an option page to another option goes to a page that is written (a pending one would be a 404)', () => {
+    const broken: string[] = [];
+    for (const lang of ['', 'fr'] as const) {
+      const dir = join(docs, lang, 'options');
+      for (const f of readdirSync(dir).filter((x) => x.endsWith('.mdx'))) {
+        for (const m of readFileSync(join(dir, f), 'utf8').matchAll(/\]\(\.\.\/([a-z-]+)\/(?:#[^)]*)?\)/g)) {
+          if (!existsSync(join(dir, `${m[1]}.mdx`))) broken.push(`${lang || 'en'} ${f} → ${m[1]}`);
+        }
+      }
+    }
+    expect(broken).toEqual([]);
+  });
+
   it('every default the code cannot write has its words in both languages', () => {
     const tokens = shipped.options.flatMap((o) => [o.default, ...(o.members ?? []).map((m) => m.default)]).flatMap((d) => (d?.token ? [d.token] : []));
     expect(tokens.filter((t) => !FACTS.en.tokens[t] || !FACTS.fr.tokens[t])).toEqual([]);

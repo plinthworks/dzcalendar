@@ -1,0 +1,137 @@
+---
+title: hiddenDays
+description: Les jours de la semaine qu'aucune vue ne montre.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Les jours que le calendrier écarte de toutes les vues, en jours ISO.
+
+<OptionFacts name="hiddenDays" />
+
+## Ce qu'elle fait
+
+Avec `hiddenDays: [3]`, une semaine n'a pas de mercredi : ses colonnes se
+resserrent, un mois perd cette colonne, et déplacer ou redimensionner un
+événement n'y atterrit jamais. Les événements d'un jour masqué ne sont pas
+dessinés (ils sont toujours là : le store les garde).
+
+Les nombres sont des jours ISO : 1 lundi … 7 dimanche. `weekends: false` y
+ajoute 6 et 7. Une vue à vous (`views`) peut nommer ses propres
+`hiddenDays`, qui l'emportent pour elle.
+
+<Aside type="caution">
+Masquer les sept jours, ou nommer un jour hors de 1 à 7, lève une `RangeError` (`every day of the week is hidden`) — à `createCalendar` ou `update()` — et rien ne change.
+</Aside>
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', hiddenDays: [3] });
+
+// Later: every day again.
+calendar.update({ hiddenDays: [] });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { Weekday } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [hiddenDays]="closed" />`,
+})
+export class Agenda {
+  // Closed on Wednesdays.
+  readonly closed: readonly Weekday[] = [3];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" hiddenDays={[3]} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :hidden-days="[3]" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `hiddenDays` en Angular, `hiddenDays` en React, `hidden-days` en Vue.
+
+## Démo en direct
+
+La semaine, mercredi (3) écarté.
+
+<LiveDemo
+  label="Une semaine sans mercredi"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "hiddenDays": [
+      3
+    ],
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`weekends`](../weekends/) — samedi et dimanche à la fois.
+- [`firstDay`](../first-day/) — les mêmes jours ISO.
+- [`views`](../views/) — les jours masqués propres à une vue.

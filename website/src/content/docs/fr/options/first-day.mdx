@@ -1,0 +1,131 @@
+---
+title: firstDay
+description: Le premier jour de la semaine.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Le jour où commencent les semaines, en jour ISO : 1 est lundi, 7 est dimanche.
+
+<OptionFacts name="firstDay" />
+
+## Ce qu'elle fait
+
+L'option décide où commence une vue semaine, la première colonne d'un mois, et la
+numérotation des semaines. Sans elle, c'est celui de la locale : lundi dans la
+plupart de l'Europe, dimanche aux États-Unis, samedi dans une grande partie du
+monde arabophone.
+
+Les nombres sont des jours ISO, comme partout dans DzCalendar (`hiddenDays`,
+`businessHours`) : 1 lundi … 7 dimanche — pas le 0 à 6 du `Date` de
+JavaScript. `update({ firstDay: null })` revient à celui de la locale.
+
+<Aside type="caution">
+Une valeur qui n'est pas un entier de 1 à 7 lève une `RangeError` à `createCalendar` ou `update()`, et rien ne change.
+</Aside>
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'America/New_York', initialView: 'dayGridMonth', firstDay: 7 });
+
+// Later: back to the locale's.
+calendar.update({ firstDay: null });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="America/New_York" view="dayGridMonth" [options]="{ firstDay: 7 }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="America/New_York" defaultView="dayGridMonth" firstDay={7} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="America/New_York" view="dayGridMonth" :options="{ firstDay: 7 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue il va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Le mois, ses semaines commençant le dimanche (7).
+
+<LiveDemo
+  label="Un mois dont les semaines commencent le dimanche"
+  height={560}
+  options={{
+    "initialView": "dayGridMonth",
+    "initialDate": "2026-10-21",
+    "firstDay": 7,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`locale`](../locale/) — la valeur par défaut en vient.
+- [`weekNumbers`](../week-numbers/) — numérotées selon ces règles.
+- [`hiddenDays`](../hidden-days/) — les mêmes jours ISO.

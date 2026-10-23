@@ -1,0 +1,123 @@
+---
+title: displayEventTime
+description: L'heure d'un événement à côté de son titre.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Si un événement montre son heure à côté de son titre.
+
+<OptionFacts name="displayEventTime" />
+
+## Ce qu'elle fait
+
+Un événement horaire montre son heure à côté de son titre : son début et sa
+fin dans une grille horaire (`09:00 – 09:45`), son début dans un mois. Avec
+`false`, le titre seul — pour une grille dont les heures le disent déjà, ou un mois de libellés
+courts.
+
+Les événements d'une journée entière ne montrent jamais d'heure. La façon dont
+l'heure s'écrit relève de `formats` (`formats: { eventTime: … }`), et tout le
+contenu est celui de l'application avec `hooks.event`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'dayGridMonth', displayEventTime: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="dayGridMonth" [options]="{ displayEventTime: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="dayGridMonth" displayEventTime={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="dayGridMonth" :options="{ displayEventTime: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Le mois, chaque événement avec son titre seul.
+
+<LiveDemo
+  label="Un mois dont les événements ne montrent que leur titre"
+  height={560}
+  options={{
+    "initialView": "dayGridMonth",
+    "initialDate": "2026-10-21",
+    "displayEventTime": false,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`allDaySlot`](../all-day-slot/) — la rangée « toute la journée ».
+- [`events`](../events/) — les champs d'un événement.
+- `hooks` — le contenu propre d'un événement (hooks.event).

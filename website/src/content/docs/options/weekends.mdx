@@ -1,0 +1,142 @@
+---
+title: weekends
+description: Whether Saturday and Sunday are shown.
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+False leaves Saturday and Sunday out of every view.
+
+<OptionFacts name="weekends" />
+
+## What it does
+
+`weekends: false` is `hiddenDays` with 6 and 7 added: a week of five days, a
+month of five columns. The two combine — `weekends: false` with
+`hiddenDays: [3]` shows Monday, Tuesday, Thursday and Friday.
+
+Saturday and Sunday here are ISO days 6 and 7, whatever the locale: where
+the weekend falls on Friday and Saturday, hide `[5, 6]` with `hiddenDays`
+instead.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', weekends: false });
+
+// Later: the whole week.
+calendar.update({ weekends: true });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <label><input type="checkbox" [checked]="weekends()" (change)="weekends.set(!weekends())" /> Weekends</label>
+    <dz-calendar timeZone="Europe/Paris" [weekends]="weekends()" />`,
+})
+export class Agenda {
+  readonly weekends = signal(false);
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [weekends, setWeekends] = useState(false);
+  return (
+    <>
+      <label>
+        <input type="checkbox" checked={weekends} onChange={() => setWeekends(!weekends)} /> Weekends
+      </label>
+      <DzCalendar timeZone="Europe/Paris" weekends={weekends} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const weekends = ref(false);
+</script>
+
+<template>
+  <label><input v-model="weekends" type="checkbox" /> Weekends</label>
+  <DzCalendar time-zone="Europe/Paris" :weekends="weekends" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an input: Angular's `weekends`, React's `weekends`, Vue's `weekends`.
+
+## Live demo
+
+The week, Monday to Friday.
+
+<LiveDemo
+  label="A working week of five days"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "weekends": false,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`hiddenDays`](../hidden-days/) — any weekday.
+- [`businessHours`](../business-hours/) — the hours of the days shown.
+- [`firstDay`](../first-day/) — where the week starts.

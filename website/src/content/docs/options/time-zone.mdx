@@ -1,0 +1,161 @@
+---
+title: timeZone
+description: The time zone the calendar is drawn in.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The IANA zone the calendar draws its days and hours in.
+
+<OptionFacts name="timeZone" />
+
+## What it does
+
+Every event keeps its own zone: `2026-10-22T10:00[America/Chicago]` is ten
+o'clock in Chicago, whatever the calendar shows. `timeZone` decides where
+that moment falls on screen — at 17:00 in a calendar set to
+`'Europe/Paris'`, at 10:00 in one set to `'America/Chicago'`. Days are that
+zone's days: a day of 23 or 25 hours when its clocks change.
+
+Give an IANA name (`'Europe/Paris'`, `'Africa/Algiers'`, `'UTC'`), never a
+bare offset: an offset has no clock changes. Left out, the calendar uses the
+browser's zone and says so once (`zone-from-browser`, through `onProblem` or
+the console) — a phone set to Tokyo would draw Algiers' 14:00 at 22:00. Pass
+`Temporal.Now.timeZoneId()` when the browser's zone is what you mean.
+
+<Aside type="caution">
+A name that is not a zone throws a `RangeError` at `createCalendar` or `update()`, and nothing changes.
+</Aside>
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  events: [{ id: 'call', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } }],
+});
+
+// Later: the same events, drawn in Chicago's hours.
+calendar.update({ timeZone: 'America/Chicago' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <select (change)="zone.set($any($event.target).value)">
+      <option value="Europe/Paris">Paris</option>
+      <option value="America/Chicago">Chicago</option>
+    </select>
+    <dz-calendar [timeZone]="zone()" />`,
+})
+export class Agenda {
+  readonly zone = signal('Europe/Paris');
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [zone, setZone] = useState('Europe/Paris');
+  return (
+    <>
+      <select value={zone} onChange={(e) => setZone(e.target.value)}>
+        <option value="Europe/Paris">Paris</option>
+        <option value="America/Chicago">Chicago</option>
+      </select>
+      <DzCalendar timeZone={zone} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const zone = ref('Europe/Paris');
+</script>
+
+<template>
+  <select v-model="zone">
+    <option value="Europe/Paris">Paris</option>
+    <option value="America/Chicago">Chicago</option>
+  </select>
+  <DzCalendar :time-zone="zone" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an input: Angular's `timeZone`, React's `timeZone`, Vue's `time-zone`.
+
+## Live demo
+
+The call is set at 10:00 in Chicago; the calendar, in Paris, draws it at 17:00.
+
+<LiveDemo
+  label="An event set in Chicago, drawn in a calendar set to Paris"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "scrollTime": "PT8H",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`initialDate`](../initial-date/) — its "today" is in this zone.
+- [`businessHours`](../business-hours/) — hours read in this zone unless a rule names its own.
+- [Time zones and clock changes](../../guides/time-zones/).

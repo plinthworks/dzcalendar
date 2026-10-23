@@ -318,10 +318,21 @@ const entryHint = (family: string): string =>
 const hiddenOf = (hidden: readonly Weekday[] | undefined, weekends: boolean | undefined): Weekday[] =>
   [...new Set([...(hidden ?? []), ...(weekends === false ? ([6, 7] as const) : [])])].sort() as Weekday[];
 
+/** The week's days as given, checked the same at creation and in update(): a RangeError names what is wrong. */
+function checkDays(firstDay: number | null | undefined, hidden: readonly number[] | undefined, weekends: boolean | undefined, current?: { days: readonly Weekday[] | undefined; weekends: boolean | undefined }): void {
+  if (firstDay != null && !(Number.isInteger(firstDay) && firstDay >= 1 && firstDay <= 7)) throw new RangeError(`firstDay is an ISO weekday, 1 (Monday) to 7 (Sunday): ${firstDay}`);
+  if (hidden !== undefined && (!Array.isArray(hidden) || hidden.some((d) => !Number.isInteger(d) || d < 1 || d > 7))) throw new RangeError(`hiddenDays are ISO weekdays, 1 (Monday) to 7 (Sunday): ${String(hidden)}`);
+  if (hiddenOf((hidden ?? current?.days) as readonly Weekday[] | undefined, weekends ?? current?.weekends).length >= 7) throw new RangeError('every day of the week is hidden');
+}
+
 /** The registered language's words (`defineLocale`, `@dzcalendar/dom/locales/*`), else English. */
 const messagesFor = (locale: string) => messagesForLocale(locale);
 /** An application's messages over the locale's: a set written before a version added keys still works. */
-const withDefaults = (given: Partial<DzMessages> | undefined, locale: string): DzMessages => (given ? { ...messagesFor(locale), ...given } : messagesFor(locale));
+/** The application's words over the locale's; the views' labels merged name by name (a label for a view of its own keeps the built-in ones). */
+const withDefaults = (given: Partial<DzMessages> | undefined, locale: string): DzMessages => {
+  const base = messagesFor(locale);
+  return given ? { ...base, ...given, views: { ...base.views, ...given.views } } : base;
+};
 
 /** A locale whose dates are written in `calendar` (Intl's `-u-ca-`); none: the locale as it is. */
 function withCalendar(locale: string, calendar: string | null | undefined): string {
@@ -522,6 +533,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   let secondaryCalendar = options.secondaryCalendar ?? null;
   // Defaults go after the spread: `timeZone: undefined` (a framework's unset
   // input) or `locale: ''` (an empty lang attribute) must not erase them.
+  // Checked as update() checks them: a week with no day, a weekday 8, a first day 0 never make a calendar.
+  if (!options.kernel) checkDays(options.firstDay, options.hiddenDays, options.weekends);
   const kernel =
     options.kernel ??
     createKernel({
@@ -1361,7 +1374,6 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       checkLook(changes);
       if (changes.dayMaxLanes !== undefined && typeof changes.dayMaxLanes === 'number' && !(Number.isInteger(changes.dayMaxLanes) && changes.dayMaxLanes >= 1)) throw new RangeError(`dayMaxLanes must be a whole number ≥ 1, 'auto' or null: ${changes.dayMaxLanes}`);
       if ('eventMaxStack' in changes) assertStack(changes.eventMaxStack);
-      if (changes.firstDay != null && !(Number.isInteger(changes.firstDay) && changes.firstDay >= 1 && changes.firstDay <= 7)) throw new RangeError(`firstDay is an ISO weekday, 1 (Monday) to 7 (Sunday): ${changes.firstDay}`);
       // Locale and calendars together, checked before anything changes (a bad one must not stick).
       const touchesLocale = Boolean(changes.locale) || 'displayCalendar' in changes || 'secondaryCalendar' in changes;
       const nextBase = changes.locale || baseLocale;
@@ -1369,9 +1381,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       const nextSecondary = 'secondaryCalendar' in changes ? (changes.secondaryCalendar ?? null) : secondaryCalendar;
       const nextEffective = touchesLocale ? withCalendar(nextBase, nextDisplay) : null;
       if (touchesLocale && nextSecondary) withCalendar(nextBase, nextSecondary);
-      if (changes.hiddenDays?.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw new RangeError(`hiddenDays are ISO weekdays, 1 (Monday) to 7 (Sunday): ${changes.hiddenDays.join(', ')}`);
-      if (('hiddenDays' in changes || 'weekends' in changes) && hiddenOf('hiddenDays' in changes ? changes.hiddenDays : hidden.days, 'weekends' in changes ? changes.weekends : hidden.weekends).length >= 7) {
-        throw new RangeError('every day of the week is hidden');
+      if ('firstDay' in changes || 'hiddenDays' in changes || 'weekends' in changes) {
+        checkDays(changes.firstDay, 'hiddenDays' in changes ? (changes.hiddenDays ?? []) : undefined, 'weekends' in changes ? (changes.weekends ?? true) : undefined, hidden);
       }
       // Live settings check themselves and apply at once (nothing to redraw): a bad one throws here, before any change.
       if (settings.apply(changes)) {

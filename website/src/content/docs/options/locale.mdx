@@ -1,0 +1,132 @@
+---
+title: locale
+description: The language and the conventions the calendar is written in.
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The BCP 47 language the calendar's words, dates and numbers are written in.
+
+<OptionFacts name="locale" />
+
+## What it does
+
+`locale` decides how dates and times are written (`21 oct.`, `Oct 21`), the
+calendar's own words (the buttons, "+N more", the menus), and the week's
+conventions when `firstDay` is not given: the first day of the week and how
+weeks are numbered.
+
+English and French words are built in. Arabic, Spanish and German are one
+import each (`import '@dzcalendar/dom/locales/ar'`, `/es`, `/de`); another
+language takes its words from `messages` or `defineLocale`. A locale whose
+words are not loaded is still written by the platform — dates and numbers in
+that language — with the English words. Left out, the page's language
+(`<html lang>`) is used, then `'en'`.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/dom/locales/de';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Berlin', locale: 'de-DE' });
+
+// Later: French, built in.
+calendar.update({ locale: 'fr-FR' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/dom/locales/ar';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Asia/Riyadh" locale="ar-SA" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/dom/locales/es';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Madrid" locale="es-ES" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" locale="fr-FR" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an input: Angular's `locale`, React's `locale`, Vue's `locale`.
+
+## Live demo
+
+The same week, its dates, hours and buttons in French.
+
+<LiveDemo
+  label="A week written in French"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "locale": "fr-FR",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`firstDay`](../first-day/) — the week's first day, the locale's by default.
+- [`titleFormat`](../title-format/) — how the title is written.
+- [Languages](../../guides/languages/).

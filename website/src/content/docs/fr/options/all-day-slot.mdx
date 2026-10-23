@@ -1,0 +1,130 @@
+---
+title: allDaySlot
+description: La rangée « toute la journée » de la grille horaire.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+La rangée au-dessus des heures d'une grille horaire où vont les événements d'une journée entière.
+
+<OptionFacts name="allDaySlot" />
+
+## Ce qu'elle fait
+
+Dans une vue semaine ou jour, les événements d'une journée entière (un congé,
+un congrès) se placent dans une rangée au-dessus des heures. Avec `false`, la
+rangée disparaît : les heures commencent en haut.
+
+Sans la rangée, les événements d'une journée entière ne sont pas dessinés dans
+la grille horaire — un congé serait invisible. Le calendrier le signale
+(`events-not-drawn`, par `onProblem` ou la console). Un événement de fond
+d'une journée entière colore toujours ses colonnes. Son libellé est celui de
+l'application avec `hooks.allDayLabel`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  allDaySlot: false,
+  events: [{ id: 'off', title: 'Day off', start: '2026-10-23', allDay: true }],
+  // Said once (events-not-drawn): this day off is not drawn in the week.
+  onProblem: (problem) => console.warn(problem.code, problem.detail),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ allDaySlot: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" allDaySlot={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ allDaySlot: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+La semaine sans la rangée « toute la journée » : les heures commencent en haut.
+
+<LiveDemo
+  label="Une semaine sans sa rangée « toute la journée »"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "allDaySlot": false,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`displayEventTime`](../display-event-time/) — ce que montre un événement.
+- [`events`](../events/) — les événements d'une journée entière (allDay: true).
+- `hooks` — le libellé de la rangée (hooks.allDayLabel).

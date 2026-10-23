@@ -7,6 +7,7 @@ import {
   ViewContainerRef,
   type EmbeddedViewRef,
   type OnDestroy,
+  OnInit,
   computed,
   contentChild,
   contentChildren,
@@ -89,7 +90,7 @@ function defined<T extends object>(o: T): Partial<T> {
   template: '',
   host: { style: 'display: block' },
 })
-export class DzCalendar implements OnDestroy {
+export class DzCalendar implements OnInit, OnDestroy {
   private readonly host: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly zone = inject(NgZone);
   private readonly defaults = inject(DZ_CALENDAR_DEFAULTS);
@@ -273,16 +274,42 @@ export class DzCalendar implements OnDestroy {
   private lastSelection: Selection | null = null;
 
   /**
-   * Created at construction, so the calendar exists as soon as the component
-   * does; inputs are not bound yet — the effect below brings them in on the
-   * first change detection.
+   * Made in ngOnInit, once the inputs are bound: what they say is the calendar's
+   * from its first paint (its zone, its scroll, its first view) — made at
+   * construction, it drew with none of them and took them afterwards, too late
+   * for what only the first paint reads (18j review: a `timeZone` input said
+   * `zone-from-browser`, `scrollTime` was not scrolled to).
    */
-  private readonly calendar: CalendarInstance = this.zone.runOutsideAngular(() =>
+  private calendar!: CalendarInstance;
+  /** What the settings were when the calendar was made: the effect below sends only what changes after. */
+  private sent: Record<string, unknown> = {};
+
+  private make(): CalendarInstance {
+    const given = { ...(untracked(this.settings) as Record<string, unknown>) };
+    this.sent = given;
+    // The bindings speak update()'s names: the view and the date shown are the calendar's first ones.
+    const { view, date, ...rest } = given as { view?: string; date?: PlainDate } & Record<string, unknown>;
+    try {
+      return this.makeWith(rest, view, date);
+    } catch {
+      // A value the calendar refuses (an unknown view): made bare, then every binding laid on by the effect below,
+      // each alone when one fails — the bad one told to Angular's ErrorHandler once, the good ones not lost with it.
+      const made = this.makeWith({}, undefined, undefined);
+      this.calendar = made;
+      this.sent = {};
+      return made;
+    }
+  }
+
+  private makeWith(rest: Record<string, unknown>, view: string | undefined, date: PlainDate | undefined): CalendarInstance {
+    return this.zone.runOutsideAngular(() =>
     createCalendar(this.host, {
       ...this.defaults,
       // The application's motion, made for this calendar, unless one is given here or in the defaults.
-      ...(this.makeMotion && this.defaults.motion === undefined && (untracked(this.settings) as CalendarOptions).motion === undefined && this.ownMotion()),
-      ...(untracked(this.settings) as CalendarOptions),
+      ...(this.makeMotion && this.defaults.motion === undefined && (rest as CalendarOptions).motion === undefined && this.ownMotion()),
+      ...(rest as CalendarOptions),
+      ...(view !== undefined && { initialView: view }),
+      ...(date !== undefined && { initialDate: date }),
       onDateClick: (c) => this.emit(() => this.dateClick.emit(c)),
       onSlotClick: (x) => this.emit(() => this.slotClick.emit(x)),
       onResourceProblems: (ps) => this.emit(() => this.resourceProblems.emit(ps)),
@@ -319,7 +346,8 @@ export class DzCalendar implements OnDestroy {
           this.sourceNotice.emit(n);
         }),
     }),
-  );
+    );
+  }
 
   /** The controller, the problems and the calendar's state wired to the bindings, once the calendar is drawn. */
   private wire(): void {
@@ -352,20 +380,25 @@ export class DzCalendar implements OnDestroy {
     this.unsubscribe = stop;
   }
 
-  constructor() {
+  ngOnInit(): void {
+    this.calendar = this.make();
     // Drawn now, or — Temporal still loading (Safari, no provideDzCalendar() holding the start) — once it is
     // (18i): until then the calendar keeps what the bindings ask, and the controller and problems wait.
     if (temporalReady()) this.wire();
     else void this.calendar.ready.then(() => !this.destroyed && this.wire(), () => {});
+  }
 
+  constructor() {
     // The settings are read here, so the effect follows them; the call into the
     // calendar runs untracked. The calendar may answer by calling back — a view
     // change writes `view` — and a callback that writes a signal inside an
     // effect is an error on Angular 18 (NG0600), and a hidden dependency on any.
-    let sent: Record<string, unknown> = {};
     effect(() => {
       const s = this.settings() as Record<string, unknown>;
       untracked(() => {
+        // Not made yet (ngOnInit makes it with these very settings).
+        if (!this.calendar) return;
+        const sent = this.sent;
         // Only what changed since the last call: a view or a date change must not
         // diff ten thousand events again, and one bad value must not be sent
         // again with every later change.
@@ -374,14 +407,14 @@ export class DzCalendar implements OnDestroy {
         // Another template (or none): the views made from the last one go; the
         // calendar redraws every event's content with the new hooks.
         // Other templates: nothing dropped here — an element whose hooks changed is let go by the calendar (its willUnmount destroys its view); the others keep theirs.
-        sent = s;
+        this.sent = s;
         if (Object.keys(changes).length > 0) this.apply(changes as CalendarUpdate);
       });
     });
     effect(() => {
       const sel = this.selection();
       untracked(() => {
-        if (sel === this.lastSelection) return;
+        if (!this.calendar || sel === this.lastSelection) return;
         this.lastSelection = sel;
         this.zone.runOutsideAngular(() => this.calendar.select(sel));
       });
@@ -396,7 +429,7 @@ export class DzCalendar implements OnDestroy {
   ngOnDestroy(): void {
     this.destroyed = true;
     this.unsubscribe();
-    this.calendar.destroy();
+    this.calendar?.destroy();
     this.dropViews();
     this.controller.detach();
   }
