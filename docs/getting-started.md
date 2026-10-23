@@ -14,6 +14,8 @@ npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme
 import '@dzcalendar/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
+// Repeating events (the `rrule` below): their engine, imported once by an application that has them.
+import '@dzcalendar/core/recurrence';
 
 const calendar = createCalendar(document.getElementById('agenda')!, {
   timeZone: 'Europe/Paris',          // the zone the calendar is drawn in
@@ -101,6 +103,14 @@ first: it is on screen sooner, and nothing else changes —
   second).
 
 ## Worth knowing
+
+- **Paid for only when used.** Repeating events need `import
+  '@dzcalendar/core/recurrence'` once (without it, an event with `rrule` is
+  refused with the problem `recurrence-not-loaded`; `@dzcalendar/ical` and the
+  FullCalendar translation bring it themselves). `@dzcalendar/dom` has the time
+  grid and the day grid; `@dzcalendar/dom/base` has no view, and
+  `@dzcalendar/dom/timegrid`, `/daygrid`, `/list`, `/multimonth` add each
+  (a view not imported is said with its import).
 
 - **The box is given, never measured.** The calendar is as tall as
   `--dz-height` says (40rem by default). `--dz-height: 100%` is 100% of its

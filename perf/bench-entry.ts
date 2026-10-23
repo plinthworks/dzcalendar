@@ -24,6 +24,8 @@ import {
   itemEvent,
 } from '../packages/core/src/index.js';
 import type { EventInput, Mutation } from '../packages/core/src/index.js';
+// The series measured below need their engine (owner, 18i: an entry of its own).
+import '../packages/core/src/recurrence-entry.js';
 import { expandZoned, parseRRule } from '../packages/rrule/src/index.js';
 import { buildListModel, buildMultiMonthModel } from '../packages/core/src/views.js';
 import { findSlots } from '../packages/slots/src/index.js';

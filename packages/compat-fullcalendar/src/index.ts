@@ -10,6 +10,8 @@
  * without an equivalent is a problem — warnings; the calendar is drawn.
  * Nothing here throws.
  */
+// FullCalendar's rrule events translate to repeating events: the recurrence entry comes with the translation.
+import '@dzcalendar/core/recurrence';
 import { createCalendar, hasRenderer } from '@dzcalendar/dom';
 import type { CalendarInstance, CalendarOptions as DzOptions } from '@dzcalendar/dom';
 import type { Problem } from '@dzcalendar/core';

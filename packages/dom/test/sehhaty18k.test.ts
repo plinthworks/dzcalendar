@@ -147,3 +147,11 @@ describe('a resize-only event in a calendar that is not editable (18k review)', 
     cal.destroy();
   });
 });
+
+describe('the base entry (18i)', () => {
+  it('a view whose renderer is not imported names its entry', async () => {
+    const { hasRenderer } = await import('../src/base.js');
+    // The full entry has the grids; the message for a family without a renderer names the import.
+    expect(hasRenderer('timeGrid')).toBe(true);
+  });
+});

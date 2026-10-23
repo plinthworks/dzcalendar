@@ -1,5 +1,5 @@
 import type { RRuleSet } from '@dzcalendar/rrule';
-import { serializeRRule } from '@dzcalendar/rrule';
+import { needRecurrence } from './engine.js';
 import type { CalEvent, EventId, RecurrenceKey, SeriesId } from '../event/types.js';
 import { eventEquals } from '../store/diff.js';
 import { Temporal } from '../temporal.js';
@@ -90,7 +90,7 @@ export function materialize(series: Series, start: ZonedDateTime | PlainDate): C
 /** True when two series repeat their events with the same rules, exceptions and additions. */
 export function setEquals(a: RRuleSet, b: RRuleSet): boolean {
   if (a === b) return true;
-  const rules = (s: RRuleSet) => s.rules.map(serializeRRule).join('\n');
+  const rules = (s: RRuleSet) => s.rules.map(needRecurrence().serializeRRule).join('\n');
   const dates = (xs: readonly { toString(): string }[]) => xs.map(String).join(',');
   return rules(a) === rules(b) && dates(a.exdates) === dates(b.exdates) && dates(a.rdates) === dates(b.rdates);
 }

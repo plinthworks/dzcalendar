@@ -27,7 +27,8 @@ npm uninstall @fullcalendar/core @fullcalendar/daygrid …   # every @fullcalend
 | `changeView(v)` | `update({ view: v })` |
 | `refetchEvents()`, `unselect()`, `destroy()` | `refetch()`, `select(null)`, `destroy()` |
 | types (`CalendarOptions`, `EventClickArg`, `EventApi`…) | the same names from `@dzcalendar/compat-fullcalendar` |
-| plugins (`daygrid`, `timegrid`, `interaction`, `rrule`, `icalendar`, `resource*`) | removed: built in |
+| plugins (`daygrid`, `timegrid`, `interaction`, `icalendar`, `resource*`) | removed: built in |
+| `@fullcalendar/rrule` | `import '@dzcalendar/core/recurrence'` (the translation through `@dzcalendar/compat-fullcalendar` brings it itself) |
 | `@fullcalendar/list`, `multimonth` | `import '@dzcalendar/dom/list'`, `'@dzcalendar/dom/multimonth'` |
 | `@fullcalendar/timeline`, `resource-timeline` | `import '@dzcalendar/pro'` |
 | `@fullcalendar/core/locales/ar` (`es`, `de`) | `import '@dzcalendar/dom/locales/ar'`; `locale: arLocale` → `locale: 'ar'` |

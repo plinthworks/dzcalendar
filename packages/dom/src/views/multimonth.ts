@@ -1,7 +1,9 @@
 import { registerModelFamily } from '@dzcalendar/core';
 import { buildMultiMonthModel, updateMultiMonthModel } from '@dzcalendar/core/views';
 import type { MultiMonthModel } from '@dzcalendar/core/views';
-import { createDayGridView, ensureStyles, registerView } from '@dzcalendar/dom/toolkit';
+import { ensureStyles, registerView } from '@dzcalendar/dom/toolkit';
+// The year's months are day grids: that view's renderer, from its entry.
+import { createDayGridView } from '@dzcalendar/dom/daygrid';
 
 /**
  * Months laid side by side, `--dz-mm-cols` at most (`multiMonthMaxColumns`;

@@ -8,7 +8,7 @@ import type { Parsed } from './parse-temporal.js';
 import { problem } from './problems.js';
 import type { Problem } from './problems.js';
 import type { AllDayEvent, CalEvent, EventInput, ResourceId, TimedEvent } from './types.js';
-import { parseRRule, serializeRRule } from '@dzcalendar/rrule';
+import { recurrenceEngine } from '../recurrence/engine.js';
 import type { RRule, RRuleSet } from '@dzcalendar/rrule';
 import type { Series } from '../recurrence/series.js';
 import type { Instant } from '../temporal.js';
@@ -203,9 +203,15 @@ function recurrenceSet(input: EventInput, ctx: NormalizeContext, path: string, e
     problems.push(problem('invalid-rrule', 'error', `${path}.rrule`, 'expected a rule string or a list of them'));
     return null;
   }
+  // Repeating events are an entry of their own (owner, 18i): without it, said, never guessed.
+  const engine = recurrenceEngine();
+  if (!engine) {
+    problems.push(problem('recurrence-not-loaded', 'error', `${path}.rrule`, "import '@dzcalendar/core/recurrence' for repeating events (imported already? then two copies of @dzcalendar/core are installed)"));
+    return null;
+  }
   const rules: RRule[] = [];
   texts.forEach((text, i) => {
-    const r = typeof text === 'string' ? parseRRule(text) : null;
+    const r = typeof text === 'string' ? engine.parseRRule(text) : null;
     if (!r || !r.ok) {
       problems.push(problem('invalid-rrule', 'error', `${path}.rrule${texts.length > 1 ? `[${i}]` : ''}`, r && !r.ok ? r.problem.detail : 'not a string'));
       return;
@@ -496,7 +502,7 @@ export function normalizeMany(
         // Two 53-bit hashes of the same text under different seeds: ~106 bits,
         // so ids derived across chunks and refreshes do not meet by chance.
         // A series' rules are part of what it is: the same start with another rule is another series.
-        const rules = item.kind === 'series' ? `|${item.series.set.rules.map(serializeRRule).join(';;')}` : '';
+        const rules = item.kind === 'series' ? `|${item.series.set.rules.map((r) => recurrenceEngine()?.serializeRRule(r) ?? '').join(';;')}` : '';
         const text = `${event.start.toString()}|${event.end.toString()}|${event.title}${rules}`;
         const base = `${sourceId}:${hash53(text)}${hash53(text, 0x9e3779b9)}`;
         const rank = ranks.get(base) ?? 0;

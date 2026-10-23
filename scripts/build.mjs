@@ -55,9 +55,10 @@ function typescript(name) {
     ...shared(name),
     type: 'module',
     // The DOM's built-in views register themselves on import: a bundler must keep those modules.
-    // The Pro registers its family and views on import: kept too.
+    // The Pro registers its family and views on import: kept too. ical, the compat and the Pro editor plug in the
+    // recurrence engine on import (18i): their entry is kept, or a bundler skipping the barrel would lose it.
     sideEffects:
-      name === 'dom' ? ['./views/*.js', './calendar.js', './list.js', './multimonth.js', './custom.js', './locales/*.js'] : name === 'pro' ? ['./index.js', './model-entry.js', './timeline/family.js', './timeline/view.js'] : name === 'element' ? ['./define.js'] : false,
+      name === 'dom' ? ['./views/*.js', './calendar.js', './index.js', './timegrid.js', './daygrid.js', './list.js', './multimonth.js', './custom.js', './locales/*.js'] : name === 'pro' ? ['./index.js', './model-entry.js', './editor-entry.js', './timeline/family.js', './timeline/view.js'] : name === 'element' ? ['./define.js'] : name === 'core' ? ['./recurrence-entry.js'] : name === 'ical' || name === 'compat-fullcalendar' ? ['./index.js'] : false,
     main: './index.js',
     module: './index.js',
     types: './index.d.ts',
@@ -65,6 +66,10 @@ function typescript(name) {
       '.': { types: './index.d.ts', default: './index.js' },
       // Views paid for only when imported: `import '@dzcalendar/dom/list'` registers the family.
       ...(name === 'dom' && {
+        // Without views, and each grid on its own (owner, 18i): `@dzcalendar/dom` keeps both grids.
+        './base': { types: './base.d.ts', default: './base.js' },
+        './timegrid': { types: './timegrid.d.ts', default: './timegrid.js' },
+        './daygrid': { types: './daygrid.d.ts', default: './daygrid.js' },
         './list': { types: './list.d.ts', default: './list.js' },
         './multimonth': { types: './multimonth.d.ts', default: './multimonth.js' },
         './custom': { types: './custom.d.ts', default: './custom.js' },
@@ -75,7 +80,8 @@ function typescript(name) {
         ...Object.fromEntries(['ar', 'es', 'de'].map((l) => [`./locales/${l}`, { types: `./locales/${l}.d.ts`, default: `./locales/${l}.js` }])),
       }),
       // The commands as JSON Schema, for an assistant in the host application (npm run gen:schema).
-      ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' }, './commands.schema.json': './commands.schema.json' }),
+      // Repeating events paid for only when imported (owner, 18i): `import '@dzcalendar/core/recurrence'`.
+      ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' }, './recurrence': { types: './recurrence-entry.d.ts', default: './recurrence-entry.js' }, './commands.schema.json': './commands.schema.json' }),
       // The timeline without a screen (a server, a worker): `@dzcalendar/pro/model`.
       ...(name === 'pro' && {
         './model': { types: './model-entry.d.ts', default: './model-entry.js' },

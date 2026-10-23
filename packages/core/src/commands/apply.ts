@@ -2,11 +2,10 @@ import { normalizeEvent } from '../event/normalize.js';
 import { problem } from '../event/problems.js';
 import type { Problem } from '../event/problems.js';
 import type { CalEvent, EventInput } from '../event/types.js';
-import { deleteOccurrence, deleteSeries, editOccurrence, editedOccurrence, firstKey, startOfKey } from '../recurrence/edit.js';
+import { needRecurrence } from '../recurrence/engine.js';
 import type { EditScope, OccurrenceRef } from '../recurrence/edit.js';
 import { materialize, parseInstanceKey } from '../recurrence/series.js';
 import type { Series } from '../recurrence/series.js';
-import { expandSeries } from '../recurrence/expand.js';
 import { viewWindow } from '../store/store.js';
 import { validateProposal } from '../rules/validate.js';
 import type { Violation } from '../rules/validate.js';
@@ -14,7 +13,6 @@ import type { Mutation } from '../store/changes.js';
 import type { StoreSnapshot } from '../store/store.js';
 import type { Command, CommandContext, CommandResult, EventPatch, Reach } from './types.js';
 import { patchEvent, toInput } from './patch.js';
-import { parseRRule } from '@dzcalendar/rrule';
 import { Temporal } from '../temporal.js';
 import type { ZonedDateTime } from '../temporal.js';
 
@@ -86,7 +84,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
     }
     const sr = current.getSeries(id);
     // No key: the series as a whole, anchored on its first start (even when DTSTART itself is excluded or off-rule).
-    if (sr) return { kind: 'occurrence', ref: { seriesId: id, key: reach.key !== undefined ? keyOf(sr, reach.key) : firstKey(sr) }, scope: reach.scope ?? (reach.key === undefined ? 'all' : 'this') };
+    if (sr) return { kind: 'occurrence', ref: { seriesId: id, key: reach.key !== undefined ? keyOf(sr, reach.key) : needRecurrence().firstKey(sr) }, scope: reach.scope ?? (reach.key === undefined ? 'all' : 'this') };
     const k = parseInstanceKey(id);
     const of = 'seriesId' in k ? current.getSeries(k.seriesId) : undefined;
     if ('seriesId' in k && of) return { kind: 'occurrence', ref: { seriesId: k.seriesId, key: keyOf(of, k.key) }, scope: reach.scope ?? 'this' };
@@ -101,7 +99,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
     const own = sr.overrides.get(t.ref.key);
     if (own !== undefined) return current.getEvent(own);
     try {
-      return materialize(sr, startOfKey(sr, t.ref.key));
+      return materialize(sr, needRecurrence().startOfKey(sr, t.ref.key));
     } catch {
       return undefined;
     }
@@ -119,7 +117,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
     if (t.kind === 'event') {
       const after = patchEvent(t.event, patch, ctx.normalize, path, []);
       pair = after ? { before: t.event, after } : null;
-    } else pair = editedOccurrence(current, t.ref, patch, t.scope, ctx.normalize);
+    } else pair = needRecurrence().editedOccurrence(current, t.ref, patch, t.scope, ctx.normalize);
     if (!pair) return true; // the edit itself will report why
     const found = validateProposal(
       current,
@@ -140,7 +138,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
     if (!ctx.rules) return true;
     const zone = ctx.rules.displayZone;
     const d0 = sr.base.allDay ? sr.base.start : sr.base.start.withTimeZone(zone).toPlainDate();
-    const { occurrences } = expandSeries(sr, viewWindow(d0, d0.add({ days: 366 }), zone), { limit: 500 });
+    const { occurrences } = needRecurrence().expandSeries(sr, viewWindow(d0, d0.add({ days: 366 }), zone), { limit: 500 });
     for (const occ of occurrences) {
       const found = validateProposal(current, { event: occ, start: occ.start, end: occ.end, resourceIds: occ.resourceIds, ...(ctx.external && { external: true }) }, ctx.rules, { movingSeries: sr.id });
       if (found.length > 0) {
@@ -155,7 +153,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
   function warnIfEmpty(sr: Series, path: string): void {
     const zone = ctx.normalize.displayZone;
     const d0 = sr.base.allDay ? sr.base.start : sr.base.start.withTimeZone(zone).toPlainDate();
-    if (expandSeries(sr, viewWindow(d0, d0.add({ years: 10 }), zone), { limit: 1 }).occurrences.length === 0) problems.push(problem('invalid-rrule', 'warning', `${path}.rrule`, 'no occurrence'));
+    if (needRecurrence().expandSeries(sr, viewWindow(d0, d0.add({ years: 10 }), zone), { limit: 1 }).occurrences.length === 0) problems.push(problem('invalid-rrule', 'warning', `${path}.rrule`, 'no occurrence'));
   }
 
   function edit(id: string, patch: EventPatch, reach: Reach, path: string): boolean {
@@ -167,7 +165,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
       if (!next) return false;
       return next === t.event || push({ kind: 'event', before: t.event, after: next });
     }
-    const r = editOccurrence(current, t.ref, patch, t.scope, ctx.normalize, path, problems);
+    const r = needRecurrence().editOccurrence(current, t.ref, patch, t.scope, ctx.normalize, path, problems);
     return r.ok && pushAll(r.mutations);
   }
 
@@ -217,7 +215,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
         const t = target(c.id, c, path, true);
         if (!t) return false;
         if (t.kind === 'event') return push({ kind: 'event', before: t.event });
-        const r = deleteOccurrence(current, t.ref, t.scope, path, problems);
+        const r = needRecurrence().deleteOccurrence(current, t.ref, t.scope, path, problems);
         return r.ok && pushAll(r.mutations);
       }
       case 'series.delete': {
@@ -226,7 +224,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
           problems.push(problem('unknown-event', 'error', `${path}.id`, c.id));
           return false;
         }
-        return pushAll(deleteSeries(current, sr));
+        return pushAll(needRecurrence().deleteSeries(current, sr));
       }
       case 'series.split': {
         const sr = current.getSeries(c.id);
@@ -234,7 +232,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
           problems.push(problem('unknown-event', 'error', `${path}.id`, c.id));
           return false;
         }
-        const r = editOccurrence(current, { seriesId: c.id, key: keyOf(sr, c.at) }, c.patch ?? {}, 'following', ctx.normalize, path, problems, {}, true);
+        const r = needRecurrence().editOccurrence(current, { seriesId: c.id, key: keyOf(sr, c.at) }, c.patch ?? {}, 'following', ctx.normalize, path, problems, {}, true);
         return r.ok && pushAll(r.mutations);
       }
       case 'event.repeat': {
@@ -277,7 +275,7 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
         const texts = typeof written === 'string' ? [written] : Array.isArray(written) ? written : [];
         const rules = [];
         for (const [i, text] of texts.entries()) {
-          const r = typeof text === 'string' ? parseRRule(text) : null;
+          const r = typeof text === 'string' ? needRecurrence().parseRRule(text) : null;
           const sub = texts.length > 1 ? `${path}.rrule[${i}]` : `${path}.rrule`;
           if (!r || !r.ok) {
             problems.push(problem('invalid-rrule', 'error', sub, r && !r.ok ? r.problem.detail : String(text)));

@@ -14,6 +14,9 @@ import { DzCalendarPlugin } from '@dzcalendar/vue';
 createApp(App).use(DzCalendarPlugin, { defaults: { timeZone: 'Asia/Riyadh', locale: 'ar-SA' } }).mount('#app');
 ```
 
+
+> Repeating events (`rrule`): `import '@dzcalendar/core/recurrence'` once in the application (docs/getting-started.md, "Worth knowing").
+
 ## A calendar
 
 ```vue

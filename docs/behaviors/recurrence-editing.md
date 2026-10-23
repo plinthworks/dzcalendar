@@ -1,5 +1,8 @@
 # Editing a recurring event: this one, this and following, all
 
+> Repeating events need `import '@dzcalendar/core/recurrence'` once (18i); without it an event with `rrule` is refused with `recurrence-not-loaded`.
+
+
 Observable behaviour of calendars in general (FullCalendar's documentation,
 Google Calendar, Outlook): when a person changes one occurrence of a
 repeating event, they are asked how far the change reaches. Described here

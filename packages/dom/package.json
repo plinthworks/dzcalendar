@@ -12,6 +12,18 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./base": {
+      "types": "./src/base.ts",
+      "default": "./src/base.ts"
+    },
+    "./timegrid": {
+      "types": "./src/timegrid.ts",
+      "default": "./src/timegrid.ts"
+    },
+    "./daygrid": {
+      "types": "./src/daygrid.ts",
+      "default": "./src/daygrid.ts"
+    },
     "./list": {
       "types": "./src/list.ts",
       "default": "./src/list.ts"

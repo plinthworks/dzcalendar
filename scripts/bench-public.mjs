@@ -33,6 +33,8 @@ report(result);
 
 async function measure() {
 for (const d of ['fc6', 'fc7']) if (!existsSync(join(bench, d, 'node_modules'))) execFileSync('npm', ['ci', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: join(bench, d), stdio: 'inherit' });
+// DzCalendar as npm gives it: its packages built first (bench-public/vite.config.ts reads their dist/).
+execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit' });
 execFileSync('npx', ['vite', 'build', '--config', 'bench-public/vite.config.ts'], { cwd: root, stdio: 'inherit' });
 
 let commit = 'working tree';

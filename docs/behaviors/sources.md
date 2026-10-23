@@ -1,5 +1,8 @@
 # Event sources
 
+> A source's events with `rrule` need `import '@dzcalendar/core/recurrence'` once in the application (18i).
+
+
 Observable behaviour of calendars fed from servers (FullCalendar's public
 documentation of event sources, JSON feeds and iCalendar feeds; Google
 Calendar and Outlook subscribing to `.ics` URLs), described in our own

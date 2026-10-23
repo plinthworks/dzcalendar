@@ -1,3 +1,5 @@
+// The demo has repeating events (owner, 18i: their entry is imported by the application).
+import '@dzcalendar/core/recurrence';
 import type { EventInput } from '@dzcalendar/core';
 
 /**

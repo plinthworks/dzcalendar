@@ -24,6 +24,8 @@ export type ProblemCode =
   | 'allday-zone-ignored'
   | 'unknown-resource'
   | 'invalid-rrule'
+  /** An event with `rrule` while `@dzcalendar/core/recurrence` is not imported. */
+  | 'recurrence-not-loaded'
   | 'invalid-exdate'
   | 'invalid-rdate'
   | 'too-many-occurrences'

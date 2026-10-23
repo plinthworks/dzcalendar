@@ -6,7 +6,7 @@ import type { Problem } from '../event/problems.js';
 import type { Normalized } from '../event/normalize.js';
 import type { CalEvent, EventId, ResourceId, SeriesId } from '../event/types.js';
 import { occurrenceKey, escapeId, keyOf, seriesEquals, setEquals } from '../recurrence/series.js';
-import { expandSeries, occurrenceSpan, seriesSpan } from '../recurrence/expand.js';
+import { needRecurrence } from '../recurrence/engine.js';
 import type { Series } from '../recurrence/series.js';
 import type { Instant, PlainDate, ZoneId } from '../temporal.js';
 import { eventEquals, stamp } from './diff.js';
@@ -223,7 +223,7 @@ export class StoreSnapshot {
       const sr = this.state.series.get(id)!;
       if (opts.resourceId !== undefined && !sr.base.resourceIds.includes(opts.resourceId)) return;
       if (!keep(sr.base)) return;
-      const { occurrences, problems } = expandSeries(sr, w);
+      const { occurrences, problems } = needRecurrence().expandSeries(sr, w);
       if (opts.onProblem) for (const p of problems) opts.onProblem(p);
       for (const ev of occurrences) {
         if (sr.overrides.has(ev.ref!.key)) continue;
@@ -285,9 +285,9 @@ export class StoreSnapshot {
         if (current === after) continue;
         applied.push({ kind: 'series', ...(current && { before: current }), ...(after && { after }) });
         seriesTouched.add(id);
-        if (current) seriesIdx = indexRemove(seriesIdx, id, current.base.allDay, seriesSpan(current));
+        if (current) seriesIdx = indexRemove(seriesIdx, id, current.base.allDay, needRecurrence().seriesSpan(current));
         if (after) {
-          seriesIdx = indexAdd(seriesIdx, id, after.base.allDay, seriesSpan(after));
+          seriesIdx = indexAdd(seriesIdx, id, after.base.allDay, needRecurrence().seriesSpan(after));
           series = series.set(id, after);
         } else {
           series = series.delete(id);
@@ -384,7 +384,7 @@ function describe(
     // Only overrides or EXDATEs changed: the occurrences they name are what
     // changed, at known places. Anything else may move occurrences anywhere.
     if (before && after && before.base === after.base && sameRulesAndAdditions(before, after)) {
-      for (const at of changedPlaces(before, after)) (after.base.allDay ? days : spans).push(occurrenceSpan(after, at));
+      for (const at of changedPlaces(before, after)) (after.base.allDay ? days : spans).push(needRecurrence().occurrenceSpan(after, at));
       continue;
     }
     touchedSeries.push(id);

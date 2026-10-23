@@ -15,6 +15,9 @@ whether to add GSAP motion (`gsap`, `@dzcalendar/motion-gsap`,
 `@tzslot/dom`) and an example component (`src/app/agenda.ts`). Without
 prompts: `ng add @dzcalendar/angular --gsap --pro --example`.
 
+
+> Repeating events (`rrule`): `import '@dzcalendar/core/recurrence'` once in the application (docs/getting-started.md, "Worth knowing").
+
 ## A calendar
 
 ```ts

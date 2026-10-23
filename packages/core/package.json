@@ -16,6 +16,13 @@
     "./views": {
       "types": "./src/views.ts",
       "default": "./src/views.ts"
+    },
+    "./recurrence": {
+      "types": "./src/recurrence-entry.ts",
+      "default": "./src/recurrence-entry.ts"
     }
-  }
+  },
+  "sideEffects": [
+    "./src/recurrence-entry.ts"
+  ]
 }

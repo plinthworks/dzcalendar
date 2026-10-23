@@ -10,7 +10,7 @@ import type { Interactions } from './interact/host.js';
 import type { EventChange, LiveSettings } from './settings.js';
 import type { Weekday, ActionItem, CalendarKernel, CreateRequest, DurationLike, EventInput, EventSourceSpec, SourceNotice, EventInstance, KernelOptions, NavDirection, PlainDate, ZoneId } from '@dzcalendar/core';
 import type { CalendarHooks, MenuHook, ViewController, ViewCtx } from './host.js';
-import { viewFactory } from './host.js';
+import { viewFactory, hasRenderer } from './host.js';
 import { createMenu } from './menu.js';
 import { messagesForLocale } from './messages.js';
 import type { DzMessages } from './messages.js';
@@ -26,8 +26,6 @@ import { THEME_NAMES, ensureTheme, isKnownTheme } from './themes.js';
 import { createToolbar, defaultLayout, sameLook } from './toolbar.js';
 import type { CustomButton, HeaderToolbar } from './toolbar.js';
 // Built-in views register themselves.
-import './views/timegrid.js';
-import './views/daygrid.js';
 import { activeIn } from './focus.js';
 
 export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
@@ -244,7 +242,7 @@ function sameHooks(a: CalendarHooks, b: CalendarHooks): boolean {
 
 /** Where a built-in family's renderer is imported from, for an error that says what to do. */
 const entryHint = (family: string): string =>
-  family === 'list' ? ` (import '@dzcalendar/dom/list')` : family === 'multiMonth' ? ` (import '@dzcalendar/dom/multimonth')` : '';
+  family === 'list' ? ` (import '@dzcalendar/dom/list')` : family === 'multiMonth' ? ` (import '@dzcalendar/dom/multimonth')` : family === 'timeGrid' ? ` (import '@dzcalendar/dom/timegrid')` : family === 'dayGrid' ? ` (import '@dzcalendar/dom/daygrid')` : '';
 
 /** `hiddenDays`, plus the weekend when `weekends` is false. */
 const hiddenOf = (hidden: readonly Weekday[] | undefined, weekends: boolean | undefined): Weekday[] =>
@@ -326,6 +324,18 @@ function directionOf(locale: string): 'ltr' | 'rtl' {
  * week, day), with "+N" panels, business hours, a context menu on cells and
  * events, navigation and a view switcher. Read-only until Phase 7.
  */
+/** The view drawn when none is asked: the week where the time grid is imported, else the first family that is. */
+function defaultView(): string {
+  const pairs: [string, string][] = [['timeGrid', 'timeGridWeek'], ['dayGrid', 'dayGridMonth'], ['list', 'listWeek'], ['multiMonth', 'multiMonthYear']];
+  return pairs.find(([family]) => hasRenderer(family))?.[1] ?? 'timeGridWeek';
+}
+let saidRecurrence = false;
+function warnRecurrence(): void {
+  if (saidRecurrence) return;
+  saidRecurrence = true;
+  console.warn("dzcalendar: recurrence-not-loaded — events with rrule were left out: import '@dzcalendar/core/recurrence' once");
+}
+
 export function createCalendar(host: HTMLElement, options: CalendarOptions = {}): CalendarInstance {
   const doc = host.ownerDocument;
   const win = doc.defaultView;
@@ -347,7 +357,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       hiddenDays: hiddenOf(options.hiddenDays, options.weekends),
       locale: withCalendar(baseLocale, displayCalendar),
       ...(options.formats?.title && { titleFormat: options.formats.title }),
+      // No view asked: the week if its renderer is here, else the first view that is (`@dzcalendar/dom/base` + some entries).
+      initialView: options.initialView || defaultView(),
     } as KernelOptions);
+  // Repeating events given without their engine: a setup mistake, said on the console once (the data's problems stay the kernel's).
+  if (kernel.getProblems()?.problems.some((p) => p.code === 'recurrence-not-loaded')) warnRecurrence();
   // Someone else's kernel: the title written as asked here too.
   if (options.kernel && options.formats?.title) options.kernel.setTitleFormat(options.formats.title);
   if (options.kernel) {
@@ -992,6 +1006,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   // Loading is a state of the whole calendar (aria-busy); a refused save and a
   // failed fetch are said. The application hears them all through `onSource`.
   const sourceNotice = (n: SourceNotice) => {
+    if (n.type === 'problems' && n.report.problems.some((p) => p.code === 'recurrence-not-loaded')) warnRecurrence();
     if (n.type === 'loading') {
       root.classList.toggle('dz-loading', n.loading);
       root.toggleAttribute('data-loading', n.loading);
@@ -1338,7 +1353,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             kernel.setOptions({ timeGrid: { maxStack: stack === 'auto' ? guessStack() : stack } });
             measureStack();
           }
-          if (changes.events) kernel.setEvents(changes.events);
+          if (changes.events && kernel.setEvents(changes.events).problems.some((p) => p.code === 'recurrence-not-loaded')) warnRecurrence();
           if (changes.sources) {
             const keep = new Set(changes.sources.map((x) => x.id));
             for (const id of kernel.sources.ids()) if (!keep.has(id)) kernel.sources.remove(id);

@@ -9,7 +9,8 @@ const PLUGINS: Record<string, string | null> = {
   '@fullcalendar/daygrid': null,
   '@fullcalendar/timegrid': null,
   '@fullcalendar/interaction': null,
-  '@fullcalendar/rrule': null,
+  // Repeating events are an import here too (18i).
+  '@fullcalendar/rrule': '@dzcalendar/core/recurrence',
   '@fullcalendar/icalendar': null,
   '@fullcalendar/resource': null,
   '@fullcalendar/resource-timegrid': null,

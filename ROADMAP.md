@@ -51,9 +51,22 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   53, month / week / list, docs/benchmark.md). **In progress:** 18j (the
   documentation site: the skeleton built in `website/`, not committed yet).
 - **Done:** 18k (Sehhaty's production report) committed ("Phase 18k").
-  **Next:** 18i (size); 18j (the documentation site, skeleton in
-  `website/`) still to review and commit; then npm publication, licences,
-  Phase 19.
+  **18i owner's decisions (2026-10-23):** the recurrence (rrule) becomes an
+  entry imported only by those who use it (`@dzcalendar/core/recurrence`;
+  without it an event with `rrule` is a clear Problem); `timeGrid` and
+  `dayGrid` become entries like `list` and `multimonth`; the interactions
+  and the French catalogue stay built in. The benchmark now builds
+  DzCalendar from its dists (−3.1 kB gzip, measured).
+  **In progress: 18i (size).** 18i-1 committed ("Phase 18i-1"; budgets, owner: dom/base 39 339, core/recurrence 15 730; `npm run check:entries` keeps ical's recurrence under Rollup; a calendar with no view asked takes the first one imported; a missing recurrence import is said once on the console; seen, older than 18i: a redo of `event.repeat` fails): the recurrence an
+  entry (`@dzcalendar/core/recurrence`, the engine plugged into a registry;
+  ical, the compat, the Pro editor and `<dz-calendar>` bring it), `@dzcalendar/dom/base`
+  with `/timegrid` and `/daygrid` (`@dzcalendar/dom` unchanged), the
+  benchmark built from the dists: the benchmark's DZ bundle 139.4 → 126.8 kB
+  gzip (JS). 18i-2 waits for tzslot (admin-90): the polyfill loaded only
+  where Temporal is missing (`retours/2026-10-23-demande-tzslot.md`). 18j
+  (the documentation site, `website/`, preview `cd website && npm run
+  build && npm run preview` → http://127.0.0.1:4701/dzcalendar/) still to
+  review and commit; then npm publication, licences, Phase 19.
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154

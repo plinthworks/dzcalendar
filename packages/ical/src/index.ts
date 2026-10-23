@@ -4,6 +4,8 @@
  * custom VTIMEZONE matched to the IANA zone with the same offsets. Writes
  * VTIMEZONEs from the zones' real transitions.
  */
+// A calendar file's RRULEs are repeating events: the recurrence entry comes with it (owner, 18i).
+import '@dzcalendar/core/recurrence';
 export { parseICal } from './parse.js';
 export type { ParseICalOptions, ParsedICal, ICalCalendar } from './parse.js';
 export { serializeICal } from './serialize.js';

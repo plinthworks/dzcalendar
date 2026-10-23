@@ -1,5 +1,8 @@
 # The Web Component — `@dzcalendar/element`
 
+> `<dz-calendar>` (`@dzcalendar/element/define`) brings the recurrence engine itself: repeating events work as they come.
+
+
 `<dz-calendar>` for any page or framework (plain HTML, React, Vue, Svelte,
 a CMS).
 

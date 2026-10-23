@@ -10,6 +10,9 @@ npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme @dzcalendar/react
 
 and `import '@dzcalendar/theme/dzcalendar.css'` once.
 
+
+> Repeating events (`rrule`): `import '@dzcalendar/core/recurrence'` once in the application (docs/getting-started.md, "Worth knowing").
+
 ## A calendar
 
 ```tsx

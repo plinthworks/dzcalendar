@@ -1,6 +1,6 @@
 import { toInput } from '../commands/patch.js';
 import type { CalEvent, EventInput } from '../event/types.js';
-import { serializeRRule } from '@dzcalendar/rrule';
+import { needRecurrence } from '../recurrence/engine.js';
 import type { Series } from '../recurrence/series.js';
 import type { StoreSnapshot } from '../store/store.js';
 
@@ -10,7 +10,7 @@ export function seriesInput(s: Series): EventInput {
   return {
     ...toInput(s.base),
     id: s.id,
-    rrule: rules.length === 1 ? serializeRRule(rules[0]!) : rules.map(serializeRRule),
+    rrule: rules.length === 1 ? needRecurrence().serializeRRule(rules[0]!) : rules.map(needRecurrence().serializeRRule),
     ...(exdates.length > 0 && { exdate: exdates.map(String) }),
     ...(rdates.length > 0 && { rdate: rdates }),
   };

@@ -19,7 +19,8 @@
     "test:browser": "node scripts/browser.mjs",
     "pack:local": "npm run build && rm -rf packed && mkdir packed && for p in rrule core ical slots dom pro motion-gsap element compat-fullcalendar migrate react vue pro-react pro-vue theme angular pro-angular; do (cd packages/$p/dist && npm pack --pack-destination ../../../packed >/dev/null); done && ls packed",
     "test:package": "npm run pack:local && node scripts/package-smoke.mjs",
-    "perf:browser": "node scripts/perf-browser.mjs"
+    "perf:browser": "node scripts/perf-browser.mjs",
+    "check:entries": "node scripts/check-entries.mjs"
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.8.1",

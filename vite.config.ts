@@ -27,6 +27,9 @@ export default defineConfig({
   resolve: {
     alias: {
       // Subpaths first: '@dzcalendar/dom' would otherwise swallow '@dzcalendar/dom/list'.
+      '@dzcalendar/dom/base': fileURLToPath(new URL('./packages/dom/src/base.ts', import.meta.url)),
+      '@dzcalendar/dom/timegrid': fileURLToPath(new URL('./packages/dom/src/timegrid.ts', import.meta.url)),
+      '@dzcalendar/dom/daygrid': fileURLToPath(new URL('./packages/dom/src/daygrid.ts', import.meta.url)),
       '@dzcalendar/dom/list': fileURLToPath(new URL('./packages/dom/src/list.ts', import.meta.url)),
       '@dzcalendar/dom/multimonth': fileURLToPath(new URL('./packages/dom/src/multimonth.ts', import.meta.url)),
       '@dzcalendar/dom/locales/ar': fileURLToPath(new URL('./packages/dom/src/locales/ar.ts', import.meta.url)),
@@ -36,6 +39,7 @@ export default defineConfig({
       '@dzcalendar/dom/custom': fileURLToPath(new URL('./packages/dom/src/custom.ts', import.meta.url)),
       '@dzcalendar/dom/drag': fileURLToPath(new URL('./packages/dom/src/drag.ts', import.meta.url)),
       '@dzcalendar/core/views': fileURLToPath(new URL('./packages/core/src/views.ts', import.meta.url)),
+      '@dzcalendar/core/recurrence': fileURLToPath(new URL('./packages/core/src/recurrence-entry.ts', import.meta.url)),
       '@dzcalendar/angular': fileURLToPath(new URL('./packages/angular/src/index.ts', import.meta.url)),
       '@dzcalendar/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
       '@dzcalendar/dom': fileURLToPath(new URL('./packages/dom/src/index.ts', import.meta.url)),

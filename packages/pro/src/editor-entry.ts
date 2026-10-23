@@ -3,6 +3,8 @@
  * (owner's decision), the usual recurrences, a rule beyond them kept as it
  * is. `cal.update(editorHandlers(cal))` sends "Open" and "New event here" to it.
  */
+// The editor writes recurrences: their entry comes with it.
+import '@dzcalendar/core/recurrence';
 export { openEventEditor, editorHandlers } from './editor/dialog.js';
 export type { EditorOptions, EditorOutcome, EditorTarget } from './editor/dialog.js';
 export { readRepeat, writeRepeat, nthOf } from './editor/recurrence.js';
