@@ -1,0 +1,55 @@
+---
+title: DzCalendar
+description: Un calendrier et un planificateur sur Temporal — chaque événement garde son fuseau, et les jours de 23 ou 25 heures sont dessinés tels qu'ils sont.
+template: splash
+hero:
+  tagline: Un calendrier et un planificateur écrits sur Temporal. Chaque événement garde son propre fuseau ; un jour de 23 h, 25 h ou 23 h 30 est dessiné tel qu'il est.
+  actions:
+    - text: Prise en main
+      link: getting-started/installation/
+      icon: right-arrow
+    - text: Options
+      link: options/
+      variant: minimal
+banner:
+  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+<LiveDemo
+  label="Une semaine à Paris avec le changement d'heure du 25 octobre 2026"
+  height={760}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    firstDay: 1,
+    density: 'compact',
+    scrollTime: { hours: 0 },
+    editable: true,
+    selectable: true,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+      { id: 'd', title: 'Garde de nuit', start: '2026-10-25T01:00[Europe/Paris]', duration: { hours: 3 } },
+      { id: 'w', title: 'Visite', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+    ],
+  }}
+/>
+
+<CardGrid>
+  <Card title="Des fuseaux, pour de vrai" icon="clock">
+    Les instants sont des valeurs Temporal ou des chaînes ISO 8601 avec un fuseau IANA. Aucun `Date`. L'appel de Chicago est dessiné à 17 h à Paris ; le dimanche 25 octobre compte 25 heures.
+  </Card>
+  <Card title="Quatre saveurs" icon="puzzle">
+    JavaScript sans framework, Angular (19 à 22, signaux), React (18 et 19), Vue (3.4 et 3.5), et un Web Component pour tout le reste.
+  </Card>
+  <Card title="Commandes et annulation" icon="list-format">
+    Chaque modification est une commande, de simples données. Un glisser, un redimensionnement, un choix de menu sont ces mêmes commandes — vérifiées, annulables, signalées.
+  </Card>
+  <Card title="Une donnée invalide ne lève jamais d'exception" icon="warning">
+    Un événement illisible est écarté et signalé comme un problème, avec un code. Le calendrier continue de s'afficher.
+  </Card>
+</CardGrid>

@@ -48,8 +48,7 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   Chrome checks).
 - **Done:** 18h (first render) committed ("Phase 18h"): ahead of
   FullCalendar 7 in every first render (46 / 45 / 40 ms against 63 / 74 /
-  53, month / week / list, docs/benchmark.md). **In progress:** 18j (the
-  documentation site: the skeleton built in `website/`, not committed yet).
+  53, month / week / list, docs/benchmark.md).
 - **Done:** 18k (Sehhaty's production report) committed ("Phase 18k").
   **18i owner's decisions (2026-10-23):** the recurrence (rrule) becomes an
   entry imported only by those who use it (`@dzcalendar/core/recurrence`;
@@ -71,10 +70,24 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   `@tzslot/dom` (38 % of its chunk; `@tzslot/dom/lazy` asked of tzslot, its
   owner's decision); tzslot 2.3.1 (a failed `loadTemporal()` retried,
   ca3ccd1) to adopt when published; `<dz-calendar>`'s `ready` never resolves
-  if its mount gives up or it leaves before Temporal arrives 18j
-  (the documentation site, `website/`, preview `cd website && npm run
-  build && npm run preview` → http://127.0.0.1:4701/dzcalendar/) still to
-  review and commit; then npm publication, licences, Phase 19.
+  if its mount gives up or it leaves before Temporal arrives.
+- **In progress: 18j (the documentation site).** 18j-1 committed ("Phase
+  18j-1"): the site as it was, reviewed (54 pages EN/FR, examples compiled
+  by the review, CLEANROOM compared with 13 FullCalendar pages, built from a
+  clean copy as the Action does), a banner while the packages are not on
+  npm, pull requests built and not deployed. **Goes online once the owner
+  sets Settings → Pages → Source: GitHub Actions** (plinthworks/dzcalendar is
+  public; `has_pages` false). Preview: `cd website && npm run build && npm
+  run preview` (4700, or 4701 when DzGrid holds 4700). Next 18j-2 (owner:
+  facts generated + written text; online first, then batches):
+  `scripts/gen-options.mjs` → `website/src/generated/options.json`
+  (`@default`/`@live`/`@internal` tags in the JSDoc), `<OptionFacts>` and a
+  generated index, a test that every option has its EN and FR page (a
+  pending list that only shrinks), the examples compiled (tsc, vue-tsc,
+  ngc), `LiveDemo demo=` modules for callbacks; then six batches of the 80
+  options (time and week; data and resources; layout and grids; gestures;
+  callbacks; look, language and lifecycle). Then npm publication, licences,
+  Phase 19.
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154

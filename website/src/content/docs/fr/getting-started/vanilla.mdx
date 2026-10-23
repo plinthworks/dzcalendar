@@ -1,0 +1,186 @@
+---
+title: JavaScript sans framework
+description: createCalendar dans une page simple — options, mises à jour à chaud, commandes et annulation, et le Web Component.
+banner:
+  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Aucun framework n'est nécessaire : `createCalendar(element, options)` dessine
+un calendrier dans un élément et renvoie un objet pour le piloter.
+
+## Installer
+
+```sh
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme
+```
+
+## Un calendrier
+
+Un élément où dessiner :
+
+```html
+<div id="agenda"></div>
+```
+
+et un module qui le remplit :
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+import { Temporal, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+
+// Tout de suite si le navigateur a Temporal (Chrome, Edge, Firefox) ; Safari charge d'abord son polyfill.
+await loadTemporal();
+
+const calendar = createCalendar(document.getElementById('agenda')!, {
+  timeZone: 'Europe/Paris',          // le fuseau dans lequel le calendrier est dessiné
+  locale: 'fr-FR',
+  initialView: 'timeGridWeek',       // dayGridMonth, timeGridWeek, timeGridDay…
+  initialDate: Temporal.PlainDate.from('2026-10-21'),
+  editable: true,
+  selectable: true,
+  events: [
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    // Son propre fuseau : dessiné à 17 h à Paris.
+    { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+    { id: 'w', title: 'Visite', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ],
+  onEventClick: (instance) => console.log(instance.event.title, String(instance.event.start)),
+  onSelect: (selection) => console.log(String(selection.start), String(selection.end)),
+});
+```
+
+Voici ce calendrier, tournant sur les sources actuelles de DzCalendar.
+Déplacez un événement, redimensionnez-le, sélectionnez une plage d'heures,
+appuyez sur <kbd>Ctrl</kbd>+<kbd>Z</kbd> :
+
+<LiveDemo
+  label="Le calendrier de l'exemple"
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    editable: true,
+    selectable: true,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+      { id: 'w', title: 'Visite', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+    ],
+  }}
+/>
+
+Les instants sont des valeurs Temporal ou des chaînes ISO 8601 qui portent un
+fuseau IANA (`2026-10-21T09:00[Europe/Paris]`). L'appel de Chicago garde son
+fuseau : il est dessiné à 17 h à Paris, et suivrait les changements d'heure
+de Chicago. Le dimanche 25 octobre 2026, Paris recule ses horloges : ce jour
+compte 25 heures, et la vue semaine montre l'heure répétée.
+
+## Le modifier ensuite
+
+`calendar.update({ … })` change ce qui est demandé et rien d'autre, et dessine
+une seule fois. Une valeur égale à l'actuelle ne change rien — pas de
+scintillement, la position de défilement et l'événement qui a le focus sont
+gardés.
+
+```ts
+calendar.update({ view: 'dayGridMonth' });
+calendar.update({ timeZone: 'America/Chicago', locale: 'en-US' });
+calendar.update({ theme: 'night', scheme: 'dark' });
+```
+
+Ce qui peut changer ainsi : la vue et la date, le fuseau et la langue, les
+événements et les sources, les ressources, les heures ouvrées, les jours
+masqués, l'en-tête, le thème… Une valeur que le calendrier ne peut pas
+prendre (une vue inconnue) lève une `RangeError` et ne change rien.
+
+La navigation a sa propre méthode : `calendar.navigate('prev' | 'next' | 'today')`.
+
+## Commandes et annulation
+
+Chaque modification des événements est une **commande**, de simples données,
+exécutée par `calendar.run(command)`. Le glisser, le redimensionnement ou le
+choix de menu d'une personne exécutent ces mêmes commandes.
+
+```ts
+const result = calendar.run({ type: 'event.move', id: 'a', start: '2026-10-22T10:00[Europe/Paris]' });
+if (!result.ok) console.log(result.problems);
+
+calendar.undo();
+calendar.redo();
+```
+
+Une commande refusée ne lève jamais d'exception : elle renvoie
+`{ ok: false, problems }`. Les commandes sont `event.create`, `event.update`,
+`event.move`, `event.resize`, `event.delete`, `series.delete`,
+`series.split`, `series.rule`, `event.repeat` et `batch`.
+
+## Une donnée invalide ne lève jamais d'exception
+
+Un événement illisible est écarté et signalé :
+
+```ts
+calendar.kernel.getProblems()?.problems;
+// [{ code: 'missing-start', severity: …, path: …, detail: … }, …]
+```
+
+Des codes comme `missing-start`, `unknown-zone` ou `zone-defaulted` disent ce
+qui ne va pas, pour le dernier chargement d'événements. Les options sont la
+seule exception : `createCalendar` et `update` lèvent une `RangeError` sur une
+option qu'ils ne peuvent pas prendre, et ne changent rien.
+
+## Autres vues
+
+Les vues mois, semaine et jour sont intégrées. Les vues liste et la vue année
+sont des entrées à part, importées une fois :
+
+```ts
+import '@dzcalendar/dom/list';        // listDay, listWeek, listMonth, listYear
+import '@dzcalendar/dom/multimonth';  // multiMonthYear
+```
+
+## Le Web Component
+
+Pour une page sans framework — un CMS, du HTML simple, Svelte —
+`@dzcalendar/element` définit `<dz-calendar>` :
+
+```html
+<dz-calendar view="timeGridWeek" time-zone="Europe/Paris" locale="fr-FR" editable selectable></dz-calendar>
+
+<script type="module">
+  import '@dzcalendar/element/define';
+  import '@dzcalendar/theme/dzcalendar.css';
+  const cal = document.querySelector('dz-calendar');
+  cal.events = [{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]' }];
+  cal.addEventListener('dz-event-click', (e) => console.log(e.detail.event.title));
+</script>
+```
+
+- **Attributs**, à chaud : `view`, `date` (ISO), `time-zone`, `locale`,
+  `theme`, `scheme`, `density`, et les booléens `editable`, `selectable`,
+  `week-numbers`, `weekends`, `now-indicator` (présents, ou `"false"`).
+- **Propriétés** : `events`, `resources`, `sources`, et `options` pour tout le
+  reste. `calendar` est le calendrier sous-jacent (`run`, `undo`, `kernel`…).
+- **Événements** : `dz-dates-set`, `dz-select`, `dz-date-click`,
+  `dz-event-click`, `dz-problem`… Ils remontent et traversent les shadow roots.
+  Une valeur illisible devient un événement `dz-problem`, jamais une
+  exception.
+- `shadow` l'isole dans un shadow root, stylé par les propriétés `--tz-*` et
+  `--dz-*`, `stylesheet="…"` et `::part(calendar)`, `::part(toolbar)`.
+
+<Aside>
+Dans une application Angular, utilisez `@dzcalendar/angular`, pas l'élément :
+les deux utilisent la balise `dz-calendar`. S'il vous faut les deux, définissez
+l'élément sous un autre nom avec `defineDzCalendar('dz-calendar-wc')`.
+</Aside>
+
+## Ensuite
+
+- Les options une par une : [Options](../../options/).
+- Votre framework : [Angular](../angular/), [React](../react/), [Vue](../vue/).
+- En venant de FullCalendar : [Migrer depuis FullCalendar](../migrating-from-fullcalendar/).

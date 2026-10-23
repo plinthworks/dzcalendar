@@ -1,0 +1,138 @@
+---
+title: Migrer depuis FullCalendar
+description: dz-migrate réécrit le code, @dzcalendar/compat-fullcalendar lit les options à l'exécution — et ce qui change en chemin.
+banner:
+  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Deux outils, utilisés ensemble :
+
+- **`dz-migrate`** (`@dzcalendar/migrate`, un outil de développement)
+  réécrit votre code : imports, plugins, `new Calendar(…)`, les appels
+  courants, le `<full-calendar>` d'Angular. Ce qui demande une intervention manuelle est
+  marqué d'un commentaire `// dz-migrate:`.
+- **`@dzcalendar/compat-fullcalendar`** traduit un objet d'options
+  FullCalendar à l'exécution : l'application garde ses options et ses
+  callbacks.
+
+## Les étapes
+
+<Steps>
+
+1. Installez l'outil et voyez ce qu'il changerait :
+
+   ```sh
+   npm install -D @dzcalendar/migrate
+   npx dz-migrate src
+   ```
+
+2. Réécrivez :
+
+   ```sh
+   npx dz-migrate src --write
+   ```
+
+3. Remplacez les paquets — tous les `@fullcalendar/*` partent :
+
+   ```sh
+   npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/compat-fullcalendar @dzcalendar/theme
+   npm uninstall @fullcalendar/core @fullcalendar/daygrid @fullcalendar/timegrid @fullcalendar/interaction
+   ```
+
+4. Lisez les `problems` que signale la traduction, et les commentaires
+   `// dz-migrate:` laissés dans le code.
+
+</Steps>
+
+## Ce que réécrit `dz-migrate`
+
+| Avant | Après |
+|---|---|
+| `import { Calendar } from '@fullcalendar/core'` | `import { createFromFullCalendar } from '@dzcalendar/compat-fullcalendar'` |
+| `new Calendar(el, options)` | `createFromFullCalendar(el, options).calendar` |
+| `calendar.render()` | supprimé : le calendrier est dessiné à sa création |
+| `next()`, `prev()`, `today()` | `navigate('next' \| 'prev' \| 'today')` |
+| `changeView(v)` | `update({ view: v })` |
+| `refetchEvents()`, `unselect()`, `destroy()` | `refetch()`, `select(null)`, `destroy()` |
+| Types (`CalendarOptions`, `EventClickArg`, `EventApi`…) | les mêmes noms depuis `@dzcalendar/compat-fullcalendar` |
+| Plugins `daygrid`, `timegrid`, `interaction`, `icalendar`, `resource*` | supprimés : intégrés |
+| `@fullcalendar/rrule` | `import '@dzcalendar/core/recurrence'` (le paquet de compatibilité l'apporte lui-même) |
+| `@fullcalendar/list`, `multimonth` | `import '@dzcalendar/dom/list'`, `'@dzcalendar/dom/multimonth'` |
+| `@fullcalendar/timeline`, `resource-timeline` | `import '@dzcalendar/pro'` |
+| `@fullcalendar/core/locales/ar` (`es`, `de`) | `import '@dzcalendar/dom/locales/ar'`, et `locale: 'ar'` |
+| Angular `FullCalendarModule` | `DZ_CALENDAR, DzFullCalendar` |
+| Angular `<full-calendar [options]="o">` | `<dz-calendar [dzFullCalendar]="o">` |
+| `Calendar` comme type | `CalendarInstance` depuis `@dzcalendar/dom` |
+
+Signalés pour une reprise manuelle, parce que l'appel change de forme :
+`select(start, end)` (ici `select({ start, end, allDay })`), `gotoDate(d)`
+(`update({ date: Temporal.PlainDate.from(d) })`), `addEvent(e)`
+(`run({ type: 'event.create', event })`), `getEventById`, `getEvents`
+(`kernel.store.snapshot`), `setOption(k, v)` (`update({ … })`), `on` / `off`
+(utilisez les callbacks), le `getApi()` d'Angular (le `CalendarController`).
+
+## À l'exécution
+
+```ts
+import { createFromFullCalendar } from '@dzcalendar/compat-fullcalendar';
+import type { EventClickArg } from '@dzcalendar/compat-fullcalendar';
+import '@dzcalendar/theme/dzcalendar.css';
+
+const { calendar, problems, detach } = createFromFullCalendar(element, {
+  initialView: 'timeGridWeek',
+  headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' },
+  events: [{ title: 'Consultation', start: '2026-10-21T09:00:00' }],
+  eventClick: (info: EventClickArg) => console.log(info.event.title),
+}, { timeZone: 'Europe/Paris' }); // le fuseau quand les options n'en nomment aucun
+console.log(problems); // chaque supposition, chaque option sans équivalent
+```
+
+Lisez `problems` une fois : chaque supposition (`zone-guessed`) et chaque
+option sans équivalent (`compat-unsupported`) y figure.
+
+## Ce qui change en chemin
+
+- **Le fuseau horaire.** Les options FullCalendar en nomment rarement un (le
+  leur est celui du navigateur). Donnez le vôtre en troisième argument
+  (`{ timeZone }`) ; sinon celui du navigateur est pris, et signalé. Une heure
+  sans fuseau est lue dans le fuseau du calendrier — et signalée comme une
+  supposition. En Angular, le fuseau de `provideDzCalendar` est gardé quand
+  les options n'en nomment aucun.
+- **Les jours comptent à partir de lundi = 1** (ISO), pas de dimanche = 0.
+- **Les couleurs deviennent des tons** ; la couleur est gardée dans
+  `extendedProps.color`.
+- **Les callbacks reçoivent des objets simples** (`event.start` y est une
+  `Date`, par compatibilité) ; un déplacement refusé est défait avec
+  `revert()`.
+- **La hauteur est du CSS** : `--dz-height`.
+- **Tous les événements de chaque jour.** FullCalendar les montre tous sauf
+  si `dayMaxEvents` dit autrement ; la traduction aussi (`dayMaxLanes: null`,
+  les semaines grandissent).
+- **`eventDrop`, `eventResize`, `eventChange`, `eventAdd`, `eventRemove`**
+  suivent la modification d'une personne (un geste, le clavier, le menu,
+  l'éditeur). Votre propre `calendar.run()` n'est pas signalé : enregistrez
+  depuis l'endroit où votre code fait la modification.
+- **L'en-tête.** `headerToolbar` est gardé (`left` / `right` deviennent
+  `start` / `end` ; `false`, pas d'en-tête), avec `customButtons`.
+  `prevYear` / `nextYear` sont signalés et laissés de côté.
+- **Les formats.** `titleFormat`, `dayHeaderFormat`, `slotLabelFormat`,
+  `eventTimeFormat` et les formats de liste gardent leurs options `Intl` ;
+  leurs clés propres (`meridiem`, `omitZeroMinute`…) et les fonctions de
+  format sont signalées. Les heures sont celles de la langue (« 09:00 » en
+  français, « 9:00 AM » en anglais).
+- **Glisser depuis la page.** `new Draggable(el, { itemSelector, eventData })`
+  vient de `@dzcalendar/compat-fullcalendar` ; `droppable`, `drop`,
+  `eventReceive`, `eventLeave` gardent leurs arguments. En natif, utilisez
+  `makeDraggable` de `@dzcalendar/dom/drag`.
+- **Les render hooks.** `<nom>ClassNames`, `<nom>Content`, `<nom>DidMount`,
+  `<nom>WillUnmount` gardent leurs noms et leurs arguments.
+
+<Aside>
+Tant que les paquets ne sont pas sur npm, installez-les depuis des archives
+(`npm run pack:local` dans le dépôt DzCalendar) — tout l'ensemble, pas
+seulement ce que vous importez. Après les avoir remplacés dans une
+application Angular, videz ses caches (`rm -rf .angular/cache
+node_modules/.vite`).
+</Aside>

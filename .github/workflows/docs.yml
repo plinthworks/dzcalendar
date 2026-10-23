@@ -1,0 +1,69 @@
+# The documentation site (website/, Astro Starlight) on GitHub Pages:
+# https://plinthworks.github.io/dzcalendar/
+# The site reads the library from packages/*/src, so a change there rebuilds it.
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths: &paths
+      - 'website/**'
+      - 'packages/**'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  # A pull request builds the site (a broken page found before main), and deploys nothing.
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push does not cancel one already deploying.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # No engines field nor .nvmrc at the root: 22 (Astro 7 needs >= 22.12).
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+
+      # The root install brings @tzslot/core and temporal-polyfill, which the packages' sources import.
+      - name: Install the workspace
+        run: npm ci
+
+      - name: Install the site
+        working-directory: website
+        run: npm ci
+
+      - name: Build the site
+        working-directory: website
+        run: npm run build
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: website/dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

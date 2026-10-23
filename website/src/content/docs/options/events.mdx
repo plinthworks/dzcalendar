@@ -1,0 +1,200 @@
+---
+title: events
+description: The calendar's events, given as an array.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../components/CodeTabs.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The events the calendar shows, given as an array of plain objects.
+
+| | |
+|---|---|
+| **Type** | `readonly EventInput[]` |
+| **Default** | none (no events) |
+| **Live update (via `update()`)** | Yes: `update({ events })` replaces the whole list |
+
+## What it does
+
+The array is loaded as one source, named `"events"`. Each object describes an
+event; the fields used most:
+
+| Field | Type | |
+|---|---|---|
+| `id` | `string` | Keeps the event the same across updates (moves, undo) |
+| `title` | `string` | |
+| `start` | `string` or Temporal value | `'2026-10-21T09:00[Europe/Paris]'`, or `'2026-10-23'` for a day |
+| `end` | `string` or Temporal value | Or `duration` |
+| `duration` | `{ hours?, minutes?, days?… }` | Days are wall days, hours are elapsed hours |
+| `allDay` | `boolean` | |
+| `timeZone` | `string` | The event's zone, for a `start` written without one |
+| `rrule` | `string` | An RFC 5545 rule (`FREQ=WEEKLY;BYDAY=MO`): the event becomes a series |
+| `exdate`, `rdate` | arrays | Dates taken out of, or added to, the series |
+| `tone` | `string` | A colour by name: `blue`, `green`, `red`, `amber`, `violet`, `slate`, or yours |
+| `editable`, `startEditable`, `durationEditable` | `boolean` | Per event, over the calendar's `editable` |
+| `display` | `string` | `'background'` for a tint behind the other events (a closed day) |
+| `resourceId`, `resourceIds` | `string`, `string[]` | The resources it belongs to |
+| `classNames`, `url`, `extendedProps` | | Your classes, a link, your own data |
+
+**Every event keeps its own zone.** A start written
+`2026-10-22T10:00[America/Chicago]` is 10:00 in Chicago, drawn at 17:00 in a
+calendar shown in Paris, and stays 10:00 in Chicago if the calendar's zone
+changes. A start without a zone (`'2026-10-21T09:00'`) is read in the
+calendar's zone, and reported as a guess.
+
+**Updating.** `update({ events })` takes the whole new list. The store
+compares it with the previous one by `id` and by value: an array with the
+same events redraws nothing, a changed event redraws that event only. Give
+each event an `id`.
+
+**Bad data never throws.** An event that cannot be read (no start, an
+unknown zone) is left out and reported: `calendar.kernel.getProblems()?.problems`
+lists `{ code, severity, path, detail }` for the last load, with codes such as
+`missing-start`, `unknown-zone`, `zone-defaulted`.
+
+<Aside>
+For events fetched from a server as the person navigates, use `sources`
+instead (`jsonSource`, `fnSource`, iCalendar): see
+[Event sources](../../guides/event-sources/). To change one event — a move, a
+new event — run a command: `calendar.run({ type: 'event.create', event })`.
+</Aside>
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/core/recurrence'; // repeating events (rrule)
+import type { EventInput } from '@dzcalendar/core';
+
+const events: EventInput[] = [
+  { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 }, tone: 'green' },
+  { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true, tone: 'amber' },
+  { id: 'w', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+];
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'timeGridWeek', events });
+
+// Later: the whole new list.
+calendar.update({ events: [...events, { id: 'd', title: 'Training', start: '2026-10-24T10:00[Europe/Paris]', duration: { hours: 3 } }] });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { EventInput } from '@dzcalendar/core';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" view="timeGridWeek" [events]="events()" />
+    <button (click)="add()">Add</button>`,
+})
+export class Agenda {
+  readonly events = signal<EventInput[]>([
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 }, tone: 'green' },
+    { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true, tone: 'amber' },
+    { id: 'w', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ]);
+
+  add() {
+    this.events.update((list) => [...list, { id: 'd', title: 'Training', start: '2026-10-24T10:00[Europe/Paris]', duration: { hours: 3 } }]);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [events, setEvents] = useState<EventInput[]>([
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 }, tone: 'green' },
+    { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true, tone: 'amber' },
+    { id: 'w', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ]);
+  const add = () => setEvents((list) => [...list, { id: 'd', title: 'Training', start: '2026-10-24T10:00[Europe/Paris]', duration: { hours: 3 } }]);
+  return (
+    <>
+      <DzCalendar timeZone="Europe/Paris" defaultView="timeGridWeek" events={events} />
+      <button onClick={add}>Add</button>
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { shallowRef } from 'vue';
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const events = shallowRef<EventInput[]>([
+  { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 }, tone: 'green' },
+  { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true, tone: 'amber' },
+  { id: 'w', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+]);
+// A new array: a push on the same one is not seen.
+const add = () => (events.value = [...events.value, { id: 'd', title: 'Training', start: '2026-10-24T10:00[Europe/Paris]', duration: { hours: 3 } }]);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :events="events" />
+  <button @click="add">Add</button>
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+## Live demo
+
+The week of 19 October 2026 in Paris. The call is written in Chicago's zone
+and drawn at 17:00; the rounds repeat every Monday and Wednesday; Sunday the
+25th has 25 hours (the clocks go back), and the night shift crosses the
+repeated hour.
+
+<LiveDemo
+  label="A week of events in several time zones"
+  height={760}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    firstDay: 1,
+    density: 'compact',
+    scrollTime: { hours: 0 },
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 }, tone: 'green' },
+      { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true, tone: 'amber' },
+      { id: 'd', title: 'Night shift', start: '2026-10-25T01:00[Europe/Paris]', duration: { hours: 3 }, tone: 'violet' },
+      { id: 'w', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+    ],
+  }}
+/>
+
+## See also
+
+- [`initialView`](../initial-view/) — the view that shows them.
+- [Events](../../guides/events/) — commands, undo and persisting a person's changes.
+- [Event sources](../../guides/event-sources/) — events fetched as the calendar moves.
+- [Recurrence](../../guides/recurrence/) — series, exceptions, editing one occurrence.
+- [Time zones & clock changes](../../guides/time-zones/).

@@ -44,6 +44,8 @@ npm run test:browser   # layout checks in system Chrome on its own Vite server (
 npm run perf:browser   # first render, nodes, one update per view, U and W, minified, in Chrome (budgets: perf/browser-budgets.json)
 npm run pack:local     # tarballs into packed/
 npm run test:package   # a fresh Angular app from the tarballs, ng build on 19, 20, 21, 22 (network)
+npm run check:entries  # bundles from the dists run: recurrence kept, polyfill a chunk apart, nothing reads Temporal on import
+cd website && npm run build && npm run preview  # the docs site (Astro Starlight), preview on 4700 (4701 when DzGrid holds 4700)
 ```
 
 ## Working rules

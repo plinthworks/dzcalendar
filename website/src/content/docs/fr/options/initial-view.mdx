@@ -1,0 +1,168 @@
+---
+title: initialView
+description: La vue sur laquelle s'ouvre le calendrier.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+La vue que montre le calendrier à sa création.
+
+| | |
+|---|---|
+| **Type** | `string` — le nom d'une vue |
+| **Par défaut** | `'timeGridWeek'` — ou, avec `@dzcalendar/dom/base`, la première vue dont le rendu est importé (`dayGridMonth`, `listWeek`, `multiMonthYear`) |
+| **Mise à jour à chaud (via `update()`)** | Oui, sous un autre nom : `update({ view: 'dayGridMonth' })` |
+
+## Ce qu'elle fait
+
+Une vue est une façon de dessiner une période : un mois de cases, une semaine
+d'heures, une liste. `initialView` nomme celle qui s'affiche d'abord ; la
+personne passe ensuite d'une vue à l'autre avec les boutons de l'en-tête, et
+votre code avec `update({ view })`.
+
+Les vues intégrées à `@dzcalendar/dom` :
+
+| Nom | Ce qu'elle montre |
+|---|---|
+| `dayGridMonth` | Le mois, une case par jour |
+| `dayGridWeek`, `dayGridDay` | Une semaine, un jour, en cases |
+| `timeGridWeek` | La semaine, heure par heure (par défaut) |
+| `timeGridDay` | Un jour, heure par heure |
+
+Deux autres familles sont des entrées à part, importées une fois :
+
+| Nom | Import |
+|---|---|
+| `listDay`, `listWeek`, `listMonth`, `listYear` | `import '@dzcalendar/dom/list'` |
+| `multiMonthYear` | `import '@dzcalendar/dom/multimonth'` |
+
+Les vues par ressource (`resourceTimeGridWeek`…) et, avec `@dzcalendar/pro`,
+les vues timeline sont décrites dans
+[Ressources et timeline](../../guides/resources-timeline/). Vos propres vues —
+quatre jours, les dates d'un congrès — se déclarent avec `views` et se nomment
+ici comme les autres.
+
+<Aside type="caution">
+Un nom que le calendrier ne connaît pas, ou une vue dont l'entrée n'a pas été
+importée, fait partie des rares choses qui lèvent une exception :
+`createCalendar` lève une `RangeError` (son message nomme l'import à ajouter)
+et rien n'est dessiné. Les options sont vérifiées ; les données — les
+événements — ne lèvent jamais d'exception.
+</Aside>
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+import '@dzcalendar/dom/list';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  locale: 'fr-FR',
+  initialView: 'dayGridMonth',
+  headerToolbar: { start: 'prev,next today', center: 'title', end: 'dayGridMonth,timeGridWeek,listWeek' },
+});
+
+// Plus tard : une autre vue.
+calendar.update({ view: 'listWeek' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/dom/list';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" locale="fr-FR" [(view)]="view"
+      [options]="{ headerToolbar: { start: 'prev,next today', center: 'title', end: 'dayGridMonth,timeGridWeek,listWeek' } }" />
+    <p>Vue : {{ view() }}</p>`,
+})
+export class Agenda {
+  // La première vue ; elle suit ensuite le choix de la personne (bidirectionnel).
+  readonly view = signal<string | undefined>('dayGridMonth');
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/dom/list';
+
+export function Agenda() {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      locale="fr-FR"
+      defaultView="dayGridMonth"
+      headerToolbar={{ start: 'prev,next today', center: 'title', end: 'dayGridMonth,timeGridWeek,listWeek' }}
+    />
+  );
+}
+// Contrôlée à la place : view={view} onViewChange={setView}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/dom/list';
+
+const view = ref('dayGridMonth');
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" locale="fr-FR" v-model:view="view"
+    :options="{ headerToolbar: { start: 'prev,next today', center: 'title', end: 'dayGridMonth,timeGridWeek,listWeek' } }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, l'option est la vue du composant : `[(view)]` en
+Angular, `defaultView` en React (ou `view` avec `onViewChange`, contrôlée),
+`v-model:view` en Vue.
+
+## Démo en direct
+
+Le calendrier s'ouvre sur le mois ; l'en-tête passe à la semaine et à la
+liste.
+
+<LiveDemo
+  label="Un calendrier qui s'ouvre sur la vue mois"
+  height={600}
+  options={{
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    headerToolbar: { start: 'prev,next today', center: 'title', end: 'dayGridMonth,timeGridWeek,listWeek' },
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+      { id: 'w', title: 'Visite', start: '2026-10-05T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+    ],
+  }}
+/>
+
+## Voir aussi
+
+- [`headerToolbar`](../header-toolbar/) — où vont les boutons des vues.
+- [`events`](../events/) — ce que montrent les vues.
+- [Vues](../../guides/views/) — vues personnalisées, durées, jours masqués.

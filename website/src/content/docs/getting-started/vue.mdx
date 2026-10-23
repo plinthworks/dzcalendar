@@ -1,0 +1,163 @@
+---
+title: Vue
+description: The <DzCalendar> component for Vue 3.4 and 3.5 — props, v-model on view, date and selection, slots and the controller.
+banner:
+  content: 'Not on npm yet: until the first release, install the packages from tarballs built with <code>npm run pack:local</code> — <a href="/dzcalendar/getting-started/installation/">how</a>.'
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@dzcalendar/vue` gives a `<DzCalendar>` component for Vue 3.4 and 3.5.
+
+## Install
+
+```sh
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme @dzcalendar/vue
+```
+
+Import the stylesheet once, and settle the defaults of every calendar with the
+plugin (optional):
+
+```ts
+import { createApp } from 'vue';
+import '@dzcalendar/theme/dzcalendar.css';
+import { DzCalendarPlugin } from '@dzcalendar/vue';
+import '@dzcalendar/core/recurrence'; // repeating events (rrule)
+import App from './App.vue';
+
+createApp(App)
+  .use(DzCalendarPlugin, { defaults: { timeZone: 'Europe/Paris', locale: 'fr-FR' } })
+  .mount('#app');
+```
+
+## Temporal first
+
+`<DzCalendar>` waits for Temporal by itself, but your own code makes Temporal
+values too (a `ref` holding a date, in `<script setup>`). On a browser without
+Temporal of its own (Safari, every iOS browser) its polyfill arrives with
+`loadTemporal()`: await it once in `main.ts`, before mounting.
+
+```ts
+import { createApp } from 'vue';
+import { loadTemporal } from '@dzcalendar/core';
+import App from './App.vue';
+
+// At once where the browser has Temporal (Chrome, Edge, Firefox); Safari fetches its polyfill first.
+await loadTemporal();
+createApp(App).mount('#app');
+```
+
+## A calendar
+
+```vue
+<script setup lang="ts">
+import { ref, shallowRef } from 'vue';
+import { Temporal } from '@dzcalendar/core';
+import type { EventInput, PlainDate, Selection } from '@dzcalendar/core';
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+import '@dzcalendar/core/recurrence'; // repeating events (rrule)
+
+const cal = createCalendarController();
+const view = ref('timeGridWeek');
+const date = shallowRef<PlainDate>(Temporal.PlainDate.from('2026-10-21'));
+const selection = shallowRef<Selection | null>(null);
+const events = shallowRef<EventInput[]>([
+  { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+  { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true },
+  { id: 'w', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+]);
+</script>
+
+<template>
+  <header>
+    <button @click="cal.prev()">‹</button> <h2>{{ cal.title.value }}</h2> <button @click="cal.next()">›</button>
+    <button :disabled="!cal.canUndo.value" @click="cal.undo()">Undo</button>
+  </header>
+  <DzCalendar
+    :controller="cal"
+    time-zone="Europe/Paris"
+    :events="events"
+    v-model:view="view" v-model:date="date" v-model:selection="selection"
+    editable selectable
+    @event-click="(instance) => console.log(instance.event.id)">
+    <template #event-content="{ event, ctx }"><b>{{ event.title }}</b> {{ ctx.timeText }}</template>
+  </DzCalendar>
+</template>
+```
+
+## How props behave
+
+- **Props** for the common options (`events`, `sources`, `resources`,
+  `timeZone`, `locale`, `axis`, `editable`, `selectable`, `businessHours`,
+  `weekends`, `weekNumbers`, `hiddenDays`, `messages`, `theme`, `scheme`,
+  `density`, `displayCalendar`, `secondaryCalendar`, `availableSlots`);
+  **`options`** for everything else `update()` takes (`headerToolbar`,
+  `nowIndicator`, `dayMaxLanes`…); **`initial`** for what is read once
+  (`firstDay`, `rules`, `now`…).
+- Arrays and objects are compared by their contents; sources by identity
+  (keep their specs stable).
+- **Give a new array to change the events**
+  (`events.value = [...events.value, e]`): a `push` on the same array is not
+  seen.
+- A prop that goes back to `undefined` leaves the calendar's value as it was.
+
+<Aside type="caution">
+`view` and `date` bound **without** their `update:` handler win: the calendar
+goes back to them after a person navigates. Use `v-model:view` and
+`v-model:date` (as above) so that the header's buttons work.
+</Aside>
+
+## Events
+
+`@date-click`, `@event-click`, `@event-open`, `@create-request`, `@selected`,
+`@slot-click`, `@source-notice`, `@problems`, `@resource-problems`,
+`@dropped`, `@event-receive`, `@event-leave`, `@error` (a value the calendar
+refused; not listened to, it goes to `app.config.errorHandler`, else the
+console), and **`@event-change`**: what a person changed (a drag, a resize,
+the keyboard, the menu, the editor). Persist it, and call `change.revert()` if
+the server refuses.
+
+`@event-open`, `@create-request` and `@slot-click` change what the calendar
+offers ("Open" in the menu…): they are offered only while listened to.
+
+## Slots
+
+- **`#event-content="{ event, ctx }"`**: your components, teleported into each
+  event — your provides, store, router and i18n reach them.
+- **`#day-header="{ day }"`**: each day's head (`day.date`, `day.resource`,
+  `day.lengthMinutes`, `day.text`).
+- A slot for every element with a content, each given `{ ctx }`:
+  `#day-cell`, `#slot-label`, `#all-day-label`, `#more-link`,
+  `#now-indicator`, `#week-number`, `#no-events`, `#list-day-header`,
+  `#month-header`, `#resource`, `#resource-group-header`,
+  `#resource-area-header`.
+- **`#header-item-<name>="{ ctx }"`**: your place in the header, named in
+  `headerToolbar` (`:options="{ headerToolbar: { end: 'filter timeGridWeek' } }"`
+  → `#header-item-filter`).
+- **`:hooks="{ dayCell: { class: … } }"`**: classes and mounts for any
+  element, merged with the slots.
+
+## The controller
+
+`createCalendarController()` beside the calendar, or
+`injectCalendarController()` in a component inside it (an event's content).
+Refs: `title`, `view`, `date`, `range`, `canUndo`, `canRedo`, `loading`,
+`problems`, `instance`; methods `prev`, `next`, `today`, `goTo`,
+`changeView`, `dispatch`, `undo`, `redo`, `refetch`.
+
+## Server rendering
+
+Importing the packages touches no `document` or `window`; the calendar is made
+in the browser only (`onMounted`).
+
+## The Pro
+
+```ts
+import '@dzcalendar/pro';                     // the timeline views
+import { useDzExport, useEventEditor } from '@dzcalendar/pro-vue';
+
+const cal = createCalendarController();
+useEventEditor(cal, { onClosed: (outcome) => console.log(outcome) });
+const exports = useDzExport(cal);   // exports.download('pdf', 'agenda.pdf')
+```

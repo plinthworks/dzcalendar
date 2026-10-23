@@ -1,0 +1,191 @@
+---
+title: Angular
+description: Le composant <dz-calendar> pour Angular 19 à 22 — entrées en signaux, vue, date et sélection bidirectionnelles, gabarits et contrôleur.
+banner:
+  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@dzcalendar/angular` fournit un composant `<dz-calendar>` pour Angular 19 à
+22, sans zone ou avec zone.js, construit sur les signaux.
+
+## Installer
+
+```sh
+ng add @dzcalendar/angular
+```
+
+Le schematic installe `@dzcalendar/core`, `@dzcalendar/dom` et
+`@dzcalendar/theme`, place `dzcalendar.css` dans les styles du build et
+ajoute `provideDzCalendar({})` à `app.config.ts`. Il demande s'il faut ajouter
+les animations GSAP, les paquets Pro et un composant d'exemple
+(`src/app/agenda.ts`) ; sans les questions :
+`ng add @dzcalendar/angular --gsap --pro --example`.
+
+## Réglages pour toute l'application
+
+```ts
+// app.config.ts
+import { provideDzCalendar } from '@dzcalendar/angular';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+
+export const appConfig = {
+  providers: [
+    provideDzCalendar({ timeZone: 'Europe/Paris', locale: 'fr-FR' }),
+  ],
+};
+```
+
+Chaque calendrier de l'application part de ces valeurs ; ses propres entrées
+l'emportent sur elles.
+
+## Un calendrier
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+import { Temporal } from '@dzcalendar/core';
+import type { EventInput, EventInstance, PlainDate, Selection } from '@dzcalendar/core';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <h2>{{ cal.controller.title() }}</h2>
+    <dz-calendar #cal
+      timeZone="Europe/Paris"
+      [events]="events()"
+      [(view)]="view" [(date)]="date" [(selection)]="selection"
+      [editable]="true" [selectable]="true"
+      (eventClick)="open($event)">
+      <ng-template dzEventContent let-event="event" let-ctx="ctx">
+        <b>{{ event.title }}</b> {{ ctx.timeText }}
+      </ng-template>
+    </dz-calendar>`,
+})
+export class Agenda {
+  readonly events = signal<EventInput[]>([
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+    { id: 'w', title: 'Visite', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ]);
+  readonly view = signal<string | undefined>('timeGridWeek');
+  readonly date = signal<PlainDate | undefined>(Temporal.PlainDate.from('2026-10-21'));
+  readonly selection = signal<Selection | null>(null);
+
+  open(instance: EventInstance) {
+    console.log(instance.event.title);
+  }
+}
+```
+
+## Ce que prend `<dz-calendar>`
+
+**Des entrées** pour les options courantes : `events`, `sources` (gardez
+chaque spécification comme le même objet), `resources`, `timeZone`,
+`locale`, `axis` (`'wall'` ou `'elapsed'`), `editable`, `selectable`,
+`businessHours`, `weekends`, `weekNumbers`, `hiddenDays`, `messages`,
+`theme`, `scheme`, `density`, `displayCalendar`, `secondaryCalendar`,
+`availableSlots`, `hooks`.
+
+**`[options]`** pour tout le reste de ce que prend `update()` :
+`headerToolbar`, `firstDay`, `nowIndicator`, `scrollTime`, `dayMaxLanes`,
+`eventMaxStack`, `allDaySlot`, `displayEventTime`, `eventStyle`, `timeGrid`,
+`headerViews`, `contextMenu`… Chaque entrée, et chaque clé de `[options]`,
+peut changer à tout moment.
+
+**Bidirectionnel** : `[(view)]`, `[(date)]`, `[(selection)]`.
+
+**Sorties** : `(dateClick)`, `(eventClick)`, `(eventOpen)`,
+`(createRequest)`, `(slotClick)`, `(selected)`, `(sourceNotice)`,
+`(problems)`, `(resourceProblems)`, `(dropped)`, `(eventReceive)`,
+`(eventLeave)` et `(eventChange)` — ce qu'une personne a modifié (un glisser,
+un redimensionnement, le clavier, le menu, l'éditeur), pas ce que votre propre
+code a exécuté.
+
+**Gabarits** : `<ng-template dzEventContent>` pour les événements,
+`<ng-template dzDayHeader let-day>` pour l'en-tête de chaque jour
+(`day.date`, `day.lengthMinutes` — 1 380 ou 1 500 lors d'un changement
+d'heure — `day.text`), et un pour chaque élément qui a un contenu :
+`dzDayCell`, `dzSlotLabel`, `dzAllDayLabel`, `dzMoreLink`, `dzNowIndicator`,
+`dzWeekNumber`, `dzNoEvents`, `dzListDayHeader`, `dzMonthHeader`,
+`dzResource`, `dzResourceGroupHeader`, `dzResourceAreaHeader`. Ce sont vos
+composants, dans votre injecteur. `<ng-template dzHeaderItem="filter">` place
+votre propre contenu dans l'en-tête, à l'endroit nommé dans `headerToolbar`.
+
+## Le contrôleur
+
+`#cal` puis `cal.controller` — ou `inject(CalendarController)` dans un
+composant placé dans le calendrier — donne des signaux (`state`, `title`,
+`range`, `view`, `date`, `canUndo`, `canRedo`, `loading`, `problems`,
+`instance`) et des méthodes (`prev`, `next`, `today`, `goTo`, `changeView`,
+`dispatch` pour une commande, `undo`, `redo`, `refetch`). Il permet de
+dessiner votre propre en-tête.
+
+## Enregistrer la modification d'une personne
+
+```ts
+import { Component, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import type { EventChange } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar [events]="events()" [editable]="true" (eventChange)="save($event)" />`,
+})
+export class Agenda {
+  private readonly http = inject(HttpClient);
+  // …
+  save(change: EventChange) {
+    const moved = change.after;
+    if (!moved) return;
+    this.http.patch(`/api/rendez-vous/${moved.id}`, { start: moved.start.toString(), end: moved.end.toString() }).subscribe({
+      // Refusé par le serveur : exactement cette modification est annulée.
+      error: () => change.revert(),
+    });
+  }
+}
+```
+
+`change.revert()` annule exactement cette modification, même si une autre est
+venue après ; il renvoie `false`, et ne change rien, quand l'événement a été
+modifié de nouveau depuis.
+
+<Aside>
+Vérifiez vos gabarits avec `ng build`, pas `tsc` : seul le compilateur
+Angular les lit.
+</Aside>
+
+## Depuis des options FullCalendar
+
+`<dz-calendar [dzFullCalendar]="calendarOptions">` (de
+`@dzcalendar/angular/fullcalendar`) pose un objet d'options FullCalendar
+existant sur le calendrier. Voyez
+[Migrer depuis FullCalendar](../migrating-from-fullcalendar/).
+
+## Le Pro
+
+```ts
+import { DzEventEditor, DzExport } from '@dzcalendar/pro-angular';
+
+@Component({
+  imports: [DZ_CALENDAR, DzEventEditor],
+  template: `
+    <dz-calendar #cal dzEventEditor view="resourceTimelineWeek" [resources]="rooms" [events]="events()" />
+    <button (click)="exports.download(cal.controller, 'pdf', 'agenda.pdf')">PDF</button>`,
+})
+export class Planning {
+  readonly exports = inject(DzExport);
+}
+```
+
+`import '@dzcalendar/pro'` une fois enregistre les vues timeline. L'éditeur et
+les exports sont chargés à la première utilisation.
+
+:::note
+Sur Safari (sans Temporal natif), `provideDzCalendar()` retient le démarrage de l'application jusqu'à l'arrivée du polyfill de Temporal : gardez-le dans les providers, même sans valeurs par défaut (sans lui, chaque `<dz-calendar>` attend de lui-même).
+:::

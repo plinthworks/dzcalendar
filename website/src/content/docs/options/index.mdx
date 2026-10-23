@@ -1,0 +1,66 @@
+---
+title: Options
+description: Everything createCalendar takes, and what update() can change afterwards.
+---
+
+`createCalendar(element, options)` takes one object of options. Most of them
+can change afterwards with `calendar.update({ … })`; the frameworks pass them
+as inputs, props or an `options` object.
+
+Each option has its own page: what it does, its type and default, whether it
+changes live, an example in JavaScript, Angular, React and Vue, and a live
+demo. The first pages are below; the others are being written.
+
+## Pages
+
+- [`initialView`](./initial-view/) — the view the calendar opens on.
+- [`events`](./events/) — the calendar's events, as an array.
+- [`headerToolbar`](./header-toolbar/) — what the header holds, and where.
+
+## All the options
+
+| Option | Type | Live |
+|---|---|---|
+| [`initialView`](./initial-view/) | `string` | as `view` |
+| `initialDate` | `Temporal.PlainDate` | as `date` |
+| `timeZone` | `string` (IANA) | yes |
+| `locale` | `string` (BCP 47) | yes |
+| [`events`](./events/) | `EventInput[]` | yes |
+| `sources` | `EventSourceSpec[]` | yes |
+| [`headerToolbar`](./header-toolbar/) | `{ start, center, end }` or `false` | yes |
+| `headerViews` | `string[]` | yes |
+| `customButtons` | `Record<string, CustomButton>` | yes |
+| `editable` | `boolean` | yes |
+| `selectable` | `boolean` | yes |
+| `firstDay` | `1`–`7` (ISO, Monday = 1) | yes |
+| `weekends` | `boolean` | yes |
+| `hiddenDays` | `Weekday[]` | yes |
+| `weekNumbers` | `boolean` | yes |
+| `businessHours` | business hours | yes |
+| `nowIndicator` | `boolean` | yes |
+| `scrollTime` | duration | yes (next view shown) |
+| `allDaySlot` | `boolean` | yes |
+| `displayEventTime` | `boolean` | yes |
+| `dayMaxLanes` | `number`, `'auto'` or `null` | yes |
+| `eventMaxStack` | `number`, `'auto'` or `null` | yes |
+| `formats` | per place: `Intl` options or a function | yes |
+| `messages` | your words, over the locale's | yes |
+| `theme` | `string` | yes |
+| `scheme` | `'auto'`, `'light'`, `'dark'` | yes |
+| `density` | `'compact'`, `'comfortable'`, `'spacious'` | yes |
+| `eventStyle` | `'tinted'`, `'solid'` | yes |
+| `look` | `'styled'`, `'none'` | yes |
+| `displayCalendar` | Intl calendar name | yes |
+| `secondaryCalendar` | Intl calendar name | yes |
+| `resources` | `ResourceInput[]` | yes |
+| `hooks` | render hooks per element | yes |
+| `views` | your own views | no |
+| `titleFormat` | `Intl` options or a function | no |
+| `rules` | constraints on gestures | yes |
+| `cssLayers` | `boolean` | no (the first calendar of a page decides) |
+| `injectStyles` | `boolean` | no |
+| `motion` | a motion adapter | yes |
+
+Callbacks — `onEventClick`, `onDateClick`, `onSelect`, `onEventChange`,
+`onCreateRequest`, `onDrop`… — are options too, and can be replaced with
+`update()`.

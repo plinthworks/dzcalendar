@@ -1196,6 +1196,20 @@ try {
       }
     }
     {
+      // 18j review: a header's end wider than a phone (French, five buttons) breaks inside the header, the page never scrolls sideways.
+      for (const w of [320, 390]) {
+        const { p } = await page('/narrow-header.html', { viewport: { width: w, height: 700 } });
+        await p.waitForFunction(() => window.ready && document.querySelector('.dz-toolbar__views'), null, { timeout: 15000 });
+        await p.waitForTimeout(200);
+        const r = await p.evaluate(() => {
+          const bar = document.querySelector('.dz-toolbar').getBoundingClientRect();
+          return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, outside: [...document.querySelectorAll('.dz-toolbar__section, .dz-toolbar__btn')].filter((e) => e.getBoundingClientRect().right > bar.right + 0.5).map((e) => e.className.split(' ').pop()) };
+        });
+        check(`18j: a French header too wide for ${w} px breaks inside itself — nothing past its edge, no sideways scroll`, r.page === 0 && r.outside.length === 0, JSON.stringify(r));
+        await p.close();
+      }
+    }
+    {
       // Focus never hidden (2.4.11): a list row and a timeline bar focused by Tab after scrolling stay out from under the sticky heads.
       const { p } = await page('/gallery.html');
       await p.waitForFunction(() => window.ready, null, { timeout: 15000 });

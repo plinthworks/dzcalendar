@@ -61,7 +61,8 @@ dz-calendar { display: block; }
 .dz-toolbar__section { display: flex; align-items: center; gap: 0.5rem; }
 /* A narrow header (a phone, a sidebar): a place too wide for it breaks inside too. */
 @container dz-toolbar (max-width: 40rem) {
-  .dz-toolbar__section { flex-wrap: wrap; }
+  /* No wider than the header: a place wider than it would break nothing and push the page sideways. */
+  .dz-toolbar__section { flex-wrap: wrap; max-width: 100%; }
   /* Narrow (320 px, a zoom of 400 %): tighter buttons, a group that breaks rather than overflows. */
   .dz-toolbar__btn { padding: 0 0.5rem; }
   .dz-toolbar__group { flex-wrap: wrap; }

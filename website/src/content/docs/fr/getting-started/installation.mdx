@@ -1,0 +1,245 @@
+---
+title: Installation
+description: Les paquets, la feuille de style, et le même premier calendrier en JavaScript, Angular, React et Vue.
+banner:
+  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../../components/CodeTabs.astro';
+
+DzCalendar est un ensemble de petits paquets. Le noyau (`@dzcalendar/core`)
+connaît les événements, les vues et l'horloge ; il n'a pas de DOM. Le moteur de
+rendu (`@dzcalendar/dom`) le dessine. Les paquets des frameworks enveloppent le
+moteur de rendu, et une feuille de style facultative (`@dzcalendar/theme`) lui
+donne son apparence.
+
+## Installer
+
+<CodeTabs>
+<Fragment slot="js">
+
+```sh
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```sh
+ng add @dzcalendar/angular
+```
+
+Le schematic installe `@dzcalendar/core`, `dom` et `theme`, ajoute
+`dzcalendar.css` aux styles du build et `provideDzCalendar({})` à
+`app.config.ts`. Il peut aussi ajouter les animations GSAP, les paquets Pro et
+un composant d'exemple : `ng add @dzcalendar/angular --gsap --pro --example`.
+
+</Fragment>
+<Fragment slot="react">
+
+```sh
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme @dzcalendar/react
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```sh
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme @dzcalendar/vue
+```
+
+</Fragment>
+</CodeTabs>
+
+<Aside type="caution" title="Avant la première publication sur npm">
+Tant que les paquets ne sont pas publiés sur npm, ils sont construits en
+archives : `npm run pack:local` dans le dépôt DzCalendar les écrit dans
+`packed/`. Installez tout l'ensemble dont votre application a besoin, pas
+seulement ce que vous importez — `core`, `rrule`, `dom`, `theme` (et `ical`,
+`compat-fullcalendar` avec le traducteur FullCalendar) : npm ne peut pas aller
+chercher une dépendance interne qu'il ne trouve pas à côté des autres.
+</Aside>
+
+## Les paquets
+
+| Paquet | Ce qu'il apporte |
+|---|---|
+| `@dzcalendar/core` | Le noyau : événements, récurrence, sources, commandes et annulation, vues sous forme de données. Réexporte `Temporal`. |
+| `@dzcalendar/dom` | `createCalendar` : vues mois, semaine, jour ; `@dzcalendar/dom/list` et `@dzcalendar/dom/multimonth` ajoutent les vues liste et année. |
+| `@dzcalendar/theme` | `dzcalendar.css` : sept familles de couleurs, claires et sombres, vérifiées pour le contraste WCAG AA. |
+| `@dzcalendar/angular` | `<dz-calendar>` pour Angular 19 à 22, sans zone ou avec zone.js, en signaux. |
+| `@dzcalendar/react` | `<DzCalendar>` pour React 18 et 19. |
+| `@dzcalendar/vue` | `<DzCalendar>` pour Vue 3.4 et 3.5. |
+| `@dzcalendar/element` | `<dz-calendar>` en Web Component, pour n'importe quelle page. |
+| `@dzcalendar/ical` | Des sources iCalendar. |
+| `@dzcalendar/pro` | Les vues timeline, l'éditeur d'événements, l'impression et les exports. |
+
+Temporal vient avec le noyau : `import { Temporal } from '@dzcalendar/core'`.
+Là où le navigateur ne l'a pas encore, un polyfill le remplace.
+
+## La feuille de style
+
+Importez-la une fois, n'importe où dans votre application :
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+```
+
+Sans elle, le calendrier fonctionne quand même, dans les couleurs du système.
+Avec elle, trois options choisissent l'apparence, et toutes trois peuvent
+changer à chaud avec `update()` :
+
+- `theme` : `'standard'` (par défaut), `'slate'`, `'night'`, `'pastel'`,
+  `'frost'`, `'solar'`, `'contrast'`, ou l'un des vôtres créé avec
+  `defineTheme`.
+- `scheme` : `'auto'` (suit le système), `'light'` ou `'dark'`.
+- `density` : `'compact'`, `'comfortable'` (par défaut) ou `'spacious'` —
+  48, 72 ou 96 pixels par heure.
+
+Tout le CSS du calendrier est rangé dans deux couches de cascade : n'importe
+laquelle de vos règles hors couche l'emporte, quelle que soit sa spécificité.
+À côté de Tailwind, de Bootstrap ou d'un reset global, voyez
+[Thèmes et CSS](../../guides/theming/).
+
+## Votre premier calendrier
+
+Le même calendrier dans les quatre saveurs : une semaine à Paris, quatre
+événements, dont un dans le fuseau de Chicago et un qui revient chaque lundi
+et chaque mercredi.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+import { Temporal, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+
+// Tout de suite si le navigateur a Temporal (Chrome, Edge, Firefox) ; Safari charge d'abord son polyfill.
+await loadTemporal();
+
+createCalendar(document.getElementById('agenda')!, {
+  timeZone: 'Europe/Paris',
+  locale: 'fr-FR',
+  initialView: 'timeGridWeek',
+  initialDate: Temporal.PlainDate.from('2026-10-21'),
+  editable: true,
+  events: [
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+    { id: 'w', title: 'Visite', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ],
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+import { Temporal } from '@dzcalendar/core';
+import type { EventInput } from '@dzcalendar/core';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" locale="fr-FR" view="timeGridWeek" [date]="start"
+                 [editable]="true" [events]="events()" />`,
+})
+export class Agenda {
+  readonly start = Temporal.PlainDate.from('2026-10-21');
+  readonly events = signal<EventInput[]>([
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+    { id: 'w', title: 'Visite', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ]);
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import '@dzcalendar/theme/dzcalendar.css';
+import { Temporal } from '@dzcalendar/core';
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+
+const events: EventInput[] = [
+  { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+  { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+  { id: 'w', title: 'Visite', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+];
+
+export function Agenda() {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      locale="fr-FR"
+      defaultView="timeGridWeek"
+      defaultDate={Temporal.PlainDate.from('2026-10-21')}
+      editable
+      events={events}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref, shallowRef } from 'vue';
+import '@dzcalendar/theme/dzcalendar.css';
+import { Temporal } from '@dzcalendar/core';
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+
+const view = ref('timeGridWeek');
+const date = shallowRef(Temporal.PlainDate.from('2026-10-21'));
+const events: EventInput[] = [
+  { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+  { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+  { id: 'w', title: 'Visite', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" locale="fr-FR" v-model:view="view" v-model:date="date" editable :events="events" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+<Aside type="note" title="Temporal d'abord">
+Les exemples React et Vue créent des valeurs Temporal dans le composant même :
+sur Safari, qui n'a pas de Temporal natif, attendez `loadTemporal()` une fois
+au démarrage, avant le premier rendu ou le montage (montré sur les pages
+[React](../react/#temporal-dabord) et [Vue](../vue/#temporal-dabord)).
+Le `provideDzCalendar()` d'Angular l'attend.
+</Aside>
+
+Voyez-le fonctionner sur la page [JavaScript sans framework](../vanilla/),
+puis la page de votre framework : [Angular](../angular/), [React](../react/),
+[Vue](../vue/).
+
+## Prérequis
+
+- Navigateurs : Chrome 99, Firefox 97, Safari / iOS 15.4 et suivants (couches
+  de cascade). Là où `color-mix()` manque (Safari avant 16.2), les teintes
+  retombent sur le fond surélevé.
+- Pas de rendu serveur du calendrier lui-même : importer les paquets ne touche
+  ni `document` ni `window`, et le calendrier est créé dans le navigateur.

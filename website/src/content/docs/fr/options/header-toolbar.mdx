@@ -1,0 +1,170 @@
+---
+title: headerToolbar
+description: Ce que contient l'en-tête du calendrier, et où.
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Ce que contient l'en-tête du calendrier — les flèches, « aujourd'hui », le
+titre, les boutons des vues, vos propres boutons — et où ; `false` pour aucun
+en-tête.
+
+| | |
+|---|---|
+| **Type** | `{ start?: string; center?: string; end?: string }` ou `false` |
+| **Par défaut** | `{ start: 'prev,next today', center: 'title', end: headerViews.join(',') }` — les vues de `headerViews` (`dayGridMonth,timeGridWeek,timeGridDay` avec `@dzcalendar/dom`) |
+| **Mise à jour à chaud (via `update()`)** | Oui : `update({ headerToolbar })` ; une disposition égale ne change rien |
+
+## Ce qu'elle fait
+
+L'en-tête a trois places : `start`, `center` et `end`. `start` et `end`
+suivent le sens d'écriture — en arabe, `start` est à droite. Chaque place est
+une chaîne de noms :
+
+- **une espace sépare des groupes** : `'prev today'` donne deux boutons
+  séparés ;
+- **une virgule joint des boutons en un groupe** : `'prev,next'` est dessiné
+  d'un seul tenant. Un groupe de noms de vues est le sélecteur de vue, sa vue
+  courante enfoncée.
+
+Les noms :
+
+| Nom | Quoi |
+|---|---|
+| `prev`, `next` | La période précédente et la suivante |
+| `today` | Retour à aujourd'hui |
+| `title` | Le titre de la période (une région live, `aria-live="polite"`, pour les lecteurs d'écran) |
+| le nom d'une vue | Un bouton pour cette vue : `dayGridMonth`, `timeGridWeek`, `listWeek`… |
+| une clé de `customButtons` | L'un de vos boutons |
+| une clé de `headerItems` | Une place pour votre propre contenu (un menu, un filtre) |
+
+`false` retire l'en-tête : votre application dessine le sien, avec
+`calendar.navigate()` et `calendar.kernel.getState().title` — ou, dans les
+frameworks, le contrôleur.
+
+Sans `headerToolbar`, la fin de l'en-tête montre les vues de `headerViews`
+(par défaut : mois, semaine, jour) ; une vue seule ne montre pas de sélecteur.
+
+Un nom inconnu, ou une vue dont l'entrée n'a pas été importée, est laissé de
+côté et signalé une fois dans la console. Rien ne lève d'exception.
+
+## Exemple
+
+Un bouton « Recharger » à vous, avant les vues :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  locale: 'fr-FR',
+  headerToolbar: { start: 'title', center: '', end: 'reload today prev,next dayGridMonth,timeGridWeek' },
+  customButtons: {
+    reload: { text: 'Recharger', click: () => calendar.refetch() },
+  },
+});
+
+// Plus tard : plus d'en-tête du tout.
+calendar.update({ headerToolbar: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, viewChild } from '@angular/core';
+import { DZ_CALENDAR, DzCalendar } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar #cal timeZone="Europe/Paris" locale="fr-FR" [options]="options" />`,
+})
+export class Agenda {
+  private readonly cal = viewChild.required<DzCalendar>('cal');
+  readonly options = {
+    headerToolbar: { start: 'title', center: '', end: 'reload today prev,next dayGridMonth,timeGridWeek' },
+    customButtons: {
+      reload: { text: 'Recharger', click: () => this.cal().controller.refetch() },
+    },
+  };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+
+export function Agenda() {
+  const cal = useCalendarController();
+  return (
+    <DzCalendar
+      controller={cal}
+      timeZone="Europe/Paris"
+      locale="fr-FR"
+      headerToolbar={{ start: 'title', center: '', end: 'reload today prev,next dayGridMonth,timeGridWeek' }}
+      customButtons={{ reload: { text: 'Recharger', click: () => cal.refetch() } }}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+
+const cal = createCalendarController();
+const options = {
+  headerToolbar: { start: 'title', center: '', end: 'reload today prev,next dayGridMonth,timeGridWeek' },
+  customButtons: { reload: { text: 'Recharger', click: () => cal.refetch() } },
+};
+</script>
+
+<template>
+  <DzCalendar :controller="cal" time-zone="Europe/Paris" locale="fr-FR" :options="options" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Un bouton de `customButtons` prend `text` (ses mots et son nom accessible),
+`hint` (au survol ; le nom accessible quand il n'y a pas de texte), `icon`
+(une classe à vous, posée sur un `span` masqué avant les mots),
+`click(event, element)` et `active` (un booléen ou une fonction : le bouton
+devient une bascule, dessinée enfoncée). De nouvelles fonctions pour les mêmes
+boutons — les closures qu'un framework recrée à chaque rendu — sont prises
+sans redessiner l'en-tête : le bouton garde le focus.
+
+## Démo en direct
+
+Le titre au début ; « aujourd'hui », les flèches et le sélecteur de vue à la
+fin.
+
+<LiveDemo
+  label="Un calendrier à l'en-tête réorganisé"
+  height={600}
+  options={{
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    headerToolbar: { start: 'title', center: '', end: 'today prev,next dayGridMonth,timeGridWeek,listWeek' },
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## Voir aussi
+
+- [`initialView`](../initial-view/) — la vue affichée d'abord.
+- [Thèmes et CSS](../../guides/theming/) — l'apparence de l'en-tête (`--dz-title-*`, `--dz-button-*`).
+- [Clavier et accessibilité](../../guides/keyboard-accessibility/).

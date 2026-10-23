@@ -1,0 +1,30 @@
+---
+/**
+ * The same example in the four flavours, one tab each — JavaScript, Angular,
+ * React, Vue — synced across the site (`syncKey="framework"`): a reader who
+ * picks React sees React everywhere, and on the next visit.
+ *
+ *   <CodeTabs>
+ *     <Fragment slot="js">```ts …```</Fragment>
+ *     <Fragment slot="angular">…</Fragment>
+ *     <Fragment slot="react">…</Fragment>
+ *     <Fragment slot="vue">…</Fragment>
+ *   </CodeTabs>
+ *
+ * A flavour without its slot has no tab.
+ */
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+const FLAVOURS = [
+  { slot: 'js', label: 'JavaScript' },
+  { slot: 'angular', label: 'Angular' },
+  { slot: 'react', label: 'React' },
+  { slot: 'vue', label: 'Vue' },
+] as const;
+const present = FLAVOURS.filter((f) => Astro.slots.has(f.slot));
+const rendered = await Promise.all(present.map((f) => Astro.slots.render(f.slot)));
+---
+
+<Tabs syncKey="framework">
+  {present.map((f, i) => <TabItem label={f.label}><Fragment set:html={rendered[i]} /></TabItem>)}
+</Tabs>

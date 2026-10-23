@@ -1,0 +1,81 @@
+---
+/**
+ * A real DzCalendar, mounted in the browser from the library's sources
+ * (the Vite aliases in astro.config.mjs) with the theme CSS.
+ *
+ *   <LiveDemo options={{ initialView: 'dayGridMonth', initialDate: '2026-10-21', events: [...] }} />
+ *
+ * `options` is plain data (it crosses into the page as JSON): `initialDate`
+ * is an ISO date string, made a Temporal.PlainDate on mount. The demo follows
+ * Starlight's light / dark switch (`scheme`), and its zone defaults to
+ * Europe/Paris so that every visitor sees the same calendar.
+ */
+interface Props {
+  /** createCalendar's options, as JSON. */
+  options?: Record<string, unknown>;
+  /** The calendar's height in pixels (`--dz-height`). Default 560. */
+  height?: number;
+  /** What a screen reader calls the demo. */
+  label?: string;
+}
+const { options = {}, height = 560, label } = Astro.props;
+const lang = Astro.currentLocale ?? 'en';
+const given = { timeZone: 'Europe/Paris', locale: lang === 'fr' ? 'fr-FR' : 'en-US', ...options };
+---
+
+<dz-live-demo class="not-content" data-options={JSON.stringify(given)} aria-label={label}>
+  <div class="dz-demo-host" style={`--demo-height: ${height}px`}></div>
+</dz-live-demo>
+
+<script>
+  import '@dzcalendar/theme/dzcalendar.css';
+  import { Temporal, loadTemporal, temporalReady } from '@dzcalendar/core';
+  import { createCalendar } from '@dzcalendar/dom';
+  import type { CalendarInstance, CalendarOptions } from '@dzcalendar/dom';
+  // The list and multi-month views register themselves: a demo may show them.
+  // The demos have repeating events: their engine (an application imports it once too).
+  import '@dzcalendar/core/recurrence';
+  import '@dzcalendar/dom/list';
+  import '@dzcalendar/dom/multimonth';
+
+  const schemeOfPage = (): 'light' | 'dark' => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+
+  class DzLiveDemo extends HTMLElement {
+    #calendar: CalendarInstance | null = null;
+    #watch: MutationObserver | null = null;
+
+    connectedCallback() {
+      if (this.#calendar) return;
+      // Safari has no Temporal of its own: drawn once its polyfill has arrived.
+      if (!temporalReady()) return void loadTemporal().then(() => this.isConnected && this.connectedCallback());
+      const host = this.querySelector<HTMLElement>('.dz-demo-host');
+      if (!host) return;
+      const raw = JSON.parse(this.dataset.options ?? '{}') as Record<string, unknown>;
+      const options = {
+        ...raw,
+        ...(typeof raw.initialDate === 'string' && { initialDate: Temporal.PlainDate.from(raw.initialDate) }),
+        scheme: raw.scheme ?? schemeOfPage(),
+      } as CalendarOptions;
+      try {
+        this.#calendar = createCalendar(host, options);
+      } catch (error) {
+        // An option the calendar refused (a RangeError): said on the page, not a blank box.
+        host.textContent = String(error);
+        return;
+      }
+      if (raw.scheme === undefined) {
+        this.#watch = new MutationObserver(() => this.#calendar?.update({ scheme: schemeOfPage() }));
+        this.#watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      }
+    }
+
+    disconnectedCallback() {
+      this.#watch?.disconnect();
+      this.#watch = null;
+      this.#calendar?.destroy();
+      this.#calendar = null;
+    }
+  }
+
+  if (!customElements.get('dz-live-demo')) customElements.define('dz-live-demo', DzLiveDemo);
+</script>

@@ -1,0 +1,67 @@
+---
+title: Options
+description: Tout ce que prend createCalendar, et ce que update() peut changer ensuite.
+---
+
+`createCalendar(element, options)` prend un seul objet d'options. La plupart
+peuvent changer ensuite avec `calendar.update({ … })` ; les frameworks les
+passent en entrées, en props ou dans un objet `options`.
+
+Chaque option a sa page : ce qu'elle fait, son type et sa valeur par défaut,
+si elle change à chaud, un exemple en JavaScript, Angular, React et Vue, et une
+démo en direct. Les premières pages sont ci-dessous ; les autres sont en cours
+de rédaction.
+
+## Pages
+
+- [`initialView`](./initial-view/) — la vue sur laquelle s'ouvre le calendrier.
+- [`events`](./events/) — les événements du calendrier, en tableau.
+- [`headerToolbar`](./header-toolbar/) — ce que contient l'en-tête, et où.
+
+## Toutes les options
+
+| Option | Type | À chaud |
+|---|---|---|
+| [`initialView`](./initial-view/) | `string` | sous le nom `view` |
+| `initialDate` | `Temporal.PlainDate` | sous le nom `date` |
+| `timeZone` | `string` (IANA) | oui |
+| `locale` | `string` (BCP 47) | oui |
+| [`events`](./events/) | `EventInput[]` | oui |
+| `sources` | `EventSourceSpec[]` | oui |
+| [`headerToolbar`](./header-toolbar/) | `{ start, center, end }` ou `false` | oui |
+| `headerViews` | `string[]` | oui |
+| `customButtons` | `Record<string, CustomButton>` | oui |
+| `editable` | `boolean` | oui |
+| `selectable` | `boolean` | oui |
+| `firstDay` | `1`–`7` (ISO, lundi = 1) | oui |
+| `weekends` | `boolean` | oui |
+| `hiddenDays` | `Weekday[]` | oui |
+| `weekNumbers` | `boolean` | oui |
+| `businessHours` | heures ouvrées | oui |
+| `nowIndicator` | `boolean` | oui |
+| `scrollTime` | durée | oui (à la prochaine vue affichée) |
+| `allDaySlot` | `boolean` | oui |
+| `displayEventTime` | `boolean` | oui |
+| `dayMaxLanes` | `number`, `'auto'` ou `null` | oui |
+| `eventMaxStack` | `number`, `'auto'` ou `null` | oui |
+| `formats` | par endroit : options `Intl` ou une fonction | oui |
+| `messages` | vos mots, par-dessus ceux de la langue | oui |
+| `theme` | `string` | oui |
+| `scheme` | `'auto'`, `'light'`, `'dark'` | oui |
+| `density` | `'compact'`, `'comfortable'`, `'spacious'` | oui |
+| `eventStyle` | `'tinted'`, `'solid'` | oui |
+| `look` | `'styled'`, `'none'` | oui |
+| `displayCalendar` | nom de calendrier Intl | oui |
+| `secondaryCalendar` | nom de calendrier Intl | oui |
+| `resources` | `ResourceInput[]` | oui |
+| `hooks` | render hooks par élément | oui |
+| `views` | vos propres vues | non |
+| `titleFormat` | options `Intl` ou une fonction | non |
+| `rules` | contraintes sur les gestes | oui |
+| `cssLayers` | `boolean` | non (le premier calendrier de la page décide) |
+| `injectStyles` | `boolean` | non |
+| `motion` | un adaptateur d'animation | oui |
+
+Les callbacks — `onEventClick`, `onDateClick`, `onSelect`, `onEventChange`,
+`onCreateRequest`, `onDrop`… — sont aussi des options, et peuvent être
+remplacés avec `update()`.

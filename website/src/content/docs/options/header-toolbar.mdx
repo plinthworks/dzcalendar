@@ -1,0 +1,165 @@
+---
+title: headerToolbar
+description: What the calendar's header holds, and where.
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+What the calendar's header holds — the arrows, "today", the title, the view
+buttons, your own buttons — and where; `false` for no header.
+
+| | |
+|---|---|
+| **Type** | `{ start?: string; center?: string; end?: string }` or `false` |
+| **Default** | `{ start: 'prev,next today', center: 'title', end: headerViews.join(',') }` — the views of `headerViews` (`dayGridMonth,timeGridWeek,timeGridDay` with `@dzcalendar/dom`) |
+| **Live update (via `update()`)** | Yes: `update({ headerToolbar })`; an equal layout changes nothing |
+
+## What it does
+
+The header has three places: `start`, `center` and `end`. `start` and `end`
+follow the writing direction — in Arabic, `start` is on the right. Each place
+is a string of names:
+
+- **a space separates groups**: `'prev today'` is two separate buttons;
+- **a comma joins buttons into one group**: `'prev,next'` is drawn as one
+  piece. A group of view names is the view switcher, its current view
+  pressed.
+
+The names:
+
+| Name | What |
+|---|---|
+| `prev`, `next` | The previous and next period |
+| `today` | Back to today |
+| `title` | The period's title (a polite live region for screen readers) |
+| a view's name | A button for that view: `dayGridMonth`, `timeGridWeek`, `listWeek`… |
+| a key of `customButtons` | One of your buttons |
+| a key of `headerItems` | A place for your own content (a menu, a filter) |
+
+`false` takes the header away: your application draws its own, with
+`calendar.navigate()` and `calendar.kernel.getState().title` — or, in the
+frameworks, the controller.
+
+Without `headerToolbar`, the end of the header shows the views of
+`headerViews` (default: month, week, day); a single view shows no switcher.
+
+An unknown name, or a view whose entry was not imported, is left out and
+said once in the console. Nothing throws.
+
+## Example
+
+A reload button of your own, before the views:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  headerToolbar: { start: 'title', center: '', end: 'reload today prev,next dayGridMonth,timeGridWeek' },
+  customButtons: {
+    reload: { text: 'Reload', click: () => calendar.refetch() },
+  },
+});
+
+// Later: no header at all.
+calendar.update({ headerToolbar: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, viewChild } from '@angular/core';
+import { DZ_CALENDAR, DzCalendar } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar #cal timeZone="Europe/Paris" [options]="options" />`,
+})
+export class Agenda {
+  private readonly cal = viewChild.required<DzCalendar>('cal');
+  readonly options = {
+    headerToolbar: { start: 'title', center: '', end: 'reload today prev,next dayGridMonth,timeGridWeek' },
+    customButtons: {
+      reload: { text: 'Reload', click: () => this.cal().controller.refetch() },
+    },
+  };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+
+export function Agenda() {
+  const cal = useCalendarController();
+  return (
+    <DzCalendar
+      controller={cal}
+      timeZone="Europe/Paris"
+      headerToolbar={{ start: 'title', center: '', end: 'reload today prev,next dayGridMonth,timeGridWeek' }}
+      customButtons={{ reload: { text: 'Reload', click: () => cal.refetch() } }}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+
+const cal = createCalendarController();
+const options = {
+  headerToolbar: { start: 'title', center: '', end: 'reload today prev,next dayGridMonth,timeGridWeek' },
+  customButtons: { reload: { text: 'Reload', click: () => cal.refetch() } },
+};
+</script>
+
+<template>
+  <DzCalendar :controller="cal" time-zone="Europe/Paris" :options="options" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+A button of `customButtons` takes `text` (its words and accessible name),
+`hint` (on hover; the accessible name when there is no text), `icon` (a class
+of yours, put on a hidden `span` before the words), `click(event, element)`
+and `active` (a boolean or a function: the button becomes a toggle, drawn
+pressed). New functions for the same buttons — a framework's closures made at
+each render — are taken without redrawing the header: the button keeps the
+focus.
+
+## Live demo
+
+The title at the start; "today", the arrows and the view switcher at the end.
+
+<LiveDemo
+  label="A calendar with a rearranged header"
+  height={600}
+  options={{
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    headerToolbar: { start: 'title', center: '', end: 'today prev,next dayGridMonth,timeGridWeek,listWeek' },
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## See also
+
+- [`initialView`](../initial-view/) — the view shown first.
+- [Theming & CSS](../../guides/theming/) — the header's look (`--dz-title-*`, `--dz-button-*`).
+- [Keyboard & accessibility](../../guides/keyboard-accessibility/).

@@ -1,0 +1,182 @@
+---
+title: React
+description: Le composant <DzCalendar> pour React 18 et 19 — options en props, vue et date contrôlées, render props et contrôleur.
+banner:
+  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
+---
+
+`@dzcalendar/react` fournit un composant `<DzCalendar>` pour React 18 et 19.
+
+## Installer
+
+```sh
+npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme @dzcalendar/react
+```
+
+et importez la feuille de style une fois :
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+```
+
+## Temporal d'abord
+
+`<DzCalendar>` attend Temporal de lui-même, mais votre propre code crée aussi
+des valeurs Temporal (une `defaultDate`, un état). Sur un navigateur sans
+Temporal natif (Safari, tous les navigateurs iOS), son polyfill arrive avec
+`loadTemporal()` : attendez-le une fois dans `main.tsx`, avant le premier rendu.
+
+```tsx
+import { createRoot } from 'react-dom/client';
+import { loadTemporal } from '@dzcalendar/core';
+import { App } from './App';
+
+// Tout de suite si le navigateur a Temporal (Chrome, Edge, Firefox) ; Safari charge d'abord son polyfill.
+await loadTemporal();
+createRoot(document.getElementById('root')!).render(<App />);
+```
+
+## Un calendrier
+
+```tsx
+import { useState } from 'react';
+import { Temporal } from '@dzcalendar/core';
+import type { EventInput, Selection } from '@dzcalendar/core';
+import { DzCalendar, useCalendarController, useCalendarState } from '@dzcalendar/react';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+
+const events: EventInput[] = [
+  { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+  { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+  { id: 'w', title: 'Visite', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+];
+
+export function Agenda() {
+  const cal = useCalendarController();
+  const { title, canUndo } = useCalendarState(cal);
+  const [view, setView] = useState('timeGridWeek');
+  const [selection, setSelection] = useState<Selection | null>(null);
+  return (
+    <>
+      <header>
+        <button onClick={cal.prev}>‹</button> <h2>{title}</h2> <button onClick={cal.next}>›</button>
+        <button disabled={!canUndo} onClick={cal.undo}>Annuler</button>
+      </header>
+      <DzCalendar
+        controller={cal}
+        timeZone="Europe/Paris"
+        locale="fr-FR"
+        events={events}
+        view={view} onViewChange={setView}
+        defaultDate={Temporal.PlainDate.from('2026-10-21')}
+        selection={selection} onSelectionChange={setSelection}
+        editable selectable
+        renderEventContent={(event, ctx) => <><b>{event.title}</b> {ctx.timeText}</>}
+        onEventClick={(instance) => console.log(instance.event.id)}
+      />
+    </>
+  );
+}
+```
+
+## Comment se comportent les props
+
+- **Les options sont des props.** Ce qui a changé depuis le dernier rendu va
+  au calendrier, rien d'autre. Les tableaux et les objets sont comparés par
+  leur contenu : un littéral réécrit à chaque rendu (`resources={[…]}`) ne
+  change rien. Les sources sont comparées par identité — gardez-les stables
+  avec `useMemo`.
+- **`initial`** : les options lues une fois, à la création du calendrier
+  (`firstDay`, `rules`, `now`…). Leurs changements ultérieurs ne sont pas lus.
+- **Une prop qui revient à `undefined`** laisse la valeur du calendrier telle
+  quelle : passez la valeur par défaut pour la rétablir.
+- **`view`, `date`, `selection`** sont contrôlées, comme la `value` d'un
+  champ : si vous les fournissez, elles l'emportent, et `onViewChange`,
+  `onDateChange`, `onSelectionChange` disent ce qu'une personne a fait. Sinon, utilisez
+  `defaultView` et `defaultDate`, et le calendrier garde les siennes.
+- **`onError`** : une valeur que le calendrier a refusée (une vue inconnue) ;
+  les autres changements sont appliqués. Par défaut : `console.error`.
+- `className`, `style`, `id`, `data-*` et `aria-*` vont sur l'élément du
+  calendrier.
+
+## Vos composants dans le calendrier
+
+- **`renderEventContent={(event, ctx) => …}`** dessine chaque événement avec
+  vos composants, par des portails dans votre propre arbre : votre contexte,
+  votre état, votre routeur et votre i18n les atteignent.
+- **`renderDayHeader={(day) => …}`** : l'en-tête de chaque jour (`day.date`,
+  `day.resource`, `day.lengthMinutes`, `day.text`).
+- Une render prop pour chaque élément qui a un contenu : `renderDayCell`,
+  `renderSlotLabel`, `renderAllDayLabel`, `renderMoreLink`,
+  `renderNowIndicator`, `renderWeekNumber`, `renderNoEvents`,
+  `renderListDayHeader`, `renderMonthHeader`, `renderResource`,
+  `renderResourceGroupHeader`, `renderResourceAreaHeader`.
+- **`hooks={{ dayCell: { class: (d) => d.outside ? 'muted' : null } }}`** :
+  des classes et des montages pour n'importe quel élément, fusionnés avec les
+  render props.
+- **`headerItems={{ filter: <DoctorFilter /> }}`** avec
+  `headerToolbar={{ end: 'filter timeGridWeek' }}` : vos composants dans
+  l'en-tête.
+
+## Le contrôleur
+
+`useCalendarController()` donne un contrôleur stable (`prev`, `next`,
+`today`, `goTo`, `changeView`, `dispatch`, `undo`, `redo`, `refetch`) ;
+`useCalendarState(cal)` le lit (`title`, `view`, `date`, `range`, `canUndo`,
+`canRedo`, `loading`, `problems`, `instance`). Dans ce que rend
+`renderEventContent`, `useParentCalendarController()` donne le contrôleur du
+calendrier.
+
+## Enregistrer la modification d'une personne
+
+`onEventChange` dit ce qu'une personne a modifié — un glisser, un
+redimensionnement, le clavier, le menu, l'éditeur. Enregistrez-la, et appelez
+`change.revert()` si le serveur refuse :
+
+```tsx
+<DzCalendar
+  events={events}
+  editable
+  onEventChange={(change) =>
+    fetch(`/api/rendez-vous/${change.after?.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ start: String(change.after?.start) }),
+    }).then((r) => { if (!r.ok) change.revert(); })
+  }
+/>
+```
+
+Votre propre `controller.dispatch()` n'y est pas signalé : enregistrez-le là
+où votre code l'exécute.
+
+## Valeurs par défaut pour toute l'application
+
+```tsx
+import { DzCalendarProvider } from '@dzcalendar/react';
+import '@dzcalendar/core/recurrence'; // les événements répétés (rrule)
+
+<DzCalendarProvider defaults={{ timeZone: 'Europe/Paris', locale: 'fr-FR' }}>
+  <App />
+</DzCalendarProvider>
+```
+
+`motion={() => createGsapMotion()}` sur le provider crée un adaptateur
+d'animation par calendrier.
+
+## Rendu serveur
+
+Importer les paquets ne touche ni `document` ni `window` ; le calendrier n'est
+créé que dans le navigateur.
+
+## Le Pro
+
+```tsx
+import '@dzcalendar/pro';                     // les vues timeline
+import { useDzExport, useEventEditor } from '@dzcalendar/pro-react';
+
+const cal = useCalendarController();
+useEventEditor(cal, { onClosed: (outcome) => console.log(outcome) });
+const exports = useDzExport(cal);
+<button onClick={() => exports.download('pdf', 'agenda.pdf')}>PDF</button>
+```

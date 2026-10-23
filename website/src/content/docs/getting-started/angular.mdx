@@ -1,0 +1,187 @@
+---
+title: Angular
+description: The <dz-calendar> component for Angular 19 to 22 — signal inputs, two-way view, date and selection, templates and the controller.
+banner:
+  content: 'Not on npm yet: until the first release, install the packages from tarballs built with <code>npm run pack:local</code> — <a href="/dzcalendar/getting-started/installation/">how</a>.'
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@dzcalendar/angular` gives a `<dz-calendar>` component for Angular 19 to 22,
+zoneless or with zone.js, built on signals.
+
+## Install
+
+```sh
+ng add @dzcalendar/angular
+```
+
+The schematic installs `@dzcalendar/core`, `@dzcalendar/dom` and
+`@dzcalendar/theme`, puts `dzcalendar.css` in the build's styles and adds
+`provideDzCalendar({})` to `app.config.ts`. It asks whether to add GSAP
+motion, the Pro packages and an example component (`src/app/agenda.ts`);
+without the questions: `ng add @dzcalendar/angular --gsap --pro --example`.
+
+## Settings for the whole application
+
+```ts
+// app.config.ts
+import { provideDzCalendar } from '@dzcalendar/angular';
+import '@dzcalendar/core/recurrence'; // repeating events (rrule)
+
+export const appConfig = {
+  providers: [
+    provideDzCalendar({ timeZone: 'Europe/Paris', locale: 'fr-FR' }),
+  ],
+};
+```
+
+Every calendar of the application starts from these defaults; its own inputs
+win over them.
+
+## A calendar
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/core/recurrence'; // repeating events (rrule)
+import { Temporal } from '@dzcalendar/core';
+import type { EventInput, EventInstance, PlainDate, Selection } from '@dzcalendar/core';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <h2>{{ cal.controller.title() }}</h2>
+    <dz-calendar #cal
+      timeZone="Europe/Paris"
+      [events]="events()"
+      [(view)]="view" [(date)]="date" [(selection)]="selection"
+      [editable]="true" [selectable]="true"
+      (eventClick)="open($event)">
+      <ng-template dzEventContent let-event="event" let-ctx="ctx">
+        <b>{{ event.title }}</b> {{ ctx.timeText }}
+      </ng-template>
+    </dz-calendar>`,
+})
+export class Agenda {
+  readonly events = signal<EventInput[]>([
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true },
+    { id: 'w', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ]);
+  readonly view = signal<string | undefined>('timeGridWeek');
+  readonly date = signal<PlainDate | undefined>(Temporal.PlainDate.from('2026-10-21'));
+  readonly selection = signal<Selection | null>(null);
+
+  open(instance: EventInstance) {
+    console.log(instance.event.title);
+  }
+}
+```
+
+## What `<dz-calendar>` takes
+
+**Inputs** for the common options: `events`, `sources` (keep each spec the
+same object), `resources`, `timeZone`, `locale`, `axis` (`'wall'` or
+`'elapsed'`), `editable`, `selectable`, `businessHours`, `weekends`,
+`weekNumbers`, `hiddenDays`, `messages`, `theme`, `scheme`, `density`,
+`displayCalendar`, `secondaryCalendar`, `availableSlots`, `hooks`.
+
+**`[options]`** for everything else `update()` takes: `headerToolbar`,
+`firstDay`, `nowIndicator`, `scrollTime`, `dayMaxLanes`, `eventMaxStack`,
+`allDaySlot`, `displayEventTime`, `eventStyle`, `timeGrid`, `headerViews`,
+`contextMenu`… Every input, and every key of `[options]`, can change at any
+time.
+
+**Two-way**: `[(view)]`, `[(date)]`, `[(selection)]`.
+
+**Outputs**: `(dateClick)`, `(eventClick)`, `(eventOpen)`,
+`(createRequest)`, `(slotClick)`, `(selected)`, `(sourceNotice)`,
+`(problems)`, `(resourceProblems)`, `(dropped)`, `(eventReceive)`,
+`(eventLeave)` and `(eventChange)` — what a person changed (a drag, a resize,
+the keyboard, the menu, the editor), not what your own code ran.
+
+**Templates**: `<ng-template dzEventContent>` for the events,
+`<ng-template dzDayHeader let-day>` for each day's head (`day.date`,
+`day.lengthMinutes` — 1 380 or 1 500 on a clock change — `day.text`), and one
+for every element with a content: `dzDayCell`, `dzSlotLabel`,
+`dzAllDayLabel`, `dzMoreLink`, `dzNowIndicator`, `dzWeekNumber`,
+`dzNoEvents`, `dzListDayHeader`, `dzMonthHeader`, `dzResource`,
+`dzResourceGroupHeader`, `dzResourceAreaHeader`. They are your components, in
+your injector. `<ng-template dzHeaderItem="filter">` puts your own content in
+the header, at the place named in `headerToolbar`.
+
+## The controller
+
+`#cal` then `cal.controller` — or `inject(CalendarController)` in a component
+inside the calendar — gives signals (`state`, `title`, `range`, `view`,
+`date`, `canUndo`, `canRedo`, `loading`, `problems`, `instance`) and methods
+(`prev`, `next`, `today`, `goTo`, `changeView`, `dispatch` for a command,
+`undo`, `redo`, `refetch`). With it you can draw your own header.
+
+## Saving a person's change
+
+```ts
+import { Component, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import type { EventChange } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar [events]="events()" [editable]="true" (eventChange)="save($event)" />`,
+})
+export class Agenda {
+  private readonly http = inject(HttpClient);
+  // …
+  save(change: EventChange) {
+    const moved = change.after;
+    if (!moved) return;
+    this.http.patch(`/api/appointments/${moved.id}`, { start: moved.start.toString(), end: moved.end.toString() }).subscribe({
+      // Refused by the server: exactly this change is taken back.
+      error: () => change.revert(),
+    });
+  }
+}
+```
+
+`change.revert()` takes back exactly that change, even if another came after
+it; it returns `false`, and changes nothing, when the event was changed again
+since.
+
+<Aside>
+Check your templates with `ng build`, not `tsc`: only the Angular compiler
+reads them.
+</Aside>
+
+## From FullCalendar options
+
+`<dz-calendar [dzFullCalendar]="calendarOptions">` (from
+`@dzcalendar/angular/fullcalendar`) lays an existing FullCalendar options
+object on the calendar. See
+[Migrating from FullCalendar](../migrating-from-fullcalendar/).
+
+## The Pro
+
+```ts
+import { DzEventEditor, DzExport } from '@dzcalendar/pro-angular';
+
+@Component({
+  imports: [DZ_CALENDAR, DzEventEditor],
+  template: `
+    <dz-calendar #cal dzEventEditor view="resourceTimelineWeek" [resources]="rooms" [events]="events()" />
+    <button (click)="exports.download(cal.controller, 'pdf', 'agenda.pdf')">PDF</button>`,
+})
+export class Planning {
+  readonly exports = inject(DzExport);
+}
+```
+
+`import '@dzcalendar/pro'` once registers the timeline views. The editor and
+the exports are fetched on first use.
+
+:::note
+On Safari (no Temporal of its own), `provideDzCalendar()` holds the application's start until Temporal's polyfill has arrived: keep it in the providers, even with no defaults (without it, each `<dz-calendar>` waits by itself).
+:::
