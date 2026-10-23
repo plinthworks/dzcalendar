@@ -61,7 +61,8 @@ export interface ColumnAxis {
    * `prefer: 'earlier'`); in a repeat, the first reading unless told otherwise.
    */
   fromPosition(p: number, hint?: { readonly prefer?: 'earlier' | 'later' | { readonly offset: string } }): FromPosition;
-  ticks(stepMinutes: number): AxisTick[];
+  /** A tick every `stepMinutes`; `major` (labelled) every `labelMinutes` of the clock (default 60: the whole hours). */
+  ticks(stepMinutes: number, labelMinutes?: number): AxisTick[];
 }
 
 export interface ColumnAxisOptions {
@@ -88,6 +89,12 @@ const wallMinutes = (date: PlainDate, wall: PlainDateTime): number => wallMs(dat
 
 const wallAt = (date: PlainDate, minutes: number): PlainDateTime =>
   date.toPlainDateTime(Temporal.PlainTime.from('00:00')).add({ milliseconds: Math.round(minutes * 60000) });
+
+/** A tick labelled: its clock minutes a multiple of `every` (a bad `every` reads as the whole hours). */
+const labelled = (wall: PlainDateTime, every: number): boolean => {
+  const n = Number.isInteger(every) && every > 0 ? every : 60;
+  return (wall.hour * 60 + wall.minute) % n === 0 && wall.second === 0;
+};
 
 /** A step of zero would never end: a configuration error, said at once. */
 function assertStep(step: number): void {
@@ -161,7 +168,7 @@ export function buildColumnAxis(date: PlainDate, zone: ZoneId, o: ColumnAxisOpti
       // Read one millisecond earlier, then step that millisecond back.
       toEndPosition: quiet ? fast : (i) => clamp((wallMs(date, i.subtract({ milliseconds: 1 }).toZonedDateTimeISO(zone).toPlainDateTime()) + 1) / 60000 - minM),
       fromPosition: (p, hint) => resolveAt(minM + p, policyOf(hint)),
-      ticks(step) {
+      ticks(step, every = 60) {
         assertStep(step);
         const out: AxisTick[] = [];
         // On the clock's multiples of `step`: a grid from 08:30 still labels 09:00.
@@ -174,7 +181,7 @@ export function buildColumnAxis(date: PlainDate, zone: ZoneId, o: ColumnAxisOpti
             label: wall.toPlainTime(),
             instant: r.exists ? r.instant : null,
             ...(!r.exists ? { note: 'skipped' as const } : r.ambiguous ? { note: 'first-pass' as const } : {}),
-            major: wall.minute === 0,
+            major: labelled(wall, every),
           });
         }
         return out;
@@ -215,7 +222,7 @@ export function buildColumnAxis(date: PlainDate, zone: ZoneId, o: ColumnAxisOpti
       const alternative = r.ambiguous ? (r.instant!.equals(instant) ? r.other : r.instant) : null;
       return { instant, exists: true, ambiguous: r.ambiguous, alternative };
     },
-    ticks(step) {
+    ticks(step, every = 60) {
       assertStep(step);
       // Walk the wall clock, not elapsed minutes: every wall multiple of
       // `step` that happens gets a tick, twice when it happens twice. On Lord
@@ -231,11 +238,10 @@ export function buildColumnAxis(date: PlainDate, zone: ZoneId, o: ColumnAxisOpti
         for (const [instant, note] of readings) {
           const p = raw(instant);
           if (p < -1e-9 || p > length + 1e-9) continue;
-          out.push({ position: p, label: wall.toPlainTime(), instant, ...(note ? { note } : {}), major: wall.minute === 0 });
+          out.push({ position: p, label: wall.toPlainTime(), instant, ...(note ? { note } : {}), major: labelled(wall, every) });
         }
       }
       return out.sort((a, b) => a.position - b.position);
-      return out;
     },
   };
 }

@@ -197,8 +197,8 @@ export function dropTarget<G>(ctx: ViewCtx, shared: InteractionShared<G>): DropT
     accepts(c) {
       const live = ctx.live();
       if (ctx.scope.isDisposed || shared.busy || shared.holding) return false;
-      // Another calendar's event: this one editable too; a filter is given the event.
-      if (c.kind === 'calendar' && live.editable !== true) return false;
+      // Another calendar's event: this one editable too (or the event editable by its own say); a filter is given the event.
+      if (c.kind === 'calendar' && live.editable !== true && c.instance.event.perms.own === undefined) return false;
       const d = live.droppable;
       if (typeof d === 'function') {
         try {

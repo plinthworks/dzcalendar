@@ -100,6 +100,44 @@ first: it is on screen sooner, and nothing else changes —
   a second on a quiet page, longer on a page kept busy (a slice at least every
   second).
 
+## Worth knowing
+
+- **The box is given, never measured.** The calendar is as tall as
+  `--dz-height` says (40rem by default). `--dz-height: 100%` is 100% of its
+  host's height: the host needs one of its own (or `height: 100%` all the
+  way up); without it, the calendar grows with its hours and draws over the
+  page — it says so (`onProblem`, `host-no-height`).
+  `<dz-calendar>` is a block.
+- **Problems while drawing** come to `onProblem(problem)` (`{ code, detail,
+  element }`), or to the console once per code without it:
+  `events-not-drawn` (all-day events in a time grid with `allDaySlot:
+  false` — an all-day background still washes its columns — and timed events
+  entirely outside `slotMin`–`slotMax`), `host-no-height`. Each is told once,
+  and again if it comes back after going away. In the wrappers: React
+  `onProblem`, Angular `(problem)` (also on the console), Vue `@problem`.
+- **Who may change an event**: `editable` is the calendar's default; an
+  event's own `editable`, `startEditable` or `durationEditable` wins over it.
+  A `true` of its own makes it editable that way in a calendar that is not
+  (`durationEditable: true` alone: resized, not moved; deleted only with
+  `editable: true`); it then carries `data-editable` (`move`, `resize`), has
+  its menu entries as far as it said, and may be dropped on another
+  calendar. Ctrl+Z stays the editable calendar's.
+- **The month shows every event** by default (the weeks grow); a year's
+  tiny days show what fits, then "+N". `dayMaxLanes: 'auto'` (or a number)
+  for "+N" in a month too — the right choice for a very crowded one.
+- **The hours' labels** (a time grid's): one a whole hour; `timeGrid: {
+  labelMinutes: 30 }` for every half hour (`slotMinutes` sets the ticks; a
+  label falls on a tick, so take a multiple of it). Every tick carries
+  `data-time`. A timeline's heads have their own scale (`timeline.slot`).
+- **Structure**: a resize grip is the event's `::after` (6 px; no node);
+  in a month, bars are children of the week's row, not of the day's cell
+  (`grid-column`); a time grid's columns and day heads both carry
+  `data-date`; events come in with `extendedProps` and are read back as
+  `props`. Templates for a month's day cell and for the hours' labels exist:
+  `hooks.dayCell` and `hooks.slotLabel` (`dzDayCell` / `dzSlotLabel` in
+  Angular, `renderDayCell` / `renderSlotLabel` in React, `#day-cell` /
+  `#slot-label` slots in Vue).
+
 ## Then
 
 - Frameworks: `docs/angular.md`, `docs/react.md`, `docs/vue.md`, the Web

@@ -53,6 +53,8 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   store,
   editable: true,
   eventMaxStack: stack,
+  // The crowded month's "+N" is what is measured (every event is the default since 18k).
+  dayMaxLanes: 'auto',
   ...(res > 0 && { resources: Array.from({ length: res }, (_, i) => ({ id: `r${i}`, title: `Resource ${i}` })) }),
 });
 const sync = performance.now() - t0;

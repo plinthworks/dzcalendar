@@ -28,6 +28,8 @@ export interface TimeGridOptions {
   readonly minEventMinutes?: number;
   /** Gutter tick step, in minutes. Default 60. */
   readonly slotMinutes?: number;
+  /** A tick labelled every this many minutes of the clock (whole multiples of `slotMinutes` make sense). Default 60. */
+  readonly labelMinutes?: number;
   readonly resourceId?: string;
   /**
    * A resource view: one column per resource and date, resources first
@@ -150,6 +152,8 @@ export interface TimeGridColumn {
   readonly events: readonly PlacedTimed[];
   /** `display: 'background'` events: full width, under the others. */
   readonly background: readonly PlacedTimed[];
+  /** Ids of the timed events of this day entirely outside the hours shown (`slotMin`–`slotMax`): not drawn (backgrounds aside). */
+  readonly outside: readonly string[];
   /** "+N" links of clusters wider than `maxStack` (empty without it). */
   readonly more: readonly MoreTimed[];
   /** Stretches outside business hours, in axis minutes. Empty without `businessHours`. */
@@ -235,7 +239,7 @@ export function buildTimeGridColumn(
   resource: Resource | null = null,
 ): TimeGridColumn {
   const key = columnKey(date, resource);
-  if (axis.length === 0) return { key, date, resource, axis, folded: true, events: [], background: [], more: [], offHours: [], slots: [] };
+  if (axis.length === 0) return { key, date, resource, axis, folded: true, events: [], background: [], more: [], offHours: [], slots: [], outside: [] };
 
   const day = axis.day;
   const instances = query(snap, viewWindow(date, date.add({ days: 1 }), o.displayZone), o, resource);
@@ -248,6 +252,7 @@ export function buildTimeGridColumn(
   const aStart = axis.start.epochMilliseconds;
   const aEnd = axis.end.epochMilliseconds;
   const segs: TimedSegment[] = [];
+  const outside = new Set<string>();
   for (const inst of instances) {
     if (inst.event.allDay) {
       // An all-day background (a closed day) tints the whole column too, every hour shown — not only the all-day row.
@@ -261,7 +266,10 @@ export function buildTimeGridColumn(
       const f = seg.from.epochMilliseconds;
       const t = seg.to.epochMilliseconds;
       const inside = f === t ? f >= aStart && f < aEnd : t > aStart && f < aEnd;
-      if (!inside) continue;
+      if (!inside) {
+        if (!isBackground(inst.event.display)) outside.add(inst.event.id);
+        continue;
+      }
       const cut = f >= aStart && t <= aEnd ? seg : { ...seg, startsHere: seg.startsHere && f >= aStart, endsHere: seg.endsHere && t <= aEnd };
       // An event on two resources has a piece in each column: each its own key.
       segs.push(resource ? { ...cut, key: `${cut.key}|${resource.id}` } : cut);
@@ -301,7 +309,7 @@ export function buildTimeGridColumn(
   const max = o.maxStack !== undefined && o.maxStack !== null && Number.isInteger(o.maxStack) && o.maxStack >= 1 ? o.maxStack : null;
   if (max === null || !placements.some((p) => p.lanes > max)) {
     const events = placements.map((p) => place(byKey.get(p.key)!, p));
-    return { key, date, resource, axis, folded: false, events, background, more: [], offHours: offHoursOf(date, axis, o, resource), slots: slotsOf(axis, o, resource) };
+    return { key, date, resource, axis, folded: false, events, background, more: [], offHours: offHoursOf(date, axis, o, resource), slots: slotsOf(axis, o, resource), outside: [...outside] };
   }
   // A cluster wider than `max`: its first `max - 1` lanes are drawn, as wide as
   // `max` lanes allow; the others go behind "+N" in lane `max - 1`, one link per
@@ -341,7 +349,7 @@ export function buildTimeGridColumn(
     end = Math.max(end, h.top + h.visualHeight);
   }
   close();
-  return { key, date, resource, axis, folded: false, events, background, more, offHours: offHoursOf(date, axis, o, resource), slots: slotsOf(axis, o, resource) };
+  return { key, date, resource, axis, folded: false, events, background, more, offHours: offHoursOf(date, axis, o, resource), slots: slotsOf(axis, o, resource), outside: [...outside] };
 }
 
 /** A slot's start or end as an Instant; null for anything else (a string, a date): such a slot is not drawn. */
@@ -431,7 +439,7 @@ function resourceHeadsOf(range: ViewRange, o: TimeGridOptions): ResourceHead[] {
 function gutterOf(columns: readonly TimeGridColumn[], o: TimeGridOptions): AxisTick[] {
   const step = o.slotMinutes ?? 60;
   const ordinary = columns.find((c) => !c.folded && c.axis.day.transitions.length === 0) ?? columns.find((c) => !c.folded);
-  return ordinary ? ordinary.axis.ticks(step) : [];
+  return ordinary ? ordinary.axis.ticks(step, o.labelMinutes ?? 60) : [];
 }
 
 /**

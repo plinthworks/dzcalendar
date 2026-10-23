@@ -62,12 +62,18 @@ A `motion` given to `provideDzCalendar` or to a calendar wins over
 `messages`, `theme`, `scheme`, `density`, `displayCalendar`,
 `secondaryCalendar`, `availableSlots`, and **`[options]`** for everything
 else `update()` takes — `firstDay`, `rules`, `nowIndicator`, `scrollTime`,
-`dayMaxLanes` (`'auto'`, a number, or `null`: every event, the weeks grow),
+`dayMaxLanes` (by default `null` in a month — every event, the weeks grow —
+and `'auto'` in a year view; `'auto'`: what the height allows, then "+N"; or
+a number),
 `eventMaxStack`, `allDaySlot`, `displayEventTime`, `eventStyle`
 (`'tinted'` | `'solid'`), `timeGrid`, `headerViews`, `contextMenu`… All of
 them can change at any time.
 
 **Two-way**: `[(view)]`, `[(date)]`, `[(selection)]`.
+
+**`(problem)`**: something the calendar could not do as asked, found while
+drawing (`events-not-drawn`, `host-no-height`); said on the console too, once
+per code.
 
 **Outputs**: `(dateClick)`, `(eventClick)`, `(eventOpen)`,
 `(createRequest)`, `(slotClick)`, `(selected)`, `(sourceNotice)`,

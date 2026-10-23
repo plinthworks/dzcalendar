@@ -1034,6 +1034,59 @@ try {
       await p.close();
     }
 
+    // ── Phase 18k: Sehhaty's production report, each point in real Chrome ──
+    {
+      const { p, errors } = await page('/sehhaty-checks.html');
+      await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      await p.waitForTimeout(400);
+      const drag = async (from, to) => {
+        await p.mouse.move(from.x, from.y);
+        await p.mouse.down();
+        await p.mouse.move(from.x, from.y + 6, { steps: 2 });
+        await p.mouse.move(to.x, to.y, { steps: 10 });
+        await p.waitForTimeout(60);
+        await p.mouse.up();
+        await p.waitForTimeout(120);
+      };
+      // A crowded all-day row scrolls; a timed event dragged down in the hours under it stays timed.
+      const ev = await p.evaluate(() => { const e = document.querySelector('#drag .dz-ev[data-event-id="moved"]'); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 8 }; });
+      await drag(ev, { x: ev.x, y: ev.y + 96 });
+      const moved = await p.evaluate(() => { const e = window.cals.drag.kernel.store.snapshot.getEvent('moved'); return { allDay: e.allDay, start: String(e.start).slice(11, 16) }; });
+      check('18k: a timed event dragged 96 px down under a crowded all-day row stays timed, later', moved.allDay === false && moved.start > '08:30', JSON.stringify(moved));
+      // 2. A closed day (an all-day background) washes its columns, allDaySlot false.
+      const washed = await p.evaluate(() => document.querySelectorAll('#closed .dz-tg__col .sl-overlay-blocked').length);
+      check('18k: an all-day background washes its columns without the all-day row (two closed days, two washes)', washed === 2, String(washed));
+      // 1. Labels every 30 minutes.
+      const ticks = await p.evaluate(() => [...document.querySelectorAll('#labels .dz-tick')].slice(0, 5).map((t) => `${t.textContent}|${t.dataset.time}`));
+      check('18k: labelMinutes 30 names 08:00 and 08:30; every tick says its time', JSON.stringify(ticks) === JSON.stringify(['08:00|08:00', '|08:15', '08:30|08:30', '|08:45', '09:00|09:00']), JSON.stringify(ticks));
+      // 10. The month shows every event; 5. a right-click on a background opens the day's menu.
+      const month = await p.evaluate(() => ({ bars: document.querySelectorAll('#month .dz-dg__week .dz-bar:not(.dz-bar--bg)').length, more: document.querySelectorAll('#month .dz-more').length }));
+      check('18k: the month shows thirteen appointments of a day, no "+N" by default', month.bars === 13 && month.more === 0, JSON.stringify(month));
+      const bg = await p.evaluate(() => { const b = document.querySelector('#month .dz-bar--bg'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+      await p.mouse.click(bg.x, bg.y, { button: 'right' });
+      await p.waitForTimeout(150);
+      const menuOpen = await p.evaluate(() => { const m = document.querySelector('#month .dz-menu'); return m !== null && !m.hidden; });
+      check('18k: a right-click on a month background opens the day menu (the cell under the pointer)', menuOpen, '');
+      await p.keyboard.press('Escape');
+      // 3. An event that says durationEditable: true resizes in a calendar that is not editable; another does not.
+      const own = await p.evaluate(() => { const e = document.querySelector('#own .dz-ev[data-event-id="mine"]'); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.bottom - 2, editable: e.hasAttribute('data-editable'), other: document.querySelector('#own .dz-ev[data-event-id="other"]').hasAttribute('data-editable') }; });
+      await drag(own, { x: own.x, y: own.y + 36 });
+      const resized = await p.evaluate(() => { const e = window.cals.own.kernel.store.snapshot.getEvent('mine'); return String(e.end).slice(11, 16); });
+      check('18k: an event saying durationEditable: true is resized in a calendar that is not editable; the other is not marked', own.editable && !own.other && resized === '10:00', JSON.stringify({ own, resized }));
+      // It said only its length: its body does not move it (its start is the calendar's to allow).
+      const body = await p.evaluate(() => { const e = document.querySelector('#own .dz-ev[data-event-id="mine"]'); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 10 }; });
+      await drag(body, { x: body.x, y: body.y + 72 });
+      const still = await p.evaluate(() => String(window.cals.own.kernel.store.snapshot.getEvent('mine').start).slice(11, 16));
+      check('18k: an event that said only durationEditable: true does not move by its body in a calendar that is not editable', still === '09:00', still);
+      // The timeline, navigated six times a frame apart: no error.
+      await p.evaluate(async () => { for (let i = 0; i < 6; i++) { window.cals.timeline.navigate(i % 2 ? 'prev' : 'next'); await new Promise((r) => requestAnimationFrame(r)); } window.cals.timeline.navigate('today'); await new Promise((r) => setTimeout(r, 200)); });
+      // A calendar whose height comes from its content: host-no-height told.
+      const told = await p.evaluate(() => window.problems.map((x) => x.code));
+      check('18k: a calendar taller than the page with nothing scrolling is told (host-no-height)', told.includes('host-no-height'), JSON.stringify(told));
+      check('18k: no console error (the timeline navigated six times a frame apart included)', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
     // ── Phase 18g-4: WCAG 2.2 AA beyond axe's defaults ──
     {
       // An empty day: its scrolling hours hold the grid's one tab stop (owner); Tab scrolls nothing; an arrow puts the cursor at the hour in view.
@@ -1230,6 +1283,9 @@ try {
       const { p: n } = await page('/gallery.html', { viewport: { width: 320, height: 640 } });
       await n.waitForFunction(() => window.ready, null, { timeout: 15000 });
       await n.waitForTimeout(300);
+      // "+N" asked for (every event is the default since 18k).
+      await n.evaluate(() => window.cals.dayGridMonth.update({ dayMaxLanes: 2 }));
+      await n.waitForTimeout(150);
       const narrow = await n.evaluate(() => ({
         list: [...document.querySelectorAll('.dz-list')].map((l) => l.scrollWidth - l.clientWidth).filter((x) => x > 0),
         more: [...document.querySelectorAll('#v-dayGridMonth .dz-more')].map((m) => { const range = document.createRange(); range.selectNodeContents(m.firstChild); const r = range.getBoundingClientRect(); const b = m.getBoundingClientRect(); return r.right <= b.right + 1 && /\d/.test(m.firstChild.textContent); }),

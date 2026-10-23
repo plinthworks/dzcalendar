@@ -29,6 +29,8 @@ function make(axis: 'wall' | 'elapsed') {
     initialDate: Temporal.PlainDate.from('2026-10-21'),
     events: DEMO_EVENTS,
     headerViews: ['multiMonthYear', 'dayGridMonth', 'timeGridWeek', 'timeGridDay', 'listWeek'],
+    // The month's "+N" shown here (every event is the default since 18k).
+    dayMaxLanes: 'auto',
     weekNumbers: (document.querySelector<HTMLInputElement>('#weeknums')?.checked) ?? false,
     timeGrid: { axis, slotMinutes: 60 },
     businessHours: { daysOfWeek: [1, 2, 3, 4, 5], start: '09:00', end: '18:00' },

@@ -26,6 +26,6 @@ export { anyTarget, heldOn, holdOn, targetAt } from './interact/drop.js';
 export type { Carried, DropTarget, PageHold } from './interact/drop.js';
 export { TEMPLATE_ELEMENTS, templateClass, templateHooks, templateShape } from './render/templates.js';
 export type { TemplateElement, TemplateSource } from './render/templates.js';
-export { handles } from './interact/handles.js';
+export { handles, mayDelete, mayMove, mayResize } from './interact/handles.js';
 export type { ResourceContentCtx, ResourceHooks } from './host.js';
 export { activeIn, targetOf } from './focus.js';

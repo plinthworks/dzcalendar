@@ -30,9 +30,10 @@ export function toInput(e: CalEvent): EventInput {
     display: e.display,
     status: e.status,
     busy: e.busy,
-    startEditable: e.perms.start,
-    durationEditable: e.perms.duration,
-    resourceEditable: e.perms.resource,
+    // As written: a `true` only where the event said it (`own`), a `false` always — so a round trip keeps `own` as it was.
+    ...((e.perms.own?.start === true || !e.perms.start) && { startEditable: e.perms.start }),
+    ...((e.perms.own?.duration === true || !e.perms.duration) && { durationEditable: e.perms.duration }),
+    ...(!e.perms.resource && { resourceEditable: false }),
     classNames: e.classNames,
     ...(e.tone !== undefined && { tone: e.tone }),
     ...(e.url !== undefined && { url: e.url }),

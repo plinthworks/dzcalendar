@@ -54,6 +54,8 @@ export function eventEquals(a: CalEvent, b: CalEvent): boolean {
     a.perms.start === b.perms.start &&
     a.perms.duration === b.perms.duration &&
     a.perms.resource === b.perms.resource &&
+    a.perms.own?.start === b.perms.own?.start &&
+    a.perms.own?.duration === b.perms.own?.duration &&
     a.tone === b.tone &&
     a.url === b.url &&
     a.sourceId === b.sourceId &&

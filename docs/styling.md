@@ -56,7 +56,7 @@ contract test fails, as for a part.
 | Where | States |
 |---|---|
 | a day: `.dz-dg__cell`, `.dz-tg__col`, `.dz-tg__dayhead`, `.dz-list__day` (a year's cells too) | `data-date`, `data-weekday` (ISO, Monday `1` … Sunday `7`), `data-today`, `data-past`, `data-future`, `data-outside` (a month's padding day), `data-closed` (business hours closed all that day), `data-folded` (a day that did not exist in the zone), `data-resource` (its column's resource) |
-| an event, every view: `.dz-ev`, `.dz-bar`, `.dz-list__ev`, `.dz-tl__ev` (the "+N" panel's bars too) | `data-event-id`, `data-series-id`, `data-tone` (its tone's name), `data-all-day`, `data-background`, `data-past` / `data-future`, `data-selected` (touch), `data-moving` (being moved by a pointer or the keyboard); on a grid's blocks and bars (`.dz-ev`, `.dz-bar` in a grid, `.dz-tl__ev` — not a list's entries nor the panel's bars): `data-continues-before` / `data-continues-after`, the same as the classes ending in `--cont-start` / `--cont-end` (cut by the period's edge) |
+| an event, every view: `.dz-ev`, `.dz-bar`, `.dz-list__ev`, `.dz-tl__ev` (the "+N" panel's bars too) | `data-event-id`, `data-series-id`, `data-tone` (its tone's name), `data-all-day`, `data-background`, `data-past` / `data-future`, `data-selected` (touch), `data-moving` (being moved by a pointer or the keyboard), `data-editable` (`move`, `resize` or both: what it may do by its own say — `startEditable`, `durationEditable` or `editable: true` — even in a calendar that is not); on a grid's blocks and bars (`.dz-ev`, `.dz-bar` in a grid, `.dz-tl__ev` — not a list's entries nor the panel's bars): `data-continues-before` / `data-continues-after`, the same as the classes ending in `--cont-start` / `--cont-end` (cut by the period's edge) |
 | a preview: `.dz-ghost` | `data-invalid` (the rules refuse that place); `data-time` holds the time shown (a value, not a state) |
 | a free slot: `.dz-slot` | `data-seats` (seats left, a group session) |
 | the calendar: `.dz-cal` | `data-view` (the view's type), `data-dz-theme`, `data-dz-scheme` (`light` / `dark` when forced), `data-dz-density`, `data-dz-event-style`, `data-dz-look` (`none` when unstyled), `data-editable`, `data-loading` |
@@ -78,6 +78,8 @@ contract test fails, as for a part.
   `data-dz-roll`, `data-dzcalendar`.
 
 ## The element (`<dz-calendar>`)
+
+`<dz-calendar>` is a block by the calendar's base layer (an unknown element is inline); a page's rule wins.
 
 Its shadow root exposes two parts: `dz-calendar::part(calendar)` (the
 calendar) and `dz-calendar::part(toolbar)` (its header).
@@ -159,6 +161,7 @@ The --dzc-… and --dzp-… properties are the theme's own palette, private: the
 | `.dz-tg__bg`, `.dz-tg__events`, `.dz-tg__mores`, `.dz-tg__slots`, `.dz-slot` | a column's backgrounds, events, "+N", free slots |
 | `.dz-now` | the now line |
 | `.dz-more__rest` | "+N"'s words after the count (dropped when narrow) |
+| `.dz-tick` | an hour's tick of the gutter: `data-time` (`HH:mm`, labelled or not; a label every `timeGrid.labelMinutes`) |
 | `.dz-cursor`, `.dz-cursor--rest`, `.dz-tg__rest` | the keyboard's place; not placed yet (stuck to the top of the hours shown), in its box |
 
 ### The day grid and the month (`dayGridMonth`, `dayGridWeek`…)

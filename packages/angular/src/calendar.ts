@@ -36,7 +36,7 @@ import type {
   ZoneId,
 } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, DropInfo, DzMessages, EventChange, EventContentCtx, EventLeave, MotionAdapter } from '@dzcalendar/dom';
+import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarProblem, CalendarUpdate, DateClick, DropInfo, DzMessages, EventChange, EventContentCtx, EventLeave, MotionAdapter } from '@dzcalendar/dom';
 import { templateClass, templateHooks, templateShape } from '@dzcalendar/dom/toolkit';
 import type { TemplateElement, TemplateSource } from '@dzcalendar/dom/toolkit';
 import { CalendarController } from './controller.js';
@@ -60,7 +60,7 @@ import {
 } from './templates.js';
 
 /** The callbacks the component turns into outputs: not options (they would silence the outputs). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange', 'onDrop', 'onEventReceive', 'onEventLeave'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange', 'onDrop', 'onEventReceive', 'onEventLeave', 'onProblem'] as const;
 
 /** What `[options]` takes: what `update()` takes, less what has an input or an output of its own. */
 export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | 'headerItems' | (typeof OWN_CALLBACKS)[number]>;
@@ -157,6 +157,9 @@ export class DzCalendar implements OnDestroy {
   /** Loading, a failed fetch, problems in a delivery, a save refused. */
   readonly sourceNotice = output<SourceNotice>();
   readonly problems = output<NormalizationReport>();
+  /** Something the calendar could not do as asked, found while drawing (said on the console too, once per code). */
+  readonly problem = output<CalendarProblem>();
+  private readonly warnedProblems = new Set<string>();
   /** What the `resources` given could not be read as. */
   readonly resourceProblems = output<readonly Problem[]>();
   /** What a person changed (a drag, a resize, the keyboard, the menu, the editor): persist it; `revert()` if the server refuses. */
@@ -300,6 +303,14 @@ export class DzCalendar implements OnDestroy {
           this.lastSelection = null;
           if (untracked(this.selection) !== null) this.selection.set(null);
         }),
+      // An output cannot tell whether it is listened to: told there, and on the console once per code.
+      onProblem: (p) => {
+        if (!this.warnedProblems.has(p.code)) {
+          this.warnedProblems.add(p.code);
+          console.warn(`dzcalendar: ${p.code} — ${p.detail}`);
+        }
+        this.emit(() => this.problem.emit(p));
+      },
       onSource: (n) =>
         this.emit(() => {
           if (n.type === 'loading') this.controller.loading.set(n.loading);

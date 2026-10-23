@@ -137,6 +137,44 @@ first: it is on screen sooner, and nothing else changes —
   a second on a quiet page, longer on a page kept busy (a slice at least every
   second).
 
+## Worth knowing
+
+- **The box is given, never measured.** The calendar is as tall as
+  `--dz-height` says (40rem by default). `--dz-height: 100%` is 100% of its
+  host's height: the host needs one of its own (or `height: 100%` all the
+  way up); without it, the calendar grows with its hours and draws over the
+  page — it says so (`onProblem`, `host-no-height`).
+  `<dz-calendar>` is a block.
+- **Problems while drawing** come to `onProblem(problem)` (`{ code, detail,
+  element }`), or to the console once per code without it:
+  `events-not-drawn` (all-day events in a time grid with `allDaySlot:
+  false` — an all-day background still washes its columns — and timed events
+  entirely outside `slotMin`–`slotMax`), `host-no-height`. Each is told once,
+  and again if it comes back after going away. In the wrappers: React
+  `onProblem`, Angular `(problem)` (also on the console), Vue `@problem`.
+- **Who may change an event**: `editable` is the calendar's default; an
+  event's own `editable`, `startEditable` or `durationEditable` wins over it.
+  A `true` of its own makes it editable that way in a calendar that is not
+  (`durationEditable: true` alone: resized, not moved; deleted only with
+  `editable: true`); it then carries `data-editable` (`move`, `resize`), has
+  its menu entries as far as it said, and may be dropped on another
+  calendar. Ctrl+Z stays the editable calendar's.
+- **The month shows every event** by default (the weeks grow); a year's
+  tiny days show what fits, then "+N". `dayMaxLanes: 'auto'` (or a number)
+  for "+N" in a month too — the right choice for a very crowded one.
+- **The hours' labels** (a time grid's): one a whole hour; `timeGrid: {
+  labelMinutes: 30 }` for every half hour (`slotMinutes` sets the ticks; a
+  label falls on a tick, so take a multiple of it). Every tick carries
+  `data-time`. A timeline's heads have their own scale (`timeline.slot`).
+- **Structure**: a resize grip is the event's `::after` (6 px; no node);
+  in a month, bars are children of the week's row, not of the day's cell
+  (`grid-column`); a time grid's columns and day heads both carry
+  `data-date`; events come in with `extendedProps` and are read back as
+  `props`. Templates for a month's day cell and for the hours' labels exist:
+  `hooks.dayCell` and `hooks.slotLabel` (`dzDayCell` / `dzSlotLabel` in
+  Angular, `renderDayCell` / `renderSlotLabel` in React, `#day-cell` /
+  `#slot-label` slots in Vue).
+
 ## Then
 
 - Frameworks: `docs/angular.md`, `docs/react.md`, `docs/vue.md`, the Web
@@ -214,12 +252,18 @@ A `motion` given to `provideDzCalendar` or to a calendar wins over
 `messages`, `theme`, `scheme`, `density`, `displayCalendar`,
 `secondaryCalendar`, `availableSlots`, and **`[options]`** for everything
 else `update()` takes — `firstDay`, `rules`, `nowIndicator`, `scrollTime`,
-`dayMaxLanes` (`'auto'`, a number, or `null`: every event, the weeks grow),
+`dayMaxLanes` (by default `null` in a month — every event, the weeks grow —
+and `'auto'` in a year view; `'auto'`: what the height allows, then "+N"; or
+a number),
 `eventMaxStack`, `allDaySlot`, `displayEventTime`, `eventStyle`
 (`'tinted'` | `'solid'`), `timeGrid`, `headerViews`, `contextMenu`… All of
 them can change at any time.
 
 **Two-way**: `[(view)]`, `[(date)]`, `[(selection)]`.
+
+**`(problem)`**: something the calendar could not do as asked, found while
+drawing (`events-not-drawn`, `host-no-height`); said on the console too, once
+per code.
 
 **Outputs**: `(dateClick)`, `(eventClick)`, `(eventOpen)`,
 `(createRequest)`, `(slotClick)`, `(selected)`, `(sourceNotice)`,
@@ -483,6 +527,10 @@ result's `problems` say what went wrong.
 
 ## Notes
 
+- `onProblem` (React) / `@problem` (Vue): something the calendar could not
+  do as asked, found while drawing (`events-not-drawn`, `host-no-height`);
+  without a listener, the console says it once per code.
+
 - A content hook (or template, slot) now also receives **background
   events**, in a time grid's columns, with `ctx.background`: return nothing
   for them to keep a plain tint. The all-day row's and the month's
@@ -616,6 +664,10 @@ are fetched on first use. Nothing throws: a
 result's `problems` say what went wrong.
 
 ## Notes
+
+- `onProblem` (React) / `@problem` (Vue): something the calendar could not
+  do as asked, found while drawing (`events-not-drawn`, `host-no-height`);
+  without a listener, the console says it once per code.
 
 - A content hook (or template, slot) now also receives **background
   events**, in a time grid's columns, with `ctx.background`: return nothing
@@ -1826,8 +1878,10 @@ not a circular dependency.
   browser's); the calendar's then is the application's
   (`provideDzCalendar({ timeZone })`), never silently the browser's.
 - **Every day's events.** FullCalendar shows them all unless `dayMaxEvents`
-  says otherwise: so does the translation (`dayMaxLanes: null`, the weeks
-  grow).
+  says otherwise: so does DzCalendar (`dayMaxLanes: null` is its default
+  too, the weeks grow).
+- **`slotLabelInterval`** becomes `timeGrid.labelMinutes` (a label every N
+  minutes of the clock; the whole hours by default).
 - **`eventDrop`, `eventResize`, `eventChange`, `eventAdd`, `eventRemove`**
   follow a person's change (a gesture, the keyboard, the menu, the editor);
   your own `calendar.run()` is not reported — theirs reports `addEvent` and

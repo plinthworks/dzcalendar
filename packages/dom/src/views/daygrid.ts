@@ -890,7 +890,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
     },
   };
 
-  attachMenuTriggers(ctx, root, (target) => {
+  attachMenuTriggers(ctx, root, (target, point) => {
     if (sections.length === 0) return null;
     const barEl = target.closest<HTMLElement>('.dz-bar:not(.dz-bar--bg), .dz-dg__item');
     if (barEl) {
@@ -899,7 +899,12 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
       const anchor = barEl.matches('.dz-dg__item') ? (barEl.closest<HTMLElement>('.dz-dg__cell') ?? barEl) : barEl;
       return seg ? { target: { kind: 'event', instance: seg.instance }, anchor, focus: barEl.matches('.dz-dg__item') ? barEl : focusTarget(barEl) } : null;
     }
-    const cell = target.closest<HTMLElement>('.dz-dg__cell');
+    // A background bar lives in the week's row, beside the cells (not in one): the cell is the one under the pointer.
+    const cell =
+      target.closest<HTMLElement>('.dz-dg__cell') ??
+      // Read in the calendar's own root (the element's shadow root: the document's would stop at its host).
+      (point ? (((root.getRootNode() as Document | ShadowRoot).elementsFromPoint?.(point.x, point.y) ?? root.ownerDocument.elementsFromPoint?.(point.x, point.y) ?? []).find((e) => e.matches('.dz-dg__cell') && root.contains(e)) as HTMLElement | undefined) : undefined) ??
+      null;
     if (!cell) return null;
     const resource = cell.dataset['resource'];
     return { target: { kind: 'day', date: Temporal.PlainDate.from(cell.dataset['date']!), ...(resource !== undefined && { resourceId: resource }) }, anchor: cell };

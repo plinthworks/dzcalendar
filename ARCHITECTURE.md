@@ -82,6 +82,11 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18k — retours de production Sehhaty (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : un fond « journée » lave toujours ses colonnes horaires ; le `true` d'un événement gagne sur le défaut du calendrier (`perms.own = { start, duration }`, `data-editable`) ; `onProblem` pour les problèmes vus au dessin (console une fois par code sans lui) ; un mois montre tous les événements par défaut, une année « +N ».
+- **C (core)** : `timeGrid.labelMinutes` (`ticks(step, labelMinutes)`), `assertTimeGrid`, `TimeGridColumn.outside`, `setOptions(…, { silent })`.
+
 ### Ajustements après la Phase 18h — premier rendu (détail dans ROADMAP.md)
 
 - **Décisions du propriétaire** : au-delà de 2 000 événements, la période affichée d'abord, le reste en tâche de fond ; transparent (toute lecture complète termine d'abord le chargement).

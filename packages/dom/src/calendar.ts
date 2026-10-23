@@ -16,7 +16,7 @@ import { messagesForLocale } from './messages.js';
 import type { DzMessages } from './messages.js';
 import { WAAPI_MOTION } from './motion-waapi.js';
 import type { MotionAdapter, MotionChange, MotionEnter } from './motion.js';
-import { EVENT_NODE } from './interact/handles.js';
+import { EVENT_NODE, mayDelete, mayMove, mayResize } from './interact/handles.js';
 import { createPopover } from './popover.js';
 import { FrameScheduler } from './render/frame.js';
 import { h } from './render/reconcile.js';
@@ -62,7 +62,7 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly headerItems?: Readonly<Record<string, ElementHooks<HeaderItemCtx>>>;
   /** How each place is written: `{ slotLabel: { hour: 'numeric' }, title: (t) => … }` (docs/behaviors/formats.md). */
   readonly formats?: Formats;
-  /** Lanes a month day shows before "+N": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default 'auto'. */
+  /** Lanes a month day shows before "+N": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default null (owner, 18k: nothing hidden unless asked). */
   readonly dayMaxLanes?: number | 'auto' | null;
   readonly hooks?: CalendarHooks;
   /**
@@ -374,6 +374,9 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   // Theme, scheme, density: attributes the stylesheets read.
   const look = { theme: options.theme ?? 'standard', scheme: options.scheme ?? 'auto', density: options.density ?? 'comfortable', eventStyle: options.eventStyle ?? 'tinted', look: options.look ?? 'styled' };
   checkLook(look);
+  /** Problems told already (`onProblem`), and codes said on the console: the same is told once. */
+  const toldProblems = new Set<string>();
+  const warnedCodes = new Set<string>();
   let saidUnguarded = false;
   const applyLook = () => {
     // Always set: the theme's families (the standard one too) are keyed on it.
@@ -538,7 +541,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
         },
         ...(live.onCreateRequest && { onCreateRequest: live.onCreateRequest }),
         ...(live.onEventOpen && { onOpen: live.onEventOpen }),
-        ...(live.editable && {
+        // An event editable by its own say (owner, 18k) has its entries too, in a calendar that is not: as far as it said.
+        ...((live.editable || (target.kind === 'event' && mayDelete(target.instance.event, live.editable))) && {
           onCommand: (cmd: Command) => {
             // A person's choice from the menu: checked against the rules.
             const r = kernel.run(cmd, { validate: true });
@@ -546,10 +550,11 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             if (!r.ok) settings.current.onCommandRefused?.(r, cmd);
           },
         }),
-        ...(live.editable && interactions && {
+        ...((live.editable || (target.kind === 'event' && target.instance.event.perms.own !== undefined)) && interactions && {
           onGrab: (inst: EventInstance, kind: 'move' | 'resize') => interactions?.grab(inst, kind),
+          canMove: (inst: EventInstance) => mayMove(inst.event, live.editable),
           // A month draws a timed event's day, not its hours: it only moves there, as under the pointer.
-          canResize: (inst: EventInstance) => (mountedFamily !== 'dayGrid' && mountedFamily !== 'multiMonth') || inst.event.allDay,
+          canResize: (inst: EventInstance) => mayResize(inst.event, live.editable) && ((mountedFamily !== 'dayGrid' && mountedFamily !== 'multiMonth') || inst.event.allDay),
         }),
         ...(drawable('timeGridDay') && { onGoToDay: (d: PlainDate) => kernel.setView('timeGridDay', d) }),
       });
@@ -561,6 +566,25 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     },
     live: () => settings.current,
     rules: () => kernel.rules(),
+    problem(p, key = '') {
+      const told = `${p.code}|${key}`;
+      if (toldProblems.has(told)) return;
+      toldProblems.add(told);
+      const handler = settings.current.onProblem;
+      if (handler) {
+        try {
+          handler(p);
+        } catch (err) {
+          void Promise.reject(err);
+        }
+      } else if (!warnedCodes.has(p.code)) {
+        warnedCodes.add(p.code);
+        console.warn(`dzcalendar: ${p.code} — ${p.detail}`);
+      }
+    },
+    problemGone(code, key = '') {
+      toldProblems.delete(`${code}|${key}`);
+    },
     announce(text) {
       // Emptied first, so the same words twice are said twice.
       liveRegion.textContent = '';
@@ -656,6 +680,21 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   let enter: MotionEnter | null = null;
   /** The calendar has been drawn once: what comes next is a change. */
   let painted = false;
+  /** A calendar with no height of its own (Sehhaty, 18k: drawn over the whole page, the cause unseen): said. */
+  const checkBox = () => {
+    if (!win || scope.isDisposed || !root.isConnected || root.getClientRects().length === 0) return;
+    const h = root.getBoundingClientRect().height;
+    if (h === 0) return ctx.problem({ code: 'host-no-height', detail: 'the calendar is 0 px tall: its host has no height (an inline element, such as a <dz-calendar> without display: block?)', element: root });
+    const scroller = root.querySelector('.dz-tg__body, .dz-dg__body, .dz-list, .dz-tl__scroller');
+    // Nothing scrolls to speak of (a few pixels of a last row aside): the hours or the weeks are as tall as their content.
+    // A height given in absolute terms (px, rem, vh — or the default 40rem) is the application's: tall on purpose.
+    const given = (win.getComputedStyle(root).getPropertyValue('--dz-height') || '').trim();
+    const relative = given !== '' && /%|auto|fit-content|max-content|min-content/.test(given);
+    if (!(relative && h > win.innerHeight * 1.5 && scroller && scroller.scrollHeight - scroller.clientHeight < scroller.scrollHeight * 0.1)) return ctx.problemGone('host-no-height');
+    {
+      ctx.problem({ code: 'host-no-height', detail: `the calendar is ${Math.round(h)} px tall and nothing in it scrolls: its height comes from its content — give its host a height (--dz-height: 100% is 100% of the host's height, which needs one of its own)`, element: root });
+    }
+  };
   /** What was last drawn: the "from" of the next change. */
   let shown = kernel.getState();
   /** A change seen before its redraw, with what the adapter kept of the old screen. */
@@ -722,6 +761,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
     ctx.easeScroll = again;
     if (firstPaint) {
       firstPaint = false;
+      // The box is given, never measured: a calendar whose height comes from its content (or with none) is said, once, two frames on.
+      win?.requestAnimationFrame(() => win.requestAnimationFrame(checkBox));
       if (vm.family === 'timeline' && v.scrollTo) {
         // A timeline scrolls along time: to that hour of today when shown, else of its first day.
         v.scrollTo(Temporal.Duration.from(scrollTime ?? 'PT8H').total({ unit: 'minutes' }));
@@ -854,14 +895,23 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   // ── 'auto' lanes: measured once per size, never during a render ───────────
   let autoLanes = true;
   /** A month's lanes: a number, or 'auto' (measured). Also what `update({ dayMaxLanes })` calls. */
-  const setLanes = (lanes: number | 'auto' | null | undefined) => {
+  /** What the application asked (undefined: the default, decided per view). */
+  let lanesGiven = options.dayMaxLanes;
+  /** The default as it stands (re-decided when the view changes, while nothing is asked). */
+  let lanesDefault: 'auto' | null | undefined;
+  const defaultLanes = () => (kernel.getState().view.family === 'multiMonth' ? 'auto' : null);
+  const setLanes = (given: number | 'auto' | null | undefined, silent = false) => {
+    // Not given (owner, 18k): a month shows every event; a year's tiny days show what fits, then "+N".
+    if (given === undefined) lanesDefault = defaultLanes();
+    const lanes = given === undefined ? lanesDefault! : given;
     if (typeof lanes === 'number' && !(Number.isInteger(lanes) && lanes >= 1)) throw new RangeError(`dayMaxLanes must be a whole number ≥ 1, 'auto' or null: ${lanes}`);
-    autoLanes = (lanes ?? 'auto') === 'auto' && lanes !== null;
-    if (lanes === null) kernel.setOptions({ dayGrid: { maxLanes: null } });
-    else if (typeof lanes === 'number') kernel.setOptions({ dayGrid: { maxLanes: lanes } });
+    autoLanes = lanes === 'auto';
+    const how = { silent };
+    if (lanes === null) kernel.setOptions({ dayGrid: { maxLanes: null } }, how);
+    else if (typeof lanes === 'number') kernel.setOptions({ dayGrid: { maxLanes: lanes } }, how);
     // Until measured, a month shows at most 4 lanes: a day of 10 000 events must
     // not draw 10 000 nodes before "+N" exists.
-    else kernel.setOptions({ dayGrid: { maxLanes: 4 } });
+    else kernel.setOptions({ dayGrid: { maxLanes: 4 } }, how);
   };
   setLanes(options.dayMaxLanes);
   // A bar-sized probe, added once here (a write), only measured in `read`.
@@ -933,7 +983,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   }
   const RO = (win as (Window & { ResizeObserver?: typeof ResizeObserver }) | null)?.ResizeObserver;
   if (RO) {
-    const ro = new RO(() => (measureLanes(), measureStack(), view?.relayout?.()));
+    // A size changed (a tab shown, a layout fixed): the box checked again too.
+    const ro = new RO(() => (measureLanes(), measureStack(), view?.relayout?.(), checkBox()));
     ro.observe(root);
     scope.add(() => ro.disconnect());
   }
@@ -955,6 +1006,9 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   if (kernel.sources.loading) sourceNotice({ type: 'loading', loading: true });
   scope.add(
     kernel.subscribe((e) => {
+      // Another view, nothing asked: its default number of lanes first (a year: "+N"; a month: every event).
+      // Silently: this state event is about to be drawn, with them.
+      if (e.type === 'state' && e.causes.includes('view') && lanesGiven === undefined && defaultLanes() !== lanesDefault) setLanes(undefined, true);
       if (e.type === 'source') return sourceNotice(e.notice);
       // Nothing shown changed (a large load's later weeks): no redraw, an open menu or panel stays.
       if (e.type === 'store' && e.offscreen) return;
@@ -1275,6 +1329,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
             if (nowOn) view?.tick(kernel.now(), kernel.getState());
           }
           if ('dayMaxLanes' in changes) {
+            lanesGiven = changes.dayMaxLanes;
             setLanes(changes.dayMaxLanes);
             measureLanes();
           }

@@ -1,5 +1,5 @@
 import { Temporal, UNASSIGNED, isUnchanged, proposeMove, proposeResize, selectionBetween } from '@dzcalendar/core';
-import { BACKGROUND_NODE, EVENT_NODE } from './handles.js';
+import { BACKGROUND_NODE, EVENT_NODE, mayMove, mayResize } from './handles.js';
 import type { EventInstance, Hit, InteractionContext, PlainDate, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
 import { h } from '../render/reconcile.js';
@@ -216,11 +216,15 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     }
   };
 
-  const editableNode = (node: HTMLElement, inst: EventInstance) => ctx.live().editable === true && (inst.event.perms.start || inst.event.perms.duration) && !node.matches(BACKGROUND_NODE);
+  // The calendar editable, or the event by its own say (owner, 18k: its `true` wins over the calendar's default).
+  const editableNode = (node: HTMLElement, inst: EventInstance) => (mayMove(inst.event, ctx.live().editable) || mayResize(inst.event, ctx.live().editable)) && !node.matches(BACKGROUND_NODE);
 
   /** Which edge a press on an event grabbed: the end strip (or the start one), else the body. */
-  function modeAt(node: HTMLElement, inst: EventInstance, x: number, y: number, type: Press['type']): Mode {
-    if (!inst.event.perms.duration) return { kind: 'move' };
+  /** null: nothing this press may do (the event resizes only, and the body was pressed). */
+  function modeAt(node: HTMLElement, inst: EventInstance, x: number, y: number, type: Press['type']): Mode | null {
+    const editable = ctx.live().editable;
+    const move: Mode | null = mayMove(inst.event, editable) ? { kind: 'move' } : null;
+    if (!mayResize(inst.event, editable)) return move;
     const r = node.getBoundingClientRect();
     const band = Math.min(HANDLE[type], r.height / 3, r.width / 3);
     const horizontal = surface.family !== 'timeGrid' || inst.event.allDay;
@@ -229,7 +233,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     const nearStart = horizontal ? (rtl ? r.right - x < band : x - r.left < band) : y - r.top < band;
     if (nearEnd && node.dataset['resizeEnd'] === '1') return { kind: 'resize', edge: 'end' };
     if (nearStart && node.dataset['resizeStart'] === '1' && ctx.live().eventResizableFromStart) return { kind: 'resize', edge: 'start' };
-    return { kind: 'move' };
+    return move;
   }
 
   ctx.scope.on(root, 'pointerdown', (e) => {
@@ -253,8 +257,9 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     const base = { id: pe.pointerId, type, x0: pe.clientX, y0: pe.clientY, at: win.performance.now() };
     if (node && inst) {
       // A finger on an event that is not selected: let the page scroll; a tap will select it.
-      const draggable = editableNode(node, inst) && (type !== 'touch' || selected === node);
-      press = { ...base, mode: draggable ? modeAt(node, inst, pe.clientX, pe.clientY, type) : { kind: 'move' }, instance: draggable ? inst : null, node };
+      const mode = editableNode(node, inst) && (type !== 'touch' || selected === node) ? modeAt(node, inst, pe.clientX, pe.clientY, type) : null;
+      const draggable = mode !== null;
+      press = { ...base, mode: mode ?? { kind: 'move' }, instance: draggable ? inst : null, node };
       if (draggable && type !== 'touch') {
         pe.preventDefault(); // no text selection while dragging…
         (surface.focusTarget?.(node) ?? node).focus({ preventScroll: true }); // …which also cancels the focus a click gives: given back here.
@@ -736,7 +741,7 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
   return {
     refresh() {
       // No longer editable: an event selected by a touch is let go (its handles mean nothing now).
-      if (selected && ctx.live().editable !== true) select(null);
+      if (selected && ctx.live().editable !== true && surface.instanceOf(selected)?.event.perms.own === undefined) select(null);
       if (!selection) return;
       // Another period: the selection was of the one left.
       if (rangeNow() !== rangeKey) return shared.showSelection(null);

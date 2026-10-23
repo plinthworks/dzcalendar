@@ -1362,13 +1362,14 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
           return m.axis.length > 0 ? (sheet.getBoundingClientRect().width - area) / m.axis.length : 0;
         },
         write: (scale) => {
-          if (scale <= 0) return;
+          if (!(scale > 0) || !Number.isFinite(scale)) return;
           const today = ctx.kernel.getState().today;
           const day = m.axis.groups.find((g) => g.date.equals(today)) ?? m.axis.groups[0];
           // Counted in days the heads are months: today's own slot.
           const todaySlot = m.axis.slots.find((x) => x.date.equals(today));
           if (!day) return;
-          const at = m.axis.unit === 'day' ? (todaySlot?.start ?? m.axis.start) : Temporal.Instant.fromEpochMilliseconds(day.start.epochMilliseconds + minutes * 60_000);
+          const at = m.axis.unit === 'day' ? (todaySlot?.start ?? m.axis.start) : Temporal.Instant.fromEpochMilliseconds(Math.round(day.start.epochMilliseconds + minutes * 60_000));
+          // (now's minutes carry its seconds: a whole number of milliseconds, or the instant is refused)
           scrollEased(eased, scroller, () => scrollAlong(Math.max(0, m.axis.toPosition(at) * scale - (m.axis.unit === 'day' ? scale * 2 : 0))));
           measureWindow();
         },

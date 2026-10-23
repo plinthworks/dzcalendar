@@ -110,6 +110,10 @@ result's `problems` say what went wrong.
 
 ## Notes
 
+- `onProblem` (React) / `@problem` (Vue): something the calendar could not
+  do as asked, found while drawing (`events-not-drawn`, `host-no-height`);
+  without a listener, the console says it once per code.
+
 - A content hook (or template, slot) now also receives **background
   events**, in a time grid's columns, with `ctx.background`: return nothing
   for them to keep a plain tint. The all-day row's and the month's

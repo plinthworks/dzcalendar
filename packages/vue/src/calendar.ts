@@ -27,6 +27,7 @@ import type {
   DateClick,
   DayCellCtx,
   DayHeaderCtx,
+  CalendarProblem,
   DropInfo,
   DzMessages,
   EventChange,
@@ -54,7 +55,7 @@ import type { DzCalendarDefaults } from './plugin.js';
 import { same } from './same.js';
 
 /** The callbacks the component turns into events: not options (they would silence them). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange', 'onDrop', 'onEventReceive', 'onEventLeave'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange', 'onDrop', 'onEventReceive', 'onEventLeave', 'onProblem'] as const;
 
 /** What `options` takes: what `update()` takes, less what has a prop or an event of its own. */
 export type DzCalendarOptions = Omit<CalendarUpdate, 'view' | 'date' | 'events' | 'sources' | 'hooks' | 'headerItems' | 'motion' | (typeof OWN_CALLBACKS)[number]>;
@@ -109,7 +110,7 @@ export interface EventContentSlotProps {
 }
 
 /** The events whose listeners change what the calendar offers ("Open" in the menu, "New event here", slots as buttons). */
-const OFFERS = { onEventOpen: 'onEventOpen', onCreateRequest: 'onCreateRequest', onSlotClick: 'onSlotClick' } as const;
+const OFFERS = { onEventOpen: 'onEventOpen', onCreateRequest: 'onCreateRequest', onSlotClick: 'onSlotClick', onProblem: 'onProblem' } as const;
 
 /** Keys whose value is undefined are left out: a prop not bound changes nothing. */
 function defined(o: Record<string, unknown>): Record<string, unknown> {
@@ -248,6 +249,8 @@ export const DzCalendar = defineComponent({
     selected: (_s: Selection) => true,
     /** Loading, a failed fetch, problems in a delivery, a save refused. */
     sourceNotice: (_n: SourceNotice) => true,
+    /** Something the calendar could not do as asked, found while drawing (without a listener: the console, once per code). */
+    problem: (_p: CalendarProblem) => true,
     problems: (_r: NormalizationReport) => true,
     resourceProblems: (_p: readonly Problem[]) => true,
     /** A value the calendar refused (an unknown view, every day hidden): the others are applied. */
@@ -355,6 +358,7 @@ export const DzCalendar = defineComponent({
       onEventOpen: writes.taken()?.onEventOpen ?? (listening(OFFERS.onEventOpen) ? (i: EventInstance) => emit('eventOpen', i) : undefined),
       onCreateRequest: writes.taken()?.onCreateRequest ?? (listening(OFFERS.onCreateRequest) ? (r: CreateRequest) => emit('createRequest', r) : undefined),
       onSlotClick: listening(OFFERS.onSlotClick) ? (s: AvailableSlot) => emit('slotClick', s) : undefined,
+      onProblem: listening(OFFERS.onProblem) ? (p: CalendarProblem) => emit('problem', p) : undefined,
     });
     let offered = '';
     const offeredNow = () => {

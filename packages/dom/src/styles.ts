@@ -23,6 +23,8 @@ import { withLookGuard } from './render/look.js';
 export const DZ_CSS = `
 @layer dzcalendar.base, dzcalendar.theme;
 @layer dzcalendar.base {
+/* The custom element is unknown to the browser, so inline: a block, as a calendar is (a page's rule still wins). */
+dz-calendar { display: block; }
 .dz-cal {
   /* The palette, resolved once here: the page's --tz-* first, then the family's --dzp-* defaults, then system colours. */
   --dzc-fg: var(--tz-fg, var(--dzp-fg, CanvasText));
@@ -551,10 +553,10 @@ export const DZ_CSS = `
 .dz-ev--source { opacity: 0.35; }
 .dz-dragging, .dz-dragging * { cursor: grabbing !important; }
 .dz-selecting { cursor: cell; }
-.dz-editable .dz-ev:not(.dz-ev--bg), .dz-editable .dz-bar:not(.dz-bar--bg) { cursor: grab; }
+.dz-editable .dz-ev:not(.dz-ev--bg), .dz-editable .dz-bar:not(.dz-bar--bg), .dz-ev[data-editable~='move']:not(.dz-ev--bg), .dz-bar[data-editable~='move']:not(.dz-bar--bg) { cursor: grab; }
 /* Resize: a thin strip at the edge that can be pulled (drawn by CSS, found by position on press). */
-.dz-editable .dz-ev[data-resize-end]::after { content: ''; position: absolute; inset-inline: 0; bottom: 0; height: 6px; cursor: ns-resize; }
-.dz-editable .dz-bar[data-resize-end]::after { content: ''; position: absolute; inset-block: 0; inset-inline-end: 0; width: 6px; cursor: ew-resize; }
+.dz-editable .dz-ev[data-resize-end]::after, .dz-ev[data-editable~='resize'][data-resize-end]::after { content: ''; position: absolute; inset-inline: 0; bottom: 0; height: 6px; cursor: ns-resize; }
+.dz-editable .dz-bar[data-resize-end]::after, .dz-bar[data-editable~='resize'][data-resize-end]::after { content: ''; position: absolute; inset-block: 0; inset-inline-end: 0; width: 6px; cursor: ew-resize; }
 .dz-tg__allday-track .dz-bar { position: relative; }
 /* Touch: a tapped event is selected — its handles grow, and it alone stops the page from scrolling under a finger. */
 .dz-ev, .dz-bar { touch-action: pan-x pan-y; }

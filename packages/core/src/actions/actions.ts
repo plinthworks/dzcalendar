@@ -88,6 +88,8 @@ export interface ActionContext {
   readonly onGrab?: (instance: EventInstance, kind: 'move' | 'resize') => void;
   /** Whether the view lets this event's length change (a month draws a timed event's day, not its hours). Default yes. */
   readonly canResize?: (instance: EventInstance) => boolean;
+  /** Whether "Move…" is offered (default: the event's start is editable). */
+  readonly canMove?: (instance: EventInstance) => boolean;
 }
 
 /**
@@ -132,7 +134,7 @@ export function actionsFor(target: ActionTarget, ctx: ActionContext): ActionItem
     const ev = target.instance.event;
     if (ctx.onGrab && ev.display !== 'background') {
       const grab = ctx.onGrab;
-      if (ev.perms.start) out.push({ id: 'event.move', label: ctx.labels.moveEvent, enabled: true, shortcut: 'M', run: () => grab(target.instance, 'move') });
+      if (ctx.canMove?.(target.instance) ?? ev.perms.start) out.push({ id: 'event.move', label: ctx.labels.moveEvent, enabled: true, shortcut: 'M', run: () => grab(target.instance, 'move') });
       if (ev.perms.duration && (ctx.canResize?.(target.instance) ?? true)) out.push({ id: 'event.resize', label: ctx.labels.resizeEvent, enabled: true, run: () => grab(target.instance, 'resize') });
     }
     if (ctx.onCommand) out.push(deleteEntry(target.instance, ctx.labels, ctx.onCommand));

@@ -534,6 +534,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       ...m.gutter.map((t) => {
         const el = h(doc, 'span', 'dz-tick', t.major ? written(ctx, ctx.formats.slotLabel, t.label, () => ({ time: t.label, view: viewType, locale: ctx.locale }), () => formatTemporal(t.label, HM, ctx.locale)) : '');
         el.style.setProperty('--t', String(t.position));
+        // Every tick says its time (a test, a rule of the page), labelled or not.
+        el.dataset['time'] = t.label.toString().slice(0, 5);
         decorate(ctx, ctx.hooks.slotLabel, el, { view: viewType, time: t.label, position: t.position, pass: t.note === 'second-pass' ? 2 : 1, text: el.textContent ?? '' });
         return el;
       }),
@@ -794,9 +796,14 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       }
       // In reading order on screen: right to left, the first column in the DOM is the rightmost.
       cols.sort((a, b) => a.left - b.left);
+      // The all-day row scrolls when crowded: its track can be taller than the row shown, reaching under the hours —
+      // only what is seen of it is the all-day row (else a drag in the hours below it became all-day).
       const t = track.getBoundingClientRect();
+      const a = allday.getBoundingClientRect();
       const b = body.getBoundingClientRect();
-      return { cols, track: t.height > 0 ? { top: t.top, bottom: t.bottom } : null, view: { top: b.top, bottom: b.bottom }, origin };
+      const top = Math.max(t.top, a.top);
+      const bottom = Math.min(t.bottom, a.bottom);
+      return { cols, track: bottom > top ? { top, bottom } : null, view: { top: b.top, bottom: b.bottom }, origin };
     },
     hitAt(geo, x, y, scrollY) {
       const { cols } = geo;
@@ -939,6 +946,15 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       // The day's side of today (-1, 0, 1): a jump of days redraws the past and future states.
       const side = (c: ColumnItem) => Temporal.PlainDate.compare(c.column.date, state.today);
       heads.sync(withDates ? cols.map((c) => ({ ...c, sig: `${idOf(c.column.axis)}|${side(c)}|${epoch}|${c.index}|${dateRow}` })) : []);
+      // Without the all-day row, its events have nowhere to be drawn (an all-day background still washes its columns): said.
+      if (!ctx.allDaySlot && m.allDay.bars.length > 0) {
+        const n = new Set(m.allDay.bars.map((b) => b.segment.instance.event.id)).size;
+        ctx.problem({ code: 'events-not-drawn', detail: `${n} all-day event(s) in ${viewType}: allDaySlot is false, so they are not drawn (backgrounds still wash their columns)`, element: root }, `${viewType}|all-day`);
+      } else ctx.problemGone('events-not-drawn', `${viewType}|all-day`);
+      // Timed events entirely outside the hours shown (slotMin–slotMax) are not drawn either.
+      const outside = new Set(m.columns.flatMap((c) => c.outside));
+      if (outside.size > 0) ctx.problem({ code: 'events-not-drawn', detail: `${outside.size} event(s) in ${viewType} entirely outside the hours shown (slotMin–slotMax): not drawn`, element: root }, `${viewType}|hours`);
+      else ctx.problemGone('events-not-drawn', `${viewType}|hours`);
       bars.sync(!ctx.allDaySlot ? [] : [
         ...m.allDay.background.map((bar) => ({
           key: `bg:${bar.segment.key}`,

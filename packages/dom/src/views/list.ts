@@ -2,7 +2,7 @@ import { formatTemporal, registerModelFamily } from '@dzcalendar/core';
 import type { CalEvent, Command, EventInstance, KernelState, Segment } from '@dzcalendar/core';
 import { buildListModel } from '@dzcalendar/core/views';
 import type { ListDay, ListEntry, ListModel } from '@dzcalendar/core/views';
-import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, dayStates, drawNow, decorate, ensureStyles, written, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
+import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, dayStates, drawNow, mayDelete, decorate, ensureStyles, written, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
 import type { ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
 import { activeIn } from '../focus.js';
 
@@ -425,10 +425,10 @@ export function createListView(ctx: ViewCtx): ViewController {
     else live.onEventOpen?.(instance);
   };
 
-  const undoKey = () => (ctx.live().keyboardUndo === false ? '' : /Mac|iPhone|iPad/.test(doc.defaultView?.navigator.platform ?? '') ? '⌘Z' : 'Ctrl+Z');
+  const undoKey = () => (ctx.live().keyboardUndo === false || ctx.live().editable !== true ? '' : /Mac|iPhone|iPad/.test(doc.defaultView?.navigator.platform ?? '') ? '⌘Z' : 'Ctrl+Z');
 
   async function remove(instance: EventInstance, node: HTMLElement): Promise<void> {
-    if (ctx.live().editable !== true) return ctx.announce(ctx.messages.notEditable);
+    if (!mayDelete(instance.event, ctx.live().editable)) return ctx.announce(ctx.messages.notEditable);
     const ev = instance.event;
     let command: Command = { type: 'event.delete', id: ev.id };
     if (ev.ref) {

@@ -1,7 +1,7 @@
 import { commitDrop, eventAt, heldOn, proposeDrop, titleOf as carriedTitle } from './drop.js';
 import type { Carried, PageHold } from './drop.js';
 import { Temporal, UNASSIGNED, eventHit, formatTemporal, grabStep, heldEvent, intentFor, isUnchanged, resolveWall, selectionBetween, slotInstant, stepHit } from '@dzcalendar/core';
-import { EVENT_NODE } from './handles.js';
+import { EVENT_NODE, mayDelete, mayMove, mayResize } from './handles.js';
 import type { AvailableSlot, CalEvent, Command, EventInstance, Hit, Intent, PlainDate, Proposal, Selection, Step, ZonedDateTime } from '@dzcalendar/core';
 import type { ViewCtx } from '../host.js';
 import { formatMinutes } from '../render/event.js';
@@ -135,7 +135,8 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
   }
 
   /** The undo key as this platform writes it; none when the calendar's undo keys are off. */
-  const undoKey = () => (ctx.live().keyboardUndo === false ? '' : /Mac|iPhone|iPad/.test(doc.defaultView?.navigator.platform ?? '') ? '⌘Z' : 'Ctrl+Z');
+  // The shortcut said only where it works (Ctrl+Z is the editable calendar's).
+  const undoKey = () => (ctx.live().keyboardUndo === false || ctx.live().editable !== true ? '' : /Mac|iPhone|iPad/.test(doc.defaultView?.navigator.platform ?? '') ? '⌘Z' : 'Ctrl+Z');
   const lengthWords = (p: Proposal) => formatMinutes(((p.end as ZonedDateTime).epochMilliseconds - (p.start as ZonedDateTime).epochMilliseconds) / 60_000, ctx.locale);
 
   // ── where a step lands in this view ─────────────────────────────────────
@@ -303,10 +304,10 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     }
   }
 
-  const editable = (inst: EventInstance) => ctx.live().editable === true && (inst.event.perms.start || inst.event.perms.duration) && inst.event.display !== 'background';
+  const editable = (inst: EventInstance) => (mayMove(inst.event, ctx.live().editable) || mayResize(inst.event, ctx.live().editable)) && inst.event.display !== 'background';
 
   async function remove(inst: EventInstance, node: HTMLElement): Promise<void> {
-    if (ctx.live().editable !== true) return ctx.announce(m().notEditable);
+    if (!mayDelete(inst.event, ctx.live().editable)) return ctx.announce(m().notEditable);
     const ev = inst.event;
     const r = node.getBoundingClientRect();
     let command: Command = { type: 'event.delete', id: ev.id };
@@ -383,10 +384,10 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
   function step(kind: 'move' | 'resize', edge: 'start' | 'end', by: Step): void {
     const h = held!;
     const ev = h.instance.event;
-    if (kind === 'move' && !ev.perms.start) return ctx.announce(m().cannotMove);
+    if (kind === 'move' && !mayMove(ev, ctx.live().editable)) return ctx.announce(m().cannotMove);
     if (kind === 'resize') {
       // A timed event in a month only moves (its hours are not drawn there), as under the pointer.
-      const resizable = ev.perms.duration && (edge === 'end' || ctx.live().eventResizableFromStart === true) && (hits() === 'time' || h.event.allDay);
+      const resizable = mayResize(ev, ctx.live().editable) && (edge === 'end' || ctx.live().eventResizableFromStart === true) && (hits() === 'time' || h.event.allDay);
       if (!resizable) return ctx.announce(m().cannotResize);
     }
     const ic = icFor(h);

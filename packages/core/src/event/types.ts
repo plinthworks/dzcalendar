@@ -71,7 +71,17 @@ interface EventCommon {
   readonly display: EventDisplay;
   readonly status: EventStatus;
   readonly busy: boolean;
-  readonly perms: { readonly start: boolean; readonly duration: boolean; readonly resource: boolean };
+  /**
+   * What may be changed. `own`: what the event said `true` to itself (`startEditable` / `durationEditable`, or
+   * `editable` for both) — it is then editable that way even in a calendar that is not (its say wins over the
+   * calendar's default, owner 18k). Absent when it said no `true` that gives it anything.
+   */
+  readonly perms: {
+    readonly start: boolean;
+    readonly duration: boolean;
+    readonly resource: boolean;
+    readonly own?: { readonly start: boolean; readonly duration: boolean };
+  };
   readonly classNames: readonly string[];
   readonly tone?: string;
   readonly url?: string;

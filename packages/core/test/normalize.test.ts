@@ -350,7 +350,14 @@ describe('the rest of the event', () => {
   });
 
   it('editable sets every permission; the specific ones win', () => {
-    expect(accept({ start: '2026-05-01', editable: false, durationEditable: true }).event.perms).toEqual({ start: false, duration: true, resource: false });
+    // An explicit `true` of its own: `own` (it wins over a calendar that is not editable, owner 18k).
+    expect(accept({ start: '2026-05-01', editable: false, durationEditable: true }).event.perms).toEqual({ start: false, duration: true, resource: false, own: { start: false, duration: true } });
+    // Nothing said: every permission by default, not `own` (the calendar decides).
+    expect(accept({ start: '2026-05-01' }).event.perms).toEqual({ start: true, duration: true, resource: true });
+    // `editable: true` but neither the start nor the length: nothing of its own (it would give nothing).
+    expect(accept({ start: '2026-05-01', editable: true, startEditable: false, durationEditable: false }).event.perms).toEqual({ start: false, duration: false, resource: true });
+    // `editable: true` alone: both of its own.
+    expect(accept({ start: '2026-05-01', editable: true }).event.perms.own).toEqual({ start: true, duration: true });
   });
 
   it('resourceId and resourceIds merge without duplicates; unknown-resource warns', () => {

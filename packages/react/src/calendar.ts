@@ -3,7 +3,7 @@ import type { CSSProperties, ForwardedRef, ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import type { AvailableSlot, CalEvent, CreateRequest, EventInstance, NormalizationReport, PlainDate, Problem, Selection, SourceNotice } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
-import type { CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, EventChange, EventContentCtx, HeaderItemCtx, MotionAdapter } from '@dzcalendar/dom';
+import type { CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, EventChange, EventContentCtx, HeaderItemCtx, MotionAdapter, CalendarProblem } from '@dzcalendar/dom';
 import { DzCalendarContext } from './context.js';
 import type { DzCalendarDefaults } from './context.js';
 import { CalendarController, CalendarControllerContext } from './controller.js';
@@ -16,7 +16,7 @@ import type { Portal, TemplateElement, TemplateProps } from './templates.js';
 const useBrowserLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
 
 /** The callbacks the component takes as its own props (with what the calendar reports). */
-const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange'] as const;
+const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange', 'onProblem'] as const;
 /** Props that are not options of the calendar. */
 const NOT_OPTIONS = new Set<string>([...OWN_CALLBACKS, 'controller', 'renderEventContent', ...Object.values(TEMPLATES), 'hooks', 'headerItems', 'defaultView', 'defaultDate', 'onViewChange', 'onDateChange', 'selection', 'onSelectionChange', 'onSourceNotice', 'onProblems', 'onError', 'axis', 'className', 'style', 'id', 'motion', 'initial']);
 
@@ -46,6 +46,8 @@ export interface DzCalendarProps extends DzCalendarOptions, TemplateProps {
   readonly onDateClick?: (click: DateClick) => void;
   /** A free slot clicked (or Enter on it): the slot as given. Book it; the server checks it again. */
   readonly onSlotClick?: (slot: AvailableSlot) => void;
+  /** Something the calendar could not do as asked, found while drawing (without it: the console, once per code). */
+  readonly onProblem?: (problem: CalendarProblem) => void;
   readonly onEventClick?: (instance: EventInstance) => void;
   /** What a person changed (a drag, a resize, the keyboard, the menu, the editor): persist it; `revert()` if the server refuses. */
   readonly onEventChange?: (change: EventChange) => void;
@@ -181,12 +183,13 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
       onEventOpen: t?.onEventOpen ?? (p.onEventOpen && ((i: EventInstance) => latest.current.onEventOpen?.(i))),
       onCreateRequest: t?.onCreateRequest ?? (p.onCreateRequest && ((r: CreateRequest) => latest.current.onCreateRequest?.(r))),
       onSlotClick: p.onSlotClick && ((x: AvailableSlot) => latest.current.onSlotClick?.(x)),
+      onProblem: p.onProblem && ((x: CalendarProblem) => latest.current.onProblem?.(x)),
     };
   };
   const offeredKey = () => {
     const t = ctl.current.takenOver;
     const p = latest.current;
-    return [t?.onEventOpen ?? p.onEventOpen, t?.onCreateRequest ?? p.onCreateRequest, p.onSlotClick].map((f) => (f === undefined ? '0' : f === t?.onEventOpen || f === t?.onCreateRequest ? 't' : '1')).join('');
+    return [t?.onEventOpen ?? p.onEventOpen, t?.onCreateRequest ?? p.onCreateRequest, p.onSlotClick, p.onProblem].map((f) => (f === undefined ? '0' : f === t?.onEventOpen || f === t?.onCreateRequest ? 't' : '1')).join('');
   };
   const offered = offeredKey();
   const lastOffered = useRef(offered);

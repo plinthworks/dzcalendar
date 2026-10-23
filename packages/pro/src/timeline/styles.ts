@@ -99,8 +99,8 @@ export const TIMELINE_CSS = `
 .dz-tl__area, .dz-tl__area * { scroll-margin-inline-start: calc(-1 * var(--dz-tl-area, 0px) - 0.5rem); }
 .dz-tl__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .dz-tl__probe { position: absolute; visibility: hidden; pointer-events: none; inset-inline-start: -9999px; width: 1px; height: var(--dz-tl-lane); }
-.dz-editable .dz-tl__ev:not(.dz-tl__ev--bg) { cursor: grab; }
-.dz-editable .dz-tl__ev[data-resize-end]::after { content: ''; position: absolute; inset-block: 0; inset-inline-end: 0; width: 6px; cursor: ew-resize; }
+.dz-editable .dz-tl__ev:not(.dz-tl__ev--bg), .dz-tl__ev[data-editable~='move']:not(.dz-tl__ev--bg) { cursor: grab; }
+.dz-editable .dz-tl__ev[data-resize-end]::after, .dz-tl__ev[data-editable~='resize'][data-resize-end]::after { content: ''; position: absolute; inset-block: 0; inset-inline-end: 0; width: 6px; cursor: ew-resize; }
 .dz-tl__ev, .dz-tl__lane { touch-action: pan-x pan-y; }
 @media (forced-colors: active) { .dz-tl__ev { border: 1px solid CanvasText; } .dz-tl__now { border-inline-start-color: CanvasText; } .dz-tl__ev:focus-visible, .dz-tl__resizer:focus-visible, .dz-tl__expander:focus-visible, .dz-tl__cell:focus-visible { outline: 2px solid Highlight; } .dz-tl__resizer:focus-visible { background: Highlight; } }
 @media print { .dz-tl { height: auto; } .dz-tl__scroller { overflow: visible; } }

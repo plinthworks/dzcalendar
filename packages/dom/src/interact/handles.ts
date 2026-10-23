@@ -1,4 +1,4 @@
-import type { Segment } from '@dzcalendar/core';
+import type { CalEvent, Segment } from '@dzcalendar/core';
 
 /**
  * Which edges of an event node a pointer may pull: the end where the event
@@ -13,6 +13,15 @@ export function handles(el: HTMLElement, seg: Segment, bg: boolean): void {
   if (resizable && seg.startsHere) el.dataset['resizeStart'] = '1';
   else delete el.dataset['resizeStart'];
 }
+
+/**
+ * What a person may do to an event: moving it needs its start editable and the calendar editable, or the event
+ * saying so itself (`startEditable`/`editable: true`, owner 18k); resizing likewise with its duration.
+ */
+export const mayMove = (ev: CalEvent, editable: boolean | undefined): boolean => ev.perms.start && (editable === true || ev.perms.own?.start === true);
+export const mayResize = (ev: CalEvent, editable: boolean | undefined): boolean => ev.perms.duration && (editable === true || ev.perms.own?.duration === true);
+/** Deleting: the calendar editable, or the event saying `true` for both its start and its length (`editable: true`). */
+export const mayDelete = (ev: CalEvent, editable: boolean | undefined): boolean => editable === true || (ev.perms.own?.start === true && ev.perms.own?.duration === true);
 
 /** An event's node, in any family (the time grid's, the day grid's bars, a timeline's): what gestures grab. */
 /** An event's node — never a leaving copy (the motion's, on its way out). */

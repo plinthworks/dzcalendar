@@ -1,4 +1,4 @@
-import type { EventChange } from './settings.js';
+import type { EventChange, CalendarProblem } from './settings.js';
 import type { Formats } from './render/formats.js';
 import type { ActionItem, ActionTarget, CalendarKernel, PlainDate, Resource, Command, CommandResult, EditScope, EventInstance, Instant, KernelState, Proposal, RulesContext, Segment, ZoneId } from '@dzcalendar/core';
 import type {
@@ -178,6 +178,12 @@ export interface ViewCtx {
   rules(): RulesContext | null;
   /** Said by screen readers (a polite live region). */
   announce(text: string): void;
+  /**
+   * Something it could not do as asked (`onProblem`, else the console once per code). Told once per `code` and
+   * `key` (a view, a kind) until `problemGone` says the condition went away: then told again if it comes back.
+   */
+  problem(p: CalendarProblem, key?: string): void;
+  problemGone(code: CalendarProblem['code'], key?: string): void;
   /** "This event / following / all" for a gesture on an occurrence: the application's `chooseScope`, or a menu at the drop point. */
   chooseScope(info: ScopeRequest, at: { x: number; y: number }): Promise<EditScope | null>;
   /** A drop in a repeated hour: which of the two readings (a menu at the drop point). */

@@ -85,7 +85,7 @@ describe('the month keeps its nodes', () => {
 
   it('auto lanes cap a month at 4 before it is measured; a week of the day grid is never capped', () => {
     const crowded = Array.from({ length: 9 }, (_, i) => ({ id: `e${i}`, start: `2026-10-21T0${i}:30[Europe/Paris]` }));
-    const host = mount(crowded, { initialView: 'dayGridMonth', headerViews: ['dayGridMonth', 'dayGridWeek'] });
+    const host = mount(crowded, { initialView: 'dayGridMonth', headerViews: ['dayGridMonth', 'dayGridWeek'], dayMaxLanes: 'auto' });
     expect(host.querySelectorAll('.dz-more')).toHaveLength(1);
     cal!.update({ view: 'dayGridWeek' });
     expect(host.querySelectorAll('.dz-more')).toHaveLength(0);

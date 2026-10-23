@@ -145,6 +145,10 @@ export function dayStates(el: HTMLElement, date: PlainDate, today: PlainDate | n
 export function applyEventLook(el: HTMLElement, ev: CalEvent, now?: Instant): void {
   state(el, 'all-day', ev.allDay);
   state(el, 'background', ev.display === 'background' || ev.display === 'inverse-background');
+  // Editable by its own say (`editable`, `startEditable` or `durationEditable: true`), whatever the calendar's default: what it may do.
+  const own = ev.perms.own;
+  if (own) el.dataset['editable'] = [own.start && 'move', own.duration && 'resize'].filter(Boolean).join(' ');
+  else delete el.dataset['editable'];
   if (ev.tone) el.dataset['tone'] = ev.tone;
   else delete el.dataset['tone'];
   if (now) {

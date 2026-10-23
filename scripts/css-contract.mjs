@@ -9,7 +9,7 @@ import { join, relative } from 'node:path';
 // The element's `dz-*` words are its DOM events' names, not classes: it draws nothing of its own.
 const SOURCES = ['packages/dom/src', 'packages/pro/src', 'packages/motion-gsap/src', 'packages/theme/dzcalendar.scss'];
 /** Words with the prefix that are not classes: events, ids, attributes, comment markers. */
-const NOT_CLASSES = new Set(['dz-drop', 'dz-header', 'dz-pop-*', 'dz-editor-*']);
+const NOT_CLASSES = new Set(['dz-drop', 'dz-header', 'dz-pop-*', 'dz-editor-*', 'dz-calendar']);
 /** Tokens named in comments as examples (a tone, the reading order), not read. */
 const NOT_TOKENS = new Set();
 /** The calendar's own data-* hooks, not states for a page (positions, keys, its bookkeeping). */

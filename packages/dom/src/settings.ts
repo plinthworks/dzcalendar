@@ -50,7 +50,25 @@ export interface EventLeave {
   revert(): boolean;
 }
 
+/**
+ * Something the calendar could not do as asked, found while drawing (not in
+ * the data: those are the kernel's problems). Told to `onProblem`, else said
+ * once per code on the console.
+ */
+export interface CalendarProblem {
+  /**
+   * `events-not-drawn`: events the view cannot show (all-day events in a time grid without its all-day row);
+   * `host-no-height`: the calendar has no height of its own (an inline host, or `--dz-height: 100%` with no
+   * ancestor of a given height: it grows with its content).
+   */
+  readonly code: 'events-not-drawn' | 'host-no-height';
+  readonly detail: string;
+  readonly element?: HTMLElement;
+}
+
 export interface LiveSettings {
+  /** Something the calendar could not do as asked, found while drawing; without it, said once per code on the console. */
+  readonly onProblem?: (problem: CalendarProblem) => void;
   /** After a person's change: persist it, and `revert()` it if the server refuses. */
   readonly onEventChange?: (change: EventChange) => void;
   /** "New event here" from the context menu: the application opens its own editor. */
@@ -114,6 +132,7 @@ type Handler<K extends keyof LiveSettings> = {
 };
 
 const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
+  onProblem: {},
   onEventChange: {},
   onCreateRequest: {},
   onEventOpen: {},

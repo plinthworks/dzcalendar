@@ -86,3 +86,25 @@ describe('eventEquals', () => {
     expect(r.ok && r.mutations).toEqual([]);
   });
 });
+
+describe('an event editable by its own say (18k review)', () => {
+  it('gaining or losing its own true is a change; a no-op patch keeps it; revoking one keeps the other', () => {
+    const store = createEventStore();
+    const n = (input: Parameters<typeof normalizeEvent>[0]) => {
+      const r = normalizeEvent(input, ctx());
+      if (!r.ok || r.value.kind !== 'event') throw new Error('bad');
+      return r.value.event;
+    };
+    store.apply([{ kind: 'event', after: n({ id: 'a', start: '2026-05-01T09:00Z', duration: { minutes: 30 } }) }], 'api');
+    const c = { normalize: ctx() };
+    let r = applyCommand(store.snapshot, { type: 'event.update', id: 'a', patch: { durationEditable: true } }, c);
+    expect(r.ok && r.mutations.length).toBe(1);
+    store.apply(r.ok ? r.mutations : [], 'command');
+    expect(store.snapshot.getEvent('a')!.perms.own).toEqual({ start: false, duration: true });
+    r = applyCommand(store.snapshot, { type: 'event.update', id: 'a', patch: {} }, c);
+    expect(r.ok && r.mutations).toEqual([]);
+    r = applyCommand(store.snapshot, { type: 'event.update', id: 'a', patch: { durationEditable: false } }, c);
+    store.apply(r.ok ? r.mutations : [], 'command');
+    expect(store.snapshot.getEvent('a')!.perms.own).toBeUndefined();
+  });
+});

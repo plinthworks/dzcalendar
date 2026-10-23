@@ -48,6 +48,7 @@ const EVENTS = {
   onCommandRefused: 'dz-command-refused',
   onProposalRefused: 'dz-proposal-refused',
   onResourceProblems: 'dz-resource-problems',
+  onProblem: 'dz-calendar-problem',
 } as const;
 
 /** What could not be read: where (`attribute:time-zone`, `property:options`), and a short code (`unknown-zone`…). */
@@ -71,7 +72,8 @@ const LIVE = new Set(['messages', 'locale', 'timeZone', 'motion', 'hooks', 'busi
  * the menu, "New event here", slots as buttons): passed only when the page
  * listens to their event (or gives the callback in `options`).
  */
-const OFFERS: Record<string, string> = { onEventOpen: 'dz-event-open', onCreateRequest: 'dz-create-request', onSlotClick: 'dz-slot-click' };
+// Given only once listened to (or in `options`): without a listener, the calendar's own console warning stays (onProblem).
+const OFFERS: Record<string, string> = { onEventOpen: 'dz-event-open', onCreateRequest: 'dz-create-request', onSlotClick: 'dz-slot-click', onProblem: 'dz-calendar-problem' };
 
 /** At most this many problems kept on `problems` (the oldest go). */
 const KEEP = 100;

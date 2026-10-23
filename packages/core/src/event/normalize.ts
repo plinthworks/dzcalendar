@@ -254,11 +254,14 @@ function recurrenceSet(input: EventInput, ctx: NormalizeContext, path: string, e
 // carry ten thousand empty arrays, and every event has the same shape.
 const EMPTY_LIST: readonly string[] = Object.freeze([]);
 const EMPTY_PROPS: Readonly<Record<string, unknown>> = Object.freeze({});
-const PERMS = Array.from({ length: 8 }, (_, i) =>
-  Object.freeze({ start: (i & 1) !== 0, duration: (i & 2) !== 0, resource: (i & 4) !== 0 }),
-);
-const perms = (start: boolean, duration: boolean, resource: boolean) =>
-  PERMS[(start ? 1 : 0) | (duration ? 2 : 0) | (resource ? 4 : 0)]!;
+const OWN = [null, { start: true, duration: false }, { start: false, duration: true }, { start: true, duration: true }].map((o) => o && Object.freeze(o));
+const PERMS = Array.from({ length: 32 }, (_, i) => {
+  const own = OWN[(i >> 3) & 3];
+  return Object.freeze({ start: (i & 1) !== 0, duration: (i & 2) !== 0, resource: (i & 4) !== 0, ...(own && { own }) });
+});
+/** One frozen object per combination: `ownStart` / `ownDuration` only count where they give something. */
+const perms = (start: boolean, duration: boolean, resource: boolean, ownStart = false, ownDuration = false) =>
+  PERMS[(start ? 1 : 0) | (duration ? 2 : 0) | (resource ? 4 : 0) | (ownStart && start ? 8 : 0) | (ownDuration && duration ? 16 : 0)]!;
 const list = (xs: readonly string[]): readonly string[] => (xs.length === 0 ? EMPTY_LIST : Object.freeze(xs));
 
 /**
@@ -295,6 +298,9 @@ function buildCommon(input: EventInput, ctx: NormalizeContext, path: string, pro
       input.startEditable ?? editable,
       input.durationEditable ?? editable,
       input.resourceEditable ?? editable,
+      // What it said `true` to itself: its own field, else `editable` for both.
+      (input.startEditable ?? input.editable) === true,
+      (input.durationEditable ?? input.editable) === true,
     ),
     classNames: classList(input.classNames),
     // A tone names a CSS token (`--dz-tone-<tone>`): anything else is ignored, never interpolated.

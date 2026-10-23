@@ -37,7 +37,7 @@ export type {
   ViewHookCtx,
   WeekNumberCtx,
 } from './render/hooks.js';
-export type { LiveSettings, DateClick, EventChange } from './settings.js';
+export type { LiveSettings, DateClick, EventChange, CalendarProblem } from './settings.js';
 export type { CustomButton, HeaderToolbar } from './toolbar.js';
 export type { DropInfo } from './interact/drop.js';
 export type { EventLeave } from './settings.js';

@@ -80,6 +80,7 @@ export default defineConfig({
         tailwind: fileURLToPath(new URL('./playground/tailwind.html', import.meta.url)),
         unstyled: fileURLToPath(new URL('./playground/unstyled.html', import.meta.url)),
         gallery: fileURLToPath(new URL('./playground/gallery.html', import.meta.url)),
+        sehhaty18k: fileURLToPath(new URL('./playground/sehhaty-checks.html', import.meta.url)),
       },
     },
   },

@@ -226,8 +226,11 @@ export interface CalendarKernel {
   setTimeZone(zone: ZoneId): void;
   /** Titles, and the first weekday unless one was given, follow the new locale. */
   setLocale(locale: string): void;
-  /** Shallow-merged per key (`timeGrid`, `dayGrid`) over the current options. */
-  setOptions(options: ModelOptions): void;
+  /**
+   * Shallow-merged per key (`timeGrid`, `dayGrid`) over the current options. `silent`: the model is made again
+   * but no state event is told — for a renderer adjusting options while it handles a state event it is about to draw.
+   */
+  setOptions(options: ModelOptions, how?: { readonly silent?: boolean }): void;
   /** The week's first day (ISO, Monday = 1); null: the locale's again. A view whose range moves redraws. */
   setFirstDay(day: Weekday | null): void;
   /** How the title is written from now on (null: the default again). */
@@ -305,6 +308,14 @@ export function assertTimeline(t: NonNullable<ModelOptions['timeline']>): void {
   }
 }
 
+/** A time grid's ticks and labels that cannot be taken: said before anything changes, never thrown while drawing. */
+export function assertTimeGrid(t: NonNullable<ModelOptions['timeGrid']>): void {
+  for (const k of ['slotMinutes', 'labelMinutes'] as const) {
+    const v = t[k];
+    if (v !== undefined && !(Number.isInteger(v) && v >= 1 && v <= 1440)) throw new RangeError(`timeGrid.${k} must be whole minutes from 1 to 1440: ${String(v)}`);
+  }
+}
+
 /** Two id lists are the same set. */
 const sameIds = (a: readonly string[] | undefined, b: readonly string[] | undefined) => [...(a ?? [])].sort().join('\u0000') === [...(b ?? [])].sort().join('\u0000');
 
@@ -321,6 +332,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   if (!isValidZone(o.timeZone)) throw new RangeError(`timeZone is not a time zone: ${o.timeZone}`);
   if (o.businessHours !== undefined) assertBusinessHours(o.businessHours);
   if (o.timeline) assertTimeline(o.timeline);
+  if (o.timeGrid) assertTimeGrid(o.timeGrid);
   const views: Record<string, ViewSpec> = { ...BUILTIN_VIEWS, ...registeredViewSpecs() };
   for (const [type, v] of Object.entries(o.views ?? {})) {
     // A member a framework left `undefined` does not erase a default.
@@ -658,8 +670,9 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       // Read at every gesture and command: nothing to redraw.
       rulesGiven = rules;
     },
-    setOptions(next) {
+    setOptions(next, how = {}) {
       if (next.businessHours !== undefined) assertBusinessHours(next.businessHours);
+      if (next.timeGrid) assertTimeGrid(next.timeGrid);
       if (next.timeline) assertTimeline(next.timeline);
       // Equal values (per key, one level deep) change nothing and say nothing.
       const same = (a: object | undefined, b: object | undefined) =>
@@ -705,7 +718,10 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       }
       if ('resourceOrder' in next || 'resourceGroupField' in next) buildResources();
       view = nextView;
-      changeState('options');
+      if (how.silent) {
+        state = computeState();
+        model = null;
+      } else changeState('options');
     },
     setEvents(events) {
       return loadEvents(events);

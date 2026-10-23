@@ -73,8 +73,10 @@ not a circular dependency.
   browser's); the calendar's then is the application's
   (`provideDzCalendar({ timeZone })`), never silently the browser's.
 - **Every day's events.** FullCalendar shows them all unless `dayMaxEvents`
-  says otherwise: so does the translation (`dayMaxLanes: null`, the weeks
-  grow).
+  says otherwise: so does DzCalendar (`dayMaxLanes: null` is its default
+  too, the weeks grow).
+- **`slotLabelInterval`** becomes `timeGrid.labelMinutes` (a label every N
+  minutes of the clock; the whole hours by default).
 - **`eventDrop`, `eventResize`, `eventChange`, `eventAdd`, `eventRemove`**
   follow a person's change (a gesture, the keyboard, the menu, the editor);
   your own `calendar.run()` is not reported — theirs reports `addEvent` and

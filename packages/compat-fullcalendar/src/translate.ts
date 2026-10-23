@@ -257,8 +257,7 @@ export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}):
     else problems.push(said('invalid-option', 'hiddenDays', 'not-a-list', 'error'));
   }
   if (fc['direction'] !== undefined && take('direction') === 'rtl') problems.push(said('compat-unsupported', 'direction', 'from-locale'));
-  // Theirs shows every event of a day unless told otherwise: the weeks grow (dayMaxLanes null).
-  out['dayMaxLanes'] = null;
+  // Theirs shows every event of a day unless told otherwise — DzCalendar's month too (and its year view "+N"): only what is said is written.
   for (const k of ['dayMaxEventRows', 'dayMaxEvents']) {
     const v = take(k);
     if (typeof v === 'number') out['dayMaxLanes'] = v;
@@ -273,6 +272,12 @@ export function translate(given: unknown, how: { readonly zone?: ZoneId } = {}):
   if (slot !== null) {
     if (/timeline/i.test(String(out['initialView'] ?? ''))) out['timeline'] = { slot: slot >= 1440 ? 'day' : whole('slotDuration', slot, 1, 1440) };
     else timeGrid['slotMinutes'] = whole('slotDuration', slot, 1, 1440);
+  }
+  const label = minutes('slotLabelInterval');
+  // A time grid's labels; a timeline's heads have their own (said, not dropped silently).
+  if (label !== null) {
+    if (/timeline/i.test(String(out['initialView'] ?? ''))) problems.push(said('compat-unsupported', 'slotLabelInterval', 'timeline'));
+    else timeGrid['labelMinutes'] = whole('slotLabelInterval', label, 1, 1440);
   }
   const snap = minutes('snapDuration');
   if (snap !== null) out['snapMinutes'] = whole('snapDuration', snap, 1, 1440);

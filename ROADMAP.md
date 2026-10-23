@@ -50,8 +50,9 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   FullCalendar 7 in every first render (46 / 45 / 40 ms against 63 / 74 /
   53, month / week / list, docs/benchmark.md). **In progress:** 18j (the
   documentation site: the skeleton built in `website/`, not committed yet).
-  **Next:** 18i (size), and Sehhaty's production report
-  (`retours/2026-10-23-sehhaty.md`); then npm publication, licences,
+- **Done:** 18k (Sehhaty's production report) committed ("Phase 18k").
+  **Next:** 18i (size); 18j (the documentation site, skeleton in
+  `website/`) still to review and commit; then npm publication, licences,
   Phase 19.
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
@@ -2494,7 +2495,89 @@ Net: −430 lines of CSS, −60 of menu, −35 of re-measuring.
 - The first drag on a large calendar finishes the load (≈ 65 ms on 10 000
   events) through the interaction's snapshot.
 
-**Seen during 18h's review, not caused by it (to fix):** the Pro timeline
+### 18k — Sehhaty's production report (`retours/2026-10-23-sehhaty.md`)
+
+**Owner's decisions (2026-10-23):** Sehhaty first, then 18i. An all-day
+background event washes its whole time-grid column, always (as
+FullCalendar), besides the all-day row when shown; an event's
+`durationEditable` / `startEditable` win over the calendar's defaults
+(as FullCalendar), and no resize handle is drawn on an event that cannot be
+resized; runtime problems through an `onProblem(problem)` option (the
+wrappers' `problems` output), a `console.warn` once per code without it; the
+month shows every event by default (`dayMaxLanes` default: none — the week
+grows), "+N" only when asked.
+**Taken without a question (no serious alternative):** `timeGrid.labelMinutes`
+(a label every N minutes, default 60; the compat maps `slotLabelInterval`);
+a month's context-menu target is a `day` without an instant; the menu's
+target found under the pointer (not by `closest` from the event target);
+`data-date` on the time grid's day heads; `<dz-calendar>` a block; a problem
+when the host has no height; the structure documented (the resize grip is a
+`::after`, month bars live in the week row, the box is given, never
+measured, `extendedProps` in, `props` out); `dzDayCell` and `dzSlotLabel`
+exist already (18f-2) — said in the docs; the two bugs seen in 18h's review.
+
+**Built**
+- Measured first against Sehhaty's own path (the compat, their objects):
+  points 2 (a closed day not washed), 3 (the trigger) and 4 (a month's
+  `slot` target) did not reproduce on the current code (their build was of
+  2026-10-20; they withdrew 2); 1 and 5 were real.
+- `timeGrid.labelMinutes` (a label every N minutes of the clock, default
+  60; `data-time` on every tick; the compat maps `slotLabelInterval`, said
+  `compat-unsupported` for a timeline); `assertTimeGrid` refuses
+  `slotMinutes` / `labelMinutes` that cannot be taken (a RangeError at
+  creation or `update`, no longer thrown while drawing).
+- An event's own `true` wins (owner): `perms.own = { start, duration }`
+  (round-trip safe through `toInput`, compared by `eventEquals`); moving
+  needs the start, resizing the length (`mayMove` / `mayResize`),
+  deleting both (`mayDelete`), each the calendar's `editable` or the
+  event's own; its node says `data-editable="move resize"`; its menu
+  offers what it may do; it may be dropped on a calendar that is not
+  editable. Ctrl+Z stays the editable calendar's (the hint is left out
+  elsewhere).
+- `onProblem` (owner) with `ctx.problem` / `problemGone` (told once per code
+  and key, again after it went away), else `console.warn` once per code:
+  `events-not-drawn` (all-day events without the all-day row; timed events
+  outside `slotMin`–`slotMax`), `host-no-height` (no height, or a relative
+  `--dz-height` with nothing scrolling; checked again on resize). Angular
+  `(problem)` (with the console), Vue `@problem`, React `onProblem`, the
+  element `dz-calendar-problem` (offered once listened to).
+- `dayMaxLanes` by default (owner): a month every event, a year "+N" —
+  decided per view while nothing is asked (a silent `setOptions`, no second
+  paint); the compat writes it only when FullCalendar's options say it.
+- A month's context menu finds the cell under the pointer (a background
+  bar beside the cells; the element's shadow root included).
+- `<dz-calendar>` a block; the docs' "Worth knowing" (the box given, the
+  grip a `::after`, month bars in the week row, `data-date` on day heads,
+  `extendedProps`/`props`, the day-cell and slot-label templates).
+- Fixed from 18h's review: the timeline's scroll-to-now (fractional
+  milliseconds; a non-finite scale); a drag in the hours under a crowded,
+  scrolling all-day row became all-day (the hit area clamped to the row
+  seen).
+- Tests: `packages/dom/test/sehhaty18k.test.ts` (12), core own/round trip,
+  Chrome block "Phase 18k" (`playground/sehhaty-checks.html`).
+- Budget (owner, measured + 3 %): dom 57 086.
+
+**Reviews fixed** (architect + execution in Chrome)
+- `own` was ignored by `eventEquals` (a re-delivery or an update changing
+  only it was dropped), set where it gave nothing, and too coarse (revoking
+  one `true` kept the other's effect, a resize-only event could be moved and
+  deleted, its menu offered "Move"); the menu, the touch selection and the
+  drop still gated on the calendar alone.
+- The lanes default re-entered the kernel's emit (two paints, events out of
+  order); the problems' dedupe keyed on their wording and never cleared; an
+  explicit tall height was reported; the docs named the wrong element for
+  `--dz-height: 100%`; the month menu fix did not pierce a shadow root; the
+  wrappers' `onProblem` was overridable through `options` (Angular, Vue) and
+  sent on every render (React).
+
+**Not done on purpose**
+- Deviation: the wrappers' output is `problem` (`problems` is the data's
+  report already).
+- Ctrl+Z of an own event's change in a calendar that is not editable (the
+  history holds the application's commands too).
+- `events-not-drawn` for an event on no resource column of a resource view.
+
+**Seen during 18h's review, now fixed in 18k:** the Pro timeline
 throws `RangeError: Expected finite integer` (from
 `Instant.fromEpochMilliseconds`, the scheduled scroll-to-time write in
 `packages/pro/src/timeline/view.ts`) after six quick navigations one frame
