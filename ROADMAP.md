@@ -62,8 +62,11 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   ical, the compat, the Pro editor and `<dz-calendar>` bring it), `@dzcalendar/dom/base`
   with `/timegrid` and `/daygrid` (`@dzcalendar/dom` unchanged), the
   benchmark built from the dists: the benchmark's DZ bundle 139.4 → 126.8 kB
-  gzip (JS). 18i-2 waits for tzslot (admin-90): the polyfill loaded only
-  where Temporal is missing (`retours/2026-10-23-demande-tzslot.md`). 18j
+  gzip (JS). 18i-2 waits for tzslot 2.3.0 on npm: `@tzslot/core/lazy`
+  (`loadTemporal()`, built and committed by tzslot at 35ebaa4, 795 B first load,
+  the polyfill's 24.5 kB fetched only without native Temporal — no stable
+  Safari has it, so about three visitors in four skip it); not to be pinned
+  before it is published. 18j
   (the documentation site, `website/`, preview `cd website && npm run
   build && npm run preview` → http://127.0.0.1:4701/dzcalendar/) still to
   review and commit; then npm publication, licences, Phase 19.

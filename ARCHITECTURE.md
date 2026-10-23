@@ -1651,7 +1651,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 
 **K.1 Axe horaire par défaut (section C).** Valider : mode `wall` par défaut avec bandes et côte à côte des deux passes, `elapsed` en option, `elapsed` obligatoire en timeline. C'est la décision la plus visible du produit.
 
-**K.2 Polyfill statique.** tzslot a décidé de garder le polyfill en import statique (≈ 19,7 ko gzip pour `@tzslot/core`). Pour DzCalendar, avec un budget total à ≈ 86 ko, c'est ~23 %. Garder (cohérent avec tzslot) ou demander un chargement conditionnel upstream pour les navigateurs où Temporal est natif ? Le doc d'analyse chiffre la couverture native à ~70 % (Safari absent jusqu'à 27.2).
+**K.2 Polyfill statique.** tzslot a décidé de garder le polyfill en import statique (≈ 19,7 ko gzip pour `@tzslot/core`). Pour DzCalendar, avec un budget total à ≈ 86 ko, c'est ~23 %. Garder (cohérent avec tzslot) ou demander un chargement conditionnel upstream pour les navigateurs où Temporal est natif ? Le doc d'analyse chiffre la couverture native à ~70 % (Safari : aucune version stable en octobre 2026, la Technology Preview 249 d’août 2026 la première — tzslot, 2026-10-23).
 
 **K.3 Périmètre upstream.** Valider l'envoi à `@tzslot/core` de `dayInfo`, `transitionsBetween`, `getWeekInfo`, et le calendrier : implémentation locale d'abord, migration en tzslot 2.2. Qui publie et quand ?
 

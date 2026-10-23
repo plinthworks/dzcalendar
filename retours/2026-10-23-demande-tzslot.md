@@ -8,7 +8,7 @@ le polyfill Temporal n'est chargé que là où Temporal manque (révision de K.2
 
 `packages/core/src/temporal.ts` importe `temporal-polyfill/full` de façon
 statique : ≈ 20 ko gzip embarqués pour tous les visiteurs, alors que Chrome,
-Firefox et Edge ont Temporal en natif (Safari l'aura en 27.2). DzCalendar pèse
+Firefox et Edge ont Temporal en natif (Safari : aucune version stable, Technology Preview 249 seulement — correction de tzslot). DzCalendar pèse
 138,5 ko dans le benchmark public, contre 94,9 ko pour FullCalendar 7 — ce
 polyfill est le premier poste à retirer.
 
