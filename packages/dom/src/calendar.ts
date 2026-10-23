@@ -777,6 +777,10 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
       firstPaint = false;
       // The box is given, never measured: a calendar whose height comes from its content (or with none) is said, once, two frames on.
       win?.requestAnimationFrame(() => win.requestAnimationFrame(checkBox));
+      // No zone given: the device's is used — said once (Sehhaty, a patient's phone set to Tokyo: every slot outside the grid).
+      if (!options.kernel && !options.timeZone) {
+        ctx.problem({ code: 'zone-from-browser', detail: `no timeZone given: the browser's (${kernel.getState().timeZone}) is used — pass timeZone (Temporal.Now.timeZoneId() for the browser's on purpose)`, element: root });
+      }
       if (vm.family === 'timeline' && v.scrollTo) {
         // A timeline scrolls along time: to that hour of today when shown, else of its first day.
         v.scrollTo(Temporal.Duration.from(scrollTime ?? 'PT8H').total({ unit: 'minutes' }));

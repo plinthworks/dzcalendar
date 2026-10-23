@@ -159,7 +159,9 @@ first: it is on screen sooner, and nothing else changes —
   element }`), or to the console once per code without it:
   `events-not-drawn` (all-day events in a time grid with `allDaySlot:
   false` — an all-day background still washes its columns — and timed events
-  entirely outside `slotMin`–`slotMax`), `host-no-height`. Each is told once,
+  entirely outside `slotMin`–`slotMax`), `host-no-height`, `zone-from-browser`
+  (no `timeZone` given: the device's is used — a phone set to Tokyo draws
+  Algiers' 14:00 at 22:00; pass `timeZone`). Each is told once,
   and again if it comes back after going away. In the wrappers: React
   `onProblem`, Angular `(problem)` (also on the console), Vue `@problem`.
 - **Who may change an event**: `editable` is the calendar's default; an

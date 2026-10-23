@@ -155,3 +155,16 @@ describe('the base entry (18i)', () => {
     expect(hasRenderer('timeGrid')).toBe(true);
   });
 });
+
+describe('zone-from-browser (Sehhaty, after 18k)', () => {
+  it('no timeZone given: said once; a zone given: nothing', () => {
+    const told: string[] = [];
+    const host = document.body.appendChild(document.createElement('div'));
+    const cal = createCalendar(host, { locale: 'fr-FR', initialView: 'timeGridWeek', onProblem: (p) => told.push(p.code) } as CalendarOptions);
+    cal.update({ view: 'timeGridDay' });
+    cal.destroy();
+    const { cal: given } = mount({ onProblem: (p) => told.push(`given:${p.code}`) });
+    given.destroy();
+    expect(told.filter((c) => c.endsWith('zone-from-browser'))).toEqual(['zone-from-browser']);
+  });
+});

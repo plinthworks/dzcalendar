@@ -59,9 +59,11 @@ export interface CalendarProblem {
   /**
    * `events-not-drawn`: events the view cannot show (all-day events in a time grid without its all-day row);
    * `host-no-height`: the calendar has no height of its own (an inline host, or `--dz-height: 100%` with no
-   * ancestor of a given height: it grows with its content).
+   * ancestor of a given height: it grows with its content);
+   * `zone-from-browser`: no `timeZone` given — the browser's is used (a device set elsewhere draws another day;
+   * pass `timeZone`, `Temporal.Now.timeZoneId()` for the browser's on purpose).
    */
-  readonly code: 'events-not-drawn' | 'host-no-height';
+  readonly code: 'events-not-drawn' | 'host-no-height' | 'zone-from-browser';
   readonly detail: string;
   readonly element?: HTMLElement;
 }
