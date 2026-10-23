@@ -5,15 +5,12 @@ description: The calendar's events, given as an array.
 
 import { Aside } from '@astrojs/starlight/components';
 import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
 import LiveDemo from '../../../components/LiveDemo.astro';
 
 The events the calendar shows, given as an array of plain objects.
 
-| | |
-|---|---|
-| **Type** | `readonly EventInput[]` |
-| **Default** | none (no events) |
-| **Live update (via `update()`)** | Yes: `update({ events })` replaces the whole list |
+<OptionFacts name="events" />
 
 ## What it does
 

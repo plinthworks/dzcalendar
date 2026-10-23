@@ -4,16 +4,13 @@ description: What the calendar's header holds, and where.
 ---
 
 import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
 import LiveDemo from '../../../components/LiveDemo.astro';
 
 What the calendar's header holds — the arrows, "today", the title, the view
 buttons, your own buttons — and where; `false` for no header.
 
-| | |
-|---|---|
-| **Type** | `{ start?: string; center?: string; end?: string }` or `false` |
-| **Default** | `{ start: 'prev,next today', center: 'title', end: headerViews.join(',') }` — the views of `headerViews` (`dayGridMonth,timeGridWeek,timeGridDay` with `@dzcalendar/dom`) |
-| **Live update (via `update()`)** | Yes: `update({ headerToolbar })`; an equal layout changes nothing |
+<OptionFacts name="headerToolbar" />
 
 ## What it does
 
@@ -55,6 +52,8 @@ A reload button of your own, before the views:
 <Fragment slot="js">
 
 ```ts
+import { createCalendar } from '@dzcalendar/dom';
+
 const calendar = createCalendar(element, {
   timeZone: 'Europe/Paris',
   headerToolbar: { start: 'title', center: '', end: 'reload today prev,next dayGridMonth,timeGridWeek' },

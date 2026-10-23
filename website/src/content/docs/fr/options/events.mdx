@@ -5,15 +5,12 @@ description: Les événements du calendrier, donnés en tableau.
 
 import { Aside } from '@astrojs/starlight/components';
 import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
 import LiveDemo from '../../../../components/LiveDemo.astro';
 
 Les événements que montre le calendrier, donnés en tableau d'objets simples.
 
-| | |
-|---|---|
-| **Type** | `readonly EventInput[]` |
-| **Par défaut** | aucun (pas d'événement) |
-| **Mise à jour à chaud (via `update()`)** | Oui : `update({ events })` remplace toute la liste |
+<OptionFacts name="events" />
 
 ## Ce qu'elle fait
 

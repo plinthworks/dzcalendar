@@ -31,10 +31,15 @@ import { activeIn } from './focus.js';
 export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   /** A kernel built elsewhere (shared store, tests). Otherwise one is made from the options. */
   readonly kernel?: CalendarKernel;
-  /** Default: the locale's (EN and FR built in; `@dzcalendar/dom/locales/ar|es|de`, `defineLocale`), else EN. */
-  /** Any of the words, over the locale's (`defineLocale` takes a complete set). */
+  /**
+   * Any of the words, over the locale's (EN and FR built in; `@dzcalendar/dom/locales/ar|es|de`, `defineLocale` for a complete set; else EN).
+   * @default {localeWords}
+   */
   readonly messages?: Partial<DzMessages>;
-  /** False under a CSP without inline styles: include `DZ_CSS` yourself. */
+  /**
+   * False under a CSP without inline styles: include `DZ_CSS` yourself.
+   * @default true
+   */
   readonly injectStyles?: boolean;
   /**
    * The calendar's CSS in cascade layers (default true): any rule of the page
@@ -42,17 +47,34 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
    * unlayered (Tailwind 3, Bootstrap's reboot, normalize.css): the CSS is then
    * plain, its class selectors outweigh those resets, and a page rule of the
    * same weight coming after it wins. The first calendar of a document decides.
+   * @default true
    */
   readonly cssLayers?: boolean;
-  /** The calendar owns it from here: it is destroyed with the calendar, or when replaced. */
+  /**
+   * The calendar owns it from here: it is destroyed with the calendar, or when replaced.
+   * @default {builtInMotion}
+   */
   readonly motion?: MotionAdapter;
-  /** Where the time grid is scrolled to on first paint. Default PT8H. */
+  /**
+   * Where the time grid is scrolled to on first paint. Default PT8H.
+   * @default 'PT8H'
+   * @live next-view
+   */
   readonly scrollTime?: DurationLike;
-  /** The line at the current time, refreshed every minute. Default true. */
+  /**
+   * The line at the current time, refreshed every minute. Default true.
+   * @default true
+   */
   readonly nowIndicator?: boolean;
-  /** The view switcher's buttons. Default: month, week, day — those this renderer draws. Without `headerToolbar`. */
+  /**
+   * The view switcher's buttons. Default: month, week, day — those this renderer draws. Without `headerToolbar`.
+   * @default {renderedViews}
+   */
   readonly headerViews?: readonly string[];
-  /** What the header holds and where (`'prev,next today'`: a space between groups, a comma inside one); false: no header. Default: the arrows joined and "today" at the start, the title in the centre, `headerViews` at the end. */
+  /**
+   * What the header holds and where (`'prev,next today'`: a space between groups, a comma inside one); false: no header. Default: the arrows joined and "today" at the start, the title in the centre, `headerViews` at the end.
+   * @default {defaultHeader}
+   */
   readonly headerToolbar?: HeaderToolbar | false;
   /** The application's buttons, named in `headerToolbar`. */
   readonly customButtons?: Readonly<Record<string, CustomButton>>;
@@ -60,60 +82,101 @@ export interface CalendarOptions extends Partial<KernelOptions>, LiveSettings {
   readonly headerItems?: Readonly<Record<string, ElementHooks<HeaderItemCtx>>>;
   /** How each place is written: `{ slotLabel: { hour: 'numeric' }, title: (t) => … }` (docs/behaviors/formats.md). */
   readonly formats?: Formats;
-  /** Lanes a month day shows before "+N": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default null (owner, 18k: nothing hidden unless asked). */
+  /**
+   * Lanes a month day shows before "+N": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default: null in a month (nothing hidden unless asked), 'auto' in a year's tiny days.
+   * @default {lanesPerView}
+   */
   readonly dayMaxLanes?: number | 'auto' | null;
+  /** The calendar's elements made the application's: per element (`event`, `dayCell`, `slotLabel`…), its classes, content and mounts (docs/behaviors/render-hooks.md). */
   readonly hooks?: CalendarHooks;
   /**
    * "New event here" from the context menu: the application opens its own
    * editor. A moment in a time grid, a date in a month.
    */
   readonly onCreateRequest?: (request: CreateRequest) => void;
-  /** False hides Saturday and Sunday (added to `hiddenDays`). Default true. */
+  /**
+   * False hides Saturday and Sunday (added to `hiddenDays`). Default true.
+   * @default true
+   */
   readonly weekends?: boolean;
-  /** A number per week: on the month's rows, in the week's corner. Default false. */
+  /**
+   * A number per week: on the month's rows, in the week's corner. Default false.
+   * @default false
+   */
   readonly weekNumbers?: boolean;
-  /** The time grid's all-day row; false: none (all-day events are then not shown there). Default true. */
+  /**
+   * The time grid's all-day row; false: none (all-day events are then not shown there). Default true.
+   * @default true
+   */
   readonly allDaySlot?: boolean;
-  /** An event's time beside its title; false: the title alone. Default true. */
+  /**
+   * An event's time beside its title; false: the title alone. Default true.
+   * @default true
+   */
   readonly displayEventTime?: boolean;
   /**
    * A ready-made family ('standard', 'slate', 'night', 'pastel', 'frost',
-   * 'solar', 'contrast' — with @dzcalendar/theme) or one made with
+   * 'solar', 'contrast' — with `@dzcalendar/theme`) or one made with
    * `defineTheme`. Default 'standard'.
+   * @default 'standard'
    */
   readonly theme?: string;
-  /** Light, dark, or the page's ('auto'). Default 'auto'. */
+  /**
+   * Light, dark, or the page's ('auto'). Default 'auto'.
+   * @default 'auto'
+   */
   readonly scheme?: 'auto' | 'light' | 'dark';
-  /** Default 'comfortable'. */
+  /**
+   * Default 'comfortable'.
+   * @default 'comfortable'
+   */
   readonly density?: 'compact' | 'comfortable' | 'spacious';
-  /** Events tinted with their tone's edge ('tinted', the default) or filled blocks of their tone ('solid'). */
+  /**
+   * Events tinted with their tone's edge ('tinted', the default) or filled blocks of their tone ('solid').
+   * @default 'tinted'
+   */
   readonly eventStyle?: 'tinted' | 'solid';
-  /** 'none': the structure only (grids, positions, sizes) — every colour, border, shadow and type yours (Tailwind, a design system). Default 'styled'. */
+  /**
+   * 'none': the structure only (grids, positions, sizes) — every colour, border, shadow and type yours (Tailwind, a design system). Default 'styled'.
+   * @default 'styled'
+   */
   readonly look?: 'styled' | 'none';
   /**
    * The calendar dates are written in ('islamic-umalqura', 'persian'…; Intl's
    * names). The data and the grids stay Gregorian; titles, numbers and
    * labels follow it. Default: the locale's.
+   * @default {localeCalendar}
    */
   readonly displayCalendar?: string | null;
-  /** A second calendar shown beside the dates (a cell's day, a heading's date). Default none. */
+  /**
+   * A second calendar shown beside the dates (a cell's day, a heading's date). Default none.
+   * @default null
+   */
   readonly secondaryCalendar?: string | null;
-  /** Months side by side at most in a multi-month view (1: a stack). Default 3. */
+  /**
+   * Months side by side at most in a multi-month view (1: a stack). Default 3.
+   * @default 3
+   */
   readonly multiMonthMaxColumns?: number;
   /**
    * Above this many events in a view, only what is on screen (and a margin)
    * is mounted; below, everything (what a screen reader's browse mode reads).
    * Default 500; `Infinity` never windows.
+   * @default 500
    */
   readonly virtualizeAbove?: number;
   /** Options of a plugin's views, by family (`{ timeline: { areaColumns, … } }` for the Pro's timeline). */
   readonly viewOptions?: Readonly<Record<string, unknown>>;
-  /** Prepares for printing on `beforeprint` (everything drawn) and restores on `afterprint`. Default false. */
+  /**
+   * Prepares for printing on `beforeprint` (everything drawn) and restores on `afterprint`. Default false.
+   * @default false
+   */
   readonly autoPrint?: boolean;
   /**
    * Overlapping events side by side in a time grid before "+N": a number,
    * 'auto' (as many as the column's width allows, about 2.5rem each) or null
    * (all, however thin). Default 'auto'.
+   * @default 'auto'
    */
   readonly eventMaxStack?: number | 'auto' | null;
 }
@@ -131,7 +194,7 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
   readonly sources?: readonly EventSourceSpec[];
   readonly hooks?: CalendarHooks;
   readonly businessHours?: KernelOptions['businessHours'];
-  /** Bookable slots drawn in the week and day views (\`findSlots(...).slots\`); null: none. A new array redraws. */
+  /** Bookable slots drawn in the week and day views (`findSlots(...).slots`); null: none. A new array redraws. */
   readonly availableSlots?: KernelOptions['availableSlots'];
   readonly hiddenDays?: KernelOptions['hiddenDays'];
   /** What resource views show as columns; a new array replaces them (the same array changes nothing). */
@@ -1315,7 +1378,6 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
         ctx.snapMinutes = settings.current.snapMinutes ?? 15;
         root.classList.toggle('dz-editable', settings.current.editable === true);
         root.toggleAttribute('data-editable', settings.current.editable === true);
-    root.toggleAttribute('data-editable', settings.current.editable === true);
       }
       holding = true;
       try {

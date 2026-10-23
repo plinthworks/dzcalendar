@@ -21,15 +21,37 @@ import type { ViewRange } from './spec.js';
 
 export interface TimeGridOptions {
   readonly displayZone: ZoneId;
+  /**
+   * 'wall': every day's rows aligned, a clock change marked; 'elapsed': real time drawn to scale.
+   * @default 'wall'
+   */
   readonly axis?: AxisMode;
+  /**
+   * The first hour shown (a duration from midnight).
+   * @default 'PT0H'
+   */
   readonly slotMin?: DurationLike;
+  /**
+   * The end of the last hour shown (up to 24 hours).
+   * @default 'PT24H'
+   */
   readonly slotMax?: DurationLike;
-  /** The shortest an event is drawn, in minutes. Default 15. */
+  /**
+   * The shortest an event is drawn, in minutes. Default 15.
+   * @default 15
+   */
   readonly minEventMinutes?: number;
-  /** Gutter tick step, in minutes. Default 60. */
+  /**
+   * Gutter tick step, in minutes. Default 60.
+   * @default 60
+   */
   readonly slotMinutes?: number;
-  /** A tick labelled every this many minutes of the clock (whole multiples of `slotMinutes` make sense). Default 60. */
+  /**
+   * A tick labelled every this many minutes of the clock (whole multiples of `slotMinutes` make sense). Default 60.
+   * @default 60
+   */
   readonly labelMinutes?: number;
+  /** @internal */
   readonly resourceId?: string;
   /**
    * A resource view: one column per resource and date, resources first
@@ -51,6 +73,7 @@ export interface TimeGridOptions {
    * `maxStack - 1` lanes and puts the rest behind "+N" links in the last one
    * (1: all of a crowded cluster behind one link). Absent, null or not a whole
    * number ≥ 1: no limit.
+   * @default null
    */
   readonly maxStack?: number | null;
 }

@@ -44,26 +44,51 @@ export interface ModelOptions {
   readonly dayGrid?: Omit<DayGridOptions, 'displayZone' | 'businessHours' | 'showNonCurrentDates' | 'resources' | 'resourceGroups'>;
   /** A timeline's scale and rows (the Pro's family reads them). */
   readonly timeline?: {
-    /** Minutes per slot (dividing a day) or 'day'. Default: 30 for a day, 60 up to a week, days beyond. */
+    /**
+     * Minutes per slot (dividing a day) or 'day'. Default: 30 for a day, 60 up to a week, days beyond.
+     * @default {slotPerSpan}
+     */
     readonly slot?: number | 'day';
-    /** Lanes a resource row shows before "+N". Default 3. */
+    /**
+     * Lanes a resource row shows before "+N". Default 3.
+     * @default 3
+     */
     readonly maxLanes?: number;
-    /** Lanes of a timeline without resources (its one row fills the view: the DOM measures it). Default 12. */
+    /**
+     * Lanes of a timeline without resources (its one row fills the view: the DOM measures it). Default 12.
+     * @default 12
+     */
     readonly fillLanes?: number;
   };
   /** How sibling resources are ordered after their `order`: field names (`'-title'` descending) or a comparison. */
   readonly resourceOrder?: ResourceOrder | undefined;
   /** Resource views group their columns (a timeline its rows) by this field: a head over each run. */
   readonly resourceGroupField?: string | undefined;
-  /** Resource views add an "Unassigned" column (a timeline a row) first, for events on no known resource. Default false. */
+  /**
+   * Resource views add an "Unassigned" column (a timeline a row) first, for events on no known resource. Default false.
+   * @default false
+   */
   readonly showUnassigned?: boolean;
-  /** A timeline's rows: resources whose children are hidden, groups shut. Default: everything open. */
+  /**
+   * A timeline's rows: resources whose children are hidden, groups shut. Default: everything open.
+   * @default []
+   */
   readonly collapsedResources?: readonly string[];
+  /** @default [] */
   readonly collapsedGroups?: readonly string[];
+  /**
+   * The hours a place is open: shaded outside in the time grid and checked by `rules`. One set (`{ days, start, end }`), several, or `true` for Monday to Friday, 9:00 to 17:00.
+   */
   readonly businessHours?: BusinessHoursInput;
-  /** Bookable slots drawn in the time grid (compared by identity: a new array redraws). */
+  /**
+   * Bookable slots drawn in the time grid (compared by identity: a new array redraws).
+   * @default null
+   */
   readonly availableSlots?: readonly AvailableSlot[] | null;
-  /** Weekdays no view shows (ISO: 6 and 7 for the weekend), unless a view names its own. */
+  /**
+   * Weekdays no view shows (ISO: 6 and 7 for the weekend), unless a view names its own.
+   * @default []
+   */
   readonly hiddenDays?: readonly Weekday[];
 }
 
@@ -80,14 +105,26 @@ export interface TitleFormatArg {
 export type TitleFormat = Intl.DateTimeFormatOptions | ((arg: TitleFormatArg) => string);
 
 export interface KernelOptions extends ModelOptions {
+  /** @default {browserZone} */
   readonly timeZone: ZoneId;
+  /** @default {pageLanguage} */
   readonly locale: string;
-  /** Default: the locale's. */
+  /**
+   * Default: the locale's.
+   * @default {localeWeek}
+   */
   readonly firstDay?: Weekday;
-  /** How the title is written; default: the month, a week's days, a day in full. */
+  /**
+   * How the title is written; default: the month, a week's days, a day in full.
+   * @default {titlePerView}
+   */
   readonly titleFormat?: TitleFormat;
-  /** Default: today in `timeZone`. */
+  /**
+   * Default: today in `timeZone`.
+   * @default {today}
+   */
   readonly initialDate?: PlainDate;
+  /** @default {firstView} */
   readonly initialView?: string;
   /** Added to (and overriding) the built-in views: a whole spec, or settings (`{ family: 'timeGrid', visibleRange }`) the rest filled in, the type its key. */
   readonly views?: Readonly<Record<string, ViewSpec | ViewSettings>>;
@@ -95,17 +132,26 @@ export interface KernelOptions extends ModelOptions {
   readonly store?: EventStore;
   /** Loaded as an array source named "events"; replaced with `setEvents`. */
   readonly events?: readonly EventInput[];
-  /** Injectable for tests. Default: the system clock. */
+  /**
+   * Injectable for tests. Default: the system clock.
+   * @internal
+   */
   readonly now?: () => Instant;
   /** What edits are checked against (business hours come from `businessHours`). */
   readonly rules?: Omit<RulesContext, 'displayZone' | 'businessHours'>;
-  /** Undo entries kept. Default 200. */
+  /**
+   * Undo entries kept. Default 200.
+   * @default 200
+   */
   readonly historyLimit?: number;
   /** Fetched as the calendar moves (`kernel.sources` adds, removes, refetches). */
   readonly sources?: readonly EventSourceSpec[];
   /** Loading, fetch errors, problems in a delivery, saves refused. */
   readonly onSource?: (n: SourceNotice) => void;
-  /** For retries; injectable for tests. Default: the global timers. */
+  /**
+   * For retries; injectable for tests. Default: the global timers.
+   * @internal
+   */
   readonly timers?: Timers;
   /** What resource views show as columns (`setResources` replaces them). */
   readonly resources?: readonly ResourceInput[];

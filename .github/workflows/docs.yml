@@ -11,6 +11,9 @@ on:
       - 'packages/**'
       - 'docs/**'
       - '.github/workflows/docs.yml'
+      - 'scripts/**'
+      - 'package.json'
+      - 'vite.config.ts'
   # A pull request builds the site (a broken page found before main), and deploys nothing.
   pull_request:
     paths: *paths
@@ -44,6 +47,10 @@ jobs:
       # The root install brings @tzslot/core and temporal-polyfill, which the packages' sources import.
       - name: Install the workspace
         run: npm ci
+
+      # The option facts are what the types say, and every example of the tabs compiles (tsc, vue-tsc, ngc).
+      - name: Check the option facts and the examples
+        run: npm run docs:check
 
       - name: Install the site
         working-directory: website

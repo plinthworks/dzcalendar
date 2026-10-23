@@ -22,8 +22,12 @@ export const isBackground = (d: EventDisplay): boolean => d === 'background' || 
 
 export interface DayGridOptions {
   readonly displayZone: ZoneId;
-  /** Rows of bars per day before "+N". Unlimited when absent or null. */
+  /**
+   * Rows of bars per day before "+N". Unlimited when absent or null.
+   * @default null
+   */
   readonly maxLanes?: number | null;
+  /** @internal */
   readonly resourceId?: string;
   /**
    * A resource view: in each row, every resource's days side by side

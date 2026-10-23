@@ -45,6 +45,8 @@ npm run perf:browser   # first render, nodes, one update per view, U and W, mini
 npm run pack:local     # tarballs into packed/
 npm run test:package   # a fresh Angular app from the tarballs, ng build on 19, 20, 21, 22 (network)
 npm run check:entries  # bundles from the dists run: recurrence kept, polyfill a chunk apart, nothing reads Temporal on import
+npm run gen:options    # website/src/generated/options.json, the option facts from the types (after a JSDoc change)
+npm run docs:check     # those facts current, and every example of the site's tabs compiled (tsc, vue-tsc, ngc)
 cd website && npm run build && npm run preview  # the docs site (Astro Starlight), preview on 4700 (4701 when DzGrid holds 4700)
 ```
 

@@ -1,0 +1,52 @@
+---
+/**
+ * An option's facts, generated from the types (scripts/gen-options.mjs →
+ * src/generated/options.json): its type, its default, whether `update()`
+ * changes it, where it is declared. `name` is an option (`initialView`) or a
+ * group's member (`timeGrid.axis`). An unknown name fails the build.
+ *
+ *   <OptionFacts name="initialView" />
+ */
+import data from '../generated/options.json';
+import { FACTS } from '../i18n/facts';
+
+interface Props {
+  name: string;
+}
+interface Fact {
+  name: string;
+  type: string;
+  resolved?: string | null;
+  doc: string;
+  default: { code: string } | { token: string } | null;
+  source: string | null;
+  live?: 'yes' | 'no' | 'next-view' | { as: string };
+  members?: Fact[];
+}
+const { name } = Astro.props;
+const [top, member] = name.split('.');
+const option = (data.options as Fact[]).find((o) => o.name === top);
+const fact = member ? option?.members?.find((m) => m.name === member) : option;
+if (!fact) throw new Error(`<OptionFacts name="${name}">: no such option in src/generated/options.json (npm run gen:options)`);
+const words = FACTS[Astro.currentLocale === 'fr' ? 'fr' : 'en'];
+const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const code = (text: string) => `<code>${escape(text)}</code>`;
+/** The words' only markup: `code`. */
+const inline = (md: string) => escape(md).replace(/`([^`]+)`/g, '<code>$1</code>');
+const def = fact.default === null ? words.none : 'code' in fact.default ? code(fact.default.code) : inline(words.tokens[fact.default.token] ?? '');
+if (fact.default && 'token' in fact.default && !words.tokens[fact.default.token]) throw new Error(`<OptionFacts name="${name}">: no words for the default {${fact.default.token}} in src/i18n/facts.ts`);
+// A member changes as its option does.
+const live = member ? option!.live : fact.live;
+const liveText = live === 'yes' ? words.yes : live === 'no' ? words.no : live === 'next-view' ? words.nextView : live ? inline(words.as(live.as)) : '';
+const file = fact.source ?? '';
+const href = `https://github.com/plinthworks/dzcalendar/blob/main/${file}`;
+---
+
+<table class="dz-facts">
+  <tbody>
+    <tr><th scope="row">{words.type}</th><td set:html={code(fact.type) + (fact.resolved ? ` — ${code(fact.resolved)}` : '')} /></tr>
+    <tr><th scope="row">{words.default}</th><td set:html={def} /></tr>
+    <tr><th scope="row" set:html={inline(words.live)} /><td set:html={liveText} /></tr>
+    {fact.source && <tr><th scope="row">{words.source}</th><td><a href={href}><code>{file}</code></a></td></tr>}
+  </tbody>
+</table>

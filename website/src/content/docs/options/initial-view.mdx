@@ -5,15 +5,12 @@ description: The view the calendar opens on.
 
 import { Aside } from '@astrojs/starlight/components';
 import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
 import LiveDemo from '../../../components/LiveDemo.astro';
 
 The view the calendar shows when it is made.
 
-| | |
-|---|---|
-| **Type** | `string` — a view's name |
-| **Default** | `'timeGridWeek'` — or, with `@dzcalendar/dom/base`, the first view whose renderer is imported (`dayGridMonth`, `listWeek`, `multiMonthYear`) |
-| **Live update (via `update()`)** | Yes, under another name: `update({ view: 'dayGridMonth' })` |
+<OptionFacts name="initialView" />
 
 ## What it does
 

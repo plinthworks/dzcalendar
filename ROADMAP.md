@@ -78,7 +78,11 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   npm, pull requests built and not deployed. **Goes online once the owner
   sets Settings → Pages → Source: GitHub Actions** (plinthworks/dzcalendar is
   public; `has_pages` false). Preview: `cd website && npm run build && npm
-  run preview` (4700, or 4701 when DzGrid holds 4700). Next 18j-2 (owner:
+  run preview` (4700, or 4701 when DzGrid holds 4700). 18j-2 batch 0
+  committed ("Phase 18j-2, batch 0"): the mechanism below, built and
+  reviewed (79 options: `dayGrid.maxLanes` and `timeGrid.maxStack` left out
+  of the pages — `createCalendar` sets them from `dayMaxLanes` and
+  `eventMaxStack`); 76 pending. Next the six batches. 18j-2 (owner:
   facts generated + written text; online first, then batches):
   `scripts/gen-options.mjs` → `website/src/generated/options.json`
   (`@default`/`@live`/`@internal` tags in the JSDoc), `<OptionFacts>` and a

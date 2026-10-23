@@ -1,0 +1,1068 @@
+{
+  "generatedBy": "scripts/gen-options.mjs",
+  "options": [
+    {
+      "name": "allDaySlot",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "The time grid's all-day row; false: none (all-day events are then not shown there). Default true.",
+      "default": {
+        "code": "true"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "autoPrint",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "Prepares for printing on `beforeprint` (everything drawn) and restores on `afterprint`. Default false.",
+      "default": {
+        "code": "false"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "no"
+    },
+    {
+      "name": "availableSlots",
+      "type": "readonly AvailableSlot[] | null",
+      "resolved": "readonly AvailableSlot[]",
+      "doc": "Bookable slots drawn in the time grid (compared by identity: a new array redraws).",
+      "default": {
+        "code": "null"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "businessHours",
+      "type": "BusinessHoursInput",
+      "resolved": "boolean | BusinessHoursRule | readonly BusinessHoursRule[]",
+      "doc": "The hours a place is open: shaded outside in the time grid and checked by `rules`. One set (`{ days, start, end }`), several, or `true` for Monday to Friday, 9:00 to 17:00.",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "chooseScope",
+      "type": "(request: ScopeRequest) => EditScope | null | Promise<EditScope | null>",
+      "resolved": "(request: ScopeRequest) => EditScope | Promise<EditScope | null> | null",
+      "doc": "A gesture on an occurrence of a series: how far it reaches. Resolve null to cancel. Default: a \"this / following / all\" menu where it dropped.",
+      "default": {
+        "token": "scopeMenu"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "collapsedGroups",
+      "type": "readonly string[]",
+      "resolved": null,
+      "doc": "",
+      "default": {
+        "code": "[]"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "collapsedResources",
+      "type": "readonly string[]",
+      "resolved": null,
+      "doc": "A timeline's rows: resources whose children are hidden, groups shut. Default: everything open.",
+      "default": {
+        "code": "[]"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "contextMenu",
+      "type": "MenuHook",
+      "resolved": "(ctx: ContextMenuCtx, defaults: readonly ActionItem[]) => readonly ActionItem[] | null",
+      "doc": "Keep, reorder, add to or replace the context menu's entries; null or [] leaves the browser's menu (an application opening its own calls preventDefault itself).",
+      "default": {
+        "token": "builtInMenu"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "cssLayers",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "The calendar's CSS in cascade layers (default true): any rule of the page outside a layer wins over it. False for a page whose global reset is unlayered (Tailwind 3, Bootstrap's reboot, normalize.css): the CSS is then plain, its class selectors outweigh those resets, and a page rule of the same weight coming after it wins. The first calendar of a document decides.",
+      "default": {
+        "code": "true"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "no"
+    },
+    {
+      "name": "customButtons",
+      "type": "Readonly<Record<string, CustomButton>>",
+      "resolved": null,
+      "doc": "The application's buttons, named in `headerToolbar`.",
+      "default": null,
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "dayMaxLanes",
+      "type": "number | 'auto' | null",
+      "resolved": "number | \"auto\"",
+      "doc": "Lanes a month day shows before \"+N\": a number, 'auto' (as many as the height allows), or null (every event: the weeks grow, the month scrolls). Default: null in a month (nothing hidden unless asked), 'auto' in a year's tiny days.",
+      "default": {
+        "token": "lanesPerView"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "density",
+      "type": "'compact' | 'comfortable' | 'spacious'",
+      "resolved": "\"compact\" | \"comfortable\" | \"spacious\"",
+      "doc": "Default 'comfortable'.",
+      "default": {
+        "code": "'comfortable'"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "displayCalendar",
+      "type": "string | null",
+      "resolved": "string",
+      "doc": "The calendar dates are written in ('islamic-umalqura', 'persian'…; Intl's names). The data and the grids stay Gregorian; titles, numbers and labels follow it. Default: the locale's.",
+      "default": {
+        "token": "localeCalendar"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "displayEventTime",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "An event's time beside its title; false: the title alone. Default true.",
+      "default": {
+        "code": "true"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "dragEdgeNavigate",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "Holding a dragged event at the side goes to the previous/next period. Default true.",
+      "default": {
+        "code": "true"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "droppable",
+      "type": "boolean | ((data: unknown) => boolean)",
+      "resolved": null,
+      "doc": "What may be dropped here from the page (`makeDraggable`) or another calendar: true, false (default), or a filter given the element's data.",
+      "default": {
+        "code": "false"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "editable",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "Events can be dragged and resized, and the context menu offers editing entries. Default false.",
+      "default": {
+        "code": "false"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "eventMaxStack",
+      "type": "number | 'auto' | null",
+      "resolved": "number | \"auto\"",
+      "doc": "Overlapping events side by side in a time grid before \"+N\": a number, 'auto' (as many as the column's width allows, about 2.5rem each) or null (all, however thin). Default 'auto'.",
+      "default": {
+        "code": "'auto'"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "eventResizableFromStart",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "Timed events can be resized from their start too. Default false.",
+      "default": {
+        "code": "false"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "eventStyle",
+      "type": "'tinted' | 'solid'",
+      "resolved": "\"tinted\" | \"solid\"",
+      "doc": "Events tinted with their tone's edge ('tinted', the default) or filled blocks of their tone ('solid').",
+      "default": {
+        "code": "'tinted'"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "events",
+      "type": "readonly EventInput[]",
+      "resolved": null,
+      "doc": "Loaded as an array source named \"events\"; replaced with `setEvents`.",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "firstDay",
+      "type": "Weekday",
+      "resolved": "1 | 2 | 3 | 4 | 5 | 6 | 7",
+      "doc": "Default: the locale's.",
+      "default": {
+        "token": "localeWeek"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "formats",
+      "type": "Formats",
+      "resolved": null,
+      "doc": "How each place is written: `{ slotLabel: { hour: 'numeric' }, title: (t) => … }` (docs/behaviors/formats.md).",
+      "default": null,
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "headerItems",
+      "type": "Readonly<Record<string, ElementHooks<HeaderItemCtx>>>",
+      "resolved": null,
+      "doc": "The application's places in the header (a menu, a filter, a badge), named in `headerToolbar`: its content, classes and mounts.",
+      "default": null,
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "headerToolbar",
+      "type": "HeaderToolbar | false",
+      "resolved": "false | HeaderToolbar",
+      "doc": "What the header holds and where (`'prev,next today'`: a space between groups, a comma inside one); false: no header. Default: the arrows joined and \"today\" at the start, the title in the centre, `headerViews` at the end.",
+      "default": {
+        "token": "defaultHeader"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "headerViews",
+      "type": "readonly string[]",
+      "resolved": null,
+      "doc": "The view switcher's buttons. Default: month, week, day — those this renderer draws. Without `headerToolbar`.",
+      "default": {
+        "token": "renderedViews"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "hiddenDays",
+      "type": "readonly Weekday[]",
+      "resolved": null,
+      "doc": "Weekdays no view shows (ISO: 6 and 7 for the weekend), unless a view names its own.",
+      "default": {
+        "code": "[]"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "historyLimit",
+      "type": "number",
+      "resolved": null,
+      "doc": "Undo entries kept. Default 200.",
+      "default": {
+        "code": "200"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": "no"
+    },
+    {
+      "name": "hooks",
+      "type": "CalendarHooks",
+      "resolved": null,
+      "doc": "The calendar's elements made the application's: per element (`event`, `dayCell`, `slotLabel`…), its classes, content and mounts (docs/behaviors/render-hooks.md).",
+      "default": null,
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes",
+      "members": [
+        {
+          "name": "allDayLabel",
+          "type": "ElementHooks<AllDayLabelCtx>",
+          "resolved": null,
+          "doc": "The all-day row's label.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "dayCell",
+          "type": "ElementHooks<DayCellCtx>",
+          "resolved": null,
+          "doc": "A day's cell (a month, a day grid's week).",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "dayHeader",
+          "type": "ElementHooks<DayHeaderCtx>",
+          "resolved": null,
+          "doc": "A day's head (a week's or a day's date, a month's weekday): a mark, a count, a button.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "dayLane",
+          "type": "ElementHooks<DayLaneCtx>",
+          "resolved": "ElementHooks<Day>",
+          "doc": "A time grid's column for a day.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "event",
+          "type": "EventHooks",
+          "resolved": null,
+          "doc": "",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "listDayHeader",
+          "type": "ElementHooks<ListDayHeaderCtx>",
+          "resolved": null,
+          "doc": "A list's day heading.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "monthHeader",
+          "type": "ElementHooks<MonthHeaderCtx>",
+          "resolved": null,
+          "doc": "A month's title in a multi-month view.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "moreLink",
+          "type": "ElementHooks<MoreLinkCtx>",
+          "resolved": null,
+          "doc": "\"+N\".",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "morePopover",
+          "type": "ElementHooks<MorePopoverCtx>",
+          "resolved": null,
+          "doc": "The panel \"+N\" opens.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "noEvents",
+          "type": "ElementHooks<NoEventsCtx>",
+          "resolved": null,
+          "doc": "The list's \"nothing to show\".",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "nowIndicator",
+          "type": "ElementHooks<NowIndicatorCtx>",
+          "resolved": null,
+          "doc": "The line at the current time.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "resource",
+          "type": "ResourceHooks",
+          "resolved": null,
+          "doc": "",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "resourceAreaHeader",
+          "type": "ElementHooks<ResourceAreaHeaderCtx>",
+          "resolved": null,
+          "doc": "A timeline's resource column head.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "resourceGroupHeader",
+          "type": "ElementHooks<ResourceGroupCtx>",
+          "resolved": null,
+          "doc": "A group's head (resource views) and its row (a timeline).",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "resourceGroupLane",
+          "type": "ElementHooks<ResourceGroupCtx>",
+          "resolved": null,
+          "doc": "",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "resourceLane",
+          "type": "ElementHooks<ResourceLaneCtx>",
+          "resolved": null,
+          "doc": "A resource's row in a timeline.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "slotLabel",
+          "type": "ElementHooks<SlotLabelCtx>",
+          "resolved": null,
+          "doc": "A time label in a time grid's gutter.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "slotLane",
+          "type": "ElementHooks<SlotLaneCtx>",
+          "resolved": null,
+          "doc": "A slot's row across a time grid (drawn as elements only when this hook is given).",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "view",
+          "type": "ElementHooks<ViewHookCtx>",
+          "resolved": null,
+          "doc": "The view's root.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        },
+        {
+          "name": "weekNumber",
+          "type": "ElementHooks<WeekNumberCtx>",
+          "resolved": null,
+          "doc": "A week's number.",
+          "default": null,
+          "source": "packages/dom/src/host.ts"
+        }
+      ]
+    },
+    {
+      "name": "initialDate",
+      "type": "PlainDate",
+      "resolved": null,
+      "doc": "Default: today in `timeZone`.",
+      "default": {
+        "token": "today"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": {
+        "as": "date"
+      }
+    },
+    {
+      "name": "initialView",
+      "type": "string",
+      "resolved": null,
+      "doc": "",
+      "default": {
+        "token": "firstView"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": {
+        "as": "view"
+      }
+    },
+    {
+      "name": "injectStyles",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "False under a CSP without inline styles: include `DZ_CSS` yourself.",
+      "default": {
+        "code": "true"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "no"
+    },
+    {
+      "name": "kernel",
+      "type": "CalendarKernel",
+      "resolved": null,
+      "doc": "A kernel built elsewhere (shared store, tests). Otherwise one is made from the options.",
+      "default": null,
+      "source": "packages/dom/src/calendar.ts",
+      "live": "no"
+    },
+    {
+      "name": "keyboardUndo",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo inside the calendar. Default true.",
+      "default": {
+        "code": "true"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "locale",
+      "type": "string",
+      "resolved": null,
+      "doc": "",
+      "default": {
+        "token": "pageLanguage"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "look",
+      "type": "'styled' | 'none'",
+      "resolved": "\"styled\" | \"none\"",
+      "doc": "'none': the structure only (grids, positions, sizes) — every colour, border, shadow and type yours (Tailwind, a design system). Default 'styled'.",
+      "default": {
+        "code": "'styled'"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "messages",
+      "type": "Partial<DzMessages>",
+      "resolved": null,
+      "doc": "Any of the words, over the locale's (EN and FR built in; `@dzcalendar/dom/locales/ar|es|de`, `defineLocale` for a complete set; else EN).",
+      "default": {
+        "token": "localeWords"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "motion",
+      "type": "MotionAdapter",
+      "resolved": null,
+      "doc": "The calendar owns it from here: it is destroyed with the calendar, or when replaced.",
+      "default": {
+        "token": "builtInMotion"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "multiMonthMaxColumns",
+      "type": "number",
+      "resolved": null,
+      "doc": "Months side by side at most in a multi-month view (1: a stack). Default 3.",
+      "default": {
+        "code": "3"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "nowIndicator",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "The line at the current time, refreshed every minute. Default true.",
+      "default": {
+        "code": "true"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onCommandRefused",
+      "type": "(result: CommandResult, command: Command) => void",
+      "resolved": null,
+      "doc": "A command from the calendar's own UI was refused: why (problems, rule violations).",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onCreateRequest",
+      "type": "(request: CreateRequest) => void",
+      "resolved": null,
+      "doc": "\"New event here\" from the context menu: the application opens its own editor. A moment in a time grid, a date in a month.",
+      "default": null,
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onDateClick",
+      "type": "(click: DateClick) => void",
+      "resolved": null,
+      "doc": "",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onDrop",
+      "type": "(drop: DropInfo) => void",
+      "resolved": null,
+      "doc": "An element of the page was dropped and its event made (not on a refusal).",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onEventChange",
+      "type": "(change: EventChange) => void",
+      "resolved": null,
+      "doc": "After a person's change: persist it, and `revert()` it if the server refuses.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onEventClick",
+      "type": "(instance: EventInstance) => void",
+      "resolved": null,
+      "doc": "",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onEventLeave",
+      "type": "(leave: EventLeave) => void",
+      "resolved": null,
+      "doc": "An event of this calendar was dropped on another one: `revert()` puts it back on both.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onEventOpen",
+      "type": "(instance: EventInstance) => void",
+      "resolved": null,
+      "doc": "\"Open\" from the context menu.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onEventReceive",
+      "type": "(change: EventChange) => void",
+      "resolved": null,
+      "doc": "An event came in (dropped from the page or from another calendar): persist it; `revert()` takes it back (both calendars' sides).",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onProblem",
+      "type": "(problem: CalendarProblem) => void",
+      "resolved": null,
+      "doc": "Something the calendar could not do as asked, found while drawing; without it, said once per code on the console.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onProposalRefused",
+      "type": "(proposal: Proposal) => void",
+      "resolved": null,
+      "doc": "A gesture dropped where the rules refuse it (the proposal and its violations).",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onResourceProblems",
+      "type": "(problems: readonly Problem[]) => void",
+      "resolved": null,
+      "doc": "What the resources given (option or `update`) could not be read as: refused entries, dropped fields. Called only when there are some.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onResourceToggle",
+      "type": "(state: { readonly collapsedResources: readonly string[]; readonly collapsedGroups: readonly string[] }) => void",
+      "resolved": "(state: { readonly collapsedResources: readonly string[]; readonly collapsedGroups: readonly string[]; }) => void",
+      "doc": "A person folded or unfolded a resource or a group (a timeline's tree): the state to keep, if the application wants it back.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onSelect",
+      "type": "(selection: Selection) => void",
+      "resolved": null,
+      "doc": "",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onSlotClick",
+      "type": "(slot: AvailableSlot) => void",
+      "resolved": null,
+      "doc": "A free slot of `availableSlots` was clicked (or Enter on it): the slot as given. The application books it — its server checks it again (`checkSlot`) before saving; the calendar creates nothing.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "onSource",
+      "type": "(n: SourceNotice) => void",
+      "resolved": null,
+      "doc": "Loading, fetch errors, problems in a delivery, saves refused.",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "no"
+    },
+    {
+      "name": "onUnselect",
+      "type": "() => void",
+      "resolved": null,
+      "doc": "The selection shown went away (a click elsewhere, Escape, another period) — not when the application cleared it.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "resourceGroupField",
+      "type": "string | undefined",
+      "resolved": "string",
+      "doc": "Resource views group their columns (a timeline its rows) by this field: a head over each run.",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "resourceOrder",
+      "type": "ResourceOrder | undefined",
+      "resolved": "string | readonly string[] | ((a: Resource, b: Resource) => number)",
+      "doc": "How sibling resources are ordered after their `order`: field names (`'-title'` descending) or a comparison.",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "resources",
+      "type": "readonly ResourceInput[]",
+      "resolved": null,
+      "doc": "What resource views show as columns (`setResources` replaces them).",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "rules",
+      "type": "Omit<RulesContext, 'displayZone' | 'businessHours'>",
+      "resolved": null,
+      "doc": "What edits are checked against (business hours come from `businessHours`).",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "scheme",
+      "type": "'auto' | 'light' | 'dark'",
+      "resolved": "\"auto\" | \"light\" | \"dark\"",
+      "doc": "Light, dark, or the page's ('auto'). Default 'auto'.",
+      "default": {
+        "code": "'auto'"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "scrollTime",
+      "type": "DurationLike",
+      "resolved": null,
+      "doc": "Where the time grid is scrolled to on first paint. Default PT8H.",
+      "default": {
+        "code": "'PT8H'"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "next-view"
+    },
+    {
+      "name": "secondaryCalendar",
+      "type": "string | null",
+      "resolved": "string",
+      "doc": "A second calendar shown beside the dates (a cell's day, a heading's date). Default none.",
+      "default": {
+        "code": "null"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "selectable",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "Dragging across empty time selects it (`onSelect`). Default false.",
+      "default": {
+        "code": "false"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "showUnassigned",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "Resource views add an \"Unassigned\" column (a timeline a row) first, for events on no known resource. Default false.",
+      "default": {
+        "code": "false"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "snapMinutes",
+      "type": "number",
+      "resolved": null,
+      "doc": "Minutes gestures and context-menu moments snap to in a time grid. Default 15.",
+      "default": {
+        "code": "15"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
+      "name": "sources",
+      "type": "readonly EventSourceSpec[]",
+      "resolved": null,
+      "doc": "Fetched as the calendar moves (`kernel.sources` adds, removes, refetches).",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "store",
+      "type": "EventStore",
+      "resolved": null,
+      "doc": "A store to share: four kernels on one store show the same events in four zones.",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "no"
+    },
+    {
+      "name": "theme",
+      "type": "string",
+      "resolved": null,
+      "doc": "A ready-made family ('standard', 'slate', 'night', 'pastel', 'frost', 'solar', 'contrast' — with `@dzcalendar/theme`) or one made with `defineTheme`. Default 'standard'.",
+      "default": {
+        "code": "'standard'"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "timeGrid",
+      "type": "Omit<TimeGridOptions, 'displayZone' | 'businessHours' | 'availableSlots' | 'resources' | 'resourceGroups'>",
+      "resolved": null,
+      "doc": "",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes",
+      "members": [
+        {
+          "name": "axis",
+          "type": "AxisMode",
+          "resolved": "\"wall\" | \"elapsed\"",
+          "doc": "'wall': every day's rows aligned, a clock change marked; 'elapsed': real time drawn to scale.",
+          "default": {
+            "code": "'wall'"
+          },
+          "source": "packages/core/src/views/timegrid.ts"
+        },
+        {
+          "name": "labelMinutes",
+          "type": "number",
+          "resolved": null,
+          "doc": "A tick labelled every this many minutes of the clock (whole multiples of `slotMinutes` make sense). Default 60.",
+          "default": {
+            "code": "60"
+          },
+          "source": "packages/core/src/views/timegrid.ts"
+        },
+        {
+          "name": "minEventMinutes",
+          "type": "number",
+          "resolved": null,
+          "doc": "The shortest an event is drawn, in minutes. Default 15.",
+          "default": {
+            "code": "15"
+          },
+          "source": "packages/core/src/views/timegrid.ts"
+        },
+        {
+          "name": "slotMax",
+          "type": "DurationLike",
+          "resolved": null,
+          "doc": "The end of the last hour shown (up to 24 hours).",
+          "default": {
+            "code": "'PT24H'"
+          },
+          "source": "packages/core/src/views/timegrid.ts"
+        },
+        {
+          "name": "slotMin",
+          "type": "DurationLike",
+          "resolved": null,
+          "doc": "The first hour shown (a duration from midnight).",
+          "default": {
+            "code": "'PT0H'"
+          },
+          "source": "packages/core/src/views/timegrid.ts"
+        },
+        {
+          "name": "slotMinutes",
+          "type": "number",
+          "resolved": null,
+          "doc": "Gutter tick step, in minutes. Default 60.",
+          "default": {
+            "code": "60"
+          },
+          "source": "packages/core/src/views/timegrid.ts"
+        }
+      ]
+    },
+    {
+      "name": "timeZone",
+      "type": "ZoneId",
+      "resolved": "string",
+      "doc": "",
+      "default": {
+        "token": "browserZone"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes"
+    },
+    {
+      "name": "timeline",
+      "type": "{ readonly slot?: number | 'day'; readonly maxLanes?: number; readonly fillLanes?: number }",
+      "resolved": null,
+      "doc": "A timeline's scale and rows (the Pro's family reads them).",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "yes",
+      "members": [
+        {
+          "name": "fillLanes",
+          "type": "number",
+          "resolved": null,
+          "doc": "Lanes of a timeline without resources (its one row fills the view: the DOM measures it). Default 12.",
+          "default": {
+            "code": "12"
+          },
+          "source": "packages/core/src/kernel.ts"
+        },
+        {
+          "name": "maxLanes",
+          "type": "number",
+          "resolved": null,
+          "doc": "Lanes a resource row shows before \"+N\". Default 3.",
+          "default": {
+            "code": "3"
+          },
+          "source": "packages/core/src/kernel.ts"
+        },
+        {
+          "name": "slot",
+          "type": "number | 'day'",
+          "resolved": "number | \"day\"",
+          "doc": "Minutes per slot (dividing a day) or 'day'. Default: 30 for a day, 60 up to a week, days beyond.",
+          "default": {
+            "token": "slotPerSpan"
+          },
+          "source": "packages/core/src/kernel.ts"
+        }
+      ]
+    },
+    {
+      "name": "titleFormat",
+      "type": "TitleFormat",
+      "resolved": "DateTimeFormatOptions | ((arg: TitleFormatArg) => string)",
+      "doc": "How the title is written; default: the month, a week's days, a day in full.",
+      "default": {
+        "token": "titlePerView"
+      },
+      "source": "packages/core/src/kernel.ts",
+      "live": {
+        "as": "formats"
+      }
+    },
+    {
+      "name": "viewOptions",
+      "type": "Readonly<Record<string, unknown>>",
+      "resolved": null,
+      "doc": "Options of a plugin's views, by family (`{ timeline: { areaColumns, … } }` for the Pro's timeline).",
+      "default": null,
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "views",
+      "type": "Readonly<Record<string, ViewSpec | ViewSettings>>",
+      "resolved": null,
+      "doc": "Added to (and overriding) the built-in views: a whole spec, or settings (`{ family: 'timeGrid', visibleRange }`) the rest filled in, the type its key.",
+      "default": null,
+      "source": "packages/core/src/kernel.ts",
+      "live": "no"
+    },
+    {
+      "name": "virtualizeAbove",
+      "type": "number",
+      "resolved": null,
+      "doc": "Above this many events in a view, only what is on screen (and a margin) is mounted; below, everything (what a screen reader's browse mode reads). Default 500; `Infinity` never windows.",
+      "default": {
+        "code": "500"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "no"
+    },
+    {
+      "name": "weekNumbers",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "A number per week: on the month's rows, in the week's corner. Default false.",
+      "default": {
+        "code": "false"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    },
+    {
+      "name": "weekends",
+      "type": "boolean",
+      "resolved": null,
+      "doc": "False hides Saturday and Sunday (added to `hiddenDays`). Default true.",
+      "default": {
+        "code": "true"
+      },
+      "source": "packages/dom/src/calendar.ts",
+      "live": "yes"
+    }
+  ]
+}

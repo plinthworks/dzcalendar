@@ -77,15 +77,27 @@ export interface LiveSettings {
   readonly onCreateRequest?: (request: CreateRequest) => void;
   /** "Open" from the context menu. */
   readonly onEventOpen?: (instance: EventInstance) => void;
-  /** Events can be dragged and resized, and the context menu offers editing entries. Default false. */
+  /**
+   * Events can be dragged and resized, and the context menu offers editing entries. Default false.
+   * @default false
+   */
   readonly editable?: boolean;
   /** A command from the calendar's own UI was refused: why (problems, rule violations). */
   readonly onCommandRefused?: (result: CommandResult, command: Command) => void;
-  /** Keep, reorder, add to or replace the context menu's entries; null or [] leaves the browser's menu (an application opening its own calls preventDefault itself). */
+  /**
+   * Keep, reorder, add to or replace the context menu's entries; null or [] leaves the browser's menu (an application opening its own calls preventDefault itself).
+   * @default {builtInMenu}
+   */
   readonly contextMenu?: MenuHook;
-  /** Minutes gestures and context-menu moments snap to in a time grid. Default 15. */
+  /**
+   * Minutes gestures and context-menu moments snap to in a time grid. Default 15.
+   * @default 15
+   */
   readonly snapMinutes?: number;
-  /** Dragging across empty time selects it (`onSelect`). Default false. */
+  /**
+   * Dragging across empty time selects it (`onSelect`). Default false.
+   * @default false
+   */
   readonly selectable?: boolean;
   readonly onSelect?: (selection: Selection) => void;
   /** The selection shown went away (a click elsewhere, Escape, another period) — not when the application cleared it. */
@@ -93,27 +105,38 @@ export interface LiveSettings {
   readonly onDateClick?: (click: DateClick) => void;
   readonly onEventClick?: (instance: EventInstance) => void;
   /**
-   * A free slot of \`availableSlots\` was clicked (or Enter on it): the slot as
+   * A free slot of `availableSlots` was clicked (or Enter on it): the slot as
    * given. The application books it — its server checks it again
-   * (\`checkSlot\`) before saving; the calendar creates nothing.
+   * (`checkSlot`) before saving; the calendar creates nothing.
    */
   readonly onSlotClick?: (slot: AvailableSlot) => void;
   /**
    * A gesture on an occurrence of a series: how far it reaches. Resolve
    * null to cancel. Default: a "this / following / all" menu where it dropped.
+   * @default {scopeMenu}
    */
   readonly chooseScope?: (request: ScopeRequest) => EditScope | null | Promise<EditScope | null>;
-  /** Holding a dragged event at the side goes to the previous/next period. Default true. */
+  /**
+   * Holding a dragged event at the side goes to the previous/next period. Default true.
+   * @default true
+   */
   readonly dragEdgeNavigate?: boolean;
-  /** Timed events can be resized from their start too. Default false. */
+  /**
+   * Timed events can be resized from their start too. Default false.
+   * @default false
+   */
   readonly eventResizableFromStart?: boolean;
   /** A gesture dropped where the rules refuse it (the proposal and its violations). */
   readonly onProposalRefused?: (proposal: Proposal) => void;
-  /** Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo inside the calendar. Default true. */
+  /**
+   * Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z undo and redo inside the calendar. Default true.
+   * @default true
+   */
   readonly keyboardUndo?: boolean;
   /**
    * What may be dropped here from the page (`makeDraggable`) or another
    * calendar: true, false (default), or a filter given the element's data.
+   * @default false
    */
   readonly droppable?: boolean | ((data: unknown) => boolean);
   /** An element of the page was dropped and its event made (not on a refusal). */

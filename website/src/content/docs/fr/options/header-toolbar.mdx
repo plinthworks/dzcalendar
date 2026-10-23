@@ -4,17 +4,14 @@ description: Ce que contient l'en-tête du calendrier, et où.
 ---
 
 import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
 import LiveDemo from '../../../../components/LiveDemo.astro';
 
 Ce que contient l'en-tête du calendrier — les flèches, « aujourd'hui », le
 titre, les boutons des vues, vos propres boutons — et où ; `false` pour aucun
 en-tête.
 
-| | |
-|---|---|
-| **Type** | `{ start?: string; center?: string; end?: string }` ou `false` |
-| **Par défaut** | `{ start: 'prev,next today', center: 'title', end: headerViews.join(',') }` — les vues de `headerViews` (`dayGridMonth,timeGridWeek,timeGridDay` avec `@dzcalendar/dom`) |
-| **Mise à jour à chaud (via `update()`)** | Oui : `update({ headerToolbar })` ; une disposition égale ne change rien |
+<OptionFacts name="headerToolbar" />
 
 ## Ce qu'elle fait
 
@@ -57,6 +54,8 @@ Un bouton « Recharger » à vous, avant les vues :
 <Fragment slot="js">
 
 ```ts
+import { createCalendar } from '@dzcalendar/dom';
+
 const calendar = createCalendar(element, {
   timeZone: 'Europe/Paris',
   locale: 'fr-FR',

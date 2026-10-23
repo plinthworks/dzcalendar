@@ -94,12 +94,8 @@ export default defineConfig({
         {
           label: 'Options',
           translations: { fr: 'Options' },
-          items: [
-            { slug: 'options' },
-            { slug: 'options/initial-view' },
-            { slug: 'options/events' },
-            { slug: 'options/header-toolbar' },
-          ],
+          // Every page written under options/ (the index first, its sidebar.order 0): a new page needs no line here.
+          items: [{ autogenerate: { directory: 'options' } }],
         },
         {
           label: 'API',

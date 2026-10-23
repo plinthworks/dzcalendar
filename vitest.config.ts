@@ -16,7 +16,7 @@ export default defineConfig({
           globals: true,
           environment: 'node',
           setupFiles: ['test/temporal-setup.ts', 'test/recurrence-setup.ts'],
-          include: ['packages/core/test/**/*.test.ts', 'packages/theme/test/**/*.test.ts', 'packages/rrule/test/**/*.test.ts', 'packages/ical/test/**/*.test.ts', 'packages/slots/test/**/*.test.ts', 'packages/pro/test/*.test.ts', 'packages/migrate/test/**/*.test.ts'],
+          include: ['packages/core/test/**/*.test.ts', 'packages/theme/test/**/*.test.ts', 'packages/rrule/test/**/*.test.ts', 'packages/ical/test/**/*.test.ts', 'packages/slots/test/**/*.test.ts', 'packages/pro/test/*.test.ts', 'packages/migrate/test/**/*.test.ts', 'website/test/**/*.test.ts'],
         },
       },
       {

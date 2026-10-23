@@ -20,7 +20,10 @@
     "pack:local": "npm run build && rm -rf packed && mkdir packed && for p in rrule core ical slots dom pro motion-gsap element compat-fullcalendar migrate react vue pro-react pro-vue theme angular pro-angular; do (cd packages/$p/dist && npm pack --pack-destination ../../../packed >/dev/null); done && ls packed",
     "test:package": "npm run pack:local && node scripts/package-smoke.mjs",
     "perf:browser": "node scripts/perf-browser.mjs",
-    "check:entries": "node scripts/check-entries.mjs"
+    "check:entries": "node scripts/check-entries.mjs",
+    "gen:options": "node scripts/gen-options.mjs",
+    "docs:examples": "node scripts/docs-examples.mjs",
+    "docs:check": "node scripts/gen-options.mjs --check && node scripts/docs-examples.mjs"
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.8.1",
@@ -52,6 +55,7 @@
     "vite": "^6.3.6",
     "vitest": "^4.0.8",
     "vue": "3.5.43",
+    "vue-tsc": "^3.3.13",
     "zone.js": "^0.15.1"
   },
   "workspaces": [

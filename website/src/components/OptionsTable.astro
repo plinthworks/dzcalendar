@@ -1,0 +1,32 @@
+---
+/**
+ * Every option of createCalendar, from the types (src/generated/options.json):
+ * its name (a link once its page is written), its type, whether `update()`
+ * changes it. The options index of each language.
+ */
+import data from '../generated/options.json';
+import { FACTS } from '../i18n/facts';
+
+const fr = Astro.currentLocale === 'fr';
+const words = FACTS[fr ? 'fr' : 'en'];
+const pages = Object.keys(import.meta.glob('../content/docs/options/*.mdx')).map((p) => p.split('/').pop()!.replace('.mdx', ''));
+const slug = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const liveOf = (live: unknown) => (live === 'yes' || live === 'next-view' ? words.yes : live === 'no' ? (fr ? 'Non' : 'No') : `${fr ? 'Oui, sous' : 'Yes, as'} <code>${(live as { as: string }).as}</code>`);
+const rows = (data.options as { name: string; type: string; live: unknown }[]).map((o) => ({ ...o, page: pages.includes(slug(o.name)) ? `./${slug(o.name)}/` : null }));
+---
+
+<table class="dz-options">
+  <thead>
+    <tr><th>{fr ? 'Option' : 'Option'}</th><th>{words.type}</th><th>{fr ? 'En direct' : 'Live'}</th></tr>
+  </thead>
+  <tbody>
+    {rows.map((o) => (
+      <tr>
+        <td>{o.page ? <a href={o.page}><code>{o.name}</code></a> : <code>{o.name}</code>}</td>
+        <td set:html={`<code>${escape(o.type.length > 60 ? `${o.type.slice(0, 57)}…` : o.type)}</code>`} />
+        <td set:html={liveOf(o.live)} />
+      </tr>
+    ))}
+  </tbody>
+</table>
