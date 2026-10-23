@@ -256,11 +256,15 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       }
       case 'activate':
         return activate(at);
-      case 'cancel':
+      case 'cancel': {
         if (!anchor && !shared.selection) return false;
+        const had = shared.selection !== null;
         anchor = null;
         shared.showSelection(null);
+        // Said, so the region does not keep the last "Selected: …".
+        if (had) ctx.announce(m().selectionCleared);
         return true;
+      }
       default:
         return false;
     }

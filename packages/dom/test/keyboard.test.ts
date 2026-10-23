@@ -170,9 +170,10 @@ describe('time grid: a cursor on the slots', () => {
     expect(await said()).toBe('Sélection : mercredi 21 octobre, 00:00 à 00:45');
     press('Enter');
     expect(got.map((s) => [String(s.start), String(s.end)])).toEqual([['2026-10-21T00:00:00+02:00[Europe/Paris]', '2026-10-21T00:45:00+02:00[Europe/Paris]']]);
-    // Escape clears it; a plain arrow too.
+    // Escape clears it (and says so: the region does not keep "Sélection : …"); a plain arrow too.
     press('Escape');
     expect(host.querySelector('.dz-ghost--select')).toBeNull();
+    expect(await said()).toBe('Sélection effacée');
   });
 
   it('Enter on an empty slot is a date click', () => {

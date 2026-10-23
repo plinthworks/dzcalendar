@@ -52,7 +52,7 @@ const base = {
   headerViews: ['dayGridMonth', 'timeGridWeek', 'timeGridDay', 'listWeek'],
 } as const;
 
-const views: [string, Record<string, unknown>][] = [
+const views: [string, Record<string, unknown> & { id?: string }][] = [
   ['timeGridWeek', {}],
   ['dayGridMonth', {}],
   ['listWeek', {}],
@@ -60,19 +60,21 @@ const views: [string, Record<string, unknown>][] = [
   ['resourceTimelineWeek', { resources, headerViews: ['resourceTimelineDay', 'resourceTimelineWeek'] }],
   ['resourceTimeGridDay', { resources, headerViews: ['resourceTimeGridDay', 'timeGridWeek'] }],
   ['multiMonthYear', { headerViews: ['multiMonthYear', 'dayGridMonth'] }],
+  // An empty day (WCAG checks: its scrolling hours hold the grid's tab stop).
+  ['timeGridDay', { initialDate: Temporal.PlainDate.from('2026-10-27'), id: 'emptyDay' }],
 ];
 const main = document.getElementById('main')!;
 const cals: Record<string, unknown> = {};
-for (const [view, extra] of views) {
+for (const [view, { id = view, ...extra }] of views) {
   const h = document.createElement('p');
   h.className = 'lbl';
-  h.textContent = view;
+  h.textContent = id;
   const card = document.createElement('section');
   card.className = 'card';
-  card.id = `v-${view}`;
+  card.id = `v-${id}`;
   const el = document.createElement('div');
   card.append(el);
   main.append(h, card);
-  cals[view] = createCalendar(el, { ...base, initialView: view, ...extra } as Parameters<typeof createCalendar>[1]);
+  cals[id] = createCalendar(el, { ...base, initialView: view, ...extra } as Parameters<typeof createCalendar>[1]);
 }
 Object.assign(window, { cals, ready: true });

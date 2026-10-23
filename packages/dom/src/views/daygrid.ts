@@ -1,4 +1,4 @@
-import { dayStates, drawNow } from '../render/event.js';
+import { dayStates, drawNow, moreText } from '../render/event.js';
 import { weekWords, written } from '../render/formats.js';
 import { Temporal, formatTemporal, dayInfo } from '@dzcalendar/core';
 import { weekNumber, weekRulesFor } from '@dzcalendar/core';
@@ -433,7 +433,7 @@ export function createDayGridView(ctx: ViewCtx, opts: { readonly months?: boolea
 
   function drawMore(link: HTMLElement, m: MoreItem): void {
     link.dataset['col'] = String(m.col);
-    link.textContent = ctx.messages.moreLink({ count: m.count });
+    moreText(link, ctx.messages.moreLink({ count: m.count }));
     link.style.setProperty('--col', String(m.col));
     link.style.setProperty('--lane', String(m.lane));
     link.setAttribute('aria-label', ctx.messages.moreLabel({ count: m.count, date: formatTemporal(m.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale) }));

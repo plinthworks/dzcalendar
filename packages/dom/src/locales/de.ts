@@ -55,6 +55,7 @@ return {
   timeSlots: 'Zeitfenster',
   range: ({ from, to }) => `${from} bis ${to}`,
   selected: ({ span }) => `Ausgewählt: ${span}`,
+  selectionCleared: 'Auswahl aufgehoben',
   violation: (code) =>
     ({ constraint: 'außerhalb der erlaubten Zeiten', overlap: 'überschneidet sich mit einem anderen Termin', allow: 'von der Anwendung abgelehnt', 'valid-range': 'außerhalb der angezeigten Daten', 'not-editable': 'kann nicht geändert werden' })[code],
   noFurther: 'Weiter geht es nicht',

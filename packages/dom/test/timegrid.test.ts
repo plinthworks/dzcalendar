@@ -35,10 +35,11 @@ describe('time grid, read-only', () => {
     expect(host.querySelector('.dz-tg__col--today')!.getAttribute('data-date')).toBe('2026-10-21');
   });
 
-  it('the gutter comes first in the grid, then the columns in date order', () => {
+  it('the gutter comes first in the grid (after the keyboard cursor, first in the tab order), then the columns in date order', () => {
     const host = mount([]);
     const grid = host.querySelector('.dz-tg__grid')!;
-    expect(grid.firstElementChild!.classList.contains('dz-tg__gutter')).toBe(true);
+    // The cursor rests in the hours (owner, 18g-4): an empty day's scrolling region holds the grid's tab stop.
+    expect([grid.children[0]!.className, grid.children[0]!.firstElementChild!.className, grid.children[1]!.classList.contains('dz-tg__gutter')]).toEqual(['dz-tg__rest', 'dz-cursor dz-cursor--rest', true]);
     const order = [...grid.querySelectorAll('.dz-tg__gutter, .dz-tg__col')].map((e) => (e as HTMLElement).dataset['date'] ?? 'gutter');
     expect(order).toEqual(['gutter', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25']);
   });

@@ -43,8 +43,10 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
 - **Done:** 18g-3 (the visual pass) committed ("Phase 18g-3"); every
   check green, exit codes read; before/after screenshots published for the
   owner (`playground/gallery.html` makes them again).
-  **Next: 18g-4** (WCAG 2.2 AA) — ask the owner first about the empty
-  day's tab stop.
+- **Done:** 18g-4 (WCAG 2.2 AA) committed ("Phase 18g-4") — **Phase 18g
+  is complete**. Every check green, exit codes read (1 473 tests, 267
+  Chrome checks). **Next:** first render and size (below), then npm
+  publication, licences, Phase 19.
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2768,7 +2770,7 @@ slots", a business view). Decided:
   its own): `revert()` is the way back for both (the sheet says so).
 - Seen, older than 18f, left for the CSS and a11y pass (owner): an empty
   day of a time grid fails axe's `scrollable-region-focusable` (the
-  keyboard's cursor rests in the all-day row, not in the scrolling hours).
+  keyboard's cursor rests in the all-day row, not in the scrolling hours). Fixed in 18g-4.
 
 ### Order
 
@@ -2962,6 +2964,71 @@ as automated checks.
   event is placed by the event (it is a size container) — documented.
 
 ### 18g-4 — WCAG 2.2 AA
+- **Owner's decisions (2026-10-22):** the time grid's one tab stop (its
+  keyboard cursor) rests in the visible hours — at now when shown, else at
+  `scrollTime` — not in the all-day row (an empty day's scrolling hours then
+  hold something focusable); targets: an event's height is its duration,
+  WCAG 2.5.8's "essential" exception, said in the conformance report; every
+  other target (buttons, day numbers, "+N", handles) at least 24 px.
+
+**Built**
+- The time grid's cursor rests, before its first focus, in the hours shown
+  (a sticky box over the first column: an empty day's scrolling region
+  holds the tab stop, tabbing scrolls nothing); focused, it goes on now
+  when today shows it, else on the first slot in view; it moves by the
+  least scroll (no centring jump). The timeline's likewise (it was focused
+  off-screen).
+- Targets ≥ `--dz-target-min` (24 px): day and week numbers, "+N", list
+  dates, the panel's close button, the timeline's expander; events take
+  the essential exception, the column grip the spacing one.
+- 320 px / 400 %: the header's title alone on its line and wrapping, its
+  buttons tighter and wrapping; the list's time above its title; "+N" keeps
+  its count when narrow (`.dz-more__rest` dropped); weekday heads clipped
+  with an ellipsis.
+- Focus never hidden: `scroll-padding` under the list's and the timeline's
+  sticky heads (`--dz-list-head`, `--dz-tl-head`), and what sticks keeps
+  the scroll when focused (negative `scroll-margin`). Rings made explicit
+  (week number, "+N", day number, close button, the column grip — solid);
+  forced-colour rules for the timeline.
+- "Selection cleared" said on Escape (EN, FR, AR, ES, DE). A keyboard
+  context menu stays open through a scroll that does not move its anchor;
+  closed by one, it hands the focus back.
+- Outside-month numbers in `--dz-fg-muted` (they are links: AA).
+- Chrome (scripts/browser.mjs, "Phase 18g-4"): an empty day under axe; the
+  cursor resting and placed (now, RTL, no all-day row); targets; text
+  spacing measured on the text's own box, across and down; text at 200 %;
+  reflow at 320 and 640 px (the list included); focus not obscured (list,
+  timeline); axe under forced colours, light and dark; the timeline's
+  cursor seen; a grip keeping the scroll; a keyboard menu through a smooth
+  scroll. `playground/gallery.html` gained an empty day.
+- `site/a11y-conformance.md` reviewed: 1.4.4, 1.4.10, 1.4.12, 2.1.4, 2.5.8
+  now Supports (with what checks them), 1.4.13 (native `title`s, the
+  user-agent case), 1.3.5 / 3.3.7 worded for the Pro editor, the timeline's
+  coverage stated.
+- Budgets (owner, measured + 3 %): dom/list 5 429, pro 15 506.
+
+**Reviews fixed** (architect + execution in Chrome)
+- The decision "at now when shown" was not what `home()` did — it is now.
+- The timeline's cursor was focused off-screen (pre-existing); the column
+  grip's focus jumped the view 525 px (from this pass's scroll-padding).
+- The list scrolled sideways at 320 px and its rows did not follow the
+  page's text size; "+N" lost its count when narrow; Escape left a stale
+  "Selected: …"; ArrowUp past the top jumped 260 px; a keyboard menu
+  closed at once during a scroll and dropped the focus on `<body>`
+  (pre-existing).
+- The column grip's focus was a 35 % tint; the ACR claimed checks that did
+  not exist (1.4.4, vertical cuts for 1.4.12) and a ring on everything; the
+  24 px floors and the sticky offsets were not tokens.
+- The time heads' "02:00*" (the second pass) lost its star with wider text
+  spacing: a time head's text may run into the next one's padding.
+
+**Not done on purpose**
+- Screen-reader sessions (NVDA, JAWS, VoiceOver, TalkBack) and an audit
+  with users — still the ACR's first known gap.
+- axe under forced colours with the calendar's scheme opposite the
+  system's reports the pre-forcing colours (a false positive: the page is
+  drawn in the forced palette); the checks run with matching schemes.
+- `aria-keyshortcuts`, remappable keys (3.3.2 stays "partially").
 - axe in Chrome on every view × theme × scheme; the keyboard end to end;
   reflow at 320 px and zoom 200 %; text spacing (1.4.12); targets ≥ 24 px
   (2.5.8, compact density included); focus never hidden (2.4.11) under the

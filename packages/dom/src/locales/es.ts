@@ -55,6 +55,7 @@ return {
   timeSlots: 'Franjas horarias',
   range: ({ from, to }) => `${from} a ${to}`,
   selected: ({ span }) => `Seleccionado: ${span}`,
+  selectionCleared: 'Selección borrada',
   violation: (code) =>
     ({ constraint: 'fuera del horario permitido', overlap: 'se superpone con otro evento', allow: 'rechazado por la aplicación', 'valid-range': 'fuera de las fechas mostradas', 'not-editable': 'no se puede modificar' })[code],
   noFurther: 'No se puede avanzar más',

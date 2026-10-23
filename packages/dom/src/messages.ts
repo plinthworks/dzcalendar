@@ -82,6 +82,8 @@ export interface DzMessages {
   range(parts: { from: string; to: string }): string;
   /** Said as Shift+arrows grow a selection. */
   selected(parts: { span: string }): string;
+  /** Said when Escape takes a selection away. */
+  readonly selectionCleared: string;
   /** Why a place is refused, from a rule's code. */
   violation(code: 'constraint' | 'overlap' | 'allow' | 'valid-range' | 'not-editable'): string;
   /** A step that cannot go anywhere (the end of the hours, a refused place). */
@@ -174,6 +176,7 @@ export const EN: DzMessages = {
   timeSlots: 'Time slots',
   range: ({ from, to }) => `${from} to ${to}`,
   selected: ({ span }) => `Selected: ${span}`,
+  selectionCleared: 'Selection cleared',
   violation: (code) =>
     ({ constraint: 'outside the allowed hours', overlap: 'overlaps another event', allow: 'refused by the application', 'valid-range': 'outside the dates shown', 'not-editable': 'cannot be changed' })[code],
   noFurther: 'Cannot go further',
@@ -251,6 +254,7 @@ export const FR: DzMessages = {
   timeSlots: 'Créneaux horaires',
   range: ({ from, to }) => `${from} à ${to}`,
   selected: ({ span }) => `Sélection : ${span}`,
+  selectionCleared: 'Sélection effacée',
   violation: (code) =>
     ({ constraint: 'en dehors des heures permises', overlap: 'chevauche un autre événement', allow: "refusé par l'application", 'valid-range': 'en dehors des dates affichables', 'not-editable': 'non modifiable' })[code],
   noFurther: 'Impossible d’aller plus loin',

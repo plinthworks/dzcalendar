@@ -60,6 +60,9 @@ export const DZ_CSS = `
 /* A narrow header (a phone, a sidebar): a place too wide for it breaks inside too. */
 @container dz-toolbar (max-width: 40rem) {
   .dz-toolbar__section { flex-wrap: wrap; }
+  /* Narrow (320 px, a zoom of 400 %): tighter buttons, a group that breaks rather than overflows. */
+  .dz-toolbar__btn { padding: 0 0.5rem; }
+  .dz-toolbar__group { flex-wrap: wrap; }
   /* The title alone on the first line, centred; the buttons share the next. */
   .dz-toolbar__section--center:not(:empty) { order: -1; flex-basis: 100%; justify-content: center; }
 }
@@ -70,7 +73,8 @@ export const DZ_CSS = `
 .dz-toolbar__section--center:empty { display: none; }
 /* No centre: the end takes what it needs, the start (and its title) the rest — the header as before. */
 .dz-toolbar__section--center:empty + .dz-toolbar__section--end { flex: none; }
-.dz-toolbar__section--center .dz-toolbar__title { flex: none; margin: 0; text-align: center; }
+/* Centred; it may wrap rather than push the header wider than the calendar (320 px). */
+.dz-toolbar__section--center .dz-toolbar__title { flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; margin: 0; text-align: center; }
 .dz-toolbar__section--end .dz-toolbar__title { flex: none; }
 .dz-toolbar__custom { display: inline-flex; align-items: center; gap: 0.375rem; }
 .dz-toolbar__custom[aria-pressed='true'] { background: var(--dz-button-active-bg, var(--dz-accent, var(--dzc-accent))); color: var(--dz-button-active-fg, var(--dz-accent-fg, var(--dzc-accent-fg))); border-color: var(--dz-button-active-bg, var(--dz-accent, var(--dzc-accent))); }
@@ -111,7 +115,7 @@ export const DZ_CSS = `
 .dz-tg__allday { overflow-y: auto; max-height: var(--dz-allday-max, 10.5rem); flex: none; }
 .dz-tg__head { border-bottom: 1px solid var(--dz-border, var(--dzc-border)); }
 .dz-tg__dayhead { padding: 0.375rem 0.25rem; text-align: center; font-size: 0.8125rem; min-width: 0; }
-.dz-tg__dayhead-weekday { display: block; color: var(--dz-fg-muted, var(--dzc-fg-muted)); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.dz-tg__dayhead-weekday { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dz-fg-muted, var(--dzc-fg-muted)); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .dz-tg__dayhead-date { display: inline-block; min-width: 1.75rem; padding: 0.125rem 0.25rem; border-radius: 999px; font-size: 1rem; font-weight: 600; }
 .dz-tg__dayhead--today .dz-tg__dayhead-date { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); }
 /* The application's words for a day (formats.dayHeader): kept in their column, today marked as the date is. */
@@ -380,14 +384,19 @@ export const DZ_CSS = `
 .dz-dg__cell:first-child { border-inline-start: 0; }
 /* A month's padding days: a muted number, no fill (--dz-outside-bg to give one). */
 .dz-dg__cell--outside { background: var(--dz-outside-bg, transparent); }
-.dz-dg__cell--outside .dz-dg__num { color: var(--dz-outside-fg, color-mix(in srgb, var(--dz-fg-muted, var(--dzc-fg-muted)) 75%, transparent)); }
+.dz-dg__cell--outside .dz-dg__num { color: var(--dz-outside-fg, var(--dz-fg-muted, var(--dzc-fg-muted))); }
 /* Days out of service (businessHours): pale hatching; set --dz-closed-image to none to drop it, or to another image. */
 .dz-dg__cell--closed { background-image: var(--dz-closed-image, repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--dz-border, var(--dzc-border)) 28%, transparent) 7px 8px)); }
 .dz-dg__cell--today { background-color: var(--dz-today-bg, color-mix(in srgb, var(--dz-accent, var(--dzc-accent)) 7%, transparent)); }
 .dz-dg__num {
-  display: inline-block;
-  min-width: 1.5rem;
-  padding: 0.0625rem 0.375rem;
+  /* At least 24 px each way (WCAG 2.5.8; --dz-target-min, 44px for touch). */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--dz-target-min, 24px);
+  min-height: var(--dz-target-min, 24px);
+  box-sizing: border-box;
+  padding: 0 0.375rem;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -400,7 +409,7 @@ export const DZ_CSS = `
 .dz-dg__alt, .dz-tg__dayhead-alt { font-size: 0.6875rem; color: var(--dz-fg-muted, var(--dzc-fg-muted)); }
 .dz-dg__alt { margin-inline-start: 0.25rem; }
 .dz-tg__dayhead-alt { display: block; }
-.dz-dg__wk { border: 0; padding: 0 0.25rem; background: transparent; color: var(--dz-fg-muted, var(--dzc-fg-muted)); font: inherit; font-size: 0.6875rem; cursor: pointer; }
+.dz-dg__wk { border: 0; padding: 0 0.25rem; min-width: var(--dz-target-min, 24px); min-height: var(--dz-target-min, 24px); background: transparent; color: var(--dz-fg-muted, var(--dzc-fg-muted)); font: inherit; font-size: 0.6875rem; cursor: pointer; }
 .dz-tg__corner { font-size: 0.6875rem; color: var(--dz-fg-muted, var(--dzc-fg-muted)); text-align: center; align-self: end; }
 .dz-dg__cell--today .dz-dg__num { background: var(--dz-accent, var(--dzc-accent)); color: var(--dz-accent-fg, var(--dzc-accent-fg)); font-weight: 600; }
 .dz-dg__week .dz-bar { grid-row: calc(var(--lane) + 2); z-index: 1; position: relative; }
@@ -432,6 +441,8 @@ export const DZ_CSS = `
   text-align: start;
   cursor: pointer;
   white-space: nowrap;
+  /* At least 24 px high (WCAG 2.5.8): over the row gap below, never over another bar (it is the last lane). */
+  min-height: var(--dz-target-min, 24px);
   /* A narrow day (a year's months): "+3 au…" in its own cell, never over the next one's. */
   min-width: 0;
   overflow: hidden;
@@ -452,7 +463,11 @@ export const DZ_CSS = `
   align-content: start;
   z-index: 2;
 }
+.dz-more { container: dz-more / inline-size; }
+/* A narrow "+N": its count alone (the words come back with the room). */
+@container dz-more (max-width: 4.5rem) { .dz-more__rest { display: none; } }
 .dz-more:hover, .dz-more:focus-visible { background: var(--dz-bg-raised, var(--dzc-bg-raised)); outline-offset: 1px; }
+.dz-more:focus-visible, .dz-dg__wk:focus-visible, .dz-dg__num:focus-visible, .dz-pop__close:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: 1px; }
 
 /* ── popover and context menu: inside .dz-cal, so they carry its theme ──── */
 .dz-pop, .dz-menu {
@@ -472,7 +487,7 @@ export const DZ_CSS = `
 .dz-pop[hidden], .dz-menu[hidden] { display: none; }
 .dz-pop__head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.125rem 0.25rem 0.375rem; }
 .dz-pop__title { margin: 0; font-size: 0.875rem; font-weight: 600; }
-.dz-pop__close { border: 0; background: transparent; color: inherit; font: inherit; font-size: 1.125rem; line-height: 1; cursor: pointer; padding: 0.125rem 0.375rem; border-radius: var(--dz-radius, var(--dzc-radius)); }
+.dz-pop__close { border: 0; background: transparent; color: inherit; font: inherit; font-size: 1.125rem; line-height: 1; cursor: pointer; min-width: var(--dz-target-min, 24px); min-height: var(--dz-target-min, 24px); padding: 0.125rem 0.375rem; border-radius: var(--dz-radius, var(--dzc-radius)); }
 .dz-pop__list { display: grid; gap: 2px; max-height: 18rem; overflow-y: auto; }
 .dz-bar--in-popover { margin: 0; }
 /* The UA gives [popover] overflow:auto: a sub-menu would make it scroll sideways under itself. */
@@ -551,6 +566,9 @@ export const DZ_CSS = `
 .dz-cursor { position: absolute; grid-row: 1; inset-inline: 1px; z-index: 5; pointer-events: none; box-sizing: border-box; border-radius: var(--dz-radius, var(--dzc-radius)); opacity: 0; }
 .dz-tg__grid > .dz-cursor { top: calc(var(--t, 0) * var(--dz-minute, 1.2px)); height: calc(var(--h, 15) * var(--dz-minute, 1.2px)); }
 .dz-tg__allday > .dz-cursor { inset-block: 2px; }
+/* Not placed yet: in the hours, stuck to the top of what is shown (focusing it scrolls nothing); its box takes no cell of the grid. */
+.dz-tg__rest { position: absolute; grid-row: 1; grid-column: 2 / span 1; inset-block: 0; inset-inline: 0; pointer-events: none; }
+.dz-tg__rest > .dz-cursor--rest { position: sticky; top: 0; height: calc(15 * var(--dz-minute, 1.2px)); }
 .dz-cursor:focus { opacity: 1; outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: -2px; background: color-mix(in srgb, var(--dz-accent, var(--dzc-accent)) 12%, transparent); }
 .dz-dg__cell:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: -2px; }
 /* A cell's events for the keyboard and screen readers: heard, not seen — the focus ring is drawn on the bar (or "+N"). */

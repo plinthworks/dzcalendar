@@ -123,10 +123,19 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
     closed = null;
     done?.();
   };
+  /** What it was opened on, and where that was: a scroll that does not move it (one still settling after a focus) leaves the menu. */
+  let anchorEl: HTMLElement | null = null;
+  let anchorAt: { x: number; y: number } | null = null;
   // A fixed menu would float away from what it was opened on.
   const onScroll = (e: Event) => {
     const t = targetOf(e);
-    if (!(t instanceof Node) || !menu.contains(t)) close(false);
+    if (t instanceof Node && menu.contains(t)) return;
+    if (e.type === 'scroll' && anchorEl?.isConnected && anchorAt) {
+      const r = anchorEl.getBoundingClientRect();
+      if (Math.abs(r.left - anchorAt.x) < 2 && Math.abs(r.top - anchorAt.y) < 2) return;
+    }
+    // The focus in it goes back where it came from, never to the page's body.
+    close(menu.contains(doc.activeElement));
   };
   const outside = (e: Event) => {
     const t = targetOf(e);
@@ -253,6 +262,9 @@ export function createMenu(doc: Document, container: HTMLElement): MenuHost {
       close();
       returnTo = focusBack;
       closed = onClose ?? null;
+      anchorEl = at instanceof HTMLElement ? at : (focusBack ?? null);
+      const a = anchorEl?.getBoundingClientRect();
+      anchorAt = a ? { x: a.left, y: a.top } : null;
       menu.setAttribute('aria-label', label);
       build(menu, entries);
       menu.hidden = false;

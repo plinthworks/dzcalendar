@@ -10,18 +10,20 @@ import { activeIn } from '../focus.js';
 export const LIST_CSS = `
 @layer dzcalendar.base, dzcalendar.theme;
 @layer dzcalendar.base {
-.dz-list { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--dz-border, var(--dzc-border)); border-radius: var(--dz-radius, var(--dzc-radius)); }
+.dz-list { container: dz-list / inline-size; flex: 1; min-height: 0; overflow: auto; /* A focused row never under the sticky day head (WCAG 2.4.11). */ scroll-padding-top: var(--dz-list-head, 2.75rem); border: 1px solid var(--dz-border, var(--dzc-border)); border-radius: var(--dz-radius, var(--dzc-radius)); }
 .dz-list__head { position: sticky; top: 0; z-index: 1; background-color: Canvas; display: flex; justify-content: space-between; gap: 0.5rem; margin: 0; padding: 0.375rem 0.75rem; font-size: 0.875rem; font-weight: 600; background: var(--dz-bg-raised, var(--dzc-bg-raised)); border-block-end: 1px solid var(--dz-border, var(--dzc-border)); }
-.dz-list__date { all: unset; cursor: pointer; }
+.dz-list__date { all: unset; cursor: pointer; display: inline-flex; align-items: center; min-height: var(--dz-target-min, 24px); }
 .dz-list__date:focus-visible, .dz-list__ev:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: -2px; }
-.dz-list__len { font-weight: 400; color: var(--dzc-fg-muted); }
+.dz-list__len { font-weight: 400; color: var(--dz-fg-muted, var(--dzc-fg-muted)); }
 .dz-list__items { list-style: none; margin: 0; padding: 0; }
-.dz-list__ev { display: flex; align-items: baseline; gap: 0.75rem; padding: 0.375rem 0.75rem; cursor: pointer; border-block-end: 1px solid var(--dz-border, var(--dzc-border)); }
+.dz-list__ev { display: flex; align-items: baseline; gap: 0.75rem; padding: 0.375rem 0.75rem; font-size: 0.875rem; cursor: pointer; border-block-end: 1px solid var(--dz-border, var(--dzc-border)); }
 .dz-list__alt { margin-inline-start: 0.5rem; font-weight: 400; color: var(--dz-fg-muted, var(--dzc-fg-muted)); }
-.dz-list__time { flex: none; min-inline-size: 9rem; color: var(--dzc-fg-muted); font-variant-numeric: tabular-nums; }
+.dz-list__time { flex: none; min-inline-size: min(9rem, 35%); color: var(--dz-fg-muted, var(--dzc-fg-muted)); font-variant-numeric: tabular-nums; }
+/* Narrow (320 px, a zoom of 400 %): the time on its own line, the title below it, nothing sideways (1.4.10). */
+@container dz-list (max-width: 30rem) { .dz-list__ev { flex-wrap: wrap; row-gap: 0.125rem; } .dz-list__time { flex-basis: 100%; min-inline-size: 0; } .dz-list__title { min-width: 0; overflow-wrap: anywhere; } }
 .dz-list__time .dz-ev__offset, .dz-list__time .dz-ev__real { color: var(--dz-fg, var(--dzc-fg)); font-size: 0.6875rem; }
 .dz-list__dot { flex: none; align-self: center; inline-size: 0.625rem; block-size: 0.625rem; border-radius: 50%; background: var(--dz-event-accent, var(--dzc-accent)); }
-.dz-list__empty { padding: 2rem 1rem; text-align: center; color: var(--dzc-fg-muted); }
+.dz-list__empty { padding: 2rem 1rem; text-align: center; color: var(--dz-fg-muted, var(--dzc-fg-muted)); }
 .dz-list__gap { list-style: none; }
 }
 `;

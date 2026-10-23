@@ -96,6 +96,7 @@ return {
   timeSlots: 'الفترات الزمنية',
   range: ({ from, to }) => `من ${iso(from)} إلى ${iso(to)}`,
   selected: ({ span }) => `تم التحديد: ${span}`,
+  selectionCleared: 'تم إلغاء التحديد',
   violation: (code) =>
     ({ constraint: 'خارج الساعات المسموح بها', overlap: 'يتداخل مع حدث آخر', allow: 'رفضه التطبيق', 'valid-range': 'خارج التواريخ المعروضة', 'not-editable': 'لا يمكن تغييره' })[code],
   noFurther: 'لا يمكن التقدم أكثر',

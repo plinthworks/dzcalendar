@@ -20,8 +20,11 @@ deletes, undoes — without a mouse, or with a screen reader.
 
 ## What DzCalendar does — and where it differs on purpose
 - **One tab stop for the grid.** In a month, the cursor's cell (today when
-  shown); in a week or a day, a cursor on the slots (first placed at the
-  hour in view) — plus the events, which are buttons.
+  shown); in a week or a day, a cursor on the slots — plus the events, which
+  are buttons. Before it has a place it rests at the top of the hours shown
+  (owner, 18g-4: an empty day's scrolling hours hold the tab stop; tabbing
+  to it scrolls nothing); focused, it is put on now when today is shown and
+  now is in view, else on the first slot in view.
 - **Arrows move a cursor that is a Hit**, like a pointer's: ←/→ a day,
   ↑/↓ a slot (a week in a month), Home/End the line (the week row, the
   day's hours), PageUp/PageDown the period (the same date). Past the last

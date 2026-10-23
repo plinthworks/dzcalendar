@@ -82,6 +82,12 @@ Ils priment sur les sections citées.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
 
+### Ajustements après la Phase 18g-4 — WCAG 2.2 AA (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : l'unique arrêt de tabulation de la grille horaire repose dans les heures visibles (sur maintenant si on le voit) ; la hauteur d'un événement est sa durée (exception « essentielle » de 2.5.8), toute autre cible ≥ 24 px (`--dz-target-min`).
+- **D (dom)** : curseur au repos dans une boîte collante (grille horaire et timeline) ; « +N » garde son nombre quand il est étroit (`.dz-more__rest`) ; `selectionCleared` dans les messages ; un menu clavier ne se ferme que si son ancre a bougé.
+- **Décision du propriétaire** : budgets à la mesure + 3 % (dom/list 5,4 ko, pro 15,5 ko).
+
 ### Ajustements après la Phase 18g-3 — passe visuelle (détail dans ROADMAP.md)
 
 - **Décisions du propriétaire** : en-tête par défaut de FullCalendar (flèches groupées et « aujourd'hui », titre centré, vues) ; événements teintés avec liseré, texte dans le ton (45 % avec le thème, AA vérifié) ; hors service gris pâle, hachures pâles, jours hors mois sans fond. **Chaque choix surchargeable** par l'application : variables `--dz-title-*`, `--dz-button-*`, `--dz-event-*`, `--dz-closed-image`, `--dz-outside-fg`, options `headerToolbar`, `eventStyle`.

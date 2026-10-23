@@ -85,6 +85,23 @@ export function startReadingOf(ev: CalEvent, zone: string): Reading | undefined 
 }
 
 /** The event's own classes, swapped as a set; its tone as its own variable (no cycle). */
+/**
+ * "+N"'s words: the count first, the rest in its own span, which a narrow
+ * "+N" drops (`@container dz-more`) — "+3" stays read where "+3 autres"
+ * would end in "+…". Words with no space are written whole.
+ */
+export function moreText(el: HTMLElement, text: string): void {
+  const m = /^(\S+)(\s.+)$/su.exec(text);
+  if (!m) {
+    el.textContent = text;
+    return;
+  }
+  const rest = el.ownerDocument.createElement('span');
+  rest.className = 'dz-more__rest';
+  rest.textContent = m[2]!;
+  el.replaceChildren(m[1]!, rest);
+}
+
 /** The calendar's now, read once per drawing (a microtask): not once per event drawn. */
 const NOWS = new WeakMap<object, Instant>();
 export function drawNow(ctx: ViewCtx): Instant {

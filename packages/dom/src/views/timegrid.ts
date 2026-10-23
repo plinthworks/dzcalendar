@@ -1,4 +1,4 @@
-import { dayStates, drawNow } from '../render/event.js';
+import { dayStates, drawNow, moreText } from '../render/event.js';
 import { weekWords } from '../render/formats.js';
 import { written } from '../render/formats.js';
 import { Temporal, formatTemporal, locateNow, weekNumber, weekRulesFor } from '@dzcalendar/core';
@@ -353,7 +353,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     b.style.setProperty('--h', String(m.more.height));
     b.style.setProperty('--l', String(m.more.left));
     b.style.setProperty('--w', String(m.more.width));
-    b.textContent = ctx.messages.moreLink({ count: m.more.events.length });
+    moreText(b, ctx.messages.moreLink({ count: m.more.events.length }));
     const first = m.more.events[0]!.segment.from.toZonedDateTimeISO(ctx.zone);
     const when = `${formatTemporal(m.date, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale)}, ${formatTemporal(first.toPlainTime(), HM, ctx.locale)}`;
     b.setAttribute('aria-label', ctx.messages.moreLabel({ count: m.more.events.length, date: when }));
@@ -562,16 +562,23 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   // One focusable node, replaced on each move (focus moving is what screen
   // readers say reliably). Placed in the grid by `grid-column`, so it scrolls
   // with the hours and needs no measuring. Until it has a place it rests in
-  // the all-day row: tabbing to it scrolls nothing, and it is then put at
-  // the hour in view.
+  // the hours, stuck to the top of what is shown (owner, 18g-4: the scrolling
+  // hours hold the grid's one tab stop, an empty day included): tabbing to it
+  // scrolls nothing, and it is then put at the hour in view.
   const cursorHits = new WeakMap<Element, Hit>();
-  let cursorNode = h(doc, 'div', 'dz-cursor');
-  cursorNode.tabIndex = 0;
-  cursorNode.setAttribute('role', 'button');
-  cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
-  // An absolutely placed grid child: its end line must be named, `auto` would run to the grid's edge.
-  cursorNode.style.gridColumn = '2 / span 1';
-  allday.prepend(cursorNode);
+  // Its place: a box over the first column, the hours' full height, out of the grid's flow (it takes no cell;
+  // grid row 1 is the hours' only row, as for every cursor).
+  const restHost = h(doc, 'div', 'dz-tg__rest');
+  grid.prepend(restHost);
+  const restingCursor = () => {
+    const node = h(doc, 'div', 'dz-cursor dz-cursor--rest');
+    node.tabIndex = 0;
+    node.setAttribute('role', 'button');
+    node.setAttribute('aria-label', ctx.messages.timeSlots);
+    restHost.append(node);
+    return node;
+  };
+  let cursorNode = restingCursor();
 
   /** The column of a date (and resource, in a resource view: without one, the date's first). */
   const columnOf = (date: PlainDate, resourceId?: string) =>
@@ -609,7 +616,18 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const cols = model?.columns ?? [];
       const today = ctx.kernel.getState().today;
       const col = cols.find((c) => c.date.equals(today) && usable(c)) ?? cols.find(usable);
-      return col ? topSlot(col) : null;
+      if (!col) return null;
+      // Today shown with now in view (owner, 18g-4): the slot of now; else the first slot in view.
+      if (col.date.equals(today)) {
+        const px = pxOf(col);
+        const now = ctx.kernel.now();
+        if (px > 0 && now.epochMilliseconds >= col.axis.start.epochMilliseconds && now.epochMilliseconds < col.axis.end.epochMilliseconds) {
+          const snap = Math.max(1, ctx.snapMinutes);
+          const at = Math.floor(col.axis.toPosition(now) / snap) * snap;
+          if (at * px >= body.scrollTop && (at + snap) * px <= body.scrollTop + body.clientHeight) return slotAt(col, at);
+        }
+      }
+      return topSlot(col);
     },
     fit(hit) {
       const cols = model?.columns ?? [];
@@ -666,7 +684,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       cursorHits.set(node, hit);
       const old = cursorNode;
       cursorNode = node;
-      node.focus();
+      // Scrolled only as much as it needs (a plain focus may centre it: a jump of the hours).
+      node.focus({ preventScroll: true });
+      node.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
       old.remove();
     },
     isCursor: (el) => el === cursorNode,
@@ -951,16 +971,11 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       else if (!known) win = { from: 0, to: -1 };
       columns.sync(cols.map((c) => ({ ...c, sig: `${c.sig}|${side(c)}` })));
       // The cursor's column went away (its resource removed, or resource columns gone or come): it has no place
-      // any more. A fresh one waits in the all-day row; focused, the keyboard puts it at home with its words.
+      // any more. A fresh one rests in the hours; focused, the keyboard puts it at home with its words.
       const at = cursorHits.get(cursorNode);
       if (at && !m.columns.some((c) => c.date.equals(at.date) && c.resource?.id === at.resourceId)) {
         const focused = activeIn(cursorNode) === cursorNode;
-        const fresh = h(doc, 'div', 'dz-cursor');
-        fresh.tabIndex = 0;
-        fresh.setAttribute('role', 'button');
-        fresh.setAttribute('aria-label', ctx.messages.timeSlots);
-        fresh.style.gridColumn = '2 / span 1';
-        allday.prepend(fresh);
+        const fresh = restingCursor();
         const old = cursorNode;
         cursorNode = fresh;
         old.remove();

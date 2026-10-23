@@ -12,7 +12,7 @@ export { KeyedList, h, contentsHost } from './render/reconcile.js';
 export type { Keyed, Changed } from './render/reconcile.js';
 export { attachMenuTriggers } from './menu.js';
 export type { ResolveTarget } from './menu.js';
-export { timeLabels, startReadingOf, applyEventLook, dayStates, drawNow, fillEvent, unmountEvent, timedContent, formatMinutes } from './render/event.js';
+export { timeLabels, startReadingOf, applyEventLook, dayStates, drawNow, moreText, fillEvent, unmountEvent, timedContent, formatMinutes } from './render/event.js';
 export type { TimeLabels } from './render/event.js';
 export { createDayGridView } from './views/daygrid.js';
 export { RowWindow, onScrollFrame } from './render/window.js';

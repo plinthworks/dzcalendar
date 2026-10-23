@@ -47,8 +47,8 @@ function Temporal_len([a, b]) {
   return (ms(b) - ms(a)) / 60000;
 }
 
-async function page(path, media = {}) {
-  const p = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+async function page(path, { viewport = { width: 1400, height: 950 }, ...media } = {}) {
+  const p = await browser.newPage({ viewport });
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
   p.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -1034,6 +1034,209 @@ try {
       await p.close();
     }
 
+    // ── Phase 18g-4: WCAG 2.2 AA beyond axe's defaults ──
+    {
+      // An empty day: its scrolling hours hold the grid's one tab stop (owner); Tab scrolls nothing; an arrow puts the cursor at the hour in view.
+      const { p, errors } = await page('/gallery.html');
+      await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      await p.waitForTimeout(300);
+      const empty = await axeViolations(p, '#v-emptyDay');
+      check('18g-4: an empty day has no axe violation (its scrolling hours hold something focusable)', empty.length === 0, empty.join(' | '));
+      const rest = await p.evaluate(() => {
+        const body = document.querySelector('#v-emptyDay .dz-tg__body');
+        const before = body.scrollTop;
+        const cur = document.querySelector('#v-emptyDay .dz-cursor');
+        // Where it rests, before the focus (focused, the keyboard puts a placed cursor in its stead).
+        const r = cur.getBoundingClientRect();
+        const b = body.getBoundingClientRect();
+        const was = { inBody: body.contains(cur), visible: r.height > 0 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1 };
+        cur.focus();
+        return { ...was, same: body.scrollTop === before };
+      });
+      await p.keyboard.press('ArrowDown');
+      const placed = await p.evaluate(() => { const c = document.activeElement; const b = document.querySelector('#v-emptyDay .dz-tg__body').getBoundingClientRect(); const r = c.getBoundingClientRect(); return { cursor: c.classList.contains('dz-cursor') && !c.classList.contains('dz-cursor--rest'), seen: r.top >= b.top - 1 && r.bottom <= b.bottom + 1 }; });
+      check('18g-4: the time grid’s cursor rests in the hours, in view; focusing it scrolls nothing; an arrow places it in view', rest.inBody && rest.same && rest.visible && placed.cursor && placed.seen, JSON.stringify({ rest, placed }));
+      // Focused, the cursor goes on now when today is shown and now is in view (owner).
+      const onNow = await p.evaluate(async () => {
+        const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        document.querySelector('#v-timeGridWeek .dz-tg__body .dz-cursor').focus();
+        await frame();
+        const c = document.activeElement.getBoundingClientRect();
+        const n = document.querySelector('#v-timeGridWeek .dz-now').getBoundingClientRect();
+        return { top: c.top, bottom: c.bottom, now: n.top };
+      });
+      check('18g-4: focused in a week showing now, the cursor goes on now', onNow.top <= onNow.now + 1 && onNow.now <= onNow.bottom + 1, JSON.stringify(onNow));
+      // It rests in the hours whatever the options: no all-day row, right to left.
+      const rests = await p.evaluate(async () => {
+        const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const out = [];
+        for (const [opts, label] of [[{ allDaySlot: false }, 'no all-day row'], [{ locale: 'ar' }, 'rtl']]) {
+          window.cals.timeGridDay.update(opts);
+          await frame();
+          const body = document.querySelector('#v-timeGridDay .dz-tg__body');
+          const cur = body.querySelector('.dz-cursor--rest') ?? body.querySelector('.dz-cursor');
+          const r = cur?.getBoundingClientRect();
+          const b = body.getBoundingClientRect();
+          out.push(`${label}:${r && r.height > 0 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1 && r.left >= b.left - 1 && r.right <= b.right + 1}`);
+        }
+        return out;
+      });
+      check('18g-4: the cursor rests in the hours shown without an all-day row and right to left', rests.every((x) => x.endsWith('true')), rests.join(' '));
+      // Targets of 24 px at least (2.5.8): an event's size is its duration (the "essential" exception); the timeline's column grip is alone in its 24 px (the spacing exception).
+      const small = await p.evaluate(() => {
+        const sel = 'button, [role=button], a[href], [tabindex]:not([tabindex="-1"]), input, select, [role=menuitem]';
+        return [...document.querySelectorAll(sel)]
+          .filter((e) => !e.matches('.dz-ev, .dz-bar, .dz-tl__ev, .dz-slot, .dz-cursor, .dz-dg__items *, .dz-dg__item, .dz-tl__resizer') && !e.closest('.dz-ev, .dz-bar, .dz-tl__ev, .dz-dg__items'))
+          .map((e) => { const r = e.getBoundingClientRect(); return { c: e.className.toString().split(' ')[0] || e.tagName, w: r.width, h: r.height }; })
+          .filter((x) => x.w > 0 && (x.w < 23.5 || x.h < 23.5))
+          .map((x) => `${x.c} ${Math.round(x.w)}×${Math.round(x.h)}`);
+      });
+      check('18g-4: every target but an event (essential) and a column grip (spaced) is 24 px or more (2.5.8)', small.length === 0, [...new Set(small)].join(', '));
+      // Text spacing (1.4.12): line height 1.5, paragraphs 2, letters 0.12, words 0.16 — the header loses nothing.
+      await p.addStyleTag({ content: '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }' });
+      await p.waitForTimeout(200);
+      const CUT = '.dz-toolbar__btn, .dz-toolbar__title, .dz-list__date, .dz-dg__num, .dz-more:not(.dz-more--tg), .dz-tg__dayhead-date, .dz-tl__group, .dz-tl__slot, .dz-tl__expander, .dz-list__head';
+      // Cut: the text's own box (a Range over its visible text, not the padding) out of the element's, across or down.
+      const cutNow = () => p.evaluate((sel) => [...document.querySelectorAll(sel)].filter((e) => {
+        const box = e.getBoundingClientRect();
+        if (box.width === 0 || getComputedStyle(e).textOverflow === 'ellipsis') return false;
+        const walker = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
+        for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+          if (!t.textContent.trim() || t.parentElement.closest('.dz-sr, .dz-tl__sr, .dz-live')) continue;
+          const range = document.createRange();
+          range.selectNodeContents(t);
+          const r = range.getBoundingClientRect();
+          if (r.width === 0) continue;
+          const cs = getComputedStyle(e);
+          if ((cs.overflowX !== 'visible' && (r.right > box.right + 1 || r.left < box.left - 1)) || (cs.overflowY !== 'visible' && (r.bottom > box.bottom + 1 || r.top < box.top - 1))) return true;
+        }
+        return false;
+      }).map((e) => `${e.className.split(' ')[0]} "${e.textContent.trim().slice(0, 12)}"`), CUT);
+      const cut = await cutNow();
+      check('18g-4: text spacing (1.4.12) — no button, title, date, "+N" or timeline head cut, across or down', cut.length === 0, [...new Set(cut)].join(', '));
+      check('18g-4: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+    {
+      // Resize text (1.4.4): the page's text at 200 % — nothing cut, every target still 24 px.
+      const { p } = await page('/gallery.html');
+      await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      await p.addStyleTag({ content: 'html { font-size: 200% !important; }' });
+      await p.waitForTimeout(400);
+      const r = await p.evaluate(() => {
+        const cut = [...document.querySelectorAll('.dz-toolbar__btn, .dz-toolbar__title, .dz-list__date, .dz-dg__num, .dz-more:not(.dz-more--tg), .dz-tg__dayhead-date, .dz-tl__expander')].filter((e) => e.getBoundingClientRect().width > 0 && getComputedStyle(e).textOverflow !== 'ellipsis' && e.scrollWidth > e.clientWidth + 1).map((e) => `${e.className.split(' ')[0]} "${e.textContent.trim().slice(0, 12)}"`);
+        const overflow = [...document.querySelectorAll('.dz-toolbar')].filter((t) => t.scrollWidth > t.clientWidth + 1).length;
+        return { cut: [...new Set(cut)], overflow };
+      });
+      check('18g-4: text at 200 % (1.4.4) — no button, title, date or "+N" cut; no header wider than its calendar', r.cut.length === 0 && r.overflow === 0, JSON.stringify(r));
+      await p.close();
+    }
+    {
+      // Reflow (1.4.10): 320 px wide, and 1280 px at 400 % — nothing scrolls sideways but a grid's own two-dimensional area.
+      for (const [w, h] of [[320, 640], [640, 450]]) {
+        const { p } = await page('/gallery.html', { viewport: { width: w, height: h } });
+        await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+        await p.waitForTimeout(300);
+        const r = await p.evaluate(() => ({ page: document.documentElement.scrollWidth - document.documentElement.clientWidth, bars: [...document.querySelectorAll('.dz-toolbar')].map((t) => t.scrollWidth - t.clientWidth).filter((x) => x > 0), cals: [...document.querySelectorAll('.dz-cal')].map((c) => c.scrollWidth - c.clientWidth).filter((x) => x > 0) }));
+        check(`18g-4: reflow at ${w} px — no sideways scroll of the page, a header or a calendar`, r.page === 0 && r.bars.length === 0 && r.cals.length === 0, JSON.stringify(r));
+        await p.close();
+      }
+    }
+    {
+      // Focus never hidden (2.4.11): a list row and a timeline bar focused by Tab after scrolling stay out from under the sticky heads.
+      const { p } = await page('/gallery.html');
+      await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      await p.waitForTimeout(300);
+      const hidden = await p.evaluate(async () => {
+        const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const out = [];
+        const covered = (el) => { const r = el.getBoundingClientRect(); const x = r.left + Math.min(r.width / 2, 12); const y = r.top + r.height / 2; const top = document.elementFromPoint(x, y); return !(top && (el.contains(top) || top.contains(el))); };
+        // The list: scrolled down, then a row above focused.
+        const list = document.querySelector('#v-listWeek .dz-list');
+        const rows = [...list.querySelectorAll('.dz-list__ev[tabindex], .dz-list__li [tabindex="0"], .dz-list__date')];
+        list.scrollTop = list.scrollHeight;
+        await frame();
+        for (const row of rows.slice(1, 6)) { row.focus(); await frame(); if (covered(row)) out.push(`list ${row.textContent.trim().slice(0, 20)}`); }
+        // The timeline: scrolled to the far end, then a bar focused.
+        const sc = document.querySelector('#v-resourceTimelineWeek .dz-tl__scroller');
+        sc.scrollLeft = sc.scrollWidth;
+        await frame();
+        const bar = document.querySelector('#v-resourceTimelineWeek .dz-tl__ev:not(.dz-tl__ev--bg)[tabindex]');
+        if (bar) { bar.focus(); await frame(); if (covered(bar)) out.push(`timeline ${bar.textContent.trim().slice(0, 20)}`); }
+        return out;
+      });
+      check('18g-4: focus never hidden under a sticky head or the resource column (2.4.11)', hidden.length === 0, hidden.join(', '));
+      await p.close();
+    }
+    {
+      // Forced colours (Windows High Contrast): axe with the forced palette, light and dark, the calendar's scheme following the system's.
+      const bad = [];
+      for (const scheme of ['light', 'dark']) {
+        const { p } = await page(`/gallery.html?scheme=${scheme}`, { forcedColors: 'active', colorScheme: scheme });
+        await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+        await p.waitForTimeout(300);
+        for (const id of ['#v-timeGridWeek', '#v-dayGridMonth', '#v-listWeek', '#v-resourceTimelineWeek']) bad.push(...(await axeViolations(p, id)).map((v) => `${scheme} ${id}: ${v}`));
+        await p.close();
+      }
+      check('18g-4: forced colours, light and dark — no axe violation (week, month, list, timeline)', bad.length === 0, bad.join(' | '));
+    }
+
+    {
+      // After the 18g-4 review: the timeline's cursor seen once focused; a sticky part focused keeps the scroll; a narrow list and "+N".
+      const { p } = await page('/gallery.html');
+      await p.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      await p.waitForTimeout(300);
+      const tl = await p.evaluate(async () => {
+        const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const sc = document.querySelector('#v-resourceTimelineWeek .dz-tl__scroller');
+        sc.scrollLeft = 1500;
+        await frame();
+        const before = sc.scrollLeft;
+        const rest = document.querySelector('#v-resourceTimelineWeek .dz-cursor--rest');
+        rest.focus();
+        await frame();
+        const c = document.activeElement;
+        const r = c.getBoundingClientRect();
+        const s = sc.getBoundingClientRect();
+        // The cursor lets the pointer through (pointer-events: none): seen is inside the lanes shown, right of the resource column, on screen.
+        const area = document.querySelector('#v-resourceTimelineWeek .dz-tl__area').getBoundingClientRect();
+        const seen = c.classList.contains('dz-cursor') && r.width > 0 && r.left >= area.right - 1 && r.right <= s.right + 1 && r.top >= 0 && r.bottom <= innerHeight;
+        // A column grip in the sticky head: focused, the timeline stays where it was.
+        sc.scrollLeft = 2000;
+        await frame();
+        const at = sc.scrollLeft;
+        document.querySelector('#v-resourceTimelineWeek .dz-tl__resizer')?.focus();
+        await frame();
+        return { seen, keptOnRest: Math.abs(before - sc.scrollLeft) >= 0, grip: [at, sc.scrollLeft] };
+      });
+      check('18g-4 review: the timeline’s cursor, focused by Tab, is placed where it is seen (not off-screen)', tl.seen, JSON.stringify(tl));
+      check('18g-4 review: a column grip focused in the sticky head keeps the timeline’s scroll', Math.abs(tl.grip[0] - tl.grip[1]) < 2, JSON.stringify(tl.grip));
+      // A keyboard menu opened while a scroll still settles stays open, focused.
+      await p.evaluate(() => window.cals.listWeek.update({ editable: true }));
+      await p.waitForTimeout(150);
+      await p.evaluate(() => (document.documentElement.style.scrollBehavior = 'smooth'));
+      await p.locator('#v-listWeek .dz-list__ev[tabindex]').first().focus();
+      await p.evaluate(() => window.scrollBy(0, 300));
+      await p.keyboard.press('Shift+F10');
+      await p.waitForTimeout(400);
+      const menu = await p.evaluate(() => {
+        const open = document.querySelector('#v-listWeek .dz-menu:not([hidden])');
+        document.documentElement.style.scrollBehavior = '';
+        return { open: open !== null, inMenu: open?.contains(document.activeElement) ?? false, active: document.activeElement?.className };
+      });
+      check('18g-4 review: a keyboard context menu opened during a smooth scroll stays open with the focus in it', menu.open && menu.inMenu, JSON.stringify(menu));
+      await p.keyboard.press('Escape');
+      await p.close();
+      const { p: n } = await page('/gallery.html', { viewport: { width: 320, height: 640 } });
+      await n.waitForFunction(() => window.ready, null, { timeout: 15000 });
+      await n.waitForTimeout(300);
+      const narrow = await n.evaluate(() => ({
+        list: [...document.querySelectorAll('.dz-list')].map((l) => l.scrollWidth - l.clientWidth).filter((x) => x > 0),
+        more: [...document.querySelectorAll('#v-dayGridMonth .dz-more')].map((m) => { const range = document.createRange(); range.selectNodeContents(m.firstChild); const r = range.getBoundingClientRect(); const b = m.getBoundingClientRect(); return r.right <= b.right + 1 && /\d/.test(m.firstChild.textContent); }),
+      }));
+      check('18g-4 review: at 320 px the list does not scroll sideways; a narrow "+N" keeps its count', narrow.list.length === 0 && narrow.more.length > 0 && narrow.more.every(Boolean), JSON.stringify(narrow));
+      await n.close();
+    }
     // ── Phase 18g-3: an event's text on its tint, AA for every tone × family × scheme (axe leaves colour-mix() backgrounds "incomplete") ──
     {
       const low = [];

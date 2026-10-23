@@ -96,6 +96,8 @@ calendar) and `dz-calendar::part(toolbar)` (its header).
 | `--dz-button-bg`, `--dz-button-fg`, `--dz-button-border`, `--dz-button-radius`, `--dz-button-height`, `--dz-button-font-size`, `--dz-button-weight`, `--dz-button-hover-bg` | the header's buttons: surface, text, line, corners, least height (2rem), type, under the pointer |
 | `--dz-button-active-bg`, `--dz-button-active-fg` | the pressed view (and a pressed custom button): the accent and its text by default |
 | `--dz-event-tint`, `--dz-event-shade`, `--dz-event-edge`, `--dz-event-title-weight`, `--dz-event-hyphens` | a tinted event: how much of its tone in the surface (16%), in the text (45% with the theme: the tone's dark shade, AA on every family; 0%, the plain text colour, without it), the edge's width (3px; 0 for none), the title's weight (600); `auto` to hyphenate a title in a narrow column in the page's language (cut anywhere by default: hyphenation costs a few ms at the first drawing) |
+| `--dz-target-min` | the least size of a target but an event (24px, WCAG 2.5.8; 44px for touch): day and week numbers, "+N", list dates, the panel's close button, the timeline's expander |
+| `--dz-list-head`, `--dz-tl-head` | the room a focused row keeps under the list's sticky day head (2.75rem), the timeline's time head (3.25rem, its height too) |
 | `--dz-closed-image`, `--dz-outside-fg` | a month's days out of service (pale hatching, an image; `none` to drop it), a padding day's number (muted) |
 | `--dz-line`, `--dz-today-bg`, `--dz-outside-bg`, `--dz-off-bg`, `--dz-now` | grid lines, today, a month's padding days, closed hours, the now line |
 | `--dz-gap-stripe`, `--dz-repeat-bg` | a skipped hour's stripes, a repeated hour's band (clock changes) |
@@ -156,7 +158,8 @@ The --dzc-… and --dzp-… properties are the theme's own palette, private: the
 | `.dz-tg__hours`, `.dz-off`, `.dz-tg__bands`, `.dz-band`, `.dz-band--gap`, `.dz-band--repeat`, `.dz-band--*` | closed hours; clock-change bands (a skipped hour, a repeated one) |
 | `.dz-tg__bg`, `.dz-tg__events`, `.dz-tg__mores`, `.dz-tg__slots`, `.dz-slot` | a column's backgrounds, events, "+N", free slots |
 | `.dz-now` | the now line |
-| `.dz-cursor` | the keyboard's place |
+| `.dz-more__rest` | "+N"'s words after the count (dropped when narrow) |
+| `.dz-cursor`, `.dz-cursor--rest`, `.dz-tg__rest` | the keyboard's place; not placed yet (stuck to the top of the hours shown), in its box |
 
 ### The day grid and the month (`dayGridMonth`, `dayGridWeek`…)
 

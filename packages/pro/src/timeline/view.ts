@@ -20,7 +20,7 @@ import {
   activeIn,
 } from '@dzcalendar/dom/toolkit';
 import type { Box, InteractionSurface, KeyboardSurface, ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
-import { decorate, drawNow, holder, undecorate, undecorateAll, written } from '@dzcalendar/dom/toolkit';
+import { decorate, drawNow, holder, moreText, undecorate, undecorateAll, written } from '@dzcalendar/dom/toolkit';
 import type { TimelineBar, TimelineModel, TimelineMore, TimelineRow } from './model.js';
 import { timelineNow } from './model.js';
 import { TIMELINE_CSS } from './styles.js';
@@ -646,7 +646,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     moreOf.set(b, m);
     place(b, m.from, m.to);
     b.style.setProperty('--lane', String((model?.maxLanes ?? 1) - 1));
-    b.textContent = ctx.messages.moreLink({ count: m.events.length });
+    moreText(b, ctx.messages.moreLink({ count: m.events.length }));
     const first = m.events[0]!.segment.from as Instant;
     b.setAttribute(
       'aria-label',
@@ -791,7 +791,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   // ── the keyboard: a cursor on a row, at a moment (or a day) ──────────────
   /** A cursor without a place yet: focused, the keyboard puts it at `home()` and names it. */
   function unplacedCursor(): HTMLElement {
-    const n = h(doc, 'div', 'dz-cursor dz-tl__cursor');
+    const n = h(doc, 'div', 'dz-cursor dz-tl__cursor dz-cursor--rest');
     n.tabIndex = 0;
     n.setAttribute('role', 'button');
     n.setAttribute('aria-label', ctx.messages.timeSlots);
@@ -895,6 +895,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       const old = cursorNode;
       cursorNode = node;
       node.focus({ preventScroll: true });
+      // Brought into view, clear of the sticky heads and resource column (the scroller's scroll-padding).
+      node.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
       old.remove();
     },
     isCursor: (el) => el === cursorNode,
