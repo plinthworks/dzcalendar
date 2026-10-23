@@ -1,0 +1,174 @@
+---
+title: availableSlots
+description: "Les créneaux réservables dessinés dans la grille horaire."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Les créneaux libres qu'une personne peut réserver, dessinés dans les vues semaine et jour.
+
+<OptionFacts name="availableSlots" />
+
+## Ce qu'elle fait
+
+Chaque créneau est `{ start, end }` — des `Instant` ou des `ZonedDateTime` —
+et, au besoin, `resourceId` (seules les colonnes de cette ressource le
+montrent) et `seats` (dit à côté de son heure). Ils viennent en général de
+`findSlots` (`@dzcalendar/slots`), qui calcule le temps libre d'un prestataire
+à partir de ses heures, de ce qui est occupé et des règles de réservation — le
+même code dans la page et sur le serveur.
+
+Un créneau est dessiné dans sa colonne (dans toutes les colonnes sans
+`resourceId`) ; avec `onSlotClick`, il peut être cliqué (ou atteint au clavier
+puis Entrée) et le reçoit tel quel — sans lui, les créneaux sont seulement
+montrés. `seats` est dit quand c'est un entier de 1 ou plus. `findSlots`
+donne `{ start, end }` ; `resourceId` et `seats` sont à ajouter par vous (ou
+par `@dzcalendar/pro/slots`). Le calendrier
+ne crée rien : l'application le réserve, et son serveur le vérifie de nouveau
+(`checkSlot`) avant d'enregistrer. `null` : aucun créneau. Un nouveau tableau
+redessine ; le même tableau ne change rien.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+import { findSlots } from '@dzcalendar/slots';
+
+await loadTemporal();
+const { slots } = findSlots({
+  availability: { timeZone: 'Europe/Paris', weekly: [{ days: [1, 2, 3, 4, 5], from: '09:00', to: '12:00' }] },
+  duration: 30,
+  from: Temporal.ZonedDateTime.from('2026-10-19T00:00[Europe/Paris]'),
+  to: Temporal.ZonedDateTime.from('2026-10-24T00:00[Europe/Paris]'),
+  busy: [],
+});
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  availableSlots: slots,
+  onSlotClick: (slot) => fetch('/api/book', { method: 'POST', body: JSON.stringify({ start: slot.start.toString() }) }),
+});
+
+// Later: none.
+calendar.update({ availableSlots: null });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-booking',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [availableSlots]="slots" (slotClick)="book($event)" />`,
+})
+export class Booking {
+  slots: readonly AvailableSlot[] | null = null;
+  book(slot: AvailableSlot): void {
+    console.log('book', slot.start.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Booking({ slots }: { slots: readonly AvailableSlot[] }) {
+  return <DzCalendar timeZone="Europe/Paris" availableSlots={slots} onSlotClick={(slot) => console.log('book', slot.start.toString())} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+defineProps<{ slots: readonly AvailableSlot[] }>();
+const book = (slot: AvailableSlot) => console.log('book', slot.start.toString());
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :available-slots="slots" @slot-click="book" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `availableSlots` en Angular et en React, `available-slots` en Vue ; le clic est `(slotClick)` en Angular, `onSlotClick` en React, `@slot-click` en Vue.
+
+## Démo en direct
+
+Trois créneaux libres le mercredi matin, dessinés parmi les événements.
+
+<LiveDemo
+  label="Une journée avec trois créneaux réservables"
+  height={560}
+  options={{
+    "initialView": "timeGridDay",
+    "initialDate": "2026-10-21",
+    "scrollTime": "PT8H",
+    "availableSlots": [
+      {
+        "start": "2026-10-21T10:00[Europe/Paris]",
+        "end": "2026-10-21T10:30[Europe/Paris]"
+      },
+      {
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "end": "2026-10-21T11:00[Europe/Paris]"
+      },
+      {
+        "start": "2026-10-21T11:30[Europe/Paris]",
+        "end": "2026-10-21T12:00[Europe/Paris]"
+      }
+    ],
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- `onSlotClick` — un créneau cliqué.
+- [`businessHours`](../business-hours/) — les heures du prestataire, grisées.
+- [`resources`](../resources/) — un créneau dans la colonne de sa ressource.

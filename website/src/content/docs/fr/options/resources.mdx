@@ -1,0 +1,184 @@
+---
+title: resources
+description: "Ce que les vues ressources montrent en colonnes : médecins, salles, machines."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Les ressources sur lesquelles les événements sont réservés — un médecin, une salle, une machine — dessinées en colonnes par les vues ressources.
+
+<OptionFacts name="resources" />
+
+## Ce qu'elle fait
+
+Une ressource est `{ id, title }` et, au besoin :
+
+- `parentId` : un arbre (un service au-dessus de ses médecins) ; `order` : les
+  ressources sœurs d'abord selon ce nombre.
+- `timeZone` et `businessHours` : ses propres heures, lues dans son propre
+  fuseau (un médecin à Riyad sur un calendrier affiché à Paris).
+- `eventConstraint`, `eventOverlap` : ses propres règles, au-dessus de celles
+  du calendrier.
+- `classNames`, `extendedProps`, et tout champ à vous (pour trier ou grouper).
+
+Un événement va sur une ressource avec `resourceId` (ou sur plusieurs avec
+`resourceIds`). Les vues ressources — `resourceTimeGridDay`,
+`resourceTimeGridWeek`, `resourceDayGridDay`, `resourceDayGridWeek`,
+`resourceDayGridMonth`, et les `resourceTimeline…` du Pro — dessinent une
+colonne (une ligne dans la timeline) par ressource ; un événement sur deux
+ressources est dans les deux. Les autres vues ignorent les ressources.
+
+Une mauvaise donnée ne lève jamais d'exception : ce qui ne se lit pas va à
+`onResourceProblems`. `update({ resources })` remplace la liste ; le même
+tableau ne change rien.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimeGridDay',
+  resources: [
+    { id: 'benali', title: 'Dr Benali' },
+    { id: 'haddad', title: 'Dr Haddad', timeZone: 'Asia/Riyadh', businessHours: { daysOfWeek: [7, 1, 2, 3, 4], start: '08:00', end: '12:00' } },
+  ],
+  events: [{ id: 'a', title: 'Visit', start: '2026-10-21T09:00[Europe/Paris]', resourceId: 'benali' }],
+  onResourceProblems: (problems) => console.warn(problems),
+});
+
+// Later: another list.
+calendar.update({ resources: [{ id: 'benali', title: 'Dr Benali' }] });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { ResourceInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimeGridDay" [resources]="doctors" />`,
+})
+export class Agenda {
+  readonly doctors: ResourceInput[] = [{ id: 'benali', title: 'Dr Benali' }, { id: 'haddad', title: 'Dr Haddad' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+const DOCTORS = [{ id: 'benali', title: 'Dr Benali' }, { id: 'haddad', title: 'Dr Haddad' }];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimeGridDay" resources={DOCTORS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+
+const doctors = [{ id: 'benali', title: 'Dr Benali' }, { id: 'haddad', title: 'Dr Haddad' }];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimeGridDay" :resources="doctors" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `resources` en Angular, en React et en Vue.
+
+## Démo en direct
+
+Une colonne par ressource ; la visite à attribuer n'est sur aucune, donc pas montrée ici.
+
+<LiveDemo
+  label="Une journée avec une colonne par médecin et par salle"
+  height={560}
+  options={{
+    "initialView": "resourceTimeGridDay",
+    "initialDate": "2026-10-21",
+    "scrollTime": "PT8H",
+    "resources": [
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "service": "Cardiologie"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "service": "Cardiologie"
+      },
+      {
+        "id": "room1",
+        "title": "Salle 1",
+        "service": "Imagerie"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      },
+      {
+        "id": "b",
+        "title": "Suivi",
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "duration": {
+          "hours": 1
+        },
+        "resourceId": "haddad"
+      },
+      {
+        "id": "c",
+        "title": "Scanner",
+        "start": "2026-10-21T14:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        },
+        "resourceId": "room1"
+      },
+      {
+        "id": "u",
+        "title": "À attribuer",
+        "start": "2026-10-21T11:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        }
+      }
+    ],
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## Voir aussi
+
+- [`resourceGroupField`](../resource-group-field/) — un en-tête au-dessus de chaque groupe.
+- [`showUnassigned`](../show-unassigned/) — une colonne pour les événements sans ressource.
+- [Ressources et timeline](../../guides/resources-timeline/).

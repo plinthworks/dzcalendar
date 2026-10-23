@@ -1,0 +1,132 @@
+---
+title: onSource
+description: "What the sources say: loading, failures, problems, saves."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears what the event sources say: loading, a fetch that failed, events refused, saves.
+
+<OptionFacts name="onSource" />
+
+## What it does
+
+It receives one notice at a time, by `type`:
+
+- `loading` (`{ loading }`): true while anything is fetched — a spinner.
+- `error` (`{ sourceId, error }`): a fetch failed for good, after its
+  retries; what was shown stays.
+- `problems` (`{ sourceId, report }`): events of a delivery were refused or
+  bent (`report.problems`, each `{ code, severity, path, detail }`). The
+  `events` option's own come here too when they load late (above 2 000
+  events).
+- `save-error` (`{ sourceId, edits, error, reverted }`) and `saved`: a
+  source's `save` refused (`reverted`: the edits put back; or, when the events
+  changed again meanwhile, the source fetched again) or done.
+
+It is read when the calendar is made. A source's bad data never throws: it
+comes here (a small `events` array's problems are in
+`calendar.kernel.getProblems()` instead).
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { jsonSource } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const spinner = document.getElementById('spinner')!;
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  sources: [jsonSource('appointments', { url: '/api/rendez-vous', retry: { attempts: 2, backoffMs: 500 } })],
+  onSource: (notice) => {
+    if (notice.type === 'loading') spinner.hidden = !notice.loading;
+    if (notice.type === 'error') console.error(`${notice.sourceId} could not be fetched`, notice.error);
+    if (notice.type === 'problems') console.warn(notice.report.problems);
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import type { SourceNotice } from '@dzcalendar/core';
+import { jsonSource } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    @if (loading()) { <p>Loading…</p> }
+    <dz-calendar timeZone="Europe/Paris" [sources]="sources" (sourceNotice)="said($event)" />`,
+})
+export class Agenda {
+  readonly sources = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+  readonly loading = signal(false);
+  said(notice: SourceNotice): void {
+    if (notice.type === 'loading') this.loading.set(notice.loading);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { jsonSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const SOURCES = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+
+export function Agenda() {
+  const [loading, setLoading] = useState(false);
+  return (
+    <>
+      {loading && <p>Loading…</p>}
+      <DzCalendar timeZone="Europe/Paris" sources={SOURCES} onSourceNotice={(n) => n.type === 'loading' && setLoading(n.loading)} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import type { SourceNotice } from '@dzcalendar/core';
+import { jsonSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const sources = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+const loading = ref(false);
+const said = (n: SourceNotice) => {
+  if (n.type === 'loading') loading.value = n.loading;
+};
+</script>
+
+<template>
+  <p v-if="loading">Loading…</p>
+  <DzCalendar time-zone="Europe/Paris" :sources="sources" @source-notice="said" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an output: Angular's `(sourceNotice)`, React's `onSourceNotice`, Vue's `@source-notice`. Their controllers also keep `loading` and `problems` to read.
+
+## See also
+
+- [`sources`](../sources/) — what is fetched.
+- [`events`](../events/) — the array source.
+- [Event sources](../../guides/event-sources/).

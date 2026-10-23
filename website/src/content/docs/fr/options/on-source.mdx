@@ -1,0 +1,133 @@
+---
+title: onSource
+description: "Ce que disent les sources : chargement, échecs, problèmes, enregistrements."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Écoute ce que disent les sources d'événements : le chargement, une récupération échouée, des événements refusés, les enregistrements.
+
+<OptionFacts name="onSource" />
+
+## Ce qu'elle fait
+
+Elle reçoit un avis à la fois, selon son `type` :
+
+- `loading` (`{ loading }`) : vrai tant que quelque chose est récupéré — un
+  indicateur de chargement.
+- `error` (`{ sourceId, error }`) : une récupération a échoué pour de bon,
+  après ses nouvelles tentatives ; ce qui était montré reste.
+- `problems` (`{ sourceId, report }`) : des événements d'une livraison ont été
+  refusés ou corrigés (`report.problems`, chacun `{ code, severity, path,
+  detail }`). Ceux de l'option `events` arrivent ici aussi quand ils se
+  chargent plus tard (au-delà de 2 000 événements).
+- `save-error` (`{ sourceId, edits, error, reverted }`) et `saved` : le `save`
+  d'une source refusé (`reverted` : les modifications remises ; ou, quand les
+  événements ont changé entre-temps, la source récupérée de nouveau) ou fait.
+
+Elle est lue à la création du calendrier. Une mauvaise donnée d'une source ne
+lève jamais d'exception : elle arrive ici (les problèmes d'un petit tableau
+`events` sont plutôt dans `calendar.kernel.getProblems()`).
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { jsonSource } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const spinner = document.getElementById('spinner')!;
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  sources: [jsonSource('appointments', { url: '/api/rendez-vous', retry: { attempts: 2, backoffMs: 500 } })],
+  onSource: (notice) => {
+    if (notice.type === 'loading') spinner.hidden = !notice.loading;
+    if (notice.type === 'error') console.error(`${notice.sourceId} could not be fetched`, notice.error);
+    if (notice.type === 'problems') console.warn(notice.report.problems);
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import type { SourceNotice } from '@dzcalendar/core';
+import { jsonSource } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    @if (loading()) { <p>Loading…</p> }
+    <dz-calendar timeZone="Europe/Paris" [sources]="sources" (sourceNotice)="said($event)" />`,
+})
+export class Agenda {
+  readonly sources = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+  readonly loading = signal(false);
+  said(notice: SourceNotice): void {
+    if (notice.type === 'loading') this.loading.set(notice.loading);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { jsonSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const SOURCES = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+
+export function Agenda() {
+  const [loading, setLoading] = useState(false);
+  return (
+    <>
+      {loading && <p>Loading…</p>}
+      <DzCalendar timeZone="Europe/Paris" sources={SOURCES} onSourceNotice={(n) => n.type === 'loading' && setLoading(n.loading)} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import type { SourceNotice } from '@dzcalendar/core';
+import { jsonSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const sources = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+const loading = ref(false);
+const said = (n: SourceNotice) => {
+  if (n.type === 'loading') loading.value = n.loading;
+};
+</script>
+
+<template>
+  <p v-if="loading">Loading…</p>
+  <DzCalendar time-zone="Europe/Paris" :sources="sources" @source-notice="said" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une sortie : `(sourceNotice)` en Angular, `onSourceNotice` en React, `@source-notice` en Vue. Leurs contrôleurs gardent aussi `loading` et `problems` à lire.
+
+## Voir aussi
+
+- [`sources`](../sources/) — ce qui est récupéré.
+- [`events`](../events/) — la source tableau.
+- [Sources d'événements](../../guides/event-sources/).

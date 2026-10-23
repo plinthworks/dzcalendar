@@ -1,0 +1,166 @@
+---
+title: resourceGroupField
+description: "A field resource views group their columns by."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+A field of the resources: resource views put a head over each run of resources sharing its value.
+
+<OptionFacts name="resourceGroupField" />
+
+## What it does
+
+With `resourceGroupField: 'service'`, the columns of a resource view (the
+rows of a timeline) gather under a head per service, in the order the groups
+first come. The field is read from the resource, then its `extendedProps`.
+
+Grouping applies to the roots of the tree; each root's children stay in its
+group. In the Pro's timeline a group can be shut (`collapsedGroups`). The
+head's look is the application's through `hooks.resourceGroupHeader`.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimeGridDay',
+  resources: [
+    { id: 'benali', title: 'Dr Benali', service: 'Cardiology' },
+    { id: 'room1', title: 'Room 1', service: 'Imaging' },
+  ],
+  resourceGroupField: 'service',
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimeGridDay" [resources]="staff" [options]="{ resourceGroupField: 'service' }" />`,
+})
+export class Agenda {
+  readonly staff = [{ id: 'benali', title: 'Dr Benali', service: 'Cardiology' }, { id: 'room1', title: 'Room 1', service: 'Imaging' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+const STAFF = [{ id: 'benali', title: 'Dr Benali', service: 'Cardiology' }, { id: 'room1', title: 'Room 1', service: 'Imaging' }];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimeGridDay" resources={STAFF} resourceGroupField="service" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+
+const staff = [{ id: 'benali', title: 'Dr Benali', service: 'Cardiology' }, { id: 'room1', title: 'Room 1', service: 'Imaging' }];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimeGridDay" :resources="staff" :options="{ resourceGroupField: 'service' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+The columns under a head per service.
+
+<LiveDemo
+  label="Doctors and rooms under their service"
+  height={560}
+  options={{
+    "initialView": "resourceTimeGridDay",
+    "initialDate": "2026-10-21",
+    "resources": [
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "service": "Cardiology"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "service": "Cardiology"
+      },
+      {
+        "id": "room1",
+        "title": "Room 1",
+        "service": "Imaging"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      },
+      {
+        "id": "b",
+        "title": "Follow-up",
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "duration": {
+          "hours": 1
+        },
+        "resourceId": "haddad"
+      },
+      {
+        "id": "c",
+        "title": "Scan",
+        "start": "2026-10-21T14:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        },
+        "resourceId": "room1"
+      },
+      {
+        "id": "u",
+        "title": "To assign",
+        "start": "2026-10-21T11:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        }
+      }
+    ],
+    "resourceGroupField": "service",
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## See also
+
+- [`resources`](../resources/) — the field is theirs.
+- [`resourceOrder`](../resource-order/) — the order inside a group.
+- [`collapsedGroups`](../collapsed-groups/) — a timeline's shut groups.

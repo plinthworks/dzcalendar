@@ -193,3 +193,14 @@ describe('the week checked at creation as in update() (18j review)', () => {
     cal.destroy();
   });
 });
+
+describe('update({ resourceOrder }) says a comparison that throws (18j review)', () => {
+  it('onResourceProblems hears it, the columns in input order', () => {
+    const told: string[] = [];
+    const { cal } = mount({ initialView: 'resourceTimeGridDay', resources: [{ id: 'b', title: 'B' }, { id: 'a', title: 'A' }], onResourceProblems: (ps) => told.push(...ps.map((p) => `${p.code} ${p.path}`)) });
+    cal.update({ resourceOrder: () => { throw new Error('boom'); } });
+    expect(told).toEqual(['invalid-resource resourceOrder']);
+    expect(cal.kernel.getState().view.type).toBe('resourceTimeGridDay');
+    cal.destroy();
+  });
+});

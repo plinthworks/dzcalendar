@@ -1,0 +1,179 @@
+---
+title: collapsedResources
+description: "A timeline's resources whose children are hidden."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The resources (by id) whose children a timeline hides — its tree's folded branches.
+
+<OptionFacts name="collapsedResources" />
+
+## What it does
+
+In the Pro's timeline (`import '@dzcalendar/pro'`), a resource with
+children (`parentId`) shows a button that folds and unfolds them. What is
+folded is the calendar's state: `collapsedResources` sets it, it survives
+`update()`, and `onResourceToggle` reports each change — keep it, and give it
+back next time, so the tree opens as the person left it.
+
+`update({ collapsedResources })` folds and unfolds from your code.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const saved = JSON.parse(localStorage.getItem('folded') ?? '[]') as string[];
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineDay',
+  resources: [
+    { id: 'cardio', title: 'Cardiology' },
+    { id: 'benali', title: 'Dr Benali', parentId: 'cardio' },
+    { id: 'haddad', title: 'Dr Haddad', parentId: 'cardio' },
+  ],
+  collapsedResources: saved,
+  onResourceToggle: ({ collapsedResources }) => localStorage.setItem('folded', JSON.stringify(collapsedResources)),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-planning',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineDay" [resources]="tree" [options]="{ collapsedResources: ['cardio'] }" />`,
+})
+export class Planning {
+  readonly tree = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const TREE = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+
+export function Planning() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimelineDay" resources={TREE} collapsedResources={['cardio']} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const tree = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineDay" :resources="tree" :options="{ collapsedResources: ['cardio'] }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+The Cardiology department's doctors folded under it.
+
+<LiveDemo
+  label="A timeline with a department folded"
+  height={560}
+  options={{
+    "initialView": "resourceTimelineDay",
+    "initialDate": "2026-10-21",
+    "resources": [
+      {
+        "id": "cardio",
+        "title": "Cardiology"
+      },
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "parentId": "cardio"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "parentId": "cardio"
+      },
+      {
+        "id": "room1",
+        "title": "Room 1"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      },
+      {
+        "id": "b",
+        "title": "Follow-up",
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "duration": {
+          "hours": 1
+        },
+        "resourceId": "haddad"
+      },
+      {
+        "id": "c",
+        "title": "Scan",
+        "start": "2026-10-21T14:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        },
+        "resourceId": "room1"
+      },
+      {
+        "id": "u",
+        "title": "To assign",
+        "start": "2026-10-21T11:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        }
+      }
+    ],
+    "collapsedResources": [
+      "cardio"
+    ],
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## See also
+
+- [`collapsedGroups`](../collapsed-groups/) — the same for groups.
+- [`onResourceToggle`](../on-resource-toggle/) — what the person folded.
+- [Resources & timeline](../../guides/resources-timeline/).

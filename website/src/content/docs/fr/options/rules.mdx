@@ -1,0 +1,166 @@
+---
+title: rules
+description: "Ce à quoi sont tenues les modifications : où vont les événements, les chevauchements, votre dernier mot."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Ce contre quoi sont vérifiés les déplacements, redimensionnements et dépôts d'une personne avant qu'ils aient lieu.
+
+<OptionFacts name="rules" />
+
+## Ce qu'elle fait
+
+- `constraint` : où peuvent aller les événements — `'businessHours'` (dans
+  `businessHours` ; rien sans elles), `{ groupId }` (dans les événements de ce
+  groupe : une garde dont les rendez-vous ne doivent pas sortir), ou
+  `{ spans: [{ s, e }] }` (dans des tranches données en millisecondes depuis
+  l'époque).
+- `overlap` : `false` — aucun événement sur un autre (hors événements de
+  fond) ; une fonction `(still, moving) => boolean` décide paire par paire,
+  `true` voulant dire qu'ils peuvent se chevaucher.
+- `allow` : `(placement) => boolean`, votre dernier mot sur l'endroit où irait
+  un événement (`placement.event`, `start`, `end`, `resourceIds`, `external`
+  pour un événement venu d'ailleurs). Le `start` et le `end` d'un événement
+  horaire sont dans son propre fuseau.
+- `validRange` : `{ start?, end? }` (des `PlainDate`, la fin exclue) : un
+  événement ne peut être déplacé, redimensionné ni déposé sur les jours en
+  dehors (la navigation n'est pas limitée).
+
+Un geste que les règles refusent n'a pas lieu — l'événement revient — et
+`onProposalRefused` dit pourquoi. Une commande de votre code est vérifiée
+aussi quand on le demande : `calendar.run(command, { validate: true })`. Le
+`eventConstraint` et le `eventOverlap` d'une ressource l'emportent sur
+celles-ci pour ses événements.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  businessHours: { daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '18:00' },
+  rules: {
+    constraint: 'businessHours',
+    overlap: false,
+    // Nothing on a Friday afternoon.
+    allow: ({ start }) => !(start instanceof Temporal.ZonedDateTime && start.dayOfWeek === 5 && start.hour >= 14),
+  },
+  onProposalRefused: (proposal) => console.log('refused', proposal),
+});
+
+// Later: overlaps allowed again.
+calendar.update({ rules: { constraint: 'businessHours' } });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [businessHours]="true" [options]="{ rules: { constraint: 'businessHours', overlap: false } }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable businessHours rules={{ constraint: 'businessHours', overlap: false }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable business-hours :options="{ rules: { constraint: 'businessHours', overlap: false } }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elles vont dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Glissez un événement hors des heures, ou sur un autre : il revient.
+
+<LiveDemo
+  label="Une semaine où les événements ne bougent que dans les heures d'ouverture, jamais l'un sur l'autre"
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "editable": true,
+    "businessHours": {
+      "daysOfWeek": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "start": "08:30",
+      "end": "18:00"
+    },
+    "rules": {
+      "constraint": "businessHours",
+      "overlap": false
+    },
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`businessHours`](../business-hours/) — les heures que veut dire `'businessHours'`.
+- `editable` — ce qu'une personne peut changer.
+- [`resources`](../resources/) — les règles propres d'une ressource.

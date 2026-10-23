@@ -1,0 +1,128 @@
+---
+title: sources
+description: "Les sources d'événements récupérées au fil des déplacements du calendrier."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Les sources où le calendrier va chercher ses événements, quand la période montrée change.
+
+<OptionFacts name="sources" />
+
+## Ce qu'elle fait
+
+Chaque source est une spécification faite par une fonction :
+
+- `jsonSource(id, { url })` (`@dzcalendar/core`) : un `GET` avec `start`,
+  `end` et `timeZone` dans la requête (un `POST` : dans son corps de formulaire) ; la réponse est la liste des
+  événements, ou `map` la transforme en liste. Par défaut, un mois par requête.
+- `fnSource(id, fetch)` : votre fonction, qui reçoit `{ window, signal }` —
+  la tranche à récupérer (`window.startDate`, `window.endDate`, exclue) et un
+  signal d'annulation — et rend les événements, ou une promesse.
+- `icalSource(id, { url })` (`@dzcalendar/ical`) : un flux iCalendar.
+
+Une source récupère les morceaux de temps qu'on lui demande (`chunk` : un mois
+à la fois par défaut, `prefetch` de plus de chaque côté), les garde, et
+récupère de nouveau un morceau périmé (`staleAfter`) quand il est montré de
+nouveau. Le `start` et le `end` que reçoit un serveur sont des jours entiers
+autour du morceau, plus larges que l'écran. Une récupération échouée est
+retentée si `retry` le demande, puis signalée par `onSource` ; ce qui était
+montré reste. Avec `save`, les modifications de ses événements (celles d'une
+personne, d'une commande, d'une annulation) sont réécrites : montrées tout de
+suite, remises si la promesse est rejetée — ou, quand les événements ont
+changé entre-temps, récupérées de nouveau. (`icalSource` prend `url`, `text`,
+`headers`, `defaults` et `save`, pas `staleAfter` ni `retry`.)
+
+`update({ sources })` prend la liste entière : les sources disparues sont
+retirées, les nouvelles ajoutées, les autres gardées — comparées par
+identité, donc gardez les mêmes objets (un nouvel objet est une nouvelle
+source, récupérée de nouveau). `calendar.refetch(id)` en récupère une à
+nouveau. L'identifiant `'events'` est celui de l'option `events` : une source
+qui le porte est refusée (`duplicate-id`).
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { jsonSource, fnSource } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  sources: [
+    // GET /api/rendez-vous?start=…&end=…&timeZone=Europe%2FParis
+    jsonSource('appointments', { url: '/api/rendez-vous' }),
+    fnSource('holidays', async ({ window }) => {
+      const res = await fetch(`/api/holidays?from=${window!.startDate}&to=${window!.endDate}`);
+      return res.json();
+    }),
+  ],
+});
+
+// Later: fetch the appointments again.
+calendar.refetch('appointments');
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { jsonSource } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [sources]="sources" />`,
+})
+export class Agenda {
+  // The same spec objects for the component's life: a new one would be fetched again.
+  readonly sources = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { jsonSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+// Outside the component: one spec, not a new one at each render.
+const SOURCES = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" sources={SOURCES} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { jsonSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const sources = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :sources="sources" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `sources` en Angular, en React et en Vue — gardez les spécifications hors du rendu (une constante de module, `useMemo`), sinon chaque rendu est une nouvelle source.
+
+## Voir aussi
+
+- [`events`](../events/) — un tableau, la source la plus simple.
+- [`onSource`](../on-source/) — chargement, erreurs, problèmes, enregistrements.
+- [Sources d'événements](../../guides/event-sources/).

@@ -1,0 +1,107 @@
+---
+title: onResourceToggle
+description: "A person folded or unfolded a resource or a group."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears a person fold or unfold a resource or a group in the Pro's timeline.
+
+<OptionFacts name="onResourceToggle" />
+
+## What it does
+
+It receives the whole state after the change — `{ collapsedResources,
+collapsedGroups }` — not the one row toggled: store it as it comes, and give
+it back as `collapsedResources` and `collapsedGroups` the next time, so the
+timeline opens as the person left it. A change made by your code
+(`update({ collapsedResources })`) is not reported.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const saved = JSON.parse(localStorage.getItem('tree') ?? '{}') as { collapsedResources?: string[]; collapsedGroups?: string[] };
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineWeek',
+  resources: [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }],
+  ...saved,
+  onResourceToggle: (state) => localStorage.setItem('tree', JSON.stringify(state)),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-planning',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineWeek" [resources]="tree" [options]="{ onResourceToggle: keep }" />`,
+})
+export class Planning {
+  readonly tree = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+  readonly keep = (state: { collapsedResources: readonly string[] }) => localStorage.setItem('folded', JSON.stringify(state.collapsedResources));
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const TREE = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+
+export function Planning() {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      defaultView="resourceTimelineWeek"
+      resources={TREE}
+      onResourceToggle={(state) => localStorage.setItem('tree', JSON.stringify(state))}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const tree = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+const keep = (state: { collapsedResources: readonly string[] }) => localStorage.setItem('folded', JSON.stringify(state.collapsedResources));
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineWeek" :resources="tree" :options="{ onResourceToggle: keep }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`collapsedResources`](../collapsed-resources/) — the folded resources.
+- [`collapsedGroups`](../collapsed-groups/) — the shut groups.
+- [Resources & timeline](../../guides/resources-timeline/).

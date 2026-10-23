@@ -1,0 +1,115 @@
+---
+title: kernel
+description: "Un noyau fait ailleurs, dessiné par ce calendrier."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Un noyau fait avec `createKernel` — le modèle du calendrier sans écran — que ce calendrier dessine.
+
+<OptionFacts name="kernel" />
+
+## Ce qu'elle fait
+
+Le noyau, c'est le calendrier sans le DOM : son état (vue, date, plage,
+titre), son store, ses sources, son historique, ses commandes.
+`createCalendar` en fait un à partir des options ; si on lui en donne un, il
+dessine celui-là : les options du noyau (fuseau, locale, événements,
+sources, store, règles, historique) sont celles avec lesquelles il a été fait,
+et celles données à `createCalendar` ne sont pas lues.
+
+Il sert au code qui travaille d'abord sur le modèle — un test, un serveur qui
+calcule le même modèle, deux dessins d'un seul noyau. Pour montrer les mêmes
+événements dans deux calendriers, un `store` partagé suffit en général.
+
+Il est lu à la création du calendrier, en JavaScript seulement : les
+composants Angular, React et Vue font leur propre noyau (partagez plutôt un
+`store`).
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createKernel, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+await loadTemporal();
+const kernel = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', initialView: 'timeGridWeek' });
+kernel.setEvents([{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]' }]);
+
+// The model works without a screen; the calendar draws it.
+console.log(kernel.getState().title);
+createCalendar(element, { kernel });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, viewChild } from '@angular/core';
+import { DZ_CALENDAR, DzCalendar } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" /><button (click)="title()">Title</button>`,
+})
+export class Agenda {
+  private readonly cal = viewChild.required(DzCalendar);
+  // The component's own kernel, through its instance.
+  title(): void {
+    console.log(this.cal().instance.kernel.getState().title);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+
+export function Agenda() {
+  const controller = useCalendarController();
+  // The component's own kernel, through the controller.
+  const title = () => console.log(controller.getSnapshot().instance?.kernel.getState().title);
+  return (
+    <>
+      <DzCalendar timeZone="Europe/Paris" controller={controller} />
+      <button onClick={title}>Title</button>
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+
+const controller = createCalendarController();
+// The component's own kernel, through the controller.
+const title = () => console.log(controller.instance.value?.kernel.getState().title);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :controller="controller" />
+  <button @click="title">Title</button>
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Les composants font leur propre noyau : en Angular, React et Vue, on l'atteint par le contrôleur (`instance.kernel`) ou on partage un `store`.
+
+## Voir aussi
+
+- [`store`](../store/) — partager les événements seulement.
+- [`historyLimit`](../history-limit/) — l'historique d'annulation du noyau.
+- [`events`](../events/) — chargés dans le noyau.

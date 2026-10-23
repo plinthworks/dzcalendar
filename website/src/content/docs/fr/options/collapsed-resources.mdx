@@ -1,0 +1,180 @@
+---
+title: collapsedResources
+description: "Les ressources d'une timeline dont les enfants sont masqués."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Les ressources (par identifiant) dont une timeline masque les enfants — les branches repliées de son arbre.
+
+<OptionFacts name="collapsedResources" />
+
+## Ce qu'elle fait
+
+Dans la timeline du Pro (`import '@dzcalendar/pro'`), une ressource qui a
+des enfants (`parentId`) montre un bouton qui les replie et les déplie. Ce qui
+est replié est l'état du calendrier : `collapsedResources` le fixe, il survit
+à `update()`, et `onResourceToggle` signale chaque changement — gardez-le et
+rendez-le la fois suivante, pour que l'arbre s'ouvre comme la personne l'a
+laissé.
+
+`update({ collapsedResources })` replie et déplie depuis votre code.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const saved = JSON.parse(localStorage.getItem('folded') ?? '[]') as string[];
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineDay',
+  resources: [
+    { id: 'cardio', title: 'Cardiology' },
+    { id: 'benali', title: 'Dr Benali', parentId: 'cardio' },
+    { id: 'haddad', title: 'Dr Haddad', parentId: 'cardio' },
+  ],
+  collapsedResources: saved,
+  onResourceToggle: ({ collapsedResources }) => localStorage.setItem('folded', JSON.stringify(collapsedResources)),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-planning',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineDay" [resources]="tree" [options]="{ collapsedResources: ['cardio'] }" />`,
+})
+export class Planning {
+  readonly tree = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const TREE = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+
+export function Planning() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimelineDay" resources={TREE} collapsedResources={['cardio']} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const tree = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineDay" :resources="tree" :options="{ collapsedResources: ['cardio'] }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Les médecins du service de cardiologie, repliés sous leur service.
+
+<LiveDemo
+  label="Une timeline avec un service replié"
+  height={560}
+  options={{
+    "initialView": "resourceTimelineDay",
+    "initialDate": "2026-10-21",
+    "resources": [
+      {
+        "id": "cardio",
+        "title": "Cardiologie"
+      },
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "parentId": "cardio"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "parentId": "cardio"
+      },
+      {
+        "id": "room1",
+        "title": "Salle 1"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      },
+      {
+        "id": "b",
+        "title": "Suivi",
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "duration": {
+          "hours": 1
+        },
+        "resourceId": "haddad"
+      },
+      {
+        "id": "c",
+        "title": "Scanner",
+        "start": "2026-10-21T14:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        },
+        "resourceId": "room1"
+      },
+      {
+        "id": "u",
+        "title": "À attribuer",
+        "start": "2026-10-21T11:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        }
+      }
+    ],
+    "collapsedResources": [
+      "cardio"
+    ],
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## Voir aussi
+
+- [`collapsedGroups`](../collapsed-groups/) — la même chose pour les groupes.
+- [`onResourceToggle`](../on-resource-toggle/) — ce que la personne a replié.
+- [Ressources et timeline](../../guides/resources-timeline/).

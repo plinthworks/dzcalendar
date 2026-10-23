@@ -1,0 +1,113 @@
+---
+title: kernel
+description: "A kernel made elsewhere, drawn by this calendar."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+A kernel made with `createKernel` — the calendar's model without a screen — for this calendar to draw.
+
+<OptionFacts name="kernel" />
+
+## What it does
+
+The kernel is the calendar without the DOM: its state (view, date, range,
+title), its store, its sources, its history, its commands. `createCalendar`
+makes one from the options; given one, it draws that one instead: the
+kernel's options (zone, locale, events, sources, store, rules, history) are
+the ones it was made with, and those given to `createCalendar` are not read.
+
+It serves code that works on the model first — a test, a server
+rendering the same model, two drawings of one kernel. To show the same
+events in two calendars, a shared `store` is usually enough.
+
+It is read when the calendar is made, in plain JavaScript only: the Angular,
+React and Vue components make their own kernel (share a `store` instead).
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createKernel, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+await loadTemporal();
+const kernel = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', initialView: 'timeGridWeek' });
+kernel.setEvents([{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]' }]);
+
+// The model works without a screen; the calendar draws it.
+console.log(kernel.getState().title);
+createCalendar(element, { kernel });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, viewChild } from '@angular/core';
+import { DZ_CALENDAR, DzCalendar } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" /><button (click)="title()">Title</button>`,
+})
+export class Agenda {
+  private readonly cal = viewChild.required(DzCalendar);
+  // The component's own kernel, through its instance.
+  title(): void {
+    console.log(this.cal().instance.kernel.getState().title);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+
+export function Agenda() {
+  const controller = useCalendarController();
+  // The component's own kernel, through the controller.
+  const title = () => console.log(controller.getSnapshot().instance?.kernel.getState().title);
+  return (
+    <>
+      <DzCalendar timeZone="Europe/Paris" controller={controller} />
+      <button onClick={title}>Title</button>
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+
+const controller = createCalendarController();
+// The component's own kernel, through the controller.
+const title = () => console.log(controller.instance.value?.kernel.getState().title);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :controller="controller" />
+  <button @click="title">Title</button>
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+The components make their own kernel: in Angular, React and Vue, reach it through the controller (`instance.kernel`) or share a `store`.
+
+## See also
+
+- [`store`](../store/) — share the events only.
+- [`historyLimit`](../history-limit/) — the kernel's undo history.
+- [`events`](../events/) — loaded into the kernel.

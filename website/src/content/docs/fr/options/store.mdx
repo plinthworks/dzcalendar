@@ -1,0 +1,113 @@
+---
+title: store
+description: "Un store d'événements partagé entre calendriers."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Un store à partager : plusieurs calendriers sur un même store montrent les mêmes événements.
+
+<OptionFacts name="store" />
+
+## Ce qu'elle fait
+
+Chaque calendrier garde ses événements dans un store. Si on lui en donne un,
+fait avec `createEventStore()` (`@dzcalendar/core`), les calendriers le
+partagent : quatre calendriers dans quatre fuseaux montrent les mêmes
+événements, chacun dans ses heures ; un événement déplacé dans l'un se
+déplace dans tous. Chaque calendrier garde l'historique d'annulation de ses
+propres commandes ; une commande dont l'événement a été changé entre-temps par
+un autre calendrier en sort (elle ne pourrait plus être annulée). Chargez les
+événements une fois : l'option `events` de chaque calendrier est la même
+source dans le store partagé, la dernière remplaçant les autres.
+
+Chaque calendrier garde ses propres options — fuseau, vue, sources. Un
+événement glissé d'un calendrier à un autre (`droppable`) est autre chose :
+deux stores, l'événement quittant l'un.
+
+Il est lu à la création du calendrier.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createEventStore } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const store = createEventStore();
+// The same events, in Paris and in Chicago.
+const paris = createCalendar(document.getElementById('paris')!, { timeZone: 'Europe/Paris', store });
+createCalendar(document.getElementById('chicago')!, { timeZone: 'America/Chicago', store });
+
+paris.kernel.setEvents([{ id: 'call', title: 'Call', start: '2026-10-22T16:00[Europe/Paris]', duration: { hours: 1 } }]);
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { createEventStore } from '@dzcalendar/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-two-zones',
+  imports: [DZ_CALENDAR],
+  // Both calendars of this component on one store.
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useFactory: () => ({ store: createEventStore() }) }],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" />
+    <dz-calendar timeZone="America/Chicago" />`,
+})
+export class TwoZones {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { createEventStore } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function TwoZones() {
+  const [store] = useState(createEventStore);
+  return (
+    <>
+      <DzCalendar timeZone="Europe/Paris" initial={{ store }} />
+      <DzCalendar timeZone="America/Chicago" initial={{ store }} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { createEventStore } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const store = createEventStore();
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :initial="{ store }" />
+  <DzCalendar time-zone="America/Chicago" :initial="{ store }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular il va dans les valeurs par défaut (`DZ_CALENDAR_DEFAULTS`, `provideDzCalendar`) — le `DZ_CALENDAR_DEFAULTS` d'un composant remplace celles de l'application pour ses calendriers, répétez donc ce qu'il leur faut ; en React et en Vue, dans `initial`.
+
+## Voir aussi
+
+- [`kernel`](../kernel/) — un noyau entier fait ailleurs.
+- [`events`](../events/) — les événements dont un store se remplit.
+- [`timeZone`](../time-zone/) — chaque calendrier son fuseau.

@@ -1,0 +1,176 @@
+---
+title: collapsedGroups
+description: "Les groupes fermés d'une timeline."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Les groupes (par leur valeur de `resourceGroupField`) qu'une timeline montre fermés.
+
+<OptionFacts name="collapsedGroups" />
+
+## Ce qu'elle fait
+
+Avec `resourceGroupField`, la timeline du Pro (`import '@dzcalendar/pro'`)
+dessine une ligne par groupe au-dessus de ses ressources, avec un bouton qui
+le ferme et l'ouvre. `collapsedGroups` nomme les groupes fermés par la valeur
+du champ (`'Imaging'` dans l'exemple) ; comme `collapsedResources`, c'est l'état du
+calendrier, gardé à travers `update()` et signalé par `onResourceToggle`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineDay',
+  resources: [
+    { id: 'benali', title: 'Dr Benali', service: 'Cardiology' },
+    { id: 'room1', title: 'Room 1', service: 'Imaging' },
+  ],
+  resourceGroupField: 'service',
+  collapsedGroups: ['Imaging'],
+});
+
+// Later: every group open.
+calendar.update({ collapsedGroups: [] });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-planning',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineDay" [resources]="staff"
+    [options]="{ resourceGroupField: 'service', collapsedGroups: ['Imaging'] }" />`,
+})
+export class Planning {
+  readonly staff = [{ id: 'benali', title: 'Dr Benali', service: 'Cardiology' }, { id: 'room1', title: 'Room 1', service: 'Imaging' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const STAFF = [{ id: 'benali', title: 'Dr Benali', service: 'Cardiology' }, { id: 'room1', title: 'Room 1', service: 'Imaging' }];
+
+export function Planning() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimelineDay" resources={STAFF} resourceGroupField="service" collapsedGroups={['Imaging']} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const staff = [{ id: 'benali', title: 'Dr Benali', service: 'Cardiology' }, { id: 'room1', title: 'Room 1', service: 'Imaging' }];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineDay" :resources="staff" :options="{ resourceGroupField: 'service', collapsedGroups: ['Imaging'] }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Le groupe Imagerie fermé, Cardiologie ouvert.
+
+<LiveDemo
+  label="Une timeline avec le groupe Imagerie fermé"
+  height={560}
+  options={{
+    "initialView": "resourceTimelineDay",
+    "initialDate": "2026-10-21",
+    "resources": [
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "service": "Cardiologie"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "service": "Cardiologie"
+      },
+      {
+        "id": "room1",
+        "title": "Salle 1",
+        "service": "Imagerie"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      },
+      {
+        "id": "b",
+        "title": "Suivi",
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "duration": {
+          "hours": 1
+        },
+        "resourceId": "haddad"
+      },
+      {
+        "id": "c",
+        "title": "Scanner",
+        "start": "2026-10-21T14:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        },
+        "resourceId": "room1"
+      },
+      {
+        "id": "u",
+        "title": "À attribuer",
+        "start": "2026-10-21T11:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        }
+      }
+    ],
+    "resourceGroupField": "service",
+    "collapsedGroups": [
+      "Imagerie"
+    ],
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## Voir aussi
+
+- [`resourceGroupField`](../resource-group-field/) — ce qui fait les groupes.
+- [`collapsedResources`](../collapsed-resources/) — la même chose pour les ressources.
+- [`onResourceToggle`](../on-resource-toggle/) — ce que la personne a fermé.

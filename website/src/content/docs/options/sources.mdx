@@ -1,0 +1,126 @@
+---
+title: sources
+description: "Event sources fetched as the calendar moves."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Sources the calendar fetches its events from, as the period shown changes.
+
+<OptionFacts name="sources" />
+
+## What it does
+
+Each source is a spec made by a helper:
+
+- `jsonSource(id, { url })` (`@dzcalendar/core`): a `GET` with `start`,
+  `end` and `timeZone` in the query (a `POST`: in its form body); the answer is the list of
+  events, or `map` turns it into one. By default one month a request.
+- `fnSource(id, fetch)`: your function, given `{ window, signal }` — the
+  stretch to fetch (`window.startDate`, `window.endDate`, exclusive) and an
+  abort signal — returning the events, or a promise of them.
+- `icalSource(id, { url })` (`@dzcalendar/ical`): an iCalendar feed.
+
+A source fetches the pieces of time it is asked for (`chunk`: a month at a
+time by default, `prefetch` more on each side), keeps them, and fetches again
+one gone stale (`staleAfter`) when it is shown again. The `start` and `end` a
+server receives are whole days around the piece, wider than the screen. A
+failed fetch is retried when `retry` asks, then told through `onSource`; what
+was shown stays. With `save`, the changes to its events (a person's, a
+command's, an undo) are written back: shown at once, put back if the promise
+rejects — or, when the events changed again meanwhile, fetched again.
+(`icalSource` takes `url`, `text`, `headers`, `defaults` and `save`, not
+`staleAfter` or `retry`.)
+
+`update({ sources })` takes the whole list: sources gone are removed, new
+ones added, the others kept — compared by identity, so keep the same spec
+objects (a new object is a new source, fetched again). `calendar.refetch(id)`
+fetches one again. The id `'events'` is the `events` option's: a source with
+it is refused (`duplicate-id`).
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { jsonSource, fnSource } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  sources: [
+    // GET /api/rendez-vous?start=…&end=…&timeZone=Europe%2FParis
+    jsonSource('appointments', { url: '/api/rendez-vous' }),
+    fnSource('holidays', async ({ window }) => {
+      const res = await fetch(`/api/holidays?from=${window!.startDate}&to=${window!.endDate}`);
+      return res.json();
+    }),
+  ],
+});
+
+// Later: fetch the appointments again.
+calendar.refetch('appointments');
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { jsonSource } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [sources]="sources" />`,
+})
+export class Agenda {
+  // The same spec objects for the component's life: a new one would be fetched again.
+  readonly sources = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { jsonSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+// Outside the component: one spec, not a new one at each render.
+const SOURCES = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" sources={SOURCES} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { jsonSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const sources = [jsonSource('appointments', { url: '/api/rendez-vous' })];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :sources="sources" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an input: Angular's `sources`, React's `sources`, Vue's `sources` — keep the specs outside the render (a module constant, `useMemo`), or each render is a new source.
+
+## See also
+
+- [`events`](../events/) — an array, the simplest source.
+- [`onSource`](../on-source/) — loading, errors, problems, saves.
+- [Event sources](../../guides/event-sources/).

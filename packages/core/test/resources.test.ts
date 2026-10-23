@@ -417,3 +417,23 @@ describe('kernel resources', () => {
     expect(createKernel({ timeZone: PARIS, locale: 'en-GB', now }).rules().resources).toBeUndefined();
   });
 });
+
+describe('resourceOrder after the 18j review', () => {
+  const ids = (tree: { roots: readonly { resource: { id: string }; children: readonly unknown[] }[] }): string[] =>
+    tree.roots.flatMap((n) => [n.resource.id, ...ids({ roots: n.children as never })]);
+
+  it('a value absent goes last in a descending order too', () => {
+    const { tree } = buildResourceTree([{ id: 'none' }, { id: 'a', floor: 1 }, { id: 'b', floor: 2 }], { orderBy: '-floor' });
+    expect(ids(tree as never)).toEqual(['b', 'a', 'none']);
+  });
+
+  it('a comparison that throws: the whole tree in input order (every group), said once', () => {
+    let calls = 0;
+    const { tree, problems } = buildResourceTree(
+      [{ id: 'z' }, { id: 'y', parentId: 'z' }, { id: 'x', parentId: 'z' }, { id: 'w' }],
+      { orderBy: () => { if (++calls > 1) throw new Error('boom'); return 1; } },
+    );
+    expect(ids(tree as never)).toEqual(['z', 'y', 'x', 'w']);
+    expect(problems.map((p) => `${p.code} ${p.path}`)).toEqual(['invalid-resource resourceOrder']);
+  });
+});

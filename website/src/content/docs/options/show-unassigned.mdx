@@ -1,0 +1,166 @@
+---
+title: showUnassigned
+description: "A column for events on no resource."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Adds an "Unassigned" column first to resource views (a row to the timeline) for events on no known resource.
+
+<OptionFacts name="showUnassigned" />
+
+## What it does
+
+An event with no `resourceId`, or one naming a resource that is not in
+`resources`, is not shown by resource views — it belongs to no column. With
+`showUnassigned: true` they gather in a first column, "Unassigned" (the
+words are `messages`'), where a person can see them and drag them onto a
+resource.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimeGridDay',
+  resources: [{ id: 'benali', title: 'Dr Benali' }],
+  events: [{ id: 'u', title: 'To assign', start: '2026-10-21T11:00[Europe/Paris]' }],
+  editable: true,
+  showUnassigned: true,
+});
+
+// Later: assigned ones only.
+calendar.update({ showUnassigned: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimeGridDay" [resources]="doctors" [options]="{ showUnassigned: true }" />`,
+})
+export class Agenda {
+  readonly doctors = [{ id: 'benali', title: 'Dr Benali' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+const DOCTORS = [{ id: 'benali', title: 'Dr Benali' }];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimeGridDay" resources={DOCTORS} showUnassigned />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+
+const doctors = [{ id: 'benali', title: 'Dr Benali' }];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimeGridDay" :resources="doctors" :options="{ showUnassigned: true }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+The visit to assign appears in the first column.
+
+<LiveDemo
+  label="A day with an Unassigned column first"
+  height={560}
+  options={{
+    "initialView": "resourceTimeGridDay",
+    "initialDate": "2026-10-21",
+    "resources": [
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "service": "Cardiology"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "service": "Cardiology"
+      },
+      {
+        "id": "room1",
+        "title": "Room 1",
+        "service": "Imaging"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      },
+      {
+        "id": "b",
+        "title": "Follow-up",
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "duration": {
+          "hours": 1
+        },
+        "resourceId": "haddad"
+      },
+      {
+        "id": "c",
+        "title": "Scan",
+        "start": "2026-10-21T14:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        },
+        "resourceId": "room1"
+      },
+      {
+        "id": "u",
+        "title": "To assign",
+        "start": "2026-10-21T11:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        }
+      }
+    ],
+    "showUnassigned": true,
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## See also
+
+- [`resources`](../resources/) — the columns.
+- `editable` — drag an event onto a resource.
+- [Resources & timeline](../../guides/resources-timeline/).

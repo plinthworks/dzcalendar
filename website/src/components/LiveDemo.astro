@@ -38,6 +38,8 @@ const given = { timeZone: 'Europe/Paris', locale: lang === 'fr' ? 'fr-FR' : 'en-
   import '@dzcalendar/core/recurrence';
   import '@dzcalendar/dom/list';
   import '@dzcalendar/dom/multimonth';
+  // The timeline views (the Pro, MIT for now): a demo of resources may show them.
+  import '@dzcalendar/pro';
 
   const schemeOfPage = (): 'light' | 'dark' => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 
@@ -55,6 +57,10 @@ const given = { timeZone: 'Europe/Paris', locale: lang === 'fr' ? 'fr-FR' : 'en-
       const options = {
         ...raw,
         ...(typeof raw.initialDate === 'string' && { initialDate: Temporal.PlainDate.from(raw.initialDate) }),
+        // Bookable slots as JSON: their moments written as ISO strings with a zone.
+        ...(Array.isArray(raw.availableSlots) && {
+          availableSlots: (raw.availableSlots as { start: string; end: string }[]).map((x) => ({ ...x, start: Temporal.ZonedDateTime.from(x.start), end: Temporal.ZonedDateTime.from(x.end) })),
+        }),
         scheme: raw.scheme ?? schemeOfPage(),
       } as CalendarOptions;
       try {

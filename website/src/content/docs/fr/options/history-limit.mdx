@@ -1,0 +1,86 @@
+---
+title: historyLimit
+description: "Combien de modifications peuvent être annulées."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Combien de modifications garde l'historique d'annulation.
+
+<OptionFacts name="historyLimit" />
+
+## Ce qu'elle fait
+
+Chaque commande — un glissement ou un redimensionnement d'une personne, une
+commande de votre code avec `calendar.run()` — est une entrée de l'historique
+(charger des événements n'en est pas une) : `calendar.undo()` et
+`calendar.redo()` le parcourent, de même que Ctrl/Cmd+Z et Ctrl/Cmd+Maj+Z dans
+un calendrier `editable` (`keyboardUndo`). Au-delà de ce nombre d'entrées, les plus
+anciennes sont oubliées.
+
+Il est lu à la création du calendrier.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', editable: true, historyLimit: 50 });
+
+document.getElementById('undo')!.addEventListener('click', () => calendar.undo());
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { historyLimit: 50 } }],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable initial={{ historyLimit: 50 }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :initial="{ historyLimit: 50 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular il va dans les valeurs par défaut (`DZ_CALENDAR_DEFAULTS`, `provideDzCalendar`) ; en React et en Vue, dans `initial`.
+
+## Voir aussi
+
+- `keyboardUndo` — Ctrl/Cmd+Z dans le calendrier.
+- `editable` — les modifications d'une personne.
+- [`kernel`](../kernel/) — où vit l'historique.

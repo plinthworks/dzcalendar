@@ -1,0 +1,173 @@
+---
+title: availableSlots
+description: "Bookable slots drawn in the time grid."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Free slots a person can book, drawn in the week and day views.
+
+<OptionFacts name="availableSlots" />
+
+## What it does
+
+Each slot is `{ start, end }` — `Instant`s or `ZonedDateTime`s — and,
+optionally, `resourceId` (only that resource's columns show it) and `seats`
+(said beside its time). They usually come from `findSlots` (`@dzcalendar/slots`),
+which works out a provider's free time from its hours, what is busy and the
+booking rules — the same code on the page and on the server.
+
+A slot is drawn in its column (in every column without a `resourceId`);
+with `onSlotClick` it can be clicked (or reached with the keyboard and
+Enter) and receives the slot as given — without it, slots are shown only.
+`seats` is said when it is a whole number of 1 or more. `findSlots` gives
+`{ start, end }`; `resourceId` and `seats` are yours to add (or
+`@dzcalendar/pro/slots`'). The calendar
+creates nothing: the application books it, and its server checks it again
+(`checkSlot`) before saving. `null`: no slots. A new array redraws; the same
+array again changes nothing.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+import { findSlots } from '@dzcalendar/slots';
+
+await loadTemporal();
+const { slots } = findSlots({
+  availability: { timeZone: 'Europe/Paris', weekly: [{ days: [1, 2, 3, 4, 5], from: '09:00', to: '12:00' }] },
+  duration: 30,
+  from: Temporal.ZonedDateTime.from('2026-10-19T00:00[Europe/Paris]'),
+  to: Temporal.ZonedDateTime.from('2026-10-24T00:00[Europe/Paris]'),
+  busy: [],
+});
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  availableSlots: slots,
+  onSlotClick: (slot) => fetch('/api/book', { method: 'POST', body: JSON.stringify({ start: slot.start.toString() }) }),
+});
+
+// Later: none.
+calendar.update({ availableSlots: null });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-booking',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [availableSlots]="slots" (slotClick)="book($event)" />`,
+})
+export class Booking {
+  slots: readonly AvailableSlot[] | null = null;
+  book(slot: AvailableSlot): void {
+    console.log('book', slot.start.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Booking({ slots }: { slots: readonly AvailableSlot[] }) {
+  return <DzCalendar timeZone="Europe/Paris" availableSlots={slots} onSlotClick={(slot) => console.log('book', slot.start.toString())} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+defineProps<{ slots: readonly AvailableSlot[] }>();
+const book = (slot: AvailableSlot) => console.log('book', slot.start.toString());
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :available-slots="slots" @slot-click="book" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an input: Angular's `availableSlots`, React's `availableSlots`, Vue's `available-slots`; the click is Angular's `(slotClick)`, React's `onSlotClick`, Vue's `@slot-click`.
+
+## Live demo
+
+Three free slots on Wednesday morning, drawn among the events.
+
+<LiveDemo
+  label="A day with three bookable slots"
+  height={560}
+  options={{
+    "initialView": "timeGridDay",
+    "initialDate": "2026-10-21",
+    "scrollTime": "PT8H",
+    "availableSlots": [
+      {
+        "start": "2026-10-21T10:00[Europe/Paris]",
+        "end": "2026-10-21T10:30[Europe/Paris]"
+      },
+      {
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "end": "2026-10-21T11:00[Europe/Paris]"
+      },
+      {
+        "start": "2026-10-21T11:30[Europe/Paris]",
+        "end": "2026-10-21T12:00[Europe/Paris]"
+      }
+    ],
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- `onSlotClick` — a slot clicked.
+- [`businessHours`](../business-hours/) — the provider's hours, shaded.
+- [`resources`](../resources/) — a slot in its resource's column.

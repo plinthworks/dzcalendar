@@ -1,0 +1,203 @@
+---
+title: timeline
+description: "L'échelle et les couloirs d'une timeline (le Pro)."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+L'échelle et les couloirs des vues timeline du Pro (`import '@dzcalendar/pro'`).
+
+<OptionFacts name="timeline" />
+
+## Ce qu'elle fait
+
+La timeline dessine le temps en travers, une ligne par ressource
+(`resourceTimelineDay`, `…Week`, `…Month`, `…Year`) ou une seule ligne pour
+tout (`timelineDay`…). Trois réglages, fusionnés clé par clé avec
+`update({ timeline })` — `slot: undefined` revient à la valeur par défaut :
+
+- `slot` : la largeur d'un créneau en temps.
+- `maxLanes` : les couloirs de la ligne d'une ressource ; le dernier porte
+  « +N » quand plus d'événements se chevauchent.
+- `fillLanes` : les couloirs d'une timeline sans ressources — une valeur de
+  départ : dans un navigateur, sa ligne unique remplit la vue et les couloirs
+  sont mesurés.
+
+Un créneau en minutes doit diviser un jour, et les couloirs sont des entiers
+de 1 ou plus ; toute autre valeur lève une `RangeError` à la création ou à
+`update()`. Un créneau d'horloge qui traverse
+un changement d'heure garde sa vraie largeur. La largeur à l'écran est celle
+de la feuille de style (`--dz-tl-slot`) ; les colonnes de la zone des
+ressources sont `viewOptions.timeline.areaColumns`.
+
+## Ses membres
+
+### `fillLanes`
+
+<OptionFacts name="timeline.fillLanes" />
+
+Les couloirs d'une timeline sans ressources, avant la mesure : dans un navigateur, sa ligne unique a la hauteur de la vue et tient autant de couloirs que la place le permet.
+
+### `maxLanes`
+
+<OptionFacts name="timeline.maxLanes" />
+
+Les événements qui se chevauchent que la ligne d'une ressource empile ; au-delà, son dernier couloir porte « +N », qui ouvre le reste.
+
+### `slot`
+
+<OptionFacts name="timeline.slot" />
+
+Des minutes par créneau (un diviseur du jour : 15, 30, 60, 120…) ou `'day'`. Par défaut 30 minutes pour un jour, une heure jusqu'à une semaine, un jour au-delà.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineWeek',
+  resources: [{ id: 'benali', title: 'Dr Benali' }, { id: 'room1', title: 'Room 1' }],
+  timeline: { slot: 120, maxLanes: 2 },
+});
+
+// Later: back to the default slot, lanes unchanged.
+calendar.update({ timeline: { slot: undefined } });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-planning',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineWeek" [resources]="staff" [options]="{ timeline: { slot: 120 } }" />`,
+})
+export class Planning {
+  readonly staff = [{ id: 'benali', title: 'Dr Benali' }, { id: 'room1', title: 'Room 1' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const STAFF = [{ id: 'benali', title: 'Dr Benali' }, { id: 'room1', title: 'Room 1' }];
+
+export function Planning() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimelineWeek" resources={STAFF} timeline={{ slot: 120 }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const staff = [{ id: 'benali', title: 'Dr Benali' }, { id: 'room1', title: 'Room 1' }];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineWeek" :resources="staff" :options="{ timeline: { slot: 120 } }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+La journée, une ligne par ressource, un créneau par heure (30 minutes par défaut).
+
+<LiveDemo
+  label="Une journée de ressources à un créneau par heure"
+  height={560}
+  options={{
+    "initialView": "resourceTimelineDay",
+    "initialDate": "2026-10-21",
+    "resources": [
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "service": "Cardiologie"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "service": "Cardiologie"
+      },
+      {
+        "id": "room1",
+        "title": "Salle 1",
+        "service": "Imagerie"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      },
+      {
+        "id": "b",
+        "title": "Suivi",
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "duration": {
+          "hours": 1
+        },
+        "resourceId": "haddad"
+      },
+      {
+        "id": "c",
+        "title": "Scanner",
+        "start": "2026-10-21T14:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        },
+        "resourceId": "room1"
+      },
+      {
+        "id": "u",
+        "title": "À attribuer",
+        "start": "2026-10-21T11:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        }
+      }
+    ],
+    "timeline": {
+      "slot": 60
+    },
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## Voir aussi
+
+- [`resources`](../resources/) — les lignes.
+- [`collapsedResources`](../collapsed-resources/) — les branches repliées.
+- [Ressources et timeline](../../guides/resources-timeline/).

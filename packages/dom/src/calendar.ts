@@ -1471,6 +1471,11 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
               ...('resourceGroupField' in changes && { resourceGroupField: changes.resourceGroupField }),
               ...(changes.showUnassigned !== undefined && { showUnassigned: changes.showUnassigned }),
             });
+            // A new order whose comparison throws is said as the resources' problems are (the tree in input order).
+            if ('resourceOrder' in changes) {
+              const said = kernel.getResourceProblems().filter((p) => p.path === 'resourceOrder');
+              if (said.length > 0) settings.current.onResourceProblems?.(said);
+            }
           }
           if (changes.timeline) kernel.setOptions({ timeline: changes.timeline });
           if (changes.collapsedResources || changes.collapsedGroups) {

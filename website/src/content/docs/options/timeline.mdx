@@ -1,0 +1,202 @@
+---
+title: timeline
+description: "A timeline's scale and lanes (the Pro)."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The scale and the lanes of the Pro's timeline views (`import '@dzcalendar/pro'`).
+
+<OptionFacts name="timeline" />
+
+## What it does
+
+The timeline draws time across, a row per resource (`resourceTimelineDay`,
+`…Week`, `…Month`, `…Year`) or one row for all (`timelineDay`…). Three
+settings, merged key by key with `update({ timeline })` — `slot: undefined`
+goes back to the default:
+
+- `slot`: the width of a slot in time.
+- `maxLanes`: the lanes of a resource's row; the last one holds "+N" when
+  more events overlap.
+- `fillLanes`: the lanes of a timeline without resources — a starting value:
+  in a browser its one row fills the view and the lanes are measured.
+
+A slot that is a whole number of minutes must divide a day, and the lanes
+are whole numbers of 1 or more; anything else throws a `RangeError` at
+creation or `update()`. A wall-clock slot crossing a
+clock change keeps its true width. The width on screen is the stylesheet's
+(`--dz-tl-slot`); the resource area's columns are
+`viewOptions.timeline.areaColumns`.
+
+## Its members
+
+### `fillLanes`
+
+<OptionFacts name="timeline.fillLanes" />
+
+Lanes of a timeline without resources, before it is measured: in a browser its one row is as tall as the view and holds as many lanes as fit.
+
+### `maxLanes`
+
+<OptionFacts name="timeline.maxLanes" />
+
+Overlapping events a resource's row stacks; past them its last lane holds "+N", which opens the rest.
+
+### `slot`
+
+<OptionFacts name="timeline.slot" />
+
+Minutes per slot (a divisor of a day: 15, 30, 60, 120…) or `'day'`. By default 30 minutes for a day, an hour up to a week, a day beyond.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineWeek',
+  resources: [{ id: 'benali', title: 'Dr Benali' }, { id: 'room1', title: 'Room 1' }],
+  timeline: { slot: 120, maxLanes: 2 },
+});
+
+// Later: back to the default slot, lanes unchanged.
+calendar.update({ timeline: { slot: undefined } });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-planning',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineWeek" [resources]="staff" [options]="{ timeline: { slot: 120 } }" />`,
+})
+export class Planning {
+  readonly staff = [{ id: 'benali', title: 'Dr Benali' }, { id: 'room1', title: 'Room 1' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const STAFF = [{ id: 'benali', title: 'Dr Benali' }, { id: 'room1', title: 'Room 1' }];
+
+export function Planning() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimelineWeek" resources={STAFF} timeline={{ slot: 120 }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const staff = [{ id: 'benali', title: 'Dr Benali' }, { id: 'room1', title: 'Room 1' }];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineWeek" :resources="staff" :options="{ timeline: { slot: 120 } }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+The day, a row per resource, a slot every hour (30 minutes by default).
+
+<LiveDemo
+  label="A day of resources at one slot per hour"
+  height={560}
+  options={{
+    "initialView": "resourceTimelineDay",
+    "initialDate": "2026-10-21",
+    "resources": [
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "service": "Cardiology"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "service": "Cardiology"
+      },
+      {
+        "id": "room1",
+        "title": "Room 1",
+        "service": "Imaging"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      },
+      {
+        "id": "b",
+        "title": "Follow-up",
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "duration": {
+          "hours": 1
+        },
+        "resourceId": "haddad"
+      },
+      {
+        "id": "c",
+        "title": "Scan",
+        "start": "2026-10-21T14:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        },
+        "resourceId": "room1"
+      },
+      {
+        "id": "u",
+        "title": "To assign",
+        "start": "2026-10-21T11:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        }
+      }
+    ],
+    "timeline": {
+      "slot": 60
+    },
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## See also
+
+- [`resources`](../resources/) — the rows.
+- [`collapsedResources`](../collapsed-resources/) — folded branches.
+- [Resources & timeline](../../guides/resources-timeline/).

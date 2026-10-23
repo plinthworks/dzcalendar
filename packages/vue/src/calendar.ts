@@ -209,7 +209,8 @@ export const DzCalendar = defineComponent({
     axis: any<'wall' | 'elapsed' | undefined>(),
     editable: { type: Boolean as PropType<boolean | undefined>, default: undefined },
     selectable: { type: Boolean as PropType<boolean | undefined>, default: undefined },
-    businessHours: any<BusinessHoursInput | undefined>(),
+    // Boolean first: a bare `business-hours` attribute is true (Monday to Friday, 9:00–17:00), not an empty string.
+    businessHours: { type: [Boolean, Object, Array] as PropType<BusinessHoursInput | undefined>, default: undefined },
     weekends: { type: Boolean as PropType<boolean | undefined>, default: undefined },
     weekNumbers: { type: Boolean as PropType<boolean | undefined>, default: undefined },
     hiddenDays: any<readonly Weekday[] | undefined>(),

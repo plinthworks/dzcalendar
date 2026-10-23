@@ -70,11 +70,14 @@ export interface ModelOptions {
    */
   readonly showUnassigned?: boolean;
   /**
-   * A timeline's rows: resources whose children are hidden, groups shut. Default: everything open.
+   * A timeline's rows: the resources (by id) whose children are hidden. Default: everything open.
    * @default []
    */
   readonly collapsedResources?: readonly string[];
-  /** @default [] */
+  /**
+   * A timeline's rows: the groups (by their `resourceGroupField` value) shut. Default: everything open.
+   * @default []
+   */
   readonly collapsedGroups?: readonly string[];
   /**
    * The hours a place is open: shaded outside in the time grid and checked by `rules`. One rule (`{ daysOfWeek, start, end, timeZone? }`), several, `true` for Monday to Friday 09:00–17:00, or `false` for none.

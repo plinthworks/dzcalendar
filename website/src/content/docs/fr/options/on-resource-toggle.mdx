@@ -1,0 +1,107 @@
+---
+title: onResourceToggle
+description: "Une personne a replié ou déplié une ressource ou un groupe."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Écoute une personne replier ou déplier une ressource ou un groupe dans la timeline du Pro.
+
+<OptionFacts name="onResourceToggle" />
+
+## Ce qu'elle fait
+
+Elle reçoit l'état entier après le changement — `{ collapsedResources,
+collapsedGroups }` — et non la seule ligne basculée : gardez-le tel quel, et
+rendez-le comme `collapsedResources` et `collapsedGroups` la fois suivante,
+pour que la timeline s'ouvre comme la personne l'a laissée. Un changement fait
+par votre code (`update({ collapsedResources })`) n'est pas signalé.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const saved = JSON.parse(localStorage.getItem('tree') ?? '{}') as { collapsedResources?: string[]; collapsedGroups?: string[] };
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineWeek',
+  resources: [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }],
+  ...saved,
+  onResourceToggle: (state) => localStorage.setItem('tree', JSON.stringify(state)),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-planning',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineWeek" [resources]="tree" [options]="{ onResourceToggle: keep }" />`,
+})
+export class Planning {
+  readonly tree = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+  readonly keep = (state: { collapsedResources: readonly string[] }) => localStorage.setItem('folded', JSON.stringify(state.collapsedResources));
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const TREE = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+
+export function Planning() {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      defaultView="resourceTimelineWeek"
+      resources={TREE}
+      onResourceToggle={(state) => localStorage.setItem('tree', JSON.stringify(state))}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const tree = [{ id: 'cardio', title: 'Cardiology' }, { id: 'benali', title: 'Dr Benali', parentId: 'cardio' }];
+const keep = (state: { collapsedResources: readonly string[] }) => localStorage.setItem('folded', JSON.stringify(state.collapsedResources));
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineWeek" :resources="tree" :options="{ onResourceToggle: keep }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Voir aussi
+
+- [`collapsedResources`](../collapsed-resources/) — les ressources repliées.
+- [`collapsedGroups`](../collapsed-groups/) — les groupes fermés.
+- [Ressources et timeline](../../guides/resources-timeline/).

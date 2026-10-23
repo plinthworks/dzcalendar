@@ -91,7 +91,15 @@ function comparator(order: ResourceOrder | undefined): ((a: Resource, b: Resourc
     for (const f of fields) {
       const desc = f.startsWith('-');
       const name = desc ? f.slice(1) : f;
-      const c = compareValues(fieldOf(a, name), fieldOf(b, name));
+      const x = fieldOf(a, name);
+      const y = fieldOf(b, name);
+      // Absent last whichever the direction: only what both have is turned round.
+      const absent = (v: unknown) => v === undefined || v === null;
+      if (absent(x) || absent(y)) {
+        if (absent(x) !== absent(y)) return absent(x) ? 1 : -1;
+        continue;
+      }
+      const c = compareValues(x, y);
       if (c !== 0) return desc ? -c : c;
     }
     return 0;
@@ -166,14 +174,19 @@ export function buildResourceTree(inputs: unknown, o: { readonly orderBy?: Resou
       return 0;
     }
   };
-  const sortSiblings = (xs: Resource[]) =>
+  const sortWith = (xs: Resource[], by: typeof safe | null) =>
     xs.sort((a, b) => {
       if (a.order !== b.order) return a.order === null ? 1 : b.order === null ? -1 : a.order - b.order;
-      const c = cmp ? safe(a, b) : 0;
+      const c = by ? by(a, b) : 0;
       return c !== 0 && Number.isFinite(c) ? c : pos.get(a.id)! - pos.get(b.id)!;
     });
   const kids = new Map<ResourceId | null, Resource[]>();
   for (const r of fixed) (kids.get(r.parentId) ?? kids.set(r.parentId, []).get(r.parentId)!).push(r);
+  // Every group of siblings sorted first; once a comparison has thrown, the whole tree in input order (by `order`
+  // first) — not half of it sorted by the comparison and half not.
+  for (const xs of kids.values()) sortWith(xs, cmp ? safe : null);
+  if (failed) for (const xs of kids.values()) sortWith(xs, null);
+  const sortSiblings = (xs: Resource[]) => xs;
 
   const byId = new Map<ResourceId, ResourceNode>();
   const order: Resource[] = [];

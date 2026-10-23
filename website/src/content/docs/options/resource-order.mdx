@@ -1,0 +1,174 @@
+---
+title: resourceOrder
+description: "How sibling resources are ordered."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+How resources are ordered among their siblings, after their own `order`.
+
+<OptionFacts name="resourceOrder" />
+
+## What it does
+
+Resources go depth first, children right under their parent. Among
+siblings: their `order` first (lowest first), then `resourceOrder`, then as
+given.
+
+- A field name: `'title'`; `'-title'` for descending.
+- Several, by priority: `'service,title'` or `['service', '-title']`.
+- A comparison `(a, b) => number` over the resources.
+
+Fields are read from the resource's own (`title`, `order`), then from what
+you gave, then from its `extendedProps`. Numbers compare as numbers, text by
+code unit (the same order on every machine), an absent value last in either
+direction. A comparison function receives the resources as the calendar
+keeps them: your own fields are under `.input` (or `.extendedProps`). One
+that throws puts the whole tree back in the order given, said through
+`onResourceProblems` (`invalid-resource` at `resourceOrder`).
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimeGridDay',
+  resources: [{ id: 'a', title: 'Room 2', floor: 1 }, { id: 'b', title: 'Room 1', floor: 2 }],
+  resourceOrder: 'floor,title',
+});
+
+// Later: by title, descending.
+calendar.update({ resourceOrder: '-title' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimeGridDay" [resources]="rooms" [options]="{ resourceOrder: '-title' }" />`,
+})
+export class Agenda {
+  readonly rooms = [{ id: 'a', title: 'Room 2' }, { id: 'b', title: 'Room 1' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+const ROOMS = [{ id: 'a', title: 'Room 2' }, { id: 'b', title: 'Room 1' }];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimeGridDay" resources={ROOMS} resourceOrder="-title" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+
+const rooms = [{ id: 'a', title: 'Room 2' }, { id: 'b', title: 'Room 1' }];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimeGridDay" :resources="rooms" :options="{ resourceOrder: '-title' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+The columns by title, Z to A.
+
+<LiveDemo
+  label="Resources ordered by title, descending"
+  height={560}
+  options={{
+    "initialView": "resourceTimeGridDay",
+    "initialDate": "2026-10-21",
+    "resources": [
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "service": "Cardiology"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "service": "Cardiology"
+      },
+      {
+        "id": "room1",
+        "title": "Room 1",
+        "service": "Imaging"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      },
+      {
+        "id": "b",
+        "title": "Follow-up",
+        "start": "2026-10-21T10:30[Europe/Paris]",
+        "duration": {
+          "hours": 1
+        },
+        "resourceId": "haddad"
+      },
+      {
+        "id": "c",
+        "title": "Scan",
+        "start": "2026-10-21T14:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        },
+        "resourceId": "room1"
+      },
+      {
+        "id": "u",
+        "title": "To assign",
+        "start": "2026-10-21T11:00[Europe/Paris]",
+        "duration": {
+          "minutes": 30
+        }
+      }
+    ],
+    "resourceOrder": "-title",
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## See also
+
+- [`resources`](../resources/) — their `order` comes first.
+- [`resourceGroupField`](../resource-group-field/) — groups, then order inside them.
+- [Resources & timeline](../../guides/resources-timeline/).

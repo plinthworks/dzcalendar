@@ -1,0 +1,109 @@
+---
+title: onResourceProblems
+description: "Ce qui n'a pas pu être lu dans les ressources données."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Écoute ce qui n'a pas pu être lu dans les ressources données : des entrées refusées, des champs écartés.
+
+<OptionFacts name="onResourceProblems" />
+
+## Ce qu'elle fait
+
+Appelée avec une liste de problèmes — chacun `{ code, severity, path, detail }` —
+seulement quand il y en a, après que `resources` est donné (à la création ou
+par `update()`) ou un nouveau `resourceOrder` :
+
+- `invalid-resource` : pas un objet, ou pas d'`id` (refusée) ; un champ
+  illisible (écarté, un avertissement).
+- `duplicate-id` : une deuxième ressource avec le même identifiant (refusée).
+- `unknown-zone` : un `timeZone` qui n'est pas un fuseau.
+- `unknown-resource` : un `parentId` inconnu (la ressource devient une racine).
+- `resource-cycle` : un cycle de parents (sa première ressource devient une
+  racine).
+- `invalid-resource` sur `resourceOrder` : une comparaison qui a levé une
+  exception (l'arbre dans l'ordre donné).
+
+Une mauvaise donnée ne lève jamais d'exception : les ressources lisibles sont
+dessinées.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimeGridDay',
+  resources: [{ id: 'benali', title: 'Dr Benali' }, { id: 'benali', title: 'Twice' }, { id: 'x', title: 'X', parentId: 'nobody' }],
+  // duplicate-id (the second refused), unknown-resource (X drawn as a root).
+  onResourceProblems: (problems) => console.warn(problems.map((p) => `${p.code} ${p.path}`)),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { Problem, ResourceInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimeGridDay" [resources]="doctors" (resourceProblems)="said($event)" />`,
+})
+export class Agenda {
+  readonly doctors: ResourceInput[] = [{ id: 'benali', title: 'Dr Benali' }];
+  said(problems: readonly Problem[]): void {
+    console.warn(problems);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+const DOCTORS = [{ id: 'benali', title: 'Dr Benali' }];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimeGridDay" resources={DOCTORS} onResourceProblems={(p) => console.warn(p)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { Problem } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const doctors = [{ id: 'benali', title: 'Dr Benali' }];
+const said = (problems: readonly Problem[]) => console.warn(problems);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimeGridDay" :resources="doctors" @resource-problems="said" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une sortie : `(resourceProblems)` en Angular, `onResourceProblems` en React, `@resource-problems` en Vue.
+
+## Voir aussi
+
+- [`resources`](../resources/) — ce qui est lu.
+- [`onSource`](../on-source/) — les problèmes des événements venus des sources.
+- [Ressources et timeline](../../guides/resources-timeline/).

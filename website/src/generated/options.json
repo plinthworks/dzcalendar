@@ -58,7 +58,7 @@
       "name": "collapsedGroups",
       "type": "readonly string[]",
       "resolved": null,
-      "doc": "",
+      "doc": "A timeline's rows: the groups (by their `resourceGroupField` value) shut. Default: everything open.",
       "default": {
         "code": "[]"
       },
@@ -69,7 +69,7 @@
       "name": "collapsedResources",
       "type": "readonly string[]",
       "resolved": null,
-      "doc": "A timeline's rows: resources whose children are hidden, groups shut. Default: everything open.",
+      "doc": "A timeline's rows: the resources (by id) whose children are hidden. Default: everything open.",
       "default": {
         "code": "[]"
       },

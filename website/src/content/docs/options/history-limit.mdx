@@ -1,0 +1,85 @@
+---
+title: historyLimit
+description: "How many changes can be undone."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+How many changes the undo history keeps.
+
+<OptionFacts name="historyLimit" />
+
+## What it does
+
+Every command — a person's drag or resize, a command your code runs with
+`calendar.run()` — is one entry of the history (loading events is not):
+`calendar.undo()` and `calendar.redo()` walk it, and so do Ctrl/Cmd+Z and
+Ctrl/Cmd+Shift+Z in an `editable` calendar (`keyboardUndo`). Past this many entries, the oldest
+are forgotten.
+
+It is read when the calendar is made.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', editable: true, historyLimit: 50 });
+
+document.getElementById('undo')!.addEventListener('click', () => calendar.undo());
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { historyLimit: 50 } }],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable initial={{ historyLimit: 50 }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :initial="{ historyLimit: 50 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular it goes in the defaults (`DZ_CALENDAR_DEFAULTS`, `provideDzCalendar`); in React and Vue, in `initial`.
+
+## See also
+
+- `keyboardUndo` — Ctrl/Cmd+Z in the calendar.
+- `editable` — the changes a person makes.
+- [`kernel`](../kernel/) — where the history lives.

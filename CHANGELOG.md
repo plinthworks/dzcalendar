@@ -47,6 +47,11 @@
 - `createCalendar` checks `firstDay` and `hiddenDays` as `update()` does (a
   week with no day, a weekday outside 1–7: `RangeError`).
 - `messages: { views }` keeps the built-in views' labels beside the ones given.
+- Vue: a bare `business-hours` attribute is `true` (it was an empty string, refused).
+- `resourceOrder`: an absent value goes last in a descending order too; a
+  comparison that throws puts the whole tree in input order (not half
+  sorted), and `update({ resourceOrder })` says it through
+  `onResourceProblems`.
 
 ### Added
 
