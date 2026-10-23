@@ -25,6 +25,8 @@ for (const spec of Object.values(TIMELINE_VIEWS)) registerViewSpec(spec);
 const UNASSIGNED_ROW: ResourceRow = { kind: 'resource', resource: UNASSIGNED_RESOURCE, depth: 0, expanded: null, rowKey: 'r:\u0000unassigned' };
 
 registerModelFamily<TimelineModel>('timeline', {
+  // Reads only its range: a change elsewhere keeps the model.
+  rangeOnly: true,
   build: (range, snap, { displayZone, view, options, resources }) => {
     const t = options.timeline ?? {};
     const rows = view.resources

@@ -90,7 +90,7 @@ function controller(): Controller {
   };
 }
 
-const globalTimers: Timers = {
+export const globalTimers: Timers = {
   set: (fn, ms) => (globalThis as unknown as { setTimeout(f: () => void, ms: number): unknown }).setTimeout(fn, ms),
   clear: (h) => (globalThis as unknown as { clearTimeout(h: unknown): void }).clearTimeout(h),
 };

@@ -462,6 +462,8 @@ export function normalizeMany(
   inputs: Iterable<EventInput>,
   ctx: NormalizeContext,
   sourceId?: string,
+  /** Where each input stands in the whole list (a part of it, loaded later): its problems name that place. */
+  indexes?: readonly number[],
 ): { items: Normalized[]; report: NormalizationReport } {
   assertContext(ctx);
   const items: Normalized[] = [];
@@ -472,7 +474,8 @@ export function normalizeMany(
   let rejected = 0;
   let i = 0;
   for (const input of inputs) {
-    const path = `events[${i++}]`;
+    const path = `events[${indexes ? indexes[i] : i}]`;
+    i++;
     const r = normalizeChecked(input, ctx, path);
     problems.push(...r.problems.map(tag));
     if (!r.ok) {

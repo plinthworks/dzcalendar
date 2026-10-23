@@ -64,6 +64,8 @@ export function defineView(def: CustomViewDef): ViewSpec {
   DEFS.set(family, def);
   if (known) return specOf(def);
   registerModelFamily<CustomModel>(family, {
+  // Reads only its range: a change elsewhere keeps the model.
+  rangeOnly: true,
     build: (range, snap, { displayZone }) => {
       const list = buildListModel(range, snap, { displayZone, includeEmpty: true });
       const seen = new Set<string>();

@@ -1,4 +1,5 @@
-import type { NormalizationReport } from './event/normalize.js';
+import { normalizeMany } from './event/normalize.js';
+import type { NormalizationReport, Normalized } from './event/normalize.js';
 import type { EventInput } from './event/types.js';
 import { formatRangeTitle, formatTemporal } from './format/intl.js';
 import { weekRulesFor } from './format/week.js';
@@ -6,7 +7,7 @@ import { createIdGenerator } from './ids.js';
 import { assertBusinessHours } from './rules/business-hours.js';
 import type { BusinessHoursInput } from './rules/business-hours.js';
 import { arraySource, loadStaticSource } from './source/array-source.js';
-import { createSourceManager } from './source/manager.js';
+import { createSourceManager, globalTimers } from './source/manager.js';
 import type { SourceManager, SourceNotice, Timers } from './source/manager.js';
 import type { EventSourceSpec } from './source/source.js';
 import type { StoreChange } from './store/changes.js';
@@ -24,6 +25,8 @@ import type { DayGridModel, DayGridOptions } from './views/daygrid.js';
 import { navigate } from './views/nav.js';
 import type { NavDirection } from './views/nav.js';
 import { assertViewSpec, computeViewRange } from './views/range.js';
+import { DEFER_ABOVE, idleTimers, loadDeferred, loadPeriod, pendingOn, rawOf, storeFace, writerFace } from './source/deferred.js';
+import type { DeferredEvents } from './source/deferred.js';
 import type { NavContext, ViewRange, ViewSettings, ViewSpec } from './views/spec.js';
 import { buildTimeGridModel, updateTimeGridModel } from './views/timegrid.js';
 import type { AvailableSlot, TimeGridModel, TimeGridOptions } from './views/timegrid.js';
@@ -135,6 +138,14 @@ export interface ModelFamily<M = unknown> {
   ): M;
   /** Optional fine update after a store change; absent means rebuild. */
   update?(prev: M, snap: StoreSnapshot, change: StoreChange): M;
+  /**
+   * True: the model reads only the events of its range (every built-in). A
+   * store change that touches nothing in the range (a large load's later
+   * weeks, a neighbouring chunk) then keeps the model and redraws nothing; a
+   * family that reads beyond its range (an "upcoming" list) leaves it out and
+   * is rebuilt after every change.
+   */
+  readonly rangeOnly?: boolean;
 }
 
 const FAMILIES = new Map<string, ModelFamily>();
@@ -161,6 +172,7 @@ registerModelFamily<TimeGridModel>('timeGrid', {
       ...resourceOpts(view, columns, options),
     }),
   update: updateTimeGridModel,
+  rangeOnly: true,
 });
 registerModelFamily<DayGridModel>('dayGrid', {
   build: (range, snap, { displayZone, view, options, columns }) =>
@@ -172,6 +184,7 @@ registerModelFamily<DayGridModel>('dayGrid', {
       ...resourceOpts(view, columns, options),
     }),
   update: updateDayGridModel,
+  rangeOnly: true,
 });
 
 /** The model of the current view; `family` tells a renderer what `model` is. */
@@ -194,6 +207,8 @@ export type KernelEvent =
   | {
       readonly type: 'store';
       readonly change: StoreChange;
+      /** Nothing it touched is in the period shown (nor any series): the view's model is the same, nothing to redraw. */
+      readonly offscreen?: true;
       /** The command that made it (`run`): with `validated`, what a person asked — a gesture, a menu, the keyboard, the editor. */
       readonly command?: Command;
       readonly validated?: boolean;
@@ -245,6 +260,12 @@ export interface CalendarKernel {
   now(): Instant;
   /** What the last `events`/`setEvents` load reported. */
   getProblems(): NormalizationReport | null;
+  /**
+   * Resolves when every event of the `events` option is loaded: at once for
+   * up to 2 000 events, else when the weeks beyond the shown period are in
+   * (they load while the page is idle; any read of `store` finishes them first).
+   */
+  whenLoaded(): Promise<void>;
   /**
    * Replaces the resources (a `state` event, cause 'resources'): resource
    * views redraw their columns, rules read the new ones. Returns what could
@@ -317,7 +338,8 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     views[type] = spec;
   }
   const now = o.now ?? systemNow;
-  const store = o.store ?? createEventStore();
+  // A face handed back (`store: cal.kernel.store`) is the store it shows.
+  const store = rawOf(o.store ?? createEventStore());
   const listeners = new Set<(e: KernelEvent) => void>();
 
   let timeZone = o.timeZone;
@@ -378,9 +400,58 @@ export function createKernel(o: KernelOptions): CalendarKernel {
 
   let problems: NormalizationReport | null = null;
   const idGen = createIdGenerator('ev');
-  const loadEvents = (events: readonly EventInput[]) =>
-    (problems = loadStaticSource(store, arraySource('events', events), { displayZone: timeZone, newId: idGen }).report);
-  if (o.events) loadEvents(o.events);
+  /** A large `events` option still loading (owner, 18h), and the chunks the last load wrote. */
+  let deferred: DeferredEvents | null = null;
+  let eventChunks: ReadonlyMap<string, string> = new Map();
+  /** Who waits for everything to be loaded (`whenLoaded`). */
+  let waiting: (() => void)[] = [];
+  const settle = () => {
+    if (deferred && !deferred.done) return;
+    const w = waiting;
+    waiting = [];
+    for (const f of w) f();
+  };
+  /** Whatever is still to load, now: a read or a change that needs every event calls it first. */
+  const finishEvents = () => {
+    if (deferred && !deferred.done) deferred.flush();
+  };
+  const unpend = pendingOn(store, { finish: finishEvents, load: (from, to) => deferred?.load(from, to) });
+  /** A range's days as plain ISO (another calendar's dates, written in ISO: what the load's weeks are keyed by). */
+  const isoDay = (d: PlainDate) => d.withCalendar('iso8601').toString().slice(0, 10);
+  /** What a period shows, loaded from every load on this store (this calendar's, a sharing one's). */
+  const ensureShown = (range: ViewRange) => loadPeriod(store, isoDay(range.start), isoDay(range.end));
+  const loadEvents = (events: readonly EventInput[]): NormalizationReport => {
+    deferred?.cancel();
+    deferred = null;
+    // Who waited for the cancelled load waits for this one (told at its end, or now when it is small).
+    const ctx = { displayZone: timeZone, newId: idGen };
+    // Large: the shown period now, the rest while the page is idle (its problems told when done).
+    if (events.length > DEFER_ABOVE) {
+      const d = loadDeferred(store, 'events', events, ctx, { from: isoDay(state.range.start), to: isoDay(state.range.end) }, o.timers ?? idleTimers(globalTimers), eventChunks, (report) => {
+        problems = report;
+        // After the store has it all (`done` is true by now): who waits is told on the next turn.
+        void Promise.resolve().then(settle);
+        if (report.problems.length === 0) return;
+        const notice = { type: 'problems', sourceId: 'events', report } as const;
+        o.onSource?.(notice);
+        emit({ type: 'source', notice });
+      });
+      deferred = d;
+      eventChunks = d.chunks;
+      return (problems = d.report);
+    }
+    const stale = [...eventChunks.keys()];
+    if (stale.length === 0) problems = loadStaticSource(store, arraySource('events', events), ctx).report;
+    else {
+      // A large load before: its months emptied in the same change.
+      const { items, report } = normalizeMany(events, ctx, 'events');
+      store.replaceSourceChunks('events', [['*', items], ...stale.map((k) => [k, []] as [string, readonly Normalized[]])]);
+      problems = report;
+    }
+    eventChunks = new Map();
+    settle();
+    return problems;
+  };
 
   const nav = (): NavContext => ({ firstDay, today: todayIn(timeZone) });
   let validating = false;
@@ -405,7 +476,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     { limit: o.historyLimit ?? 200 },
   );
   const sources = createSourceManager({
-    store,
+    store: writerFace(store),
     normalize: () => ({ displayZone: timeZone, newId: idGen }),
     now,
     // The `events` option is its own array source, loaded apart.
@@ -499,13 +570,34 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   };
   const changeState = (cause: StateCause) => {
     state = computeState();
+    // A period beyond what is loaded: the weeks it needs first (the rest stays for idle time).
+    ensureShown(state.range);
     model = null;
     fetchShown();
     pending.push(cause);
     flush();
   };
 
+  if (o.events) loadEvents(o.events);
+  /** The period shown in epoch ms and epoch days, a day wider each side (zones): what a change must touch to matter here. */
+  let shownFor: KernelState | null = null;
+  let shown = { lo: 0, hi: 0, loDay: 0, hiDay: 0 };
+  const offscreen = (change: StoreChange): boolean => {
+    if (change.seriesTouched.length > 0) return false;
+    if (shownFor !== state) {
+      shownFor = state;
+      const lo = state.range.start.toZonedDateTime(timeZone).epochMilliseconds - 86_400_000;
+      const hi = state.range.end.toZonedDateTime(timeZone).epochMilliseconds + 86_400_000;
+      shown = { lo, hi, loDay: Math.floor(lo / 86_400_000), hiDay: Math.ceil(hi / 86_400_000) };
+    }
+    return change.dirtySpans.every((x) => x.e <= shown.lo || x.s >= shown.hi) && change.dirtyDays.every((x) => x.e <= shown.loDay || x.s >= shown.hiDay);
+  };
   const unsubscribe = store.subscribe((change) => {
+    // Elsewhere than shown (a large load's later weeks, a neighbouring chunk): the model stands, the view need not redraw.
+    if (change.cause !== 'command' && change.cause !== 'undo' && change.cause !== 'redo' && model && FAMILIES.get(model.family)?.rangeOnly === true && offscreen(change)) {
+      emit({ type: 'store', change, offscreen: true });
+      return;
+    }
     const family = model ? FAMILIES.get(model.family) : undefined;
     model = model && family?.update ? { family: model.family, model: family.update(model.model, store.snapshot, change) } : null;
     emit(change.cause === 'command' && running ? { type: 'store', change, command: running, validated: validating } : { type: 'store', change });
@@ -514,7 +606,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   for (const spec of o.sources ?? []) sources.add(spec);
 
   return {
-    store,
+    store: storeFace(store),
     getState: () => state,
     getViewSpec: (type) => ownView(type),
     setView(type, at) {
@@ -646,6 +738,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       if (!spec || !family) return null;
       if (over?.timeline) assertTimeline(over.timeline);
       const range = computeState(at, spec).range;
+      ensureShown(range);
       const opts: ModelOptions = !over
         ? options
         : {
@@ -660,11 +753,14 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       if (model) return model;
       const family = FAMILIES.get(view.family);
       if (!family) throw new Error(`no model family registered for ${view.family}`);
+      // Another calendar's load on a shared store may not have reached this period yet.
+      ensureShown(state.range);
       model = { family: view.family, model: family.build(state.range, store.snapshot, { displayZone: timeZone, view, options, resources: resourceTree, columns }) };
       return model;
     },
     now,
     getProblems: () => problems,
+    whenLoaded: () => (deferred && !deferred.done ? new Promise<void>((resolve) => waiting.push(resolve)) : Promise.resolve()),
     setResources(next) {
       resourceInputs = next;
       buildResources();
@@ -678,6 +774,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       return () => listeners.delete(fn);
     },
     run(cmd, opts = {}) {
+      finishEvents();
       validating = opts.validate === true;
       externalRun = opts.external === true;
       running = cmd;
@@ -690,9 +787,29 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       }
     },
     rules: rulesNow,
-    history,
+    // What a person's undo or redo touches is loaded first (identity checks against what is stored).
+    history: {
+      get canUndo() {
+        return history.canUndo;
+      },
+      get canRedo() {
+        return history.canRedo;
+      },
+      run: (cmd) => (finishEvents(), history.run(cmd)),
+      undo: () => (finishEvents(), history.undo()),
+      redo: () => (finishEvents(), history.redo()),
+      revert: (applied) => (finishEvents(), history.revert(applied)),
+      transaction: (label, fn) => (finishEvents(), history.transaction(label, fn)),
+      clear: () => history.clear(),
+      destroy: () => history.destroy(),
+    } satisfies typeof history,
     sources,
     destroy() {
+      deferred?.cancel();
+      deferred = null;
+      // Who waits for the load is let go (an unmounting wrapper).
+      settle();
+      unpend();
       sources.destroy();
       unsubscribe();
       history.destroy();

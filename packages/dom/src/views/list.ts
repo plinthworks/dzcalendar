@@ -608,6 +608,8 @@ export function createListView(ctx: ViewCtx): ViewController {
 }
 
 registerModelFamily<ListModel>('list', {
+  // Reads only its range: a change elsewhere keeps the model.
+  rangeOnly: true,
   build: (range, snap, { displayZone }) => buildListModel(range, snap, { displayZone }),
 });
 registerView('list', createListView);

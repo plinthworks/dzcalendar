@@ -23,6 +23,8 @@ export interface Bench {
   readonly name: string;
   /** Draws, resolves after the first frame shown. */
   mount(m: Mount): Promise<void>;
+  /** Resolves when every event given is loaded (a library that loads them all at creation: at once). */
+  settled?(): Promise<void>;
   /** One event's title and start changed through the library's API; resolves after the next frame. */
   update(id: string, title: string, start: string, end: string): Promise<void>;
   next(): Promise<void>;

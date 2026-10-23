@@ -45,8 +45,14 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   owner (`playground/gallery.html` makes them again).
 - **Done:** 18g-4 (WCAG 2.2 AA) committed ("Phase 18g-4") — **Phase 18g
   is complete**. Every check green, exit codes read (1 473 tests, 267
-  Chrome checks). **Next:** first render and size (below), then npm
-  publication, licences, Phase 19.
+  Chrome checks).
+- **Done:** 18h (first render) committed ("Phase 18h"): ahead of
+  FullCalendar 7 in every first render (46 / 45 / 40 ms against 63 / 74 /
+  53, month / week / list, docs/benchmark.md). **In progress:** 18j (the
+  documentation site: the skeleton built in `website/`, not committed yet).
+  **Next:** 18i (size), and Sehhaty's production report
+  (`retours/2026-10-23-sehhaty.md`); then npm publication, licences,
+  Phase 19.
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
@@ -2409,6 +2415,92 @@ Net: −430 lines of CSS, −60 of menu, −35 of re-measuring.
 - A command your code runs with `{ validate: true }` is said as a person's
   (that is what validating means) — documented.
 
+
+## Phase 18h–18j — first render, size, the documentation site (planned)
+
+**Owner's decisions (2026-10-23)**
+- Order: 18h (first render) then 18i (size), **18j (the documentation
+  site) in parallel** — its skeleton, languages, deployment and getting
+  started first, the option pages after.
+- **18h — first render:** below FullCalendar 7 (month 58.5 ms, week
+  69.9 ms, list 49.8 ms against our 82, 84, 81 ms in docs/benchmark.md).
+  The kernel normalises and indexes every event at creation (80 % of a
+  10 000-event month); plan: the shown period (and a margin) first, the
+  rest when idle or when navigated to; dates read as numbers, Temporal
+  objects made for what is drawn. Problems still reported, the history,
+  sources and exports still see everything.
+- **18i — size:** below FullCalendar 7's 94.9 kB (ours 122.3 kB). **K.2
+  reversed:** the Temporal polyfill (≈ 20 kB) is **loaded only where
+  Temporal is missing** (a dynamic import; `calendar.ready` for the
+  browsers that wait) — needs `@tzslot/core`'s side. Then each view as its
+  own entry (as FullCalendar's plugins), and what everyone pays without
+  using it.
+- **18j — documentation site:** **Astro Starlight**, **French and
+  English**, published by a GitHub Action on **GitHub Pages**
+  (`https://plinthworks.github.io/dzcalendar/`, the repository public).
+  Like FullCalendar's in its structure, written from scratch (CLEANROOM):
+  getting started (vanilla JS, Angular, React, Vue), one page per option
+  (what it does, type, default, an example in tabs JS | Angular | React |
+  Vue, a live demo, related options), guides (events, sources, recurrence,
+  views, drag and drop, keyboard and accessibility, time zones and clock
+  changes, theming and CSS, Tailwind, unstyled, languages, Pro), migrating
+  from FullCalendar, the API reference generated from the types. A test:
+  every option has its page in both languages; the examples are compiled.
+
+### 18h — done (2026-10-23)
+
+**Built**
+- Above 2 000 events (owner), the `events` option loads the shown period
+  and a week either side at once; the other weeks while the page is idle
+  (`requestIdleCallback`, nearest first, slices sized by the idle period;
+  a slice forced by the one-second timeout takes 25 ms) —
+  `packages/core/src/source/deferred.ts`. Each pending week knows the
+  latest day its events reach: a period needs the weeks begun before its
+  end that reach its start, loaded at once when it is shown — by this
+  calendar or another one sharing the store (`loadPeriod`).
+- Transparent (owner): `kernel.store` is a face that finishes the load
+  before any read or write (one face per store, a face handed back is its
+  store); commands, `kernel.history` (run, undo, redo, revert), sources'
+  writes finish it first; `kernel.whenLoaded()`; the rest's problems by
+  `onSource` (`problems`, the whole report) when it is in.
+- A store change touching nothing shown (and no series) keeps the model of
+  a `rangeOnly` family (every built-in) and is told `offscreen: true`: the
+  DOM does not redraw, an open menu or "+N" panel stays.
+- The public benchmark waits for everything to load before the update,
+  the navigation and the heap, and reports "All events loaded".
+- Tests: `packages/core/test/deferred.test.ts` (17).
+- Budget (owner, measured + 3 %): core 45 741.
+
+**Reviews fixed** (architect + execution in Chrome)
+- A face passed back as `store` made a face of a face (the problems told
+  twice, other kernels blind to the load); a source could take an id of an
+  event not loaded yet, silently; `kernel.history` bypassed the load;
+  `whenLoaded` hung after `destroy`; a listener reading the store during a
+  week's write told the problems twice; a third-party family reading
+  beyond its range would have gone stale (`rangeOnly`); a non-ISO
+  calendar's period disabled the partition; twins without an id near a
+  Monday could lose their rank.
+- A second calendar on the store drew its period nearly empty until the
+  first one's idle load reached it; a long event removed by a second large
+  `setEvents` stayed shown until idle; any period beyond the first window
+  flushed everything (67 ms) — now only the weeks it needs.
+- Measured on the way: the polyfill's debug string is attached whenever
+  function names survive a build (`"noop" === noop.name`), `--keep-names`
+  included — profiles must be taken on a truly minified bundle.
+
+**Not done on purpose**
+- Up to 2 000 events nothing changes (no notice for problems: the report
+  is `setEvents`'s and `getProblems()`).
+- The first drag on a large calendar finishes the load (≈ 65 ms on 10 000
+  events) through the interaction's snapshot.
+
+**Seen during 18h's review, not caused by it (to fix):** the Pro timeline
+throws `RangeError: Expected finite integer` (from
+`Instant.fromEpochMilliseconds`, the scheduled scroll-to-time write in
+`packages/pro/src/timeline/view.ts`) after six quick navigations one frame
+apart, with 500 events too; dragging a timed event about 96 px down in a
+time-grid column made it an all-day event of that date (the same with or
+without the deferred load).
 
 ## Phase 19 — native: owner's decision on the product (2026-10-20)
 

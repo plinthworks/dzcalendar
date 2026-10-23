@@ -956,6 +956,8 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   scope.add(
     kernel.subscribe((e) => {
       if (e.type === 'source') return sourceNotice(e.notice);
+      // Nothing shown changed (a large load's later weeks): no redraw, an open menu or panel stays.
+      if (e.type === 'store' && e.offscreen) return;
       // A person's change (a command, undo, redo): what it makes appear, and what it takes away.
       let before: Leaving[] | null = null;
       if (e.type === 'store' && view && painted && (e.change.cause === 'command' || e.change.cause === 'undo' || e.change.cause === 'redo')) {

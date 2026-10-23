@@ -17,7 +17,7 @@ Elles priment sur le reste du document quand il dit autre chose.
 | Axe DST en timeGrid (K.1) | **Option C** : axe mural + transition visible ; `elapsed` en option ; `elapsed` seul en timeline. |
 | Gratuit / Pro (K.5, K.9) | **Tout en MIT pour l'instant.** Le paquet `@dzcalendar/pro` reste une frontière de code (plugins via `registerView`), sans licence FSL ni clé tant que le modèle économique n'est pas décidé. |
 | From scratch (K.11) | **`CLEANROOM.md` adopté** : seul le comportement observable / la doc publique de FullCalendar est consulté ; chaque comportement imité est décrit dans `docs/behaviors/*.md` avec nos mots. |
-| Polyfill (K.2) | **Import statique conservé**, comme dans tzslot. |
+| Polyfill (K.2) | ~~Import statique conservé, comme dans tzslot.~~ **Révisé le 2026-10-23 (Phase 18i)** : le polyfill n'est chargé que là où Temporal manque (import dynamique, `calendar.ready`). |
 | Premier jour de semaine des règles (2026-10-16) | Une règle **sans `WKST`** se lit avec le lundi (RFC 5545), partout, quelle que soit la locale : la même règle donne les mêmes dates que Google, Outlook ou le serveur. Une série **créée dans DzCalendar** (commandes, interface) reçoit `WKST` = premier jour de la locale, **écrit explicitement** dans la règle. L'affichage (grilles, numéros de semaine) suit la locale. |
 | Menu contextuel (2026-10-16) | **Toutes les actions accessibles par un menu contextuel** sur la cellule et sur l'événement (clic droit, appui long tactile, touche Menu / Maj+F10). Voir D.3 bis et `docs/behaviors/context-menu.md`. |
 
@@ -81,6 +81,12 @@ Ils priment sur les sections citées.
 - **D.10 (dom)** : `MotionAdapter` gagne `beforeChange(change)` (l'ancien écran encore dessiné) et `afterChange(état, change, body)` (renvoie `true` s'il a animé le changement : `viewChange`/`eventsEnter` ne sont alors pas appelés), `titleChange`, `nowTick` ; `MotionChange { causes, direction, from, to, days, root, rtl }`, `MotionSide { view, family, date, zone, title, days }`. Plusieurs changements avant un même dessin n'en font qu'un (le premier « from », toutes les causes, le dernier « to »). Par défaut `WAAPI_MOTION` (glissement, entrées, surcouches ; coupé sous mouvement réduit et sans `Element.animate`) ; `NO_MOTION` pour rien. Les copies d'impression ont `NO_MOTION`.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
+
+### Ajustements après la Phase 18h — premier rendu (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : au-delà de 2 000 événements, la période affichée d'abord, le reste en tâche de fond ; transparent (toute lecture complète termine d'abord le chargement).
+- **C (core)** : `source/deferred.ts` (partition par semaine, chargement à la demande d'une période), `kernel.store` devient une façade, `kernel.whenLoaded()`, `ModelFamily.rangeOnly` et l'événement `store` `offscreen`.
+- **Décision du propriétaire** : budget core à la mesure + 3 % (45,7 ko).
 
 ### Ajustements après la Phase 18g-4 — WCAG 2.2 AA (détail dans ROADMAP.md)
 

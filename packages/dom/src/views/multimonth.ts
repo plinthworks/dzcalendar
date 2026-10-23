@@ -25,6 +25,8 @@ export const MULTIMONTH_CSS = `
 `;
 
 registerModelFamily<MultiMonthModel>('multiMonth', {
+  // Reads only its range: a change elsewhere keeps the model.
+  rangeOnly: true,
   build: (range, snap, { displayZone, options }) =>
     buildMultiMonthModel(range, snap, {
       ...options.dayGrid,

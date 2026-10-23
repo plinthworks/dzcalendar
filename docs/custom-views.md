@@ -81,6 +81,13 @@ through `InteractionSurface`; `ViewCtx` gives the kernel, the frame
 scheduler, the locale, the zone, the hooks and the formats. The Pro's
 timeline is written this way (`packages/pro/src/timeline`).
 
+A family whose model reads only the events of its range declares
+`rangeOnly: true` (every built-in does): a store change that touches nothing
+in the range — a large `events` list's later weeks, a source's neighbouring
+chunk — then keeps the model, and the kernel tells it as a `store` event with
+`offscreen: true` (the DOM does not redraw for it). Without it, the family is
+rebuilt after every change.
+
 ## From FullCalendar
 
 `views: { congres: { type: 'timeGrid', visibleRange: { start, end } } }`,

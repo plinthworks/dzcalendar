@@ -93,7 +93,7 @@ async function timed(cdp, page, fn, arg) {
   return { ms, work: (await work(cdp)) - w0 };
 }
 
-const KEYS = ['first', 'firstWork', 'kernel', 'nodes', 'shown', 'update', 'updateWork', 'next', 'nextWork', 'heap'];
+const KEYS = ['first', 'firstWork', 'loaded', 'kernel', 'nodes', 'shown', 'update', 'updateWork', 'next', 'nextWork', 'heap'];
 const runs = Object.fromEntries(LIBS.map((l) => [l, Object.fromEntries(SCENARIOS.map((s) => [s.key, Object.fromEntries(KEYS.map((k) => [k, []]))]))]));
 // Libraries in turn within each round (not one after the other): what drifts on the machine drifts for all.
 for (let i = 0; i < RUNS; i++) {
@@ -110,6 +110,12 @@ for (let i = 0; i < RUNS; i++) {
       }, s);
       r.first.push(first.ms);
       r.firstWork.push(first.work);
+      // Until every event is loaded (DzCalendar loads beyond the shown period while the page is idle): what follows is measured after it.
+      r.loaded.push(first.ms + (await page.evaluate(async () => {
+        const t = performance.now();
+        await window.bench.settled?.();
+        return performance.now() - t;
+      })));
       if (lib === 'dz') r.kernel.push(await page.evaluate(() => window.kernelMs()));
       r.heap.push((await heap(cdp)) - before);
       r.nodes.push(await page.evaluate(() => document.getElementById('cal').querySelectorAll('*').length));
@@ -222,11 +228,14 @@ improved.
 
 ## Reading the numbers
 
-- DzCalendar reads, checks and indexes every event when it is created —
-  ${kernelShare} % of its month's first render here, measured apart. What it
-  buys: an update, a query or an undo touches only what changed, and nothing
-  is guessed silently. FullCalendar 7 draws its first month sooner, and is
-  smaller.
+- DzCalendar reads, checks and indexes every event — with more than 2 000
+  events, those of the shown period (and a week either side) before the first
+  frame, the others while the page is idle, by week (the view does not redraw
+  for them; any read of everything finishes them first). Its kernel is
+  ${kernelShare} % of its month's first render here, measured apart; "All
+  events loaded" is when the rest is in, and the update, the navigation and the
+  heap are measured after it. What the indexing buys: an update, a query or an
+  undo touches only what changed, and nothing is guessed silently.
 - "Elements drawn" follows each library's way of cutting a day (lanes, "+N",
   pieces): read it with "events shown".
 
@@ -237,6 +246,7 @@ ${SCENARIOS.map((sc) => `### ${sc.label}
 ${head}
 ${row('First render', (l) => ms(perf[l][sc.key].first))}
 ${row('— main-thread work', (l) => ms(perf[l][sc.key].firstWork))}
+${row('All events loaded', (l) => ms(perf[l][sc.key].loaded))}
 ${row('Events shown', (l) => String(perf[l][sc.key].shown.median))}
 ${row('Elements drawn', (l) => String(perf[l][sc.key].nodes.median))}
 ${row('Update one event', (l) => ms(perf[l][sc.key].update))}

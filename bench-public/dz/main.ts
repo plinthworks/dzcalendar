@@ -28,6 +28,9 @@ const bench: Bench = {
     cal = createCalendar(el, { kernel, editable: true, selectable: true, dayMaxLanes: 3, eventMaxStack: null });
     await frame();
   },
+  async settled() {
+    await cal!.kernel.whenLoaded();
+  },
   async update(id, title, start, end) {
     cal!.run({ type: 'event.update', id, patch: { title, start: `${start}[${zone}]`, end: `${end}[${zone}]` } });
     await frame();

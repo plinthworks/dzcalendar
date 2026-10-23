@@ -73,7 +73,7 @@ const calendar = createCalendar(document.getElementById('agenda')!, {
   `getProblems()`.
 - **Bad data never throws**: an event that cannot be read is left out and
   said — `calendar.kernel.getProblems()?.problems` lists `{ code, severity,
-  path, detail }` (`missing-start`, `unknown-zone`, `zone-guessed`…) for the
+  path, detail }` (`missing-start`, `unknown-zone`, `zone-defaulted`…) for the
   last load of events; a source's are in its `problems` notice. Options are
   the exception: `createCalendar` and `update` throw a `RangeError` on one
   they cannot take (an unknown view), and change nothing.
@@ -81,6 +81,24 @@ const calendar = createCalendar(document.getElementById('agenda')!, {
   `jsonSource('api', { url: '/events' })` (sends `start`, `end`,
   `timeZone`), `fnSource('fn', async ({ window }) => […])`, iCalendar with
   `@dzcalendar/ical`.
+
+## Many events
+
+Up to 2 000 events, the `events` option is read, checked and indexed when
+the calendar is created. Above that, the calendar does the shown period (and a
+week either side) first and the other weeks while the page is idle, nearest
+first: it is on screen sooner, and nothing else changes —
+
+- showing a period not loaded yet loads the weeks it needs at once (another
+  calendar sharing the store too); reading `calendar.kernel.store` (an
+  export, a search, the first drag), running a command or an undo finishes
+  the rest first, so they always see every event;
+- `setEvents` returns the shown period's report; when the rest is in, its
+  problems (if any) come through `onSource` (`{ type: 'problems', sourceId:
+  'events' }`, the whole report) and `kernel.getProblems()` holds all of them;
+- `await calendar.kernel.whenLoaded()` waits for everything — a fraction of
+  a second on a quiet page, longer on a page kept busy (a slice at least every
+  second).
 
 ## Then
 
