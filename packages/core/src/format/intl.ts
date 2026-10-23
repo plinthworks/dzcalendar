@@ -23,16 +23,20 @@ function formatter(locale: string, f: Fmt, timeZone: string): Intl.DateTimeForma
   return dtf;
 }
 
-const MIDNIGHT = Temporal.PlainTime.from('00:00');
-const EPOCH_DATE = Temporal.PlainDate.from('1970-01-01');
+// Made on first use, not at import: Temporal may still be loading (18i, `loadTemporal()`).
+let _midnight: ReturnType<typeof Temporal.PlainTime.from> | undefined;
+const MIDNIGHT = () => (_midnight ??= Temporal.PlainTime.from('00:00'));
+// Made on first use, not at import: Temporal may still be loading (18i, `loadTemporal()`).
+let _epoch_date: ReturnType<typeof Temporal.PlainDate.from> | undefined;
+const EPOCH_DATE = () => (_epoch_date ??= Temporal.PlainDate.from('1970-01-01'));
 
 /** The epoch milliseconds and zone that make Intl print `v` as written. */
 function asEpoch(v: Formattable): { ms: number; zone: string } {
   if (v instanceof Temporal.ZonedDateTime) return { ms: v.epochMilliseconds, zone: v.timeZoneId };
   if (v instanceof Temporal.PlainDate) return { ms: v.toZonedDateTime({ timeZone: 'UTC' }).epochMilliseconds, zone: 'UTC' };
   if (v instanceof Temporal.PlainDateTime) return { ms: v.toZonedDateTime('UTC').epochMilliseconds, zone: 'UTC' };
-  if (v instanceof Temporal.PlainTime) return { ms: EPOCH_DATE.toPlainDateTime(v).toZonedDateTime('UTC').epochMilliseconds, zone: 'UTC' };
-  return { ms: v.toPlainDate({ day: 1 }).toPlainDateTime(MIDNIGHT).toZonedDateTime('UTC').epochMilliseconds, zone: 'UTC' };
+  if (v instanceof Temporal.PlainTime) return { ms: EPOCH_DATE().toPlainDateTime(v).toZonedDateTime('UTC').epochMilliseconds, zone: 'UTC' };
+  return { ms: v.toPlainDate({ day: 1 }).toPlainDateTime(MIDNIGHT()).toZonedDateTime('UTC').epochMilliseconds, zone: 'UTC' };
 }
 
 export function formatTemporal(v: Formattable, f: Fmt, locale: string): string {
@@ -68,12 +72,14 @@ export function formatRangeTitle(a: Formattable, b: Formattable, f: Fmt, locale:
 }
 
 /** Monday 1 January 2024: a known Monday, in UTC. */
-const MONDAY = Temporal.PlainDate.from('2024-01-01');
+// Made on first use, not at import: Temporal may still be loading (18i, `loadTemporal()`).
+let _monday: ReturnType<typeof Temporal.PlainDate.from> | undefined;
+const MONDAY = () => (_monday ??= Temporal.PlainDate.from('2024-01-01'));
 
 export function weekdayNames(locale: string, width: 'narrow' | 'short' | 'long', firstDay: Weekday): string[] {
-  return Array.from({ length: 7 }, (_, i) => formatTemporal(MONDAY.add({ days: (firstDay - 1 + i) % 7 }), { weekday: width }, locale));
+  return Array.from({ length: 7 }, (_, i) => formatTemporal(MONDAY().add({ days: (firstDay - 1 + i) % 7 }), { weekday: width }, locale));
 }
 
 export function monthNames(locale: string, width: 'short' | 'long'): string[] {
-  return Array.from({ length: 12 }, (_, i) => formatTemporal(MONDAY.with({ month: i + 1, day: 1 }), { month: width }, locale));
+  return Array.from({ length: 12 }, (_, i) => formatTemporal(MONDAY().with({ month: i + 1, day: 1 }), { month: width }, locale));
 }

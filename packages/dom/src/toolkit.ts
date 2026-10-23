@@ -8,6 +8,7 @@ export type { ViewController, ViewCtx, ViewFactory, EventContentCtx } from './ho
 export type { InteractionSurface, KeyboardSurface, Box } from './interact/surface.js';
 export type { DzMessages } from './messages.js';
 export { ensureStyles } from './styles.js';
+export { deferredCalendar } from './calendar.js';
 export { KeyedList, h, contentsHost } from './render/reconcile.js';
 export type { Keyed, Changed } from './render/reconcile.js';
 export { attachMenuTriggers } from './menu.js';

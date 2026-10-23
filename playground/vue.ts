@@ -1,3 +1,4 @@
+import './prelude';
 import '../packages/theme/dzcalendar.css';
 import '@dzcalendar/pro';
 import { createApp, defineComponent, h, inject, provide, ref, shallowRef } from 'vue';

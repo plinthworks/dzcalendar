@@ -4,7 +4,9 @@ import { problem } from './problem.js';
 import { expandDates, parseRRule } from '@dzcalendar/rrule';
 import type { Availability, Window } from './types.js';
 
-const MIDNIGHT = Temporal.PlainTime.from('00:00');
+// Made on first use, not at import: Temporal may still be loading (18i, `loadTemporal()`).
+let _midnight: ReturnType<typeof Temporal.PlainTime.from> | undefined;
+const MIDNIGHT = () => (_midnight ??= Temporal.PlainTime.from('00:00'));
 
 /** A window read once: its wall times, or null (said in `problems`) when they cannot be read. */
 interface ReadWindow {
@@ -50,7 +52,7 @@ function spanOf(date: PlainDate, w: ReadWindow, zone: ZoneId): MsSpan | null {
   const s = resolveWall(date, w.from, zone, 'compatible').instant!.epochMilliseconds;
   const crosses = w.to === null || Temporal.PlainTime.compare(w.to, w.from) <= 0;
   const endDate = crosses ? date.add({ days: 1 }) : date;
-  const endTime = w.to ?? MIDNIGHT;
+  const endTime = w.to ?? MIDNIGHT();
   // A closing time the clocks skip closes when they jump (02:30 on a night that goes from 02:00 to
   // 03:00 closes at the jump): a time that does not exist never adds open time.
   const end = resolveWall(endDate, endTime, zone, 'earlier');

@@ -17,6 +17,7 @@ prompts: `ng add @dzcalendar/angular --gsap --pro --example`.
 
 
 > Repeating events (`rrule`): `import '@dzcalendar/core/recurrence'` once in the application (docs/getting-started.md, "Worth knowing").
+> On Safari (no Temporal of its own), `provideDzCalendar()` holds the application's start until Temporal's polyfill has arrived (even with no defaults: `provideDzCalendar()`), so the application's own Temporal values and every `<dz-calendar>` are ready at once; without it, a `<dz-calendar>` waits by itself (docs/getting-started.md, "Temporal from the browser").
 
 ## A calendar
 

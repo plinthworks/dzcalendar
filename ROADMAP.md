@@ -62,11 +62,16 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   ical, the compat, the Pro editor and `<dz-calendar>` bring it), `@dzcalendar/dom/base`
   with `/timegrid` and `/daygrid` (`@dzcalendar/dom` unchanged), the
   benchmark built from the dists: the benchmark's DZ bundle 139.4 → 126.8 kB
-  gzip (JS). 18i-2 waits for tzslot 2.3.0 on npm: `@tzslot/core/lazy`
-  (`loadTemporal()`, built and committed by tzslot at 35ebaa4, 795 B first load,
-  the polyfill's 24.5 kB fetched only without native Temporal — no stable
-  Safari has it, so about three visitors in four skip it); not to be pinned
-  before it is published. 18j
+  gzip (JS). 18i-2 committed ("Phase 18i-2"): Temporal from
+  `@tzslot/core/lazy` (tzslot 2.3.0), the polyfill (24.7 kB) fetched only
+  without native Temporal (Safari); `calendar.ready`, every wrapper waiting
+  by itself, `provideDzCalendar()` holding Angular's start. Public benchmark
+  126.8 → 106.1 kB gzip on Chrome (FullCalendar 7: 94.9 — the goal not met
+  yet). Open: the Pro editor still brings the polyfill statically through
+  `@tzslot/dom` (38 % of its chunk; `@tzslot/dom/lazy` asked of tzslot, its
+  owner's decision); tzslot 2.3.1 (a failed `loadTemporal()` retried,
+  ca3ccd1) to adopt when published; `<dz-calendar>`'s `ready` never resolves
+  if its mount gives up or it leaves before Temporal arrives 18j
   (the documentation site, `website/`, preview `cd website && npm run
   build && npm run preview` → http://127.0.0.1:4701/dzcalendar/) still to
   review and commit; then npm publication, licences, Phase 19.
@@ -2463,6 +2468,43 @@ Net: −430 lines of CSS, −60 of menu, −35 of re-measuring.
   changes, theming and CSS, Tailwind, unstyled, languages, Pro), migrating
   from FullCalendar, the API reference generated from the types. A test:
   every option has its page in both languages; the examples are compiled.
+
+### 18i-2 — done (2026-10-23)
+
+**Built**
+- `@tzslot/core` ^2.3.0, only through `/lazy`: the browser's Temporal where
+  it has one, the polyfill a chunk apart fetched by `loadTemporal()` where it
+  has none (owner, K.2 reversed). `loadTemporal` and `temporalReady` from
+  core; no module reads Temporal as it is imported (lazy constants;
+  `DEFAULT_*_DURATION` plain durations).
+- `calendar.ready` (owner): a calendar made before Temporal waits —
+  `deferredCalendar` (dom/toolkit) queues update/navigate/select/refetch/
+  onDestroy/destroy, `run` refuses (`calendar-not-ready`), `kernel` and
+  `element` throw and are not enumerable. `<dz-calendar>` (`ready`, its calls
+  queued), React, Vue, Angular's component and the FullCalendar translation
+  wait by themselves; `provideDzCalendar()` holds Angular's start. A polyfill
+  that cannot be fetched is said (`temporal-load-failed`).
+- `npm run check:entries`: the polyfill a chunk apart, the bundle run; 14
+  entries imported from the dists with no Temporal (shown to fail on an
+  import-time read). Purity: tzslot's default entry nowhere, `@tzslot/dom`
+  only in the Pro editor. Playground pages await Temporal (`prelude.ts`).
+- Measured: public benchmark 126.8 → 106.1 kB gzip (Chrome); polyfill chunk
+  24.7 kB more on Safari. Budgets (owner, + 3 %): react 3 995, vue 4 224,
+  element 3 265, polyfill 25 634. `CHANGELOG.md` started (18i-1 and 18i-2
+  breaks).
+
+**Reviews fixed**
+- Architect: the FullCalendar translation threw before Temporal → it waits;
+  a failed polyfill fetch was silent → said; onDestroy before ready dropped
+  → run by an early destroy; spread of a waiting instance threw → getters
+  not enumerable; purity scan widened; ARCHITECTURE/CLAUDE.md updated.
+- Chrome: one refused change queued before ready lost those after it →
+  each replayed alone; Angular without `provideDzCalendar()` threw on Safari
+  only → the component waits by itself.
+
+**Not done**
+- The Pro editor's polyfill through `@tzslot/dom` (tzslot's decision);
+  tzslot 2.3.1's retry; `<dz-calendar>`'s `ready` when its mount gives up.
 
 ### 18h — done (2026-10-23)
 

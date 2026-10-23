@@ -16,6 +16,7 @@ createApp(App).use(DzCalendarPlugin, { defaults: { timeZone: 'Asia/Riyadh', loca
 
 
 > Repeating events (`rrule`): `import '@dzcalendar/core/recurrence'` once in the application (docs/getting-started.md, "Worth knowing").
+> On Safari (no Temporal of its own), `<DzCalendar>` draws once Temporal's polyfill has arrived; `await loadTemporal()` (from `@dzcalendar/core`) before the application makes Temporal values itself (docs/getting-started.md, "Temporal from the browser").
 
 ## A calendar
 

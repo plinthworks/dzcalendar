@@ -1,7 +1,8 @@
-import { Fragment, createElement as h, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useReducer, useRef } from 'react';
+import { Fragment, createElement as h, forwardRef, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { CSSProperties, ForwardedRef, ReactNode } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import type { AvailableSlot, CalEvent, CreateRequest, EventInstance, NormalizationReport, PlainDate, Problem, Selection, SourceNotice } from '@dzcalendar/core';
+import { loadTemporal, temporalReady } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import type { CalendarInstance, CalendarOptions, CalendarUpdate, DateClick, EventChange, EventContentCtx, HeaderItemCtx, MotionAdapter, CalendarProblem } from '@dzcalendar/dom';
 import { DzCalendarContext } from './context.js';
@@ -99,6 +100,19 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
   const controller = props.controller ?? own;
   const host = useRef<HTMLDivElement>(null);
   const cal = useRef<CalendarInstance | null>(null);
+  // No Temporal of its own (Safari): the calendar made once its polyfill has arrived (owner, 18i).
+  const [temporal, setTemporal] = useState(temporalReady);
+  useEffect(() => {
+    if (temporal) return;
+    let live = true;
+    loadTemporal().then(
+      () => live && setTemporal(true),
+      (e: unknown) => console.error("dzcalendar: temporal-load-failed — Temporal's polyfill could not be loaded; the calendar is not drawn", e),
+    );
+    return () => {
+      live = false;
+    };
+  }, [temporal]);
   /** The props of the last render: what the calendar's callbacks call. */
   const latest = useRef(props);
   latest.current = props;
@@ -242,6 +256,7 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
 
   // ── made when mounted, destroyed when unmounted ──
   useBrowserLayoutEffect(() => {
+    if (!temporal) return;
     const el = host.current!;
     const first = defined(settings);
     const given = latest.current;
@@ -338,9 +353,9 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
       ctl.current.onReoffer(null);
       ctl.current.detach(c);
     };
-    // Made once: later props go through `update()` below.
+    // Made once (once Temporal is there): later props go through `update()` below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [temporal]);
 
   useBrowserLayoutEffect(() => {
     const c = cal.current;

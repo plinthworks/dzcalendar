@@ -1,3 +1,4 @@
+import './prelude';
 import '../packages/theme/dzcalendar.css';
 import '@dzcalendar/pro';
 import { createContext, createElement as h, useContext, useState } from 'react';

@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "dependencies": {
-    "@tzslot/core": "^2.2.0",
+    "@tzslot/core": "^2.3.0",
     "@dzcalendar/rrule": "0.0.0"
   },
   "exports": {

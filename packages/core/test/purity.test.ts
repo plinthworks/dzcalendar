@@ -49,8 +49,22 @@ describe('core purity', () => {
   }
 
   it('only temporal.ts imports @tzslot/core for Temporal itself', () => {
-    const importers = all.filter((f) => /import\s*\{[^}]*\bTemporal\b[^}]*\}\s*from\s*['"]@tzslot\/core['"]/.test(readFileSync(f, 'utf8')));
+    const importers = all.filter((f) => /import\s*\{[^}]*\bTemporal\b[^}]*\}\s*from\s*['"]@tzslot\/core\/lazy['"]/.test(readFileSync(f, 'utf8')));
     expect(importers.map((f) => f.replace(SRC, 'core').replace(RRULE, 'rrule'))).toEqual(['core/temporal.ts', 'rrule/temporal.ts']);
+  });
+
+  it("@tzslot/core only through its /lazy entry, in every package: the default one installs the polyfill for everyone (18i)", () => {
+    const PACKAGES = new URL('../../', import.meta.url).pathname;
+    const sources = readdirSync(PACKAGES)
+      .map((p) => join(PACKAGES, p, 'src'))
+      .filter((d) => statSync(d, { throwIfNoEntry: false })?.isDirectory())
+      .flatMap((d) => files(d));
+    const read = sources.map((f) => [f.replace(PACKAGES, ''), code(readFileSync(f, 'utf8'))] as const);
+    expect(read.length).toBeGreaterThan(100);
+    // `from '…'`, `import '…'` and `import('…')`, each form.
+    expect(read.filter(([, t]) => /(?:from\s*|import\s*\(?\s*)['"]@tzslot\/core['"]/.test(t)).map(([f]) => f)).toEqual([]);
+    // @tzslot/dom imports tzslot's default entry (its polyfill, statically): only the Pro editor, a chunk of its own, has it.
+    expect(read.filter(([, t]) => /['"]@tzslot\/dom/.test(t)).map(([f]) => f)).toEqual(['pro/src/editor/dialog.ts']);
   });
 
   it('slots reads no clock (now is an input) and stands on core and rrule only, never the DOM', () => {

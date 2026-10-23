@@ -17,6 +17,7 @@ import type {
   Weekday,
   ZoneId,
 } from '@dzcalendar/core';
+import { loadTemporal, temporalReady } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import type {
   AllDayLabelCtx,
@@ -431,7 +432,9 @@ export const DzCalendar = defineComponent({
     };
 
     let stop: (() => void) | null = null;
-    onMounted(() => {
+    // No Temporal of its own (Safari): the calendar made once its polyfill has arrived, if still mounted (owner, 18i).
+    let gone = false;
+    const mount = () => {
       const first = settings.value;
       let motion: { motion?: MotionAdapter } = {};
       if (props.motion) motion = { motion: props.motion };
@@ -520,6 +523,13 @@ export const DzCalendar = defineComponent({
           emit('update:date', s.date);
         }
       });
+    };
+    onMounted(() => {
+      if (temporalReady()) mount();
+      else loadTemporal().then(
+        () => !gone && mount(),
+        (e: unknown) => console.error("dzcalendar: temporal-load-failed — Temporal's polyfill could not be loaded; the calendar is not drawn", e),
+      );
     });
     // Another controller given: the calendar is handed over to it.
     watch(
@@ -545,6 +555,7 @@ export const DzCalendar = defineComponent({
     watch(() => props.selection, () => sync(), { flush: 'pre' });
 
     onBeforeUnmount(() => {
+      gone = true;
       stop?.();
       const c = cal;
       cal = null;

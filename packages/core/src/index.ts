@@ -5,7 +5,7 @@
  * Temporal values, tested against real IANA rules. Temporal itself comes from
  * @tzslot/core, so an app using both carries one polyfill.
  */
-export { Temporal, usingPolyfill } from './temporal.js';
+export { Temporal, usingPolyfill, loadTemporal, temporalReady } from './temporal.js';
 export type {
   PlainDate,
   PlainTime,

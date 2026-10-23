@@ -1,4 +1,5 @@
 // Phase 18k: each point of Sehhaty's report (retours/2026-10-23-sehhaty.md) on a calendar of its own, for scripts/browser.mjs.
+import './prelude';
 import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';

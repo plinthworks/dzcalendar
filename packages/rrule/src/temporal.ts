@@ -3,8 +3,8 @@
  * the platform has it, else the polyfill — one copy for the whole app), and
  * its types under the same name, so `Temporal.PlainDate` reads as a type too.
  */
-import { Temporal as TemporalValue } from '@tzslot/core';
-import type * as T from '@tzslot/core';
+import { Temporal as TemporalValue } from '@tzslot/core/lazy';
+import type * as T from '@tzslot/core/lazy';
 
 export const Temporal = TemporalValue;
 // A namespace of types only: it merges with the value above.

@@ -1,3 +1,4 @@
+import './prelude';
 import '../packages/theme/dzcalendar.css';
 import { Temporal, eventInput, exportInputs, jsonSource, viewWindow } from '@dzcalendar/core';
 import { icalSource, serializeICal } from '@dzcalendar/ical';

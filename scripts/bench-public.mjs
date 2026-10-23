@@ -57,6 +57,11 @@ const size = Object.fromEntries(
   }),
 );
 
+// The polyfill DzCalendar fetches only where the browser has no Temporal (Safari): the chunk the page does not name.
+const polyfill = readdirSync(assets)
+  .filter((f) => f.endsWith('.js') && !/^(dz|fc6|fc7|scenarios)-/.test(f))
+  .reduce((n, f) => n + gzipSync(readFileSync(join(assets, f)), { level: 9 }).length, 0);
+
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
 const server = createServer((req, res) => {
   const path = join(dist, decodeURIComponent(new URL(req.url, 'http://x').pathname));
@@ -226,7 +231,9 @@ improved.
   first measure (17 to 33 ms) does not apply to it. **Heap**: the JavaScript
   heap after a garbage collection, minus the same before creating the
   calendar (the DOM's own memory is not in it). **Size**: the page's own
-  scripts and styles, gzipped.
+  scripts and styles, gzipped, as Chrome loads them. DzCalendar takes Temporal
+  from the browser where it has one (Chrome, Edge, Firefox); on Safari, which
+  has none yet, it fetches the polyfill as well — ${kb(polyfill)} more.
 
 ## Reading the numbers
 

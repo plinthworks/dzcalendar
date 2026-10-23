@@ -1,3 +1,4 @@
+import './prelude';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';

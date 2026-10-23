@@ -1,3 +1,4 @@
+import './prelude';
 import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import type { AvailableSlot, EventInput } from '@dzcalendar/core';

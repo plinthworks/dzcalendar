@@ -49,10 +49,13 @@ npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme
 
 ```ts
 import '@dzcalendar/theme/dzcalendar.css';
-import { Temporal } from '@dzcalendar/core';
+import { Temporal, loadTemporal } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 // Repeating events (the `rrule` below): their engine, imported once by an application that has them.
 import '@dzcalendar/core/recurrence';
+
+// At once where the browser has Temporal (Chrome, Edge, Firefox); Safari fetches its polyfill first.
+await loadTemporal();
 
 const calendar = createCalendar(document.getElementById('agenda')!, {
   timeZone: 'Europe/Paris',          // the zone the calendar is drawn in
@@ -141,6 +144,21 @@ first: it is on screen sooner, and nothing else changes —
 
 ## Worth knowing
 
+- **Temporal from the browser.** Where the browser has its own (Chrome and
+  Edge 144, Firefox 139), nothing more is loaded; where it has none (Safari,
+  every iOS browser), `loadTemporal()` fetches the polyfill (≈ 25 kB gzipped)
+  once. Await it before the application's first Temporal value — reading
+  `Temporal` sooner there throws a `ReferenceError` saying so. A calendar
+  created sooner waits by itself: `calendar.ready` resolves once it is drawn;
+  meanwhile `update`, `navigate`, `select` and `refetch` wait in line, `run`
+  refuses (`calendar-not-ready`) and reading `kernel` throws. `<dz-calendar>`,
+  React, Vue and the FullCalendar translation wait too (`<dz-calendar>` has
+  `ready`), and so does Angular's `<dz-calendar>`; `provideDzCalendar()`
+  holds the application's start instead, so nothing waits once it runs. What takes a calendar (the
+  Pro editor, the exports) takes it drawn: after `ready`. A polyfill that
+  cannot be fetched is said on the console (`temporal-load-failed`).
+  A top-level `await` needs a build target that has it (Vite 7's default;
+  `build.target: 'es2022'` with Vite 6), or `loadTemporal().then(start)`.
 - **Paid for only when used.** Repeating events need `import
   '@dzcalendar/core/recurrence'` once (without it, an event with `rrule` is
   refused with the problem `recurrence-not-loaded`; `@dzcalendar/ical` and the
@@ -219,6 +237,7 @@ prompts: `ng add @dzcalendar/angular --gsap --pro --example`.
 
 
 > Repeating events (`rrule`): `import '@dzcalendar/core/recurrence'` once in the application (docs/getting-started.md, "Worth knowing").
+> On Safari (no Temporal of its own), `provideDzCalendar()` holds the application's start until Temporal's polyfill has arrived (even with no defaults: `provideDzCalendar()`), so the application's own Temporal values and every `<dz-calendar>` are ready at once; without it, a `<dz-calendar>` waits by itself (docs/getting-started.md, "Temporal from the browser").
 
 ## A calendar
 
@@ -419,6 +438,7 @@ and `import '@dzcalendar/theme/dzcalendar.css'` once.
 
 
 > Repeating events (`rrule`): `import '@dzcalendar/core/recurrence'` once in the application (docs/getting-started.md, "Worth knowing").
+> On Safari (no Temporal of its own), `<DzCalendar>` draws once Temporal's polyfill has arrived; `await loadTemporal()` (from `@dzcalendar/core`) before the application makes Temporal values itself (docs/getting-started.md, "Temporal from the browser").
 
 ## A calendar
 
@@ -589,6 +609,7 @@ createApp(App).use(DzCalendarPlugin, { defaults: { timeZone: 'Asia/Riyadh', loca
 
 
 > Repeating events (`rrule`): `import '@dzcalendar/core/recurrence'` once in the application (docs/getting-started.md, "Worth knowing").
+> On Safari (no Temporal of its own), `<DzCalendar>` draws once Temporal's polyfill has arrived; `await loadTemporal()` (from `@dzcalendar/core`) before the application makes Temporal values itself (docs/getting-started.md, "Temporal from the browser").
 
 ## A calendar
 
@@ -715,6 +736,7 @@ result's `problems` say what went wrong.
 # The Web Component — `@dzcalendar/element`
 
 > `<dz-calendar>` (`@dzcalendar/element/define`) brings the recurrence engine itself: repeating events work as they come.
+> On Safari (no Temporal of its own), `<dz-calendar>` draws once Temporal's polyfill has arrived; `dz-dates-set` says when.
 
 
 `<dz-calendar>` for any page or framework (plain HTML, React, Vue, Svelte,

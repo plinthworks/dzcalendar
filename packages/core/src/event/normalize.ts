@@ -417,8 +417,8 @@ function allDaySpan(
   if (endP) {
     end = toDate(endP, input, ctx, `${path}.end`, problems);
   } else {
-    const d = duration ?? ctx.defaultAllDayDuration ?? DEFAULT_ALL_DAY_DURATION;
     try {
+      const d = Temporal.Duration.from(duration ?? ctx.defaultAllDayDuration ?? DEFAULT_ALL_DAY_DURATION);
       // Only whole days move a date; hours on an all-day event mean nothing.
       end = start.add({ days: Math.max(1, Math.trunc(d.total({ unit: 'days', relativeTo: start }))) });
     } catch (e) {

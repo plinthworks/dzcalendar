@@ -1,6 +1,6 @@
 import '../../packages/theme/dzcalendar.css';
 import '@dzcalendar/dom/list';
-import { Temporal } from '@dzcalendar/core';
+import { Temporal, loadTemporal } from '@dzcalendar/core';
 import { createKernel } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import type { CalendarInstance } from '@dzcalendar/dom';
@@ -44,5 +44,6 @@ const bench: Bench = {
     cal = null;
   },
 };
-Object.assign(window, { bench, events, DST_CASES, drawnHeight, shownEvents, kernelMs: () => kernelMs });
+// Ready at once where Temporal is native (Chrome, Edge, Firefox); once its polyfill is fetched on Safari (18i).
+void loadTemporal().then(() => Object.assign(window, { bench, events, DST_CASES, drawnHeight, shownEvents, kernelMs: () => kernelMs }));
 

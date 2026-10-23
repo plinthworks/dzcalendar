@@ -1,3 +1,4 @@
+import './prelude';
 import '@angular/compiler';
 import '../packages/theme/dzcalendar.css';
 import { Component, provideZonelessChangeDetection, signal } from '@angular/core';

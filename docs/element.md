@@ -1,6 +1,7 @@
 # The Web Component — `@dzcalendar/element`
 
 > `<dz-calendar>` (`@dzcalendar/element/define`) brings the recurrence engine itself: repeating events work as they come.
+> On Safari (no Temporal of its own), `<dz-calendar>` draws once Temporal's polyfill has arrived; `dz-dates-set` says when.
 
 
 `<dz-calendar>` for any page or framework (plain HTML, React, Vue, Svelte,

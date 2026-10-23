@@ -19,8 +19,10 @@ export function epochDay(date: PlainDate): number {
   return era * 146097 + doe - 719468;
 }
 
-const EPOCH = Temporal.PlainDate.from('1970-01-01');
+// Made on first use, not at import: Temporal may still be loading (18i, `loadTemporal()`).
+let _epoch: ReturnType<typeof Temporal.PlainDate.from> | undefined;
+const EPOCH = () => (_epoch ??= Temporal.PlainDate.from('1970-01-01'));
 
 export function fromEpochDay(n: number): PlainDate {
-  return EPOCH.add({ days: n });
+  return EPOCH().add({ days: n });
 }

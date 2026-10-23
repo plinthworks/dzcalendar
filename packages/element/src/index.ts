@@ -14,7 +14,7 @@
  * `dz-event-click`…, composed: they cross the shadow root). Bad input never
  * throws: it is a `dz-problem` event.
  */
-import { Temporal, isValidZone } from '@dzcalendar/core';
+import { Temporal, isValidZone, loadTemporal, temporalReady } from '@dzcalendar/core';
 import type { EventInput, EventSourceSpec, PlainDate, Problem, ResourceInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import type { CalendarInstance, CalendarOptions, CalendarUpdate } from '@dzcalendar/dom';
@@ -85,6 +85,11 @@ export class DzCalendarElement extends Base {
   static readonly observedAttributes = Object.keys(ATTRIBUTES);
 
   #cal: CalendarInstance | null = null;
+  /** While Temporal's polyfill loads (Safari): what was asked of the calendar, run once it is drawn (18i). */
+  #waiting: ((cal: CalendarInstance) => void)[] | null = null;
+  #drawn: () => void = () => {};
+  /** Resolved once the calendar is first drawn: at once where Temporal is native, after its polyfill on Safari. */
+  readonly ready: Promise<void> = new Promise<void>((resolve) => (this.#drawn = resolve));
   #options: CalendarOptions = {};
   #events: readonly EventInput[] | undefined;
   #resources: readonly ResourceInput[] | undefined;
@@ -268,9 +273,11 @@ export class DzCalendarElement extends Base {
   }
 
   navigate(dir: 'prev' | 'next' | 'today'): void {
+    if (!this.#cal && this.#waiting) return void this.#waiting.push((c) => c.navigate(dir));
     this.#cal?.navigate(dir);
   }
   update(changes: CalendarUpdate): void {
+    if (!this.#cal && this.#waiting) return void this.#waiting.push(() => this.update(changes));
     try {
       this.#cal?.update(changes);
     } catch {
@@ -312,6 +319,15 @@ export class DzCalendarElement extends Base {
   }
 
   #mount(keep: { view: string; date: PlainDate; store?: CalendarInstance['kernel']['store'] } | null = null): void {
+    // No Temporal of its own (Safari): drawn when its polyfill has arrived, if still in the page (owner, 18i).
+    if (!temporalReady()) {
+      this.#waiting ??= [];
+      loadTemporal().then(
+        () => this.isConnected && !this.#cal && this.#mount(keep),
+        (e: unknown) => console.error("dzcalendar: temporal-load-failed — Temporal's polyfill could not be loaded; the calendar is not drawn", e),
+      );
+      return;
+    }
     // An Angular <dz-calendar> already drew here (the same tag name): left alone.
     if (!this.shadowRoot && this.querySelector(':scope > .dz-cal')) return this.#problem(problem('element', 'already-a-calendar'));
     const shadow = (this.#shadow ??= this.hasAttribute('shadow'));
@@ -392,6 +408,10 @@ export class DzCalendarElement extends Base {
     };
     this.#cal.kernel.subscribe((e) => e.type === 'state' && say());
     say();
+    const queued = this.#waiting ?? [];
+    this.#waiting = null;
+    for (const fn of queued) fn(this.#cal);
+    this.#drawn();
   }
 
   #unmount(): void {

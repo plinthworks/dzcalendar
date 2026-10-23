@@ -410,9 +410,10 @@ describe('normalizeMany', () => {
     const pro = new URL('../../pro/test/', import.meta.url);
     const element = new URL('../../element/test/', import.meta.url);
     const compat = new URL('../../compat-fullcalendar/test/', import.meta.url);
+    const dom = new URL('../../dom/test/', import.meta.url);
     const read = (d: URL) => readdirSync(d).filter((f) => f.endsWith('.test.ts')).map((f) => readFileSync(new URL(f, d), 'utf8'));
     // iCal's, slots' and the exports' codes are asserted by those packages' own tests.
-    const self = [...read(dir), ...read(ical), ...read(slots), ...read(pro), ...read(element), ...read(compat)].join('\n');
+    const self = [...read(dir), ...read(ical), ...read(slots), ...read(pro), ...read(element), ...read(compat), ...read(dom)].join('\n');
     expect(codes.length).toBeGreaterThan(15);
     // Asserted, not merely mentioned: the code must sit inside an expected array
     // or a toContain, so a comment or a stray string cannot satisfy this.

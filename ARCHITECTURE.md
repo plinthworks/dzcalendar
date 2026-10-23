@@ -11,7 +11,7 @@ Elles priment sur le reste du document quand il dit autre chose.
 
 | Sujet | Décision |
 |---|---|
-| Lien avec tzslot | `@tzslot/core ^2.1.0` en dépendance npm, pas de copie. |
+| Lien avec tzslot | `@tzslot/core ^2.3.0` en dépendance npm (entrée `/lazy`), pas de copie. |
 | Modèle d'événement | `ZonedDateTime` avec une zone par événement ; journées entières en `PlainDate` (fin exclusive). |
 | Périmètre | Tout ce que fait FullCalendar, Premium compris. |
 | Axe DST en timeGrid (K.1) | **Option C** : axe mural + transition visible ; `elapsed` en option ; `elapsed` seul en timeline. |
@@ -81,6 +81,12 @@ Ils priment sur les sections citées.
 - **D.10 (dom)** : `MotionAdapter` gagne `beforeChange(change)` (l'ancien écran encore dessiné) et `afterChange(état, change, body)` (renvoie `true` s'il a animé le changement : `viewChange`/`eventsEnter` ne sont alors pas appelés), `titleChange`, `nowTick` ; `MotionChange { causes, direction, from, to, days, root, rtl }`, `MotionSide { view, family, date, zone, title, days }`. Plusieurs changements avant un même dessin n'en font qu'un (le premier « from », toutes les causes, le dernier « to »). Par défaut `WAAPI_MOTION` (glissement, entrées, surcouches ; coupé sous mouvement réduit et sans `Element.animate`) ; `NO_MOTION` pour rien. Les copies d'impression ont `NO_MOTION`.
 - **motion-gsap** : préréglages `SOBER` (défaut) et `EXPRESSIVE` (`MotionPreset`, chaque valeur réglable) ; effets `zone`, `dst`, `now`, `morph`, `odometer`, `today`, `depth` (chacun désactivable) ; `opacity` seulement (jamais `visibility` : le focus reste) ; `matchMedia` suivi dès le premier usage et après un `destroy` (un adaptateur peut servir plusieurs calendriers) ; un `destroy` termine les animations en cours.
 - **Décisions du propriétaire (après revue)** : budgets à la mesure + 3 % (dom 43,4 ko, motion-gsap 3,6 ko) ; « aujourd'hui » de loin = un long glissement rapide puis un arrêt amorti, sans faire défiler les périodes intermédiaires ; **plugins de la 17b fournis par l'application** (`createGsapMotion({ plugins: { InertiaPlugin, ScrollToPlugin } })`), l'effet se faisant plus simplement sans eux.
+
+### Ajustements après la Phase 18i-2 — Temporal chargé à la demande (détail dans ROADMAP.md)
+
+- **Décisions du propriétaire** : K.2 renversé — le polyfill n'est chargé que là où Temporal manque (`@tzslot/core/lazy`, `loadTemporal()`), `calendar.ready` pour les navigateurs qui attendent.
+- **C (core)** : `loadTemporal`, `temporalReady` ; aucune lecture de Temporal à l'import (vérifié par `check:entries`) ; code de problème `calendar-not-ready`.
+- **D (dom)** : `CalendarInstance.ready` ; `deferredCalendar` (file d'attente ; `run` refuse ; `kernel`/`element` lèvent avant `ready` — exception assumée à « une mauvaise entrée ne lève jamais », ce n'est pas une entrée). Adaptateurs et traduction FullCalendar attendent d'eux-mêmes ; `provideDzCalendar()` retient le démarrage Angular.
 
 ### Ajustements après la Phase 18i-1 — poids : entrées (détail dans ROADMAP.md)
 
@@ -363,8 +369,8 @@ Ils priment sur les sections citées.
 
 | Convention tzslot | Référence | Conséquence pour DzCalendar |
 |---|---|---|
-| Une seule porte d'entrée pour Temporal : `Temporal` natif sinon polyfill `/full`, jamais de fallback `Date`. | `core/src/temporal.ts:29-55` | Tout import Temporal passe par `@tzslot/core`, ré-exporté par `@dzcalendar/core/temporal.ts`. Un test de pureté interdit `Date` et le global `Temporal`. |
-| Le polyfill est un import statique (~19,7 ko gzip). | `temporal.ts:16-19`, `CLAUDE.md` | Il compte dans nos budgets. Voir G et K. |
+| Une seule porte d'entrée pour Temporal : `Temporal` natif sinon polyfill `/full`, jamais de fallback `Date`. | `core/src/temporal.ts:29-55` | Tout import Temporal passe par `@tzslot/core/lazy` (18i-2 : jamais l'entrée par défaut, qui installe le polyfill pour tous), ré-exporté par `@dzcalendar/core/temporal.ts` avec `loadTemporal` et `temporalReady`. Un test de pureté interdit `Date`, le global `Temporal` et l'entrée par défaut dans tous les paquets. |
+| Le polyfill est chargé seulement là où Temporal manque (18i-2, K.2 renversé ; ≈ 24,7 ko gzip, un chunk à part). | `temporal.ts`, `CLAUDE.md` | Hors des budgets du premier chargement ; sa ligne de taille reste suivie. Voir G et K. |
 | `resolve` → `{exists, ambiguous, offsets, instants}`, calculé par deux lectures `earlier`/`later`. | `slots.ts:106-145` | Réutilisé tel quel (`resolveWallTime`). C'est la primitive de l'axe horaire et du drop sur l'heure répétée. |
 | `getDaySlots` marche la journée en heure murale, pas en `+24h`. 0,40 ms/jour. | `slots.ts:156-198`, `ROADMAP.md` | Génère les graduations de l'axe et les candidats du moteur de créneaux. |
 | `getMonthGrid` fait toujours 6×7 `PlainDate` ISO. `firstDayFor(locale)` interroge `Intl.Locale.getWeekInfo`. `getWeekdayOrder`. | `grid.ts:31,101,115` | Base de dayGrid mois et des en-têtes. |
@@ -437,7 +443,7 @@ Règle de partage : **tout fait de fuseau horaire (temps pur) va upstream. Toute
           └──────────────────────────┴─────────────────────────────┘
                                      │
                          ┌───────────▼─────────────┐
-                         │ @tzslot/core ^2.1.0     │  Temporal (natif|polyfill),
+                         │ @tzslot/core ^2.3.0     │  Temporal (natif|polyfill),
                          │ (npm, pas de copie)     │  resolveWallTime, getDaySlots,
                          └─────────────────────────┘  getMonthGrid, firstDayFor…
 
@@ -1362,7 +1368,7 @@ Pas de `ApplicationRef.tick()` global. Compatible zoneless : la détection est e
 
 | Paquet | Budget | Remarque |
 |---|---|---|
-| `@dzcalendar/core` | ≤ 28 ko (24 avant la Phase 6) | `@tzslot/core` (≈ 20 ko, dont le polyfill statique ≈ 19,7 ko) s'ajoute. Rééquilibré avec dom le 2026-10-16 (décision du propriétaire) : l'édition de séries et la validation sont dans le core ; la somme des budgets ne change pas. |
+| `@dzcalendar/core` | ≤ 28 ko (24 avant la Phase 6) | `@tzslot/core/lazy` (≈ 0,8 ko ; le polyfill ≈ 24,7 ko seulement sans Temporal natif, 18i-2) s'ajoute. Rééquilibré avec dom le 2026-10-16 (décision du propriétaire) : l'édition de séries et la validation sont dans le core ; la somme des budgets ne change pas. |
 | `@dzcalendar/rrule` | ≤ 7 ko | |
 | `@dzcalendar/ical` | ≤ 7,5 ko | relevé par le propriétaire (Phase 9) |
 | `@dzcalendar/slots` | ≤ 5 ko | |
@@ -1525,8 +1531,8 @@ dzcalendar/
 ```
 
 Scripts `package.json` (même forme que tzslot) : `test`, `test:ci`, `test:watch`, `test:memory`, `test:perf`, `test:browser`, `typecheck` (un `tsc` par paquet puis `tsconfig.spec.json`), `start` (vite, port **4600** pour ne pas entrer en conflit avec le 4500 de tzslot), `build`, `build:theme`, `check:size`, `pack:local`, `publish:dry`, `publish:next`, `docs:api`.
-Dépendances : `@tzslot/core: ^2.1.0` en `dependencies` de core/rrule/ical/slots ; `peerDependencies` Angular `^18 … ^22` ; dev : les mêmes outils que tzslot (vitest 4, jsdom, `@analogjs/vite-plugin-angular`, ng-packagr, sass, playwright-core).
-Un test de `build.mjs` vérifie qu'aucun `dist/package.json` ne pointe vers `src/`, et que `@tzslot/core` reste sur la plage `^2.1.0`.
+Dépendances : `@tzslot/core: ^2.3.0` en `dependencies` de core/rrule/ical/slots ; `peerDependencies` Angular `^18 … ^22` ; dev : les mêmes outils que tzslot (vitest 4, jsdom, `@analogjs/vite-plugin-angular`, ng-packagr, sass, playwright-core).
+Un test de `build.mjs` vérifie qu'aucun `dist/package.json` ne pointe vers `src/`, et que `@tzslot/core` reste sur la plage `^2.3.0`.
 
 **Config vitest** : même config que tzslot (`vitest.config.ts`) mais en `projects` : `core|rrule|ical|slots|conformance` en `environment:'node'`, `dom|angular|playground` en `jsdom` (avec le plugin Angular et `setupFiles` pour Angular).
 
@@ -1684,4 +1690,4 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 - iOS : `touch-action` dynamique par événement sélectionné doit être validé sur appareil réel.
 - RRULE : la correction des combinaisons `BYSETPOS` × `BYWEEKNO` × `WKST` est coûteuse à valider, d'où le contre-contrôle par dateutil.
 - Périmètre : FullCalendar complet + Premium + 6 failles est un chantier de plusieurs produits ; l'ordre des phases est conçu pour qu'on puisse s'arrêter à P8 avec un produit cohérent (timeGrid/dayGrid + interactions + a11y).
-- `@tzslot/core` en `dependencies` : deux copies du polyfill dans une application casseraient `instanceof` ; `normalizeEvent` détecte et convertit les objets étrangers (`foreign-temporal`), et `build.mjs` vérifie la plage `^2.1.0`.
+- `@tzslot/core` en `dependencies` : deux copies du polyfill dans une application casseraient `instanceof` ; `normalizeEvent` détecte et convertit les objets étrangers (`foreign-temporal`), et `build.mjs` vérifie la plage `^2.3.0`.

@@ -4,6 +4,7 @@
  * in the page before the calendar is created; `layers=0` is `cssLayers: false`
  * with the unlayered theme. Checked by scripts/browser.mjs.
  */
+import './prelude';
 import layered from '../packages/theme/dzcalendar.css?inline';
 import flat from '../packages/theme/unlayered.css?inline';
 import preflight from '../scripts/fixtures/resets/tailwind3-preflight.css?inline';

@@ -1,4 +1,4 @@
-import { firstDayFor } from '@tzslot/core';
+import { firstDayFor } from '@tzslot/core/lazy';
 import { Temporal } from '../temporal.js';
 import type { PlainDate, Weekday } from '../temporal.js';
 

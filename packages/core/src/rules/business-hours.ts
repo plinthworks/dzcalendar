@@ -29,7 +29,9 @@ function rulesOf(input: BusinessHoursInput): readonly BusinessHoursRule[] {
   return Array.isArray(input) ? input : [input as BusinessHoursRule];
 }
 
-const MIDNIGHT = Temporal.PlainTime.from('00:00');
+// Made on first use, not at import: Temporal may still be loading (18i, `loadTemporal()`).
+let _midnight: ReturnType<typeof Temporal.PlainTime.from> | undefined;
+const MIDNIGHT = () => (_midnight ??= Temporal.PlainTime.from('00:00'));
 const asTime = (t: PlainTime | string): PlainTime | '24:00' =>
   t === '24:00' ? '24:00' : t instanceof Temporal.PlainTime ? t : Temporal.PlainTime.from(t);
 
@@ -56,7 +58,7 @@ export function businessIntervals(from: PlainDate, to: PlainDate, input: Busines
       const s = resolveWall(d, start, zone, 'compatible').instant!.epochMilliseconds;
       const crosses = end === '24:00' || Temporal.PlainTime.compare(end, start) <= 0;
       const endDate = crosses ? d.add({ days: 1 }) : d;
-      const e = resolveWall(endDate, end === '24:00' ? MIDNIGHT : end, zone, 'compatible').instant!.epochMilliseconds;
+      const e = resolveWall(endDate, end === '24:00' ? MIDNIGHT() : end, zone, 'compatible').instant!.epochMilliseconds;
       const cs = Math.max(s, winStart);
       const ce = Math.min(e, winEnd);
       if (ce > cs) spans.push({ s: cs, e: ce });

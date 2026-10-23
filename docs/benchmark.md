@@ -50,54 +50,54 @@ improved.
 
 ### Month, 10 000 events in the year (October 2026)
 
-| | DzCalendar @ c087dd4 | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
+| | DzCalendar @ 702c1a3 | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
 |---|---|---|---|
-| First render | 46.1 ms <sub>45.4–61.6</sub> | 153.3 ms <sub>148.5–160.1</sub> | 62.9 ms <sub>61.6–65.1</sub> |
-| — main-thread work | 48.8 ms <sub>46.2–62.5</sub> | 154.3 ms <sub>149.6–161.4</sub> | 63.8 ms <sub>62.4–65.8</sub> |
-| All events loaded | 96.7 ms <sub>94.1–108.2</sub> | 153.3 ms <sub>148.5–160.1</sub> | 62.9 ms <sub>61.6–65.1</sub> |
+| First render | 47.0 ms <sub>43.8–68.7</sub> | 150.9 ms <sub>143.3–155.2</sub> | 63.1 ms <sub>60.5–63.6</sub> |
+| — main-thread work | 47.4 ms <sub>44.5–69.5</sub> | 151.9 ms <sub>144.3–156.3</sub> | 63.9 ms <sub>61.2–64.3</sub> |
+| All events loaded | 100.5 ms <sub>95.9–117.1</sub> | 150.9 ms <sub>143.3–155.2</sub> | 63.1 ms <sub>60.5–63.6</sub> |
 | Events shown | 41 | 69 | 59 |
 | Elements drawn | 401 | 6709 | 711 |
-| Update one event | 14.7 ms <sub>12.2–20.8</sub> | 68.0 ms <sub>66.8–70.0</sub> | 31.7 ms <sub>31.2–32.0</sub> |
-| — main-thread work | 6.4 ms <sub>5.9–6.8</sub> | 68.1 ms <sub>66.9–70.2</sub> | 32.1 ms <sub>31.6–32.5</sub> |
-| Navigate (next) | 33.0 ms <sub>32.9–33.1</sub> | 60.6 ms <sub>59.5–65.6</sub> | 30.5 ms <sub>29.8–32.8</sub> |
-| — main-thread work | 4.8 ms <sub>4.5–5.4</sub> | 51.9 ms <sub>50.4–53.4</sub> | 16.9 ms <sub>16.4–17.0</sub> |
+| Update one event | 17.0 ms <sub>9.6–19.6</sub> | 67.4 ms <sub>65.2–75.2</sub> | 30.9 ms <sub>30.1–31.6</sub> |
+| — main-thread work | 6.1 ms <sub>5.8–8.0</sub> | 67.6 ms <sub>65.4–75.4</sub> | 31.3 ms <sub>30.5–32.1</sub> |
+| Navigate (next) | 33.0 ms <sub>33.0–33.1</sub> | 59.3 ms <sub>58.4–68.1</sub> | 32.2 ms <sub>30.2–33.0</sub> |
+| — main-thread work | 4.9 ms <sub>4.6–6.1</sub> | 51.0 ms <sub>49.8–55.3</sub> | 16.4 ms <sub>16.2–16.9</sub> |
 | Heap (JS) | 7.4 MB | 14.2 MB | 7.3 MB |
 
 ### Week, 10 000 events in the year (19–25 October 2026)
 
-| | DzCalendar @ c087dd4 | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
+| | DzCalendar @ 702c1a3 | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
 |---|---|---|---|
-| First render | 45.5 ms <sub>42.6–53.7</sub> | 93.0 ms <sub>90.1–95.8</sub> | 74.2 ms <sub>72.5–78.6</sub> |
-| — main-thread work | 46.2 ms <sub>43.3–54.4</sub> | 96.0 ms <sub>92.9–98.6</sub> | 75.0 ms <sub>73.2–79.4</sub> |
-| All events loaded | 101.5 ms <sub>91.9–108.1</sub> | 93.0 ms <sub>90.1–95.8</sub> | 74.2 ms <sub>72.5–78.6</sub> |
+| First render | 44.2 ms <sub>41.9–54.2</sub> | 92.3 ms <sub>88.6–94.7</sub> | 74.3 ms <sub>70.8–75.0</sub> |
+| — main-thread work | 46.1 ms <sub>42.6–54.9</sub> | 95.1 ms <sub>91.3–97.6</sub> | 74.9 ms <sub>71.4–75.6</sub> |
+| All events loaded | 102.5 ms <sub>93.8–107.3</sub> | 92.3 ms <sub>88.6–94.7</sub> | 74.3 ms <sub>70.8–75.0</sub> |
 | Events shown | 155 | 197 | 194 |
 | Elements drawn | 710 | 2058 | 1549 |
-| Update one event | 5.1 ms <sub>2.8–14.6</sub> | 49.7 ms <sub>49.2–50.3</sub> | 40.3 ms <sub>39.5–41.3</sub> |
-| — main-thread work | 3.2 ms <sub>3.0–3.5</sub> | 50.2 ms <sub>49.7–50.7</sub> | 40.8 ms <sub>39.9–41.8</sub> |
-| Navigate (next) | 33.1 ms <sub>33.0–33.3</sub> | 47.0 ms <sub>42.3–48.1</sub> | 34.4 ms <sub>31.5–39.1</sub> |
-| — main-thread work | 14.9 ms <sub>14.4–15.4</sub> | 39.2 ms <sub>37.9–39.3</sub> | 28.4 ms <sub>27.8–28.7</sub> |
+| Update one event | 6.7 ms <sub>2.8–17.0</sub> | 50.2 ms <sub>48.7–50.9</sub> | 40.8 ms <sub>39.1–41.8</sub> |
+| — main-thread work | 3.1 ms <sub>3.0–3.5</sub> | 50.7 ms <sub>49.2–51.6</sub> | 41.1 ms <sub>39.6–42.3</sub> |
+| Navigate (next) | 33.2 ms <sub>33.0–33.3</sub> | 46.8 ms <sub>45.0–47.3</sub> | 33.3 ms <sub>31.6–35.0</sub> |
+| — main-thread work | 14.7 ms <sub>14.2–15.0</sub> | 39.7 ms <sub>37.6–40.8</sub> | 28.5 ms <sub>27.6–29.2</sub> |
 | Heap (JS) | 7.2 MB | 9.2 MB | 8.4 MB |
 
 ### List of the week, 10 000 events in the year
 
-| | DzCalendar @ c087dd4 | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
+| | DzCalendar @ 702c1a3 | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
 |---|---|---|---|
-| First render | 39.8 ms <sub>37.8–46.5</sub> | 62.6 ms <sub>61.6–64.3</sub> | 52.8 ms <sub>52.0–53.4</sub> |
-| — main-thread work | 40.8 ms <sub>38.7–50.1</sub> | 63.1 ms <sub>62.2–64.8</sub> | 53.1 ms <sub>52.4–53.8</sub> |
-| All events loaded | 87.3 ms <sub>76.3–97.2</sub> | 62.6 ms <sub>61.6–64.3</sub> | 52.8 ms <sub>52.0–53.4</sub> |
+| First render | 39.1 ms <sub>36.2–46.6</sub> | 62.2 ms <sub>60.0–64.5</sub> | 52.3 ms <sub>49.5–53.5</sub> |
+| — main-thread work | 39.8 ms <sub>37.0–45.8</sub> | 62.7 ms <sub>60.4–65.3</sub> | 52.9 ms <sub>49.9–54.0</sub> |
+| All events loaded | 94.1 ms <sub>81.0–96.8</sub> | 62.2 ms <sub>60.1–64.5</sub> | 52.3 ms <sub>49.5–53.5</sub> |
 | Events shown | 24 | 21 | 21 |
 | Elements drawn | 1197 | 1430 | 1184 |
-| Update one event | 6.2 ms <sub>2.9–12.2</sub> | 42.6 ms <sub>42.1–43.4</sub> | 45.5 ms <sub>33.5–47.3</sub> |
-| — main-thread work | 3.2 ms <sub>3.0–3.3</sub> | 42.7 ms <sub>42.2–43.5</sub> | 34.1 ms <sub>33.7–34.7</sub> |
-| Navigate (next) | 33.0 ms <sub>32.9–33.3</sub> | 33.7 ms <sub>31.5–34.9</sub> | 33.0 ms <sub>31.2–33.1</sub> |
-| — main-thread work | 11.1 ms <sub>10.6–11.3</sub> | 27.7 ms <sub>27.3–28.2</sub> | 19.7 ms <sub>19.3–19.8</sub> |
+| Update one event | 9.9 ms <sub>3.1–18.5</sub> | 42.7 ms <sub>41.4–43.4</sub> | 33.8 ms <sub>32.5–47.0</sub> |
+| — main-thread work | 3.2 ms <sub>3.0–3.4</sub> | 42.9 ms <sub>41.6–43.6</sub> | 33.9 ms <sub>32.7–35.6</sub> |
+| Navigate (next) | 33.1 ms <sub>33.0–33.1</sub> | 34.1 ms <sub>31.1–34.9</sub> | 31.3 ms <sub>30.1–33.1</sub> |
+| — main-thread work | 11.1 ms <sub>10.7–11.4</sub> | 28.3 ms <sub>26.8–29.4</sub> | 19.5 ms <sub>18.9–19.9</sub> |
 | Heap (JS) | 7.1 MB | 7.4 MB | 6.3 MB |
 
 ### Size
 
-| | DzCalendar @ c087dd4 | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
+| | DzCalendar @ 702c1a3 | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
 |---|---|---|---|
-| Scripts and styles, gzipped | 139.6 kB | 99.9 kB | 94.9 kB |
+| Scripts and styles, gzipped | 106.1 kB | 99.9 kB | 94.9 kB |
 
 ## Days that are not 24 hours long
 
@@ -118,7 +118,7 @@ On this measure it is right where the hours drawn and the hours lived agree
 (`timeGrid: { axis: 'elapsed' }`) draws real time to scale. The marking
 itself is not measured here.
 
-| Day | Real length | DzCalendar @ c087dd4 (wall) | DzCalendar @ c087dd4 (elapsed) | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
+| Day | Real length | DzCalendar @ 702c1a3 (wall) | DzCalendar @ 702c1a3 (elapsed) | FullCalendar 6.1.21 | FullCalendar 7.1.0 |
 |---|---|---|---|---|---|
 | Paris, 25 Oct 2026 (25 h) | 7 h | 7 h ✓ | 7 h ✓ | 6 h | 6 h |
 | Chicago, 8 Mar 2026 (23 h) | 5 h | 6 h | 5 h ✓ | 6 h | 6 h |

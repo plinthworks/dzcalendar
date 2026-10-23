@@ -1,4 +1,5 @@
 // The demo has repeating events (owner, 18i: their entry is imported by the application).
+import './prelude';
 import '@dzcalendar/core/recurrence';
 import '../packages/theme/dzcalendar.css';
 import '@dzcalendar/element/define';

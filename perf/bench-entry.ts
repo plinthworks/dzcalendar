@@ -7,6 +7,7 @@
 import {
   BUILTIN_VIEWS,
   Temporal,
+  loadTemporal,
   buildResourceTree,
   flattenRows,
   buildDayGridModel,
@@ -32,6 +33,9 @@ import { findSlots } from '../packages/slots/src/index.js';
 import { buildTimelineModel, TIMELINE_VIEWS } from '../packages/pro/src/model-entry.js';
 import { findSlots as findSeats } from '../packages/pro/src/slots-entry.js';
 import type { Busy } from '../packages/slots/src/index.js';
+
+// Node has no Temporal of its own: the polyfill, as an application on Safari awaits it (18i).
+await loadTemporal();
 
 // Run by node with --expose-gc; `gc` is not in @types/node's globals.
 const gc = (globalThis as { gc?: () => void }).gc;

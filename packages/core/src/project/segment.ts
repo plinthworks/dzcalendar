@@ -168,8 +168,10 @@ export function segmentAllDay(instance: EventInstance, view: DateIndex): Segment
   return out;
 }
 
-const EPOCH = Temporal.PlainDate.from('1970-01-01');
-const dayFrom = (n: number): PlainDate => EPOCH.add({ days: n });
+// Made on first use, not at import: Temporal may still be loading (18i, `loadTemporal()`).
+let _epoch: ReturnType<typeof Temporal.PlainDate.from> | undefined;
+const EPOCH = () => (_epoch ??= Temporal.PlainDate.from('1970-01-01'));
+const dayFrom = (n: number): PlainDate => EPOCH().add({ days: n });
 
 /**
  * Bars cut at the end of each displayed week, for a grid drawn one week per

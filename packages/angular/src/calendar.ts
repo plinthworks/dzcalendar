@@ -35,6 +35,7 @@ import type {
   Weekday,
   ZoneId,
 } from '@dzcalendar/core';
+import { temporalReady } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import type { CalendarHooks, CalendarInstance, CalendarOptions, CalendarProblem, CalendarUpdate, DateClick, DropInfo, DzMessages, EventChange, EventContentCtx, EventLeave, MotionAdapter } from '@dzcalendar/dom';
 import { templateClass, templateHooks, templateShape } from '@dzcalendar/dom/toolkit';
@@ -320,7 +321,9 @@ export class DzCalendar implements OnDestroy {
     }),
   );
 
-  constructor() {
+  /** The controller, the problems and the calendar's state wired to the bindings, once the calendar is drawn. */
+  private wire(): void {
+    this.wired = true;
     this.controller.attach(this.calendar, (fn) => this.zone.runOutsideAngular(fn));
     this.reportProblems();
     let reading = false;
@@ -347,6 +350,13 @@ export class DzCalendar implements OnDestroy {
       });
     });
     this.unsubscribe = stop;
+  }
+
+  constructor() {
+    // Drawn now, or — Temporal still loading (Safari, no provideDzCalendar() holding the start) — once it is
+    // (18i): until then the calendar keeps what the bindings ask, and the controller and problems wait.
+    if (temporalReady()) this.wire();
+    else void this.calendar.ready.then(() => !this.destroyed && this.wire(), () => {});
 
     // The settings are read here, so the effect follows them; the call into the
     // calendar runs untracked. The calendar may answer by calling back — a view
@@ -378,7 +388,8 @@ export class DzCalendar implements OnDestroy {
     });
   }
 
-  private readonly unsubscribe: () => void;
+  private unsubscribe: () => void = () => {};
+  private wired = false;
 
   private destroyed = false;
 
@@ -437,6 +448,8 @@ export class DzCalendar implements OnDestroy {
   }
 
   private reportProblems(): void {
+    // Still waiting for Temporal: read once it is drawn (wire()).
+    if (!this.wired) return;
     const p = this.calendar.kernel.getProblems();
     if (p && p !== untracked(this.controller.problems)) {
       this.controller.problems.set(p);

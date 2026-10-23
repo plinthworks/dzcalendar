@@ -63,6 +63,8 @@ export default defineConfig({
     },
   },
   build: {
+    // The pages' prelude awaits Temporal at the top level (18i).
+    target: 'es2022',
     rollupOptions: {
       input: {
         index: fileURLToPath(new URL('./playground/index.html', import.meta.url)),

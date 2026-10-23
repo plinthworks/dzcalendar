@@ -16,8 +16,11 @@ whose `@tzslot/core` we depend on and whose conventions we follow.
 - `conformance/` — language-independent JSON cases, run by vitest; the future
   Swift/Kotlin ports read the same files.
   Tests run in `node`, not jsdom. `test/purity.test.ts` enforces it.
-- Temporal comes **only** from `@tzslot/core` (re-exported by `core/src/temporal.ts`).
-  One polyfill, one set of classes for apps using both libraries.
+- Temporal comes **only** from `@tzslot/core/lazy` (re-exported by `core/src/temporal.ts`
+  with `loadTemporal`), never its default entry (it installs the polyfill for
+  everyone). One polyfill, one set of classes for apps using both libraries.
+  No module reads Temporal as it is imported (Safari loads it after):
+  `npm run check:entries` checks it — the suites preload it (`test/temporal-setup.ts`).
 - `packages/dom` — `createCalendar`; views render from the kernel's model,
   keyed by date and segment key. `packages/theme` — one family with
   `@tzslot/theme` (same `--tz-*` palette). `packages/motion-gsap` — optional.

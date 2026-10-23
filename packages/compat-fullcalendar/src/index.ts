@@ -12,7 +12,9 @@
  */
 // FullCalendar's rrule events translate to repeating events: the recurrence entry comes with the translation.
 import '@dzcalendar/core/recurrence';
+import { temporalReady } from '@dzcalendar/core';
 import { createCalendar, hasRenderer } from '@dzcalendar/dom';
+import { deferredCalendar } from '@dzcalendar/dom/toolkit';
 import type { CalendarInstance, CalendarOptions as DzOptions } from '@dzcalendar/dom';
 import type { Problem } from '@dzcalendar/core';
 import type { JsEventLike } from './translate.js';
@@ -66,6 +68,29 @@ function refused(el: HTMLElement, options: Record<string, unknown>, problems: Pr
 
 /** Makes the calendar from the other library's options, its following callbacks wired. Never throws. */
 export function createFromFullCalendar(el: HTMLElement, fullCalendarOptions: unknown, compat: CompatOptions = {}): { readonly calendar: CalendarInstance; readonly problems: readonly Problem[]; detach(): void } {
+  // No Temporal of its own (Safari): translated and made once its polyfill has arrived (`calendar.ready`); the
+  // problems join the list then (and the console, as here) — owner, 18i.
+  if (!temporalReady()) {
+    const problems: Problem[] = [];
+    let detach: (() => void) | null = null;
+    let gone = false;
+    const calendar = deferredCalendar(() => {
+      const made = createFromFullCalendar(el, fullCalendarOptions, compat);
+      problems.push(...made.problems);
+      // Detached before it was made: its callbacks never wired.
+      if (gone) made.detach();
+      else detach = made.detach;
+      return made.calendar;
+    });
+    return {
+      calendar,
+      problems,
+      detach: () => {
+        gone = true;
+        detach?.();
+      },
+    };
+  }
   const t = translate(fullCalendarOptions, compat.timeZone !== undefined ? { zone: compat.timeZone } : {});
   const problems: Problem[] = [...t.problems];
   const options: Record<string, unknown> = { ...(compat.timeZone !== undefined && { timeZone: compat.timeZone }), ...(t.options as Record<string, unknown>) };
@@ -100,6 +125,28 @@ const AT_CREATION = ['virtualizeAbove', 'autoPrint'];
  * the calendar back). Never throws.
  */
 export function applyFullCalendar(calendar: CalendarInstance, fullCalendarOptions: unknown, how: { readonly initial?: boolean } = {}): { readonly problems: readonly Problem[]; detach(): void } {
+  // A calendar still waiting for Temporal (Safari): laid on once it is drawn, the problems joining the list then (18i).
+  if (!temporalReady()) {
+    const problems: Problem[] = [];
+    let detach: (() => void) | null = null;
+    let gone = false;
+    void calendar.ready.then(
+      () => {
+        if (gone) return;
+        const done = applyFullCalendar(calendar, fullCalendarOptions, how);
+        problems.push(...done.problems);
+        detach = done.detach;
+      },
+      () => {},
+    );
+    return {
+      problems,
+      detach: () => {
+        gone = true;
+        detach?.();
+      },
+    };
+  }
   // The calendar's zone (what the application settled) when the options name none.
   const t = translate(fullCalendarOptions, { zone: calendar.kernel.getState().timeZone });
   const { initialView, initialDate, timeZone, ...rest } = t.options as Record<string, unknown>;

@@ -26,6 +26,8 @@ export type ProblemCode =
   | 'invalid-rrule'
   /** An event with `rrule` while `@dzcalendar/core/recurrence` is not imported. */
   | 'recurrence-not-loaded'
+  /** A command run on a calendar still waiting for Temporal (no native one; its polyfill loading): `await calendar.ready`. */
+  | 'calendar-not-ready'
   | 'invalid-exdate'
   | 'invalid-rdate'
   | 'too-many-occurrences'

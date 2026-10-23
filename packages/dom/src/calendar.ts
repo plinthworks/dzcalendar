@@ -2,7 +2,7 @@ import { decorate, flushMounts, holder, undecorate } from './render/hooks.js';
 import type { ElementHooks, HeaderItemCtx } from './render/hooks.js';
 import { sameFormats } from './render/formats.js';
 import type { Formats } from './render/formats.js';
-import { actionsFor, assertBusinessHours, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, Temporal } from '@dzcalendar/core';
+import { actionsFor, assertBusinessHours, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, loadTemporal, Temporal, temporalReady } from '@dzcalendar/core';
 import type { CalEvent, Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
 import { attachInteractions } from './interact/host.js';
@@ -187,6 +187,13 @@ export interface CalendarUpdate extends Partial<LiveSettings> {
 }
 
 export interface CalendarInstance {
+  /**
+   * Resolved once the calendar is drawn. At once where Temporal is native; where it is not (Safari), when its
+   * polyfill has arrived — until then `update`, `navigate`, `select`, `refetch`, `onDestroy` and `destroy` wait
+   * in line, `run`/`undo`/`redo` refuse, and reading `kernel` throws (owner, 18i). Rejected with the `RangeError`
+   * of an option it could not take.
+   */
+  readonly ready: Promise<void>;
   readonly kernel: CalendarKernel;
   readonly element: HTMLElement;
   /**
@@ -337,6 +344,109 @@ function warnRecurrence(): void {
 }
 
 export function createCalendar(host: HTMLElement, options: CalendarOptions = {}): CalendarInstance {
+  return temporalReady() ? createCalendarNow(host, options) : deferredCalendar(() => createCalendarNow(host, options), options);
+}
+
+const READY = Promise.resolve();
+
+/**
+ * The calendar on a browser without Temporal of its own: `make` builds it when the polyfill has arrived
+ * (`loadTemporal()`), what is asked meanwhile kept in order (owner, 18i: the polyfill loaded only where it is
+ * missing). For a package that makes a calendar its own way (the FullCalendar translation): `@dzcalendar/dom/toolkit`.
+ */
+export function deferredCalendar(make: () => CalendarInstance, options: CalendarOptions = {}): CalendarInstance {
+  let real: CalendarInstance | null = null;
+  let destroyed = false;
+  let failed = false;
+  const queued: ((c: CalendarInstance) => void)[] = [];
+  const destroyHooks = new Set<() => void>();
+  let given: CalendarOptions = options;
+  const later = (fn: (c: CalendarInstance) => void) => (real ? fn(real) : !failed && !destroyed && queued.push(fn));
+  const ready = loadTemporal().then(
+    () => {
+      if (destroyed) return;
+      try {
+        real = make();
+      } catch (e) {
+        failed = true;
+        queued.length = 0;
+        // What createCalendar throws at once elsewhere (an option refused): `ready` rejects with it, and it is said.
+        console.error('dzcalendar: the calendar could not be made', e);
+        throw e;
+      }
+      // Each asked change on its own, as it would have been at once: one refused does not lose those after it.
+      let first: unknown = null;
+      for (const fn of queued.splice(0)) {
+        try {
+          fn(real);
+        } catch (e) {
+          console.error('dzcalendar: a change asked while Temporal loaded was refused', e);
+          first ??= e;
+        }
+      }
+      if (first !== null) throw first;
+    },
+    (e: unknown) => {
+      failed = true;
+      queued.length = 0;
+      // The polyfill could not be fetched (offline, a blocked chunk): said, not a blank box nobody explains.
+      console.error("dzcalendar: temporal-load-failed — Temporal's polyfill could not be loaded; the calendar is not drawn", e);
+      throw e;
+    },
+  );
+  // Rejected for whoever awaits it; never an unhandled rejection for whoever does not (it is said above, or thrown by make).
+  ready.catch(() => {});
+  const notYet = (what: string): never => {
+    throw new Error(`dzcalendar: calendar.${what} read before the calendar is drawn — await calendar.ready (Temporal is loading)`);
+  };
+  const refused: CommandResult = { ok: false, problems: [{ code: 'calendar-not-ready', severity: 'error', path: '', detail: 'Temporal is loading: await calendar.ready' }] };
+  const instance: CalendarInstance = {
+    ready,
+    get kernel() { return real ? real.kernel : notYet('kernel'); },
+    get element() { return real ? real.element : notYet('element'); },
+    get motion() { return real ? real.motion : options.motion ?? WAAPI_MOTION; },
+    update: (changes) => {
+      // As the drawn calendar says them: a view and a date asked are its first ones.
+      const { view, date, ...rest } = changes as CalendarUpdate & { view?: string; date?: PlainDate };
+      given = { ...given, ...(rest as CalendarOptions), ...(view !== undefined && { initialView: view }), ...(date !== undefined && { initialDate: date }) };
+      later((c) => c.update(changes));
+    },
+    navigate: (dir) => later((c) => c.navigate(dir)),
+    run: (cmd, opts) => (real ? real.run(cmd, opts) : refused),
+    undo: () => real?.undo() ?? false,
+    redo: () => real?.redo() ?? false,
+    refetch: (id) => later((c) => c.refetch(id)),
+    preparePrint: () => real?.preparePrint() ?? (() => {}),
+    select: (sel) => later((c) => c.select(sel)),
+    onDestroy: (fn) => {
+      if (real) return real.onDestroy(fn);
+      // Kept here until drawn: run by a destroy that comes first, handed to the calendar otherwise.
+      destroyHooks.add(fn);
+      let off: (() => void) | null = null;
+      later((c) => {
+        if (destroyHooks.delete(fn)) off = c.onDestroy(fn);
+      });
+      return () => {
+        destroyHooks.delete(fn);
+        off?.();
+      };
+    },
+    getOptions: () => real?.getOptions() ?? given,
+    destroy: () => {
+      if (real) return real.destroy();
+      if (destroyed) return;
+      destroyed = true;
+      queued.length = 0;
+      for (const fn of [...destroyHooks]) fn();
+      destroyHooks.clear();
+    },
+  };
+  // Not enumerable: a spread, a devtools panel or console.log reading the instance must not meet the throw.
+  for (const key of ['kernel', 'element'] as const) Object.defineProperty(instance, key, { enumerable: false });
+  return instance;
+}
+
+function createCalendarNow(host: HTMLElement, options: CalendarOptions): CalendarInstance {
   const doc = host.ownerDocument;
   const win = doc.defaultView;
   const cssLayers = options.cssLayers !== false;
@@ -1165,6 +1275,7 @@ export function createCalendar(host: HTMLElement, options: CalendarOptions = {})
   if (options.resources && firstProblems.length > 0) settings.current.onResourceProblems?.(firstProblems);
 
   return {
+    ready: READY,
     kernel,
     element: root,
     update(changes) {

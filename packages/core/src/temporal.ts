@@ -1,8 +1,9 @@
 /**
  * Where Temporal comes from: @tzslot/core, and nowhere else.
  *
- * tzslot already decides between the native Temporal and the `/full` polyfill
- * (static import, ≈20 kB gzipped — decided by the owner, kept here). Taking it
+ * Its `/lazy` entry (tzslot 2.3) gives the native Temporal where there is one
+ * and fetches the `/full` polyfill (≈ 24.5 kB gzipped) only where there is
+ * not, from `loadTemporal()` (owner, 18i: K.2 reversed). Taking it
  * from there means an app that uses both libraries carries one polyfill, and
  * one copy of the classes: two copies would make `instanceof` lie, which is
  * why `normalizeEvent` re-reads foreign Temporal objects from their string.
@@ -10,9 +11,12 @@
  * `purity.test.ts` fails if any other file touches `Date`, the global
  * `Temporal`, or `temporal-polyfill` directly.
  */
-import { Temporal } from '@tzslot/core';
+import { Temporal } from '@tzslot/core/lazy';
 
-export { Temporal, usingPolyfill } from '@tzslot/core';
+export { Temporal, usingPolyfill, loadTemporal } from '@tzslot/core/lazy';
+
+/** Temporal can be read now: native, or the polyfill loaded. Where it is not, `await loadTemporal()` first. */
+export const temporalReady = (): boolean => 'PlainDate' in Temporal;
 export type {
   PlainDate,
   PlainTime,
@@ -22,7 +26,7 @@ export type {
   Duration,
   DurationLike,
   Weekday,
-} from '@tzslot/core';
+} from '@tzslot/core/lazy';
 
 export type PlainYearMonth = ReturnType<typeof Temporal.PlainYearMonth.from>;
 /** An IANA zone identifier ("Europe/Paris", "UTC"). Never a bare offset. */

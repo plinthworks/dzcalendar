@@ -1,4 +1,5 @@
-import { InjectionToken } from '@angular/core';
+import { InjectionToken, provideAppInitializer } from '@angular/core';
+import { loadTemporal } from '@dzcalendar/core';
 import type { CalendarOptions, MotionAdapter } from '@dzcalendar/dom';
 
 /**
@@ -14,8 +15,9 @@ export const DZ_CALENDAR_DEFAULTS = new InjectionToken<DzCalendarDefaults>('dzca
 });
 
 /** `bootstrapApplication(App, { providers: [provideDzCalendar({ timeZone: 'Europe/Paris', locale: 'fr-FR' })] })` */
-export function provideDzCalendar(defaults: DzCalendarDefaults) {
-  return [{ provide: DZ_CALENDAR_DEFAULTS, useValue: defaults }];
+export function provideDzCalendar(defaults: DzCalendarDefaults = {}) {
+  // No Temporal of its own (Safari): the application starts once its polyfill has arrived — at once elsewhere (owner, 18i).
+  return [{ provide: DZ_CALENDAR_DEFAULTS, useValue: defaults }, provideAppInitializer(() => loadTemporal())];
 }
 
 /** Makes each calendar's motion adapter (one per calendar: a drag's state is the adapter's). */

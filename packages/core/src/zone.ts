@@ -1,4 +1,4 @@
-import { resolveWallTime } from '@tzslot/core';
+import { resolveWallTime } from '@tzslot/core/lazy';
 import { epochDay } from './days.js';
 import { Temporal } from './temporal.js';
 import type { Instant, PlainDate, PlainDateTime, PlainTime, ZoneId } from './temporal.js';

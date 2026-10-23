@@ -1,5 +1,6 @@
 // A stable page for before/after screenshots of the look (Phase 18g-3): fixed data, a fixed now, every view.
 // ?scheme=dark|light, ?theme=<family>.
+import './prelude';
 import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput, ResourceInput } from '@dzcalendar/core';

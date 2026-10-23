@@ -59,8 +59,12 @@ export function occurrenceRows(snap: StoreSnapshot, o: RowsOptions): OccurrenceR
   });
 }
 
-const EPOCH = Temporal.PlainDate.from('1899-12-31');
-const LEAP_BUG = Temporal.PlainDate.from('1900-03-01');
+// Made on first use, not at import: Temporal may still be loading (18i, `loadTemporal()`).
+let _epoch: ReturnType<typeof Temporal.PlainDate.from> | undefined;
+const EPOCH = () => (_epoch ??= Temporal.PlainDate.from('1899-12-31'));
+// Made on first use, not at import: Temporal may still be loading (18i, `loadTemporal()`).
+let _leap_bug: ReturnType<typeof Temporal.PlainDate.from> | undefined;
+const LEAP_BUG = () => (_leap_bug ??= Temporal.PlainDate.from('1900-03-01'));
 
 /**
  * A wall time as an Excel serial date (the time as a fraction): what Excel
@@ -70,7 +74,7 @@ const LEAP_BUG = Temporal.PlainDate.from('1900-03-01');
  */
 export function excelSerial(t: PlainDateTime | PlainDate): number | null {
   const date = 'hour' in t ? t.toPlainDate() : t;
-  const days = EPOCH.until(date, { largestUnit: 'days' }).days + (Temporal.PlainDate.compare(date, LEAP_BUG) >= 0 ? 1 : 0);
+  const days = EPOCH().until(date, { largestUnit: 'days' }).days + (Temporal.PlainDate.compare(date, LEAP_BUG()) >= 0 ? 1 : 0);
   if (days < 1) return null;
   if (!('hour' in t)) return days;
   return days + (t.hour * 3600 + t.minute * 60 + t.second) / 86400;

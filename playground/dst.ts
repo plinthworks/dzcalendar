@@ -1,3 +1,4 @@
+import './prelude';
 import '../packages/theme/dzcalendar.css';
 import { Temporal, createEventStore, createKernel, loadStaticSource, arraySource, createIdGenerator } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';

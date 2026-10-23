@@ -1,3 +1,4 @@
+import './prelude';
 import '../packages/theme/dzcalendar.css';
 import { Temporal, arraySource, createEventStore, createIdGenerator, loadStaticSource } from '@dzcalendar/core';
 import type { EventInput } from '@dzcalendar/core';

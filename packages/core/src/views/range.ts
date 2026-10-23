@@ -1,4 +1,4 @@
-import { getMonthGrid } from '@tzslot/core';
+import { getMonthGrid } from '@tzslot/core/lazy';
 import { Temporal } from '../temporal.js';
 import type { PlainDate } from '../temporal.js';
 import type { NavContext, ViewRange, ViewSpec } from './spec.js';
