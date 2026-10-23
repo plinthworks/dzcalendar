@@ -1,0 +1,86 @@
+---
+title: virtualizeAbove
+description: "Above how many events a view mounts only what is on screen."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Above this many events in a view, only what is on screen (and a margin) is mounted.
+
+<OptionFacts name="virtualizeAbove" />
+
+## What it does
+
+A view of a few hundred events mounts them all: a screen reader's browse
+mode reads every one. Past this number, the views that scroll mount only
+what is in the scrolled part (and a margin), and mount the rest as it
+scrolls in: a week's columns (counted in events), a list (in rows), a year
+of months, the Pro's timeline. A month needs none — its days cap their rows
+(`dayMaxLanes`). `Infinity` never windows; printing (`autoPrint`,
+`preparePrint()`) draws everything first. A negative number throws a
+`RangeError`.
+
+It is read when the calendar is made.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'timeGridWeek', virtualizeAbove: 2000 });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { virtualizeAbove: 2000 } }],
+  template: `<dz-calendar timeZone="Europe/Paris" view="timeGridWeek" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="timeGridWeek" initial={{ virtualizeAbove: 2000 }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="timeGridWeek" :initial="{ virtualizeAbove: 2000 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular it goes in the defaults (`DZ_CALENDAR_DEFAULTS`, `provideDzCalendar`); in React and Vue, in `initial`.
+
+## See also
+
+- `autoPrint` — everything drawn for printing.
+- [`events`](../events/) — many events (loaded in the background above 2 000).
+- [Keyboard and accessibility](../../guides/keyboard-accessibility/).

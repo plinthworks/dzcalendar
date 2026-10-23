@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Temporal } from '@dzcalendar/core';
 import { createCalendar } from '../src/index.js';
 import type { CalendarOptions } from '../src/index.js';
@@ -201,6 +201,28 @@ describe('update({ resourceOrder }) says a comparison that throws (18j review)',
     cal.update({ resourceOrder: () => { throw new Error('boom'); } });
     expect(told).toEqual(['invalid-resource resourceOrder']);
     expect(cal.kernel.getState().view.type).toBe('resourceTimeGridDay');
+    cal.destroy();
+  });
+});
+
+describe('timeGrid hours checked at creation and in update(), not when a week is drawn (18j review)', () => {
+  it('a slotMin after slotMax throws at createCalendar though a month is shown; update() merges, refuses, changes nothing', () => {
+    const host = document.body.appendChild(document.createElement('div'));
+    expect(() => createCalendar(host, { timeZone: 'Europe/Paris', initialView: 'dayGridMonth', timeGrid: { slotMin: 'PT20H', slotMax: 'PT18H' } } as CalendarOptions)).toThrow(RangeError);
+    const { cal } = mount({ timeGrid: { slotMin: 'PT8H', slotMax: 'PT18H' } });
+    expect(() => cal.update({ timeGrid: { slotMin: 'PT19H' } })).toThrow(RangeError);
+    expect(() => cal.update({ timeGrid: { slotMax: 'not a duration' as never } })).toThrow(RangeError);
+    expect(String(cal.kernel.getOptions().timeGrid?.slotMin)).toBe('PT8H');
+    cal.destroy();
+  });
+
+  it('a header view without its renderer is said once, not at each new layout', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { cal } = mount({ headerViews: ['listWeek', 'timeGridWeek'] });
+    cal.update({ headerViews: ['listWeek', 'timeGridDay'] });
+    cal.update({ headerViews: ['listWeek', 'timeGridWeek', 'timeGridDay'] });
+    expect(warn.mock.calls.filter((c) => String(c[0]).includes('no renderer for the view listWeek')).length).toBe(1);
+    warn.mockRestore();
     cal.destroy();
   });
 });

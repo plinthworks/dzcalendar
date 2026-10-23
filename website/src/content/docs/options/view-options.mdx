@@ -1,0 +1,154 @@
+---
+title: viewOptions
+description: "Options of a plugin's views, by family."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Options a family of views takes beyond the calendar's own, keyed by family.
+
+<OptionFacts name="viewOptions" />
+
+## What it does
+
+A family that is not built in — the Pro's `timeline`, a view of your own
+made with `defineView` — reads its settings from here, under its family's
+name. Today the Pro's timeline reads `viewOptions.timeline.areaColumns`: the
+resource area's columns, each `{ field, header?, width? }` (`field` read from
+the resource, then what you gave, then `extendedProps`; `width` in pixels,
+160 for the first and 110 for the others by default).
+
+`update({ viewOptions })` redraws a family whose object is replaced — compared by reference, family by family: keep the object stable. The title column's head is `messages.resource`'s words unless `header` says otherwise.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineDay',
+  resources: [{ id: 'benali', title: 'Dr Benali', room: 'A12' }, { id: 'haddad', title: 'Dr Haddad', room: 'B03' }],
+  viewOptions: { timeline: { areaColumns: [{ field: 'title', header: 'Doctor', width: 170 }, { field: 'room', header: 'Room' }] } },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-planning',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineDay" [resources]="staff"
+    [options]="{ viewOptions: { timeline: { areaColumns: [{ field: 'title', header: 'Doctor' }, { field: 'room', header: 'Room' }] } } }" />`,
+})
+export class Planning {
+  readonly staff = [{ id: 'benali', title: 'Dr Benali', room: 'A12' }];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const STAFF = [{ id: 'benali', title: 'Dr Benali', room: 'A12' }];
+const COLUMNS = { timeline: { areaColumns: [{ field: 'title', header: 'Doctor' }, { field: 'room', header: 'Room' }] } };
+
+export function Planning() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimelineDay" resources={STAFF} viewOptions={COLUMNS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const staff = [{ id: 'benali', title: 'Dr Benali', room: 'A12' }];
+const columns = { timeline: { areaColumns: [{ field: 'title', header: 'Doctor' }, { field: 'room', header: 'Room' }] } };
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineDay" :resources="staff" :options="{ viewOptions: columns }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+The timeline's resource area shows each resource's title and room.
+
+<LiveDemo
+  label={"A timeline whose resource area has two columns"}
+  height={560}
+  options={{
+    "initialView": "resourceTimelineDay",
+    "initialDate": "2026-10-21",
+    "resources": [
+      {
+        "id": "benali",
+        "title": "Dr Benali",
+        "room": "A12"
+      },
+      {
+        "id": "haddad",
+        "title": "Dr Haddad",
+        "room": "B03"
+      }
+    ],
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        },
+        "resourceId": "benali"
+      }
+    ],
+    "viewOptions": {
+      "timeline": {
+        "areaColumns": [
+          {
+            "field": "title",
+            "header": "Doctor",
+            "width": 170
+          },
+          {
+            "field": "room",
+            "header": "Room"
+          }
+        ]
+      }
+    },
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## See also
+
+- [`timeline`](../timeline/) — the timeline's scale and lanes.
+- [`resources`](../resources/) — the fields the columns read.
+- [Resources & timeline](../../guides/resources-timeline/).

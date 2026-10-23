@@ -2,7 +2,7 @@ import { decorate, flushMounts, holder, undecorate } from './render/hooks.js';
 import type { ElementHooks, HeaderItemCtx } from './render/hooks.js';
 import { sameFormats } from './render/formats.js';
 import type { Formats } from './render/formats.js';
-import { actionsFor, assertBusinessHours, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, loadTemporal, Temporal, temporalReady } from '@dzcalendar/core';
+import { actionsFor, assertBusinessHours, assertTimeGrid, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, loadTemporal, Temporal, temporalReady } from '@dzcalendar/core';
 import type { CalEvent, Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
 import { attachInteractions } from './interact/host.js';
@@ -841,7 +841,10 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   const tabsOf = (asked: readonly string[] | undefined) =>
     (asked ?? ['dayGridMonth', 'timeGridWeek', 'timeGridDay']).filter((v) => {
       if (drawable(v)) return true;
-      if (asked) console.warn(`dzcalendar: no renderer for the view ${v}${entryHint(kernel.getViewSpec(v)?.family ?? '')}`);
+      if (asked && !saidViews.has(v)) {
+        saidViews.add(v);
+        console.warn(`dzcalendar: no renderer for the view ${v}${entryHint(kernel.getViewSpec(v)?.family ?? '')}`);
+      }
       return false;
     });
   let headerAsked = options.headerViews;
@@ -850,7 +853,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   let itemsAsked = options.headerItems ?? {};
   // A header view this renderer cannot draw: said once, not at each new layout.
   const saidViews = new Set<string>();
-  const toolbar = createToolbar(doc, scope, kernel, (v) => drawable(v) || (!saidViews.has(v) && saidViews.add(v) && tabsOf([v]).length > 0), (dir) => kernel.navigate(dir), (v) => kernel.setView(v));
+  const toolbar = createToolbar(doc, scope, kernel, (v) => drawable(v) || tabsOf([v]).length > 0, (dir) => kernel.navigate(dir), (v) => kernel.setView(v));
   // Where the header goes: `headerToolbar: false` takes it out, a layout puts it back in the same place.
   const toolbarSpot = doc.createComment('dz-header');
   root.append(toolbarSpot);
@@ -1368,6 +1371,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       if (changes.timeZone && changes.timeZone !== state.timeZone && !isZone(changes.timeZone)) throw new RangeError(`not a time zone: ${changes.timeZone}`);
       if ('businessHours' in changes && changes.businessHours !== undefined) assertBusinessHours(changes.businessHours);
       if (changes.timeline) assertTimeline(changes.timeline);
+      // Before anything changes: the merged hours (update() changes nothing when it throws).
+      if (changes.timeGrid) assertTimeGrid({ ...kernel.getOptions().timeGrid, ...changes.timeGrid });
       if (changes.multiMonthMaxColumns !== undefined && !(Number.isInteger(changes.multiMonthMaxColumns) && changes.multiMonthMaxColumns >= 1)) {
         throw new RangeError(`multiMonthMaxColumns must be a whole number ≥ 1: ${changes.multiMonthMaxColumns}`);
       }

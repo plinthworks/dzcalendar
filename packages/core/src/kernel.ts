@@ -363,6 +363,19 @@ export function assertTimeGrid(t: NonNullable<ModelOptions['timeGrid']>): void {
     const v = t[k];
     if (v !== undefined && !(Number.isInteger(v) && v >= 1 && v <= 1440)) throw new RangeError(`timeGrid.${k} must be whole minutes from 1 to 1440: ${String(v)}`);
   }
+  // The hours drawn, checked here and not when a week is first drawn (a month shown, a bad slotMin waited unseen).
+  const minutes = (k: 'slotMin' | 'slotMax', fallback: number): number => {
+    const d = t[k];
+    if (d === undefined) return fallback;
+    try {
+      return Temporal.Duration.from(d).total({ unit: 'minutes' });
+    } catch {
+      throw new RangeError(`timeGrid.${k} is not a duration: ${String(d)}`);
+    }
+  };
+  const min = minutes('slotMin', 0);
+  const max = minutes('slotMax', 1440);
+  if (!(min >= 0 && max <= 1440 && min < max)) throw new RangeError(`timeGrid: 0 ≤ slotMin < slotMax ≤ 24 h (got ${min}–${max} minutes)`);
 }
 
 /** Two id lists are the same set. */
@@ -721,7 +734,8 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     },
     setOptions(next, how = {}) {
       if (next.businessHours !== undefined) assertBusinessHours(next.businessHours);
-      if (next.timeGrid) assertTimeGrid(next.timeGrid);
+      // Merged as it will be: a slotMin given alone is checked against the slotMax already there.
+      if (next.timeGrid) assertTimeGrid({ ...options.timeGrid, ...next.timeGrid });
       if (next.timeline) assertTimeline(next.timeline);
       // Equal values (per key, one level deep) change nothing and say nothing.
       const same = (a: object | undefined, b: object | undefined) =>

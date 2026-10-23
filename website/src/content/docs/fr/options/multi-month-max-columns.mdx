@@ -1,0 +1,127 @@
+---
+title: multiMonthMaxColumns
+description: "Le nombre maximal de mois côte à côte dans une vue multi-mois."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Combien de mois une vue multi-mois met côte à côte, au plus.
+
+<OptionFacts name="multiMonthMaxColumns" />
+
+## Ce qu'elle fait
+
+La vue année (`multiMonthYear`, `import '@dzcalendar/dom/multimonth'`)
+dispose ses mois en grille : autant de colonnes que la largeur en tient,
+jusqu'à ce nombre. `1` les empile, un mois sous l'autre — le choix d'un
+téléphone. Les jours d'un mois sont petits : ils montrent ce qui tient, puis
+« +N » (`dayMaxLanes`).
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/dom/multimonth';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'multiMonthYear', multiMonthMaxColumns: 2 });
+
+// Later: one month under the other.
+calendar.update({ multiMonthMaxColumns: 1 });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/dom/multimonth';
+
+@Component({
+  selector: 'app-year',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="multiMonthYear" [options]="{ multiMonthMaxColumns: 2 }" />`,
+})
+export class Year {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/dom/multimonth';
+
+export function Year() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="multiMonthYear" multiMonthMaxColumns={2} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/dom/multimonth';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="multiMonthYear" :options="{ multiMonthMaxColumns: 2 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Les mois de l'année, deux par deux.
+
+<LiveDemo
+  label={"Une année en deux colonnes de mois"}
+  height={560}
+  options={{
+    "initialView": "multiMonthYear",
+    "initialDate": "2026-10-21",
+    "multiMonthMaxColumns": 2,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`dayMaxLanes`](../day-max-lanes/) — les événements d'un petit jour.
+- [`views`](../views/) — une vue multi-mois à vous (plusieurs mois).
+- [`initialView`](../initial-view/) — s'ouvrir sur l'année.

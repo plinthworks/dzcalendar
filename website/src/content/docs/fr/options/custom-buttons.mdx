@@ -1,0 +1,114 @@
+---
+title: customButtons
+description: "Les boutons de l'application dans l'en-tête."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Des boutons à vous, nommés dans `headerToolbar`.
+
+<OptionFacts name="customButtons" />
+
+## Ce qu'elle fait
+
+Chaque clé est le nom d'un bouton, à placer dans `headerToolbar` comme
+`today` ou une vue ; chaque valeur dit ce qu'il est :
+
+- `text` : ses mots, et son nom accessible.
+- `hint` : l'infobulle montrée au survol ; le nom accessible quand il n'a pas de texte.
+- `icon` : une classe à vous (une police d'icônes, un masque) sur un `span`
+  `aria-hidden` avant les mots — nous n'avons pas de police d'icônes.
+- `click(event, el)` : ce que fait un clic.
+- `active` : un booléen, ou une fonction relue chaque fois que le calendrier
+  se dessine — le bouton est alors une bascule (`aria-pressed`), dessinée
+  enfoncée comme la vue courante.
+
+Un bouton sous un nom intégré (`today`) prend sa place. Un bouton sans `click`
+est écarté, et un bouton sans mots ni infobulle est nommé par sa clé — les
+deux signalés dans la console ; rien ne lève d'exception.
+`update({ customButtons })` redessine l'en-tête quand les mots, l'infobulle,
+l'icône d'un bouton ou son caractère de bascule changent ; de nouvelles
+fonctions pour les mêmes boutons (les fermetures d'un framework) remplacent
+seulement les gestionnaires, et le focus reste.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+let blocked = false;
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  headerToolbar: { start: 'prev,next today', center: 'title', end: 'reload blocked' },
+  customButtons: {
+    reload: { text: 'Reload', icon: 'icon-refresh', click: () => calendar.refetch() },
+    // A toggle: drawn pressed while true.
+    blocked: { text: 'Blocked slots', active: () => blocked, click: () => { blocked = !blocked; } },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { CustomButton } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ headerToolbar: { start: 'prev,next', center: 'title', end: 'export' }, customButtons: buttons }" />`,
+})
+export class Agenda {
+  readonly buttons: Record<string, CustomButton> = { export: { text: 'Export', click: () => console.log('export') } };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda({ onExport }: { onExport: () => void }) {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      headerToolbar={{ start: 'prev,next', center: 'title', end: 'export' }}
+      customButtons={{ export: { text: 'Export', click: onExport } }}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+
+const buttons = { export: { text: 'Export', click: () => console.log('export') } };
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ headerToolbar: { start: 'prev,next', center: 'title', end: 'export' }, customButtons: buttons }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue ils vont dans `options` ; en React c'est une prop.
+
+## Voir aussi
+
+- [`headerToolbar`](../header-toolbar/) — où vont les boutons.
+- [`headerItems`](../header-items/) — un emplacement à vous (un menu, un filtre).
+- [`sources`](../sources/) — ce que récupère un bouton « recharger ».

@@ -1,0 +1,189 @@
+---
+title: timeGrid
+description: "Les heures, l'échelle et l'axe de la grille horaire."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Les heures des vues semaine et jour : lesquelles sont dessinées, comment elles sont marquées, et comment se dessine un changement d'heure.
+
+<OptionFacts name="timeGrid" />
+
+## Ce qu'elle fait
+
+Fusionnée clé par clé avec `update({ timeGrid })` : donnez ce qui change,
+le reste reste ; des valeurs égales ne changent rien.
+
+- `slotMin`, `slotMax` : la première heure dessinée et la fin de la dernière
+  (une journée d'ouverture de 08:00 à 18:00). Les événements entièrement en
+  dehors ne sont pas dessinés — signalé une fois (`events-not-drawn`).
+- `slotMinutes`, `labelMinutes` : un repère toutes les `slotMinutes` dans la
+  gouttière, étiqueté toutes les `labelMinutes` (un multiple). Seuls les
+  repères étiquetés montrent un texte ; chaque repère porte `data-time` (un
+  test, un hook, les rangées de `slotLane`).
+- `minEventMinutes` : la hauteur minimale d'un événement, pour qu'un appel de
+  cinq minutes reste lisible.
+- `axis` : `'wall'` garde les rangées de tous les jours alignées — lors d'un
+  changement d'heure, l'heure qui n'existe pas est une bande qui le dit, et
+  l'heure répétée est marquée par une bande (ses deux lectures partagent ses
+  rangées) ; `'elapsed'` dessine le temps réel à l'échelle : l'heure répétée
+  apparaît deux fois et un jour de 25 heures est plus haut.
+
+La hauteur d'une heure vient de `density` (48, 72 ou 96 px) ; les lignes de la
+grille restent horaires. `slotMinutes` et `labelMinutes` sont des minutes
+entières de 1 à 1440, et `slotMin`/`slotMax` respectent 0 ≤ `slotMin` <
+`slotMax` ≤ 24 h : toute autre valeur lève une `RangeError` à `createCalendar`
+ou `update()`, avant tout changement.
+
+## Ses membres
+
+### `axis`
+
+<OptionFacts name="timeGrid.axis" />
+
+`'wall'` (par défaut) : les rangées alignées d'un jour à l'autre, l'heure sautée et l'heure répétée marquées par des bandes. `'elapsed'` : le temps réel à l'échelle — le jour de 25 heures de Paris, l'heure répétée apparaît deux fois et la nuit est plus haute d'une heure.
+
+### `labelMinutes`
+
+<OptionFacts name="timeGrid.labelMinutes" />
+
+Une étiquette toutes les tant de minutes de l'horloge ; un multiple de `slotMinutes` tombe sur un repère.
+
+### `minEventMinutes`
+
+<OptionFacts name="timeGrid.minEventMinutes" />
+
+La hauteur minimale d'un événement : un plus court est dessiné à cette hauteur, son heure réelle inchangée.
+
+### `slotMax`
+
+<OptionFacts name="timeGrid.slotMax" />
+
+La fin de la dernière heure dessinée, en durée depuis minuit, jusqu'à 24 heures (`'PT18H'`, `{ hours: 18 }`).
+
+### `slotMin`
+
+<OptionFacts name="timeGrid.slotMin" />
+
+La première heure dessinée, en durée depuis minuit (`'PT8H'`) ; les heures d'avant ne sont pas dessinées et `scrollTime` compte à partir d'ici.
+
+### `slotMinutes`
+
+<OptionFacts name="timeGrid.slotMinutes" />
+
+Un repère toutes les tant de minutes dans la gouttière : chacun porte `data-time` et reçoit son `hooks.slotLabel` et sa rangée `slotLane` ; seuls les repères étiquetés montrent un texte. Les lignes de la grille restent horaires.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  timeGrid: { slotMin: 'PT8H', slotMax: 'PT18H', slotMinutes: 15, labelMinutes: 30 },
+});
+
+// Later: real time to scale, the rest unchanged.
+calendar.update({ timeGrid: { axis: 'elapsed' } });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" axis="elapsed" [options]="{ timeGrid: { slotMin: 'PT8H', slotMax: 'PT18H' } }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+const HOURS = { slotMin: 'PT8H', slotMax: 'PT18H', slotMinutes: 15, labelMinutes: 30 };
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" timeGrid={HOURS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ timeGrid: { slotMin: 'PT8H', slotMax: 'PT18H', slotMinutes: 15, labelMinutes: 30 } }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` (`axis` est aussi une entrée en Angular et une prop en Vue) ; en React c'est une prop (et `axis` en est une à part).
+
+## Démo en direct
+
+La journée de 08:00 à 18:00, une étiquette chaque demi-heure (les repères de 15 minutes ne portent pas de texte).
+
+<LiveDemo
+  label={"Des heures d'ouverture 08:00–18:00, une étiquette chaque demi-heure"}
+  height={560}
+  options={{
+    "initialView": "timeGridDay",
+    "initialDate": "2026-10-21",
+    "timeGrid": {
+      "slotMin": "PT8H",
+      "slotMax": "PT18H",
+      "slotMinutes": 15,
+      "labelMinutes": 30
+    },
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`scrollTime`](../scroll-time/) — où défile d'abord la grille.
+- [`eventMaxStack`](../event-max-stack/) — les événements qui se chevauchent côte à côte.
+- [Fuseaux horaires et changements d'heure](../../guides/time-zones/) — les axes mural et écoulé.

@@ -105,7 +105,7 @@ export { formatTemporal, formatToPartsTemporal, formatRangeTitle, weekdayNames, 
 export type { Fmt, Formattable } from './format/intl.js';
 export { weekNumber, weekRulesFor } from './format/week.js';
 export type { WeekRules } from './format/week.js';
-export { createKernel, registerModelFamily, assertTimeline } from './kernel.js';
+export { createKernel, registerModelFamily, assertTimeline, assertTimeGrid } from './kernel.js';
 export type { CalendarKernel, KernelOptions, KernelState, KernelEvent, ViewModel, ModelFamily, ModelOptions, StateCause, TitleFormat, TitleFormatArg } from './kernel.js';
 export { businessIntervals, assertBusinessHours } from './rules/business-hours.js';
 export type { BusinessHoursRule, BusinessHoursInput } from './rules/business-hours.js';

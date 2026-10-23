@@ -1,0 +1,182 @@
+---
+title: dayMaxLanes
+description: "Combien d'événements montre un jour du mois avant « +N »."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Combien de rangées d'événements montre un jour d'un mois (ou d'une année) avant « +N ».
+
+<OptionFacts name="dayMaxLanes" />
+
+## Ce qu'elle fait
+
+- `null` : tous les événements — les semaines grandissent pour les contenir,
+  et le mois défile. La valeur par défaut dans un mois : rien n'est caché sans
+  que vous le demandiez.
+- `'auto'` : autant que la hauteur de la case en tient, puis « +N » — la
+  valeur par défaut dans les petits jours d'une année multi-mois, et le bon
+  choix pour un mois chargé.
+- Un nombre : autant de rangées, la dernière devenant « +N » quand plus
+  d'événements tombent ce jour-là.
+
+« +N » ouvre un panneau avec les événements du jour (son apparence :
+`hooks.moreLink`, `hooks.morePopover`). Si vous la donnez, un nombre ou `null`
+s'applique à toutes les grilles de jours (un mois, une semaine ou un jour en
+cases, une année) ; `'auto'` ne limite qu'un mois et une année — une semaine
+ou un jour en cases grandit pour tout montrer. Sinon, chaque vue reprend sa
+valeur par défaut quand elle s'affiche. L'option ne touche ni la grille
+horaire (`eventMaxStack`) ni la timeline (`timeline.maxLanes`).
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'dayGridMonth', dayMaxLanes: 'auto' });
+
+// Later: every event again.
+calendar.update({ dayMaxLanes: null });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="dayGridMonth" [options]="{ dayMaxLanes: 3 }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="dayGridMonth" dayMaxLanes="auto" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="dayGridMonth" :options="{ dayMaxLanes: 'auto' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Deux rangées par jour : le jeudi 22 porte cinq événements d'une journée, donc un s'affiche et la deuxième rangée est « +4 autres ».
+
+<LiveDemo
+  label={"Un mois dont les jours montrent deux rangées, puis « +N »"}
+  height={560}
+  options={{
+    "initialView": "dayGridMonth",
+    "initialDate": "2026-10-21",
+    "dayMaxLanes": 2,
+    "events": [
+      {
+        "id": "m0",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m1",
+        "title": "Appel",
+        "start": "2026-10-21T09:15[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m2",
+        "title": "Revue",
+        "start": "2026-10-21T09:30[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m3",
+        "title": "Visite",
+        "start": "2026-10-21T09:45[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m4",
+        "title": "Déjeuner",
+        "start": "2026-10-21T12:30[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "d0",
+        "title": "Congrès",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d1",
+        "title": "Congé",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d2",
+        "title": "Formation",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d3",
+        "title": "Audit",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d4",
+        "title": "Déménagement",
+        "start": "2026-10-22",
+        "allDay": true
+      }
+    ],
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## Voir aussi
+
+- [`eventMaxStack`](../event-max-stack/) — la même chose dans une grille horaire.
+- [`multiMonthMaxColumns`](../multi-month-max-columns/) — les mois côte à côte d'une année.
+- `hooks` — « +N » et son panneau (hooks.moreLink, hooks.morePopover).

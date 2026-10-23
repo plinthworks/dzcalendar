@@ -1,0 +1,139 @@
+---
+title: headerItems
+description: "Des emplacements de l'application dans l'en-tête."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Des emplacements à vous dans l'en-tête — un menu, un filtre, un badge — nommés dans `headerToolbar`.
+
+<OptionFacts name="headerItems" />
+
+## Ce qu'elle fait
+
+Chaque clé est le nom d'un emplacement, placé dans `headerToolbar` comme un
+bouton ; chaque valeur le dessine, comme le fait un hook de rendu :
+`content(ctx, el)` (une chaîne ou un nœud), `class`, `didMount({ el, ctx })`
+(une fois, après son arrivée dans la page ; elle peut renvoyer sa fonction de nettoyage) et
+`willUnmount`. Son contexte contient `name`, `view` et `title`, et
+`content` est redemandé quand ils changent : renvoyez le même nœud pour garder
+la valeur et le focus d'un contrôle.
+
+Les frameworks le dessinent avec leurs propres gabarits :
+`<ng-template dzHeaderItem="filter" let-ctx>` en Angular, la prop
+`headerItems` en React (un nœud, ou une fonction du contexte), le slot
+`#header-item-filter` en Vue.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const select = document.createElement('select');
+select.append(new Option('All doctors', ''), new Option('Dr Benali', 'benali'));
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  headerToolbar: { start: 'prev,next today', center: 'title', end: 'filter' },
+  headerItems: {
+    filter: {
+      // The same node each time: content is asked again when the view or the title changes.
+      content: () => select,
+      didMount: ({ el }) => {
+        const onChange = () => console.log('filter', (el.querySelector('select') as HTMLSelectElement).value);
+        el.addEventListener('change', onChange);
+        return () => el.removeEventListener('change', onChange);
+      },
+    },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" [options]="{ headerToolbar: { start: 'prev,next', center: 'title', end: 'filter' } }">
+      <ng-template dzHeaderItem="filter">
+        <select (change)="doctor.set($any($event.target).value)">
+          <option value="">All doctors</option>
+          <option value="benali">Dr Benali</option>
+        </select>
+      </ng-template>
+    </dz-calendar>`,
+})
+export class Agenda {
+  readonly doctor = signal('');
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [doctor, setDoctor] = useState('');
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      headerToolbar={{ start: 'prev,next', center: 'title', end: 'filter' }}
+      headerItems={{
+        filter: (
+          <select value={doctor} onChange={(e) => setDoctor(e.target.value)}>
+            <option value="">All doctors</option>
+            <option value="benali">Dr Benali</option>
+          </select>
+        ),
+      }}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const doctor = ref('');
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ headerToolbar: { start: 'prev,next', center: 'title', end: 'filter' } }">
+    <template #header-item-filter>
+      <select v-model="doctor">
+        <option value="">All doctors</option>
+        <option value="benali">Dr Benali</option>
+      </select>
+    </template>
+  </DzCalendar>
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En JavaScript, c'est une option ; dans les frameworks, les gabarits ci-dessus.
+
+## Voir aussi
+
+- [`headerToolbar`](../header-toolbar/) — où va l'emplacement.
+- [`customButtons`](../custom-buttons/) — un simple bouton à la place.
+- `hooks` — le contenu propre des autres éléments.

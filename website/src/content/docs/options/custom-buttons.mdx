@@ -1,0 +1,113 @@
+---
+title: customButtons
+description: "The application's buttons in the header."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Buttons of your own, named in `headerToolbar`.
+
+<OptionFacts name="customButtons" />
+
+## What it does
+
+Each key is a button's name, to put in `headerToolbar` like `today` or a
+view; each value says what it is:
+
+- `text`: its words, and its accessible name.
+- `hint`: shown on hover; the accessible name when there is no text.
+- `icon`: a class of yours (an icon font, a mask) on an `aria-hidden` span
+  before the words — there is no icon font of ours.
+- `click(event, el)`: what a click does.
+- `active`: a boolean, or a function re-read whenever the calendar draws —
+  the button is then a toggle (`aria-pressed`), drawn pressed like the
+  current view.
+
+A button under a built-in name (`today`) takes its place. A button with no
+`click` is left out, and one with neither words nor hint is named by its key
+— both said on the console; nothing throws. `update({ customButtons })`
+redraws the header when a button's words, hint, icon or toggle-ness change;
+new functions for the same buttons (a framework's closures) only replace the
+handlers, and the focus stays.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+let blocked = false;
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  headerToolbar: { start: 'prev,next today', center: 'title', end: 'reload blocked' },
+  customButtons: {
+    reload: { text: 'Reload', icon: 'icon-refresh', click: () => calendar.refetch() },
+    // A toggle: drawn pressed while true.
+    blocked: { text: 'Blocked slots', active: () => blocked, click: () => { blocked = !blocked; } },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { CustomButton } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ headerToolbar: { start: 'prev,next', center: 'title', end: 'export' }, customButtons: buttons }" />`,
+})
+export class Agenda {
+  readonly buttons: Record<string, CustomButton> = { export: { text: 'Export', click: () => console.log('export') } };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda({ onExport }: { onExport: () => void }) {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      headerToolbar={{ start: 'prev,next', center: 'title', end: 'export' }}
+      customButtons={{ export: { text: 'Export', click: onExport } }}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+
+const buttons = { export: { text: 'Export', click: () => console.log('export') } };
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ headerToolbar: { start: 'prev,next', center: 'title', end: 'export' }, customButtons: buttons }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`headerToolbar`](../header-toolbar/) — where the buttons go.
+- [`headerItems`](../header-items/) — a place of your own (a menu, a filter).
+- [`sources`](../sources/) — what a "reload" button refetches.

@@ -1,0 +1,188 @@
+---
+title: timeGrid
+description: "The time grid's hours, scale and axis."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The week and day views' hours: which are drawn, how they are marked, and how a clock change is drawn.
+
+<OptionFacts name="timeGrid" />
+
+## What it does
+
+Merged key by key with `update({ timeGrid })`: give what changes, the rest
+stays; equal values change nothing.
+
+- `slotMin`, `slotMax`: the first hour drawn and the end of the last (an
+  opening day of 08:00–18:00). Events entirely outside are not drawn — said
+  once (`events-not-drawn`).
+- `slotMinutes`, `labelMinutes`: a tick every `slotMinutes` in the gutter,
+  labelled every `labelMinutes` (a multiple of it). Only the labelled ticks
+  show text; every tick carries `data-time` (a test, a hook, `slotLane`'s
+  rows).
+- `minEventMinutes`: the shortest an event is drawn, so a five-minute call
+  stays readable.
+- `axis`: `'wall'` keeps every day's rows aligned — on a clock change, the
+  hour that does not exist is a band saying so, and the repeated hour is
+  marked by a band (both readings share its rows); `'elapsed'` draws real
+  time to scale: the repeated hour appears twice and a 25-hour day is taller.
+
+How tall an hour is comes from `density` (48, 72 or 96 px); the grid's lines
+stay hourly. `slotMinutes` and `labelMinutes` must be whole minutes from 1
+to 1440, and `slotMin`/`slotMax` must satisfy 0 ≤ `slotMin` < `slotMax` ≤ 24
+h: anything else throws a `RangeError` at `createCalendar` or `update()`,
+before anything changes.
+
+## Its members
+
+### `axis`
+
+<OptionFacts name="timeGrid.axis" />
+
+`'wall'` (the default): the rows aligned day to day, the skipped and the repeated hour marked by bands. `'elapsed'`: real time to scale — on Paris's 25-hour day the repeated hour appears twice and the night is an hour taller.
+
+### `labelMinutes`
+
+<OptionFacts name="timeGrid.labelMinutes" />
+
+A label every this many minutes of the clock; a multiple of `slotMinutes` lands on a tick.
+
+### `minEventMinutes`
+
+<OptionFacts name="timeGrid.minEventMinutes" />
+
+The shortest an event is drawn: a shorter one is drawn this tall, its real time unchanged.
+
+### `slotMax`
+
+<OptionFacts name="timeGrid.slotMax" />
+
+The end of the last hour drawn, as a duration from midnight, up to 24 hours (`'PT18H'`, `{ hours: 18 }`).
+
+### `slotMin`
+
+<OptionFacts name="timeGrid.slotMin" />
+
+The first hour drawn, as a duration from midnight (`'PT8H'`); the hours before are not drawn and `scrollTime` counts from here.
+
+### `slotMinutes`
+
+<OptionFacts name="timeGrid.slotMinutes" />
+
+A tick every this many minutes in the gutter: each carries `data-time` and gets its `hooks.slotLabel` and `slotLane` row; only the labelled ones show text. The grid's lines stay hourly.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  timeGrid: { slotMin: 'PT8H', slotMax: 'PT18H', slotMinutes: 15, labelMinutes: 30 },
+});
+
+// Later: real time to scale, the rest unchanged.
+calendar.update({ timeGrid: { axis: 'elapsed' } });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" axis="elapsed" [options]="{ timeGrid: { slotMin: 'PT8H', slotMax: 'PT18H' } }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+const HOURS = { slotMin: 'PT8H', slotMax: 'PT18H', slotMinutes: 15, labelMinutes: 30 };
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" timeGrid={HOURS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ timeGrid: { slotMin: 'PT8H', slotMax: 'PT18H', slotMinutes: 15, labelMinutes: 30 } }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options` (`axis` is also an Angular input and a Vue prop); in React it is a prop (and `axis` one of its own).
+
+## Live demo
+
+The day from 08:00 to 18:00, labelled every half hour (the 15-minute ticks carry no text).
+
+<LiveDemo
+  label={"Opening hours 08:00–18:00, labels every half hour"}
+  height={560}
+  options={{
+    "initialView": "timeGridDay",
+    "initialDate": "2026-10-21",
+    "timeGrid": {
+      "slotMin": "PT8H",
+      "slotMax": "PT18H",
+      "slotMinutes": 15,
+      "labelMinutes": 30
+    },
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`scrollTime`](../scroll-time/) — where the grid is scrolled to first.
+- [`eventMaxStack`](../event-max-stack/) — overlapping events side by side.
+- [Time zones and clock changes](../../guides/time-zones/) — the wall and elapsed axes.

@@ -1,0 +1,177 @@
+---
+title: eventMaxStack
+description: "How many overlapping events a time grid shows side by side before \"+N\"."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+How many overlapping events a time grid draws side by side before "+N".
+
+<OptionFacts name="eventMaxStack" />
+
+## What it does
+
+Events at the same time share their column's width. Past this many, the
+column keeps one lane fewer and puts the rest behind a "+N" in the last lane,
+one per stretch of time.
+
+- `'auto'` (the default): as many as the column's width allows, about 2.5rem
+  each — a phone's narrow columns stack fewer than a desktop's.
+- A number: at most that many (1: all of a crowded moment behind one "+N").
+- `null`: all of them, however thin.
+
+"+N" opens a panel with the events behind it.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', eventMaxStack: 3 });
+
+// Later: every event, however thin.
+calendar.update({ eventMaxStack: null });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ eventMaxStack: 3 }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" eventMaxStack={3} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ eventMaxStack: 3 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+Four events overlap on Wednesday morning: at most three, so two show and "+2" holds the rest.
+
+<LiveDemo
+  label={"Four overlapping events, three side by side then \"+N\""}
+  height={560}
+  options={{
+    "initialView": "timeGridDay",
+    "initialDate": "2026-10-21",
+    "scrollTime": "PT8H",
+    "eventMaxStack": 3,
+    "events": [
+      {
+        "id": "m0",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m1",
+        "title": "Call",
+        "start": "2026-10-21T09:15[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m2",
+        "title": "Review",
+        "start": "2026-10-21T09:30[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m3",
+        "title": "Visit",
+        "start": "2026-10-21T09:45[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m4",
+        "title": "Lunch",
+        "start": "2026-10-21T12:30[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "d0",
+        "title": "Congress",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d1",
+        "title": "Day off",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d2",
+        "title": "Training",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d3",
+        "title": "Audit",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d4",
+        "title": "Move",
+        "start": "2026-10-22",
+        "allDay": true
+      }
+    ],
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## See also
+
+- [`dayMaxLanes`](../day-max-lanes/) — the same in a month.
+- [`timeGrid`](../time-grid/) — the time grid's hours and scale.
+- `hooks` — "+N" and its panel.

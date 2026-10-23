@@ -1,0 +1,86 @@
+---
+title: virtualizeAbove
+description: "Au-delà de combien d'événements une vue ne monte que ce qui est à l'écran."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Au-delà de ce nombre d'événements dans une vue, seul ce qui est à l'écran (et une marge) est monté.
+
+<OptionFacts name="virtualizeAbove" />
+
+## Ce qu'elle fait
+
+Une vue de quelques centaines d'événements les monte tous : le mode
+navigation d'un lecteur d'écran les lit tous. Au-delà de ce nombre, les vues qui défilent ne
+montent que ce qui est dans la partie défilée (et une marge), et montent le
+reste quand il arrive au défilement : les colonnes d'une semaine (comptées en
+événements), une liste (en lignes), une année de mois, la timeline du Pro. Un
+mois n'en a pas besoin — ses jours limitent leurs rangées (`dayMaxLanes`).
+`Infinity` ne virtualise jamais ; l'impression (`autoPrint`, `preparePrint()`)
+dessine d'abord tout. Un nombre négatif lève une `RangeError`.
+
+Elle est lue à la création du calendrier.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'timeGridWeek', virtualizeAbove: 2000 });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { virtualizeAbove: 2000 } }],
+  template: `<dz-calendar timeZone="Europe/Paris" view="timeGridWeek" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="timeGridWeek" initial={{ virtualizeAbove: 2000 }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="timeGridWeek" :initial="{ virtualizeAbove: 2000 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular elle va dans les valeurs par défaut (`DZ_CALENDAR_DEFAULTS`, `provideDzCalendar`) ; en React et en Vue, dans `initial`.
+
+## Voir aussi
+
+- `autoPrint` — tout dessiné pour l'impression.
+- [`events`](../events/) — beaucoup d'événements (chargés en arrière-plan au-delà de 2 000).
+- [Clavier et accessibilité](../../guides/keyboard-accessibility/).

@@ -1,0 +1,179 @@
+---
+title: eventMaxStack
+description: "Combien d'événements qui se chevauchent une grille horaire montre côte à côte avant « +N »."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Combien d'événements qui se chevauchent une grille horaire dessine côte à côte avant « +N ».
+
+<OptionFacts name="eventMaxStack" />
+
+## Ce qu'elle fait
+
+Les événements à la même heure se partagent la largeur de leur colonne.
+Au-delà de ce nombre, la colonne garde un couloir de moins et met le reste
+derrière un « +N » dans le dernier couloir, un par tranche de temps.
+
+- `'auto'` (la valeur par défaut) : autant que la largeur de la colonne le
+  permet, environ 2,5rem chacun — les colonnes étroites d'un téléphone en
+  empilent moins que celles d'un ordinateur.
+- Un nombre : au plus autant (1 : tout un moment chargé derrière un seul
+  « +N »).
+- `null` : tous, aussi fins soient-ils.
+
+« +N » ouvre un panneau avec les événements qu'il cache.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', eventMaxStack: 3 });
+
+// Later: every event, however thin.
+calendar.update({ eventMaxStack: null });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ eventMaxStack: 3 }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" eventMaxStack={3} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ eventMaxStack: 3 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Quatre événements se chevauchent le mercredi matin : au plus trois, donc deux s'affichent et « +2 » garde le reste.
+
+<LiveDemo
+  label={"Quatre événements qui se chevauchent, trois côte à côte puis « +N »"}
+  height={560}
+  options={{
+    "initialView": "timeGridDay",
+    "initialDate": "2026-10-21",
+    "scrollTime": "PT8H",
+    "eventMaxStack": 3,
+    "events": [
+      {
+        "id": "m0",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m1",
+        "title": "Appel",
+        "start": "2026-10-21T09:15[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m2",
+        "title": "Revue",
+        "start": "2026-10-21T09:30[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m3",
+        "title": "Visite",
+        "start": "2026-10-21T09:45[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m4",
+        "title": "Déjeuner",
+        "start": "2026-10-21T12:30[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "d0",
+        "title": "Congrès",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d1",
+        "title": "Congé",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d2",
+        "title": "Formation",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d3",
+        "title": "Audit",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d4",
+        "title": "Déménagement",
+        "start": "2026-10-22",
+        "allDay": true
+      }
+    ],
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## Voir aussi
+
+- [`dayMaxLanes`](../day-max-lanes/) — la même chose dans un mois.
+- [`timeGrid`](../time-grid/) — les heures et l'échelle de la grille horaire.
+- `hooks` — « +N » et son panneau.

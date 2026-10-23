@@ -1,0 +1,137 @@
+---
+title: headerViews
+description: "The view switcher's buttons."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The views the header's switcher offers, in order.
+
+<OptionFacts name="headerViews" />
+
+## What it does
+
+Without `headerToolbar`, the header's end is these views joined as one
+switcher, the current one pressed. By default: month, week and day — those
+whose renderer is imported (`dayGridMonth`, `timeGridWeek`, `timeGridDay`
+with `@dzcalendar/dom`). Name any view: a built-in one, one of your `views`,
+`listWeek` with `@dzcalendar/dom/list`. A single view: no switcher.
+
+With `headerToolbar` given, the views are named there instead and this option
+is not read. A view whose renderer is not imported is left out and said once
+on the console. The buttons' words come from `messages.views`.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/dom/list';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek'] });
+
+// Later: the week alone (no switcher).
+calendar.update({ headerViews: ['timeGridWeek'] });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/dom/list';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek'] }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/dom/list';
+
+const VIEWS = ['dayGridMonth', 'timeGridWeek', 'listWeek'];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" headerViews={VIEWS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/dom/list';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek'] }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+The header offers the month, the week and the list.
+
+<LiveDemo
+  label={"A switcher offering the month, the week and the list"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "headerViews": [
+      "dayGridMonth",
+      "timeGridWeek",
+      "listWeek"
+    ],
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`headerToolbar`](../header-toolbar/) — the whole header, the views named in it.
+- [`views`](../views/) — views of your own to offer.
+- [`initialView`](../initial-view/) — the one shown first.

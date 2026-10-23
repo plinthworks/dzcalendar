@@ -50,6 +50,10 @@
 - `createCalendar` checks `firstDay` and `hiddenDays` as `update()` does (a
   week with no day, a weekday outside 1–7: `RangeError`).
 - `messages: { views }` keeps the built-in views' labels beside the ones given.
+- `timeGrid.slotMin` / `slotMax` are checked at `createCalendar` and `update()`
+  (merged with what is there), not when a week is first drawn.
+- A header view without its renderer is said once on the console, not at
+  each new layout.
 - Vue: a bare `business-hours` attribute is `true` (it was an empty string, refused).
 - `resourceOrder`: an absent value goes last in a descending order too; a
   comparison that throws puts the whole tree in input order (not half

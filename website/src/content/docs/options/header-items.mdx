@@ -1,0 +1,137 @@
+---
+title: headerItems
+description: "Places of the application's own in the header."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Places of your own in the header — a menu, a filter, a badge — named in `headerToolbar`.
+
+<OptionFacts name="headerItems" />
+
+## What it does
+
+Each key is a place's name, put in `headerToolbar` like a button; each
+value draws it, as a render hook does: `content(ctx, el)` (a string or a
+node), `class`, `didMount({ el, ctx })` (once, after it is in the page; it may
+return its clean-up) and `willUnmount`. Its context holds `name`, `view` and
+`title`, and `content` is asked again when they change: return the same node
+to keep a control's value and focus.
+
+The frameworks draw it with their own templates: Angular's
+`<ng-template dzHeaderItem="filter" let-ctx>`, React's `headerItems` prop (a
+node, or a function of the context), Vue's `#header-item-filter` slot.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const select = document.createElement('select');
+select.append(new Option('All doctors', ''), new Option('Dr Benali', 'benali'));
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  headerToolbar: { start: 'prev,next today', center: 'title', end: 'filter' },
+  headerItems: {
+    filter: {
+      // The same node each time: content is asked again when the view or the title changes.
+      content: () => select,
+      didMount: ({ el }) => {
+        const onChange = () => console.log('filter', (el.querySelector('select') as HTMLSelectElement).value);
+        el.addEventListener('change', onChange);
+        return () => el.removeEventListener('change', onChange);
+      },
+    },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" [options]="{ headerToolbar: { start: 'prev,next', center: 'title', end: 'filter' } }">
+      <ng-template dzHeaderItem="filter">
+        <select (change)="doctor.set($any($event.target).value)">
+          <option value="">All doctors</option>
+          <option value="benali">Dr Benali</option>
+        </select>
+      </ng-template>
+    </dz-calendar>`,
+})
+export class Agenda {
+  readonly doctor = signal('');
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [doctor, setDoctor] = useState('');
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      headerToolbar={{ start: 'prev,next', center: 'title', end: 'filter' }}
+      headerItems={{
+        filter: (
+          <select value={doctor} onChange={(e) => setDoctor(e.target.value)}>
+            <option value="">All doctors</option>
+            <option value="benali">Dr Benali</option>
+          </select>
+        ),
+      }}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const doctor = ref('');
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ headerToolbar: { start: 'prev,next', center: 'title', end: 'filter' } }">
+    <template #header-item-filter>
+      <select v-model="doctor">
+        <option value="">All doctors</option>
+        <option value="benali">Dr Benali</option>
+      </select>
+    </template>
+  </DzCalendar>
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In plain JavaScript it is an option; in the frameworks, the templates above.
+
+## See also
+
+- [`headerToolbar`](../header-toolbar/) — where the place goes.
+- [`customButtons`](../custom-buttons/) — a plain button instead.
+- `hooks` — the other elements' own content.

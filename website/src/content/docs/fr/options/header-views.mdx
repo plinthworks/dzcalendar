@@ -1,0 +1,138 @@
+---
+title: headerViews
+description: "Les boutons du sélecteur de vues."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Les vues que propose le sélecteur de l'en-tête, dans l'ordre.
+
+<OptionFacts name="headerViews" />
+
+## Ce qu'elle fait
+
+Sans `headerToolbar`, la fin de l'en-tête est faite de ces vues réunies en
+un seul sélecteur, la vue courante enfoncée. Par défaut : mois, semaine et
+jour — celles dont le rendu est importé (`dayGridMonth`, `timeGridWeek`,
+`timeGridDay` avec `@dzcalendar/dom`). Nommez n'importe quelle vue : une vue
+intégrée, l'une de vos `views`, `listWeek` avec `@dzcalendar/dom/list`. Une
+seule vue : pas de sélecteur.
+
+Si `headerToolbar` est donné, les vues y sont nommées et cette option n'est
+pas lue. Une vue dont le rendu n'est pas importé est écartée et signalée une
+fois dans la console. Les mots des boutons viennent de `messages.views`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/dom/list';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek'] });
+
+// Later: the week alone (no switcher).
+calendar.update({ headerViews: ['timeGridWeek'] });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/dom/list';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek'] }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/dom/list';
+
+const VIEWS = ['dayGridMonth', 'timeGridWeek', 'listWeek'];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" headerViews={VIEWS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/dom/list';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek'] }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+L'en-tête propose le mois, la semaine et la liste.
+
+<LiveDemo
+  label={"Un sélecteur qui propose le mois, la semaine et la liste"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "headerViews": [
+      "dayGridMonth",
+      "timeGridWeek",
+      "listWeek"
+    ],
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`headerToolbar`](../header-toolbar/) — l'en-tête entier, les vues qui y sont nommées.
+- [`views`](../views/) — vos propres vues à proposer.
+- [`initialView`](../initial-view/) — celle montrée en premier.

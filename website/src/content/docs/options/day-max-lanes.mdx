@@ -1,0 +1,179 @@
+---
+title: dayMaxLanes
+description: "How many events a month day shows before \"+N\"."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+How many rows of events a day of a month (or of a year) shows before "+N".
+
+<OptionFacts name="dayMaxLanes" />
+
+## What it does
+
+- `null`: every event — the weeks grow to hold them, and the month scrolls.
+  The default in a month: nothing is hidden unless you ask.
+- `'auto'`: as many as the cell's height holds, then "+N" — the default in a
+  multi-month year's tiny days, and the right choice for a crowded month.
+- A number: that many rows, the last one becoming "+N" when more events
+  fall on the day.
+
+"+N" opens a panel with the day's events (its look: `hooks.moreLink`,
+`hooks.morePopover`). Given, a number or `null` holds in every day grid (a month,
+a week or a day of day cells, a year); `'auto'` caps a month and a year only —
+a week or a day of cells grows to show everything. Left out, each view takes
+its own default again when it is shown. It does not touch the time grid
+(`eventMaxStack`) nor the timeline (`timeline.maxLanes`).
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'dayGridMonth', dayMaxLanes: 'auto' });
+
+// Later: every event again.
+calendar.update({ dayMaxLanes: null });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="dayGridMonth" [options]="{ dayMaxLanes: 3 }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="dayGridMonth" dayMaxLanes="auto" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="dayGridMonth" :options="{ dayMaxLanes: 'auto' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+Two rows a day: Thursday the 22nd holds five all-day events, so one shows and the second row is "+4 more".
+
+<LiveDemo
+  label={"A month whose days show two rows, then \"+N\""}
+  height={560}
+  options={{
+    "initialView": "dayGridMonth",
+    "initialDate": "2026-10-21",
+    "dayMaxLanes": 2,
+    "events": [
+      {
+        "id": "m0",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m1",
+        "title": "Call",
+        "start": "2026-10-21T09:15[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m2",
+        "title": "Review",
+        "start": "2026-10-21T09:30[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m3",
+        "title": "Visit",
+        "start": "2026-10-21T09:45[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "m4",
+        "title": "Lunch",
+        "start": "2026-10-21T12:30[Europe/Paris]",
+        "duration": {
+          "minutes": 60
+        }
+      },
+      {
+        "id": "d0",
+        "title": "Congress",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d1",
+        "title": "Day off",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d2",
+        "title": "Training",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d3",
+        "title": "Audit",
+        "start": "2026-10-22",
+        "allDay": true
+      },
+      {
+        "id": "d4",
+        "title": "Move",
+        "start": "2026-10-22",
+        "allDay": true
+      }
+    ],
+    "timeZone": "Europe/Paris"
+  }}
+/>
+
+## See also
+
+- [`eventMaxStack`](../event-max-stack/) — the same in a time grid.
+- [`multiMonthMaxColumns`](../multi-month-max-columns/) — a year's months side by side.
+- `hooks` — "+N" and its panel (hooks.moreLink, hooks.morePopover).
