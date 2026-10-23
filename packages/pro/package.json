@@ -37,7 +37,7 @@
     }
   },
   "peerDependencies": {
-    "@tzslot/dom": "^2.2.0"
+    "@tzslot/dom": "^2.4.0"
   },
   "peerDependenciesMeta": {
     "@tzslot/dom": {
@@ -45,6 +45,6 @@
     }
   },
   "devDependencies": {
-    "@tzslot/dom": "^2.2.0"
+    "@tzslot/dom": "^2.4.0"
   }
 }

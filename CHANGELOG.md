@@ -40,6 +40,9 @@
 
 ### Fixed
 
+- The Pro editor takes tzslot's widgets from `@tzslot/dom/lazy` (`@tzslot/dom`
+  ^2.4.0): the Temporal polyfill is no longer in its chunk for every browser.
+
 - Angular: `<dz-calendar>` makes its calendar once its inputs are bound: a
   `timeZone` input no longer says `zone-from-browser`, `scrollTime` in
   `[options]` scrolls the first grid, the first view and date are the

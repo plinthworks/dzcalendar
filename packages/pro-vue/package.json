@@ -11,7 +11,7 @@
   },
   "peerDependencies": {
     "vue": "^3.4.0",
-    "@tzslot/dom": "^2.2.0",
+    "@tzslot/dom": "^2.4.0",
     "@dzcalendar/vue": "0.0.0"
   },
   "exports": {

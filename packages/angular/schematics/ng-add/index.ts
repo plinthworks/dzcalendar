@@ -49,7 +49,7 @@ export function ngAdd(o: NgAddOptions): Rule {
     return chain([
       ...ours(['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/theme']),
       ...(o.gsap ? [peer('gsap', '^3.13.0'), ...ours(['@dzcalendar/motion-gsap'])] : []),
-      ...(o.pro ? [...ours(['@dzcalendar/pro', '@dzcalendar/pro-angular']), peer('@tzslot/dom', '^2.2.0')] : []),
+      ...(o.pro ? [...ours(['@dzcalendar/pro', '@dzcalendar/pro-angular']), peer('@tzslot/dom', '^2.4.0')] : []),
       // The theme in the application's styles (once).
       updateWorkspace((ws) => {
         const build = ws.projects.get(name)?.targets.get('build');

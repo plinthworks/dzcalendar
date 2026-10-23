@@ -11,7 +11,7 @@
   },
   "peerDependencies": {
     "@angular/core": "^19.0.0 || ^20.0.0 || ^21.0.0 || ^22.0.0",
-    "@tzslot/dom": "^2.2.0",
+    "@tzslot/dom": "^2.4.0",
     "@dzcalendar/angular": "0.0.0"
   },
   "main": "./src/index.ts",

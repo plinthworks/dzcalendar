@@ -66,10 +66,9 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   without native Temporal (Safari); `calendar.ready`, every wrapper waiting
   by itself, `provideDzCalendar()` holding Angular's start. Public benchmark
   126.8 → 106.1 kB gzip on Chrome (FullCalendar 7: 94.9 — the goal not met
-  yet). Open: the Pro editor still brings the polyfill statically through
-  `@tzslot/dom` (38 % of its chunk; `@tzslot/dom/lazy` asked of tzslot, its
-  owner's decision); tzslot 2.3.1 (a failed `loadTemporal()` retried,
-  ca3ccd1) to adopt when published; `<dz-calendar>`'s `ready` never resolves
+  yet). The Pro editor on `@tzslot/dom/lazy` (tzslot 2.4.0, which also retries a
+  failed `loadTemporal()`): its chunk 38.2 kB gzip, the polyfill a chunk apart
+  (it was in the editor's chunk for every browser). Open: `<dz-calendar>`'s `ready` never resolves
   if its mount gives up or it leaves before Temporal arrives.
 - **In progress: 18j (the documentation site).** 18j-1 committed ("Phase
   18j-1"): the site as it was, reviewed (54 pages EN/FR, examples compiled

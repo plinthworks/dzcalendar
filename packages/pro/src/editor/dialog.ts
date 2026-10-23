@@ -3,8 +3,10 @@ import type { CalEvent, Command, CommandResult, CreateRequest, EditScope, EventI
 import { ensureStyles, messagesForLocale } from '@dzcalendar/dom';
 import { activeIn, targetOf } from '@dzcalendar/dom/toolkit';
 import type { CalendarInstance } from '@dzcalendar/dom';
-import { createDateTimeRange, EN as TZ_EN, FR as TZ_FR, AR as TZ_AR } from '@tzslot/dom';
-import type { DateTimeRangeInstance } from '@tzslot/dom';
+// The /lazy entry (tzslot 2.4): the widgets without the Temporal polyfill, which the application loads where it is
+// missing (`loadTemporal()`) — the default entry would put it in the editor's chunk for every browser (18i).
+import { createDateTimeRange, EN as TZ_EN, FR as TZ_FR, AR as TZ_AR } from '@tzslot/dom/lazy';
+import type { DateTimeRangeInstance } from '@tzslot/dom/lazy';
 import { editorMessagesFor } from './messages.js';
 import type { EditorMessages } from './messages.js';
 import { nthOf, readRepeat, writeRepeat } from './recurrence.js';
