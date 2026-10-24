@@ -1,0 +1,103 @@
+---
+title: droppable
+description: "Ce qui peut être déposé sur le calendrier depuis la page ou un autre calendrier."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Ce qui peut être déposé ici : un élément de la page rendu glissable, ou un événement d'un autre calendrier.
+
+<OptionFacts name="droppable" />
+
+## Ce qu'elle fait
+
+- `true` : tout. `false` (par défaut) : rien.
+- Une fonction `(data) => boolean` : un filtre, qui reçoit la `data` de
+  l'élément — ou, pour un événement venu d'un autre calendrier, l'événement
+  lui-même.
+
+Un élément de la page devient glissable avec `makeDraggable(el, { event,
+data, create? })` (`@dzcalendar/dom/drag`) : `event` est ce qu'il devient (un
+événement sans son début — l'endroit du dépôt le donne — ou une fonction qui
+en rend un, lue au début du glissement) ; avec `create: false`, aucun
+événement n'est créé et `onDrop` seul entend le dépôt. Déposé, l'événement
+est créé par une commande vérifiée comme un geste (les `rules` s'appliquent),
+`onDrop` entend le dépôt et `onEventReceive` l'événement — `revert()` l'annule. Un événement glissé depuis un autre calendrier demande que celui-ci
+soit aussi `editable` (ou que l'événement soit lui-même modifiable) ; le calendrier
+qu'il a quitté entend `onEventLeave`. Le clavier peut tout faire : Entrée sur
+l'élément le saisit, Tab atteint un calendrier, les flèches le placent,
+Entrée le dépose.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import { makeDraggable } from '@dzcalendar/dom/drag';
+
+// A card of the waiting list: it becomes a 30-minute consultation where it is dropped.
+makeDraggable(document.getElementById('patient-42')!, {
+  event: { title: 'Consultation', duration: { minutes: 30 } },
+  data: { patientId: 42 },
+});
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  // Only patients, not the other cards of the page.
+  droppable: (data) => typeof data === 'object' && data !== null && 'patientId' in data,
+  onEventReceive: (change) => console.log('booked', change.after?.start.toString()),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ droppable: true }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" droppable />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ droppable: true }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop. Le dépôt et l'événement sont `(dropped)` et `(eventReceive)` en Angular, `@dropped` et `@event-receive` en Vue, `onDrop` et `onEventReceive` en React.
+
+## Voir aussi
+
+- `onDrop` — un élément déposé.
+- `onEventReceive` — l'événement créé ou arrivé.
+- [Glisser-déposer](../../guides/drag-and-drop/).

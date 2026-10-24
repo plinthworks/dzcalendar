@@ -122,7 +122,7 @@ export interface LiveSettings {
    */
   readonly dragEdgeNavigate?: boolean;
   /**
-   * Timed events can be resized from their start too. Default false.
+   * Events — timed or all-day — can be resized from their start too, not only their end. Default false.
    * @default false
    */
   readonly eventResizableFromStart?: boolean;

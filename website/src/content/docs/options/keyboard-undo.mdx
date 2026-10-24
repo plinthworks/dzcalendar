@@ -1,0 +1,85 @@
+---
+title: keyboardUndo
+description: "Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z inside the calendar."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Undo and redo from the keyboard inside an editable calendar.
+
+<OptionFacts name="keyboardUndo" />
+
+## What it does
+
+In an `editable` calendar, Ctrl/Cmd+Z undoes the last change and
+Ctrl/Cmd+Shift+Z (or Ctrl+Y) redoes it, said for a screen reader — when the
+focus is in the calendar, not in your fields, and not while an event is
+held. False leaves those keys to your application (its own undo across the
+page). `calendar.undo()` and `calendar.redo()` work either way.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', editable: true, keyboardUndo: false });
+
+// The application's own undo, for the whole page.
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') calendar.undo();
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ keyboardUndo: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable keyboardUndo={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ keyboardUndo: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`historyLimit`](../history-limit/) — how many changes can be undone.
+- [`editable`](../editable/) — the changes a person makes.
+- [Keyboard and accessibility](../../guides/keyboard-accessibility/).

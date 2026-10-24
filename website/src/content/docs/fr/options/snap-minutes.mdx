@@ -1,0 +1,123 @@
+---
+title: snapMinutes
+description: "Les minutes sur lesquelles s'alignent les gestes dans une grille horaire."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Le pas, en minutes, sur lequel s'alignent les déplacements, redimensionnements, sélections et moments du menu contextuel dans une grille horaire.
+
+<OptionFacts name="snapMinutes" />
+
+## Ce qu'elle fait
+
+Un événement glissé tombe sur un multiple de ce nombre de minutes ; un
+redimensionnement, une sélection, les flèches du clavier et « Nouvel
+événement à 14:30 » du menu contextuel utilisent le même pas. Il ne dépend pas
+du dessin de la grille (`timeGrid.slotMinutes`) : une grille étiquetée toutes
+les heures peut s'aligner sur cinq minutes. Les jours d'un mois restent des
+jours entiers, quoi que dise cette option. Une valeur qui n'est pas un nombre
+entier de minutes de 1 à 1440 lève une `RangeError`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', editable: true, snapMinutes: 5 });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ snapMinutes: 5 }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable snapMinutes={5} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ snapMinutes: 5 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Glissez un événement : il se déplace par pas de cinq minutes.
+
+<LiveDemo
+  label={"Une semaine modifiable alignée sur 5 minutes"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "editable": true,
+    "snapMinutes": 5,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`editable`](../editable/) — déplacer et redimensionner.
+- [`selectable`](../selectable/) — sélectionner.
+- [`timeGrid`](../time-grid/) — comment se dessinent les heures de la grille.

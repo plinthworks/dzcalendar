@@ -1,0 +1,105 @@
+---
+title: chooseScope
+description: "Jusqu'où va un geste sur un événement répété."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Décide jusqu'où va le déplacement, le redimensionnement ou la suppression d'une occurrence d'un événement répété.
+
+<OptionFacts name="chooseScope" />
+
+## Ce qu'elle fait
+
+Une personne glisse une occurrence d'une réunion hebdomadaire : est-ce
+celle-ci, celle-ci et les suivantes, ou toutes ? Par défaut, le calendrier le
+demande, avec un petit menu « celle-ci / les suivantes / toutes » là où
+l'événement a été déposé.
+
+Donnez une fonction pour en décider vous-même — votre propre boîte de dialogue, ou une
+règle : elle reçoit `{ instance, kind, proposal? }` (`kind` vaut `'move'`,
+`'resize'` ou `'delete'`) (`proposal` pour un déplacement ou un redimensionnement) et renvoie, ou
+résout vers, `'this'`, `'following'` ou `'all'` — ou `null` pour annuler,
+l'événement retournant alors à sa place. Une promesse permet au calendrier
+d'attendre votre boîte de dialogue. Elle est consultée pour un glissement, un
+redimensionnement et la touche Suppr ; le « Supprimer » du menu contextuel
+sur une occurrence a son propre sous-menu celle-ci / les suivantes / toutes
+(pour l'interdire, écartez `event.delete` avec `contextMenu`). Un glissement
+qui fait passer une occurrence de l'horaire à la journée entière, ou
+l'inverse, ne change que celle-ci, sans demander.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/core/recurrence';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  events: [{ id: 'staff', title: 'Staff meeting', start: '2026-10-19T09:00[Europe/Paris]', rrule: 'FREQ=WEEKLY' }],
+  // The Delete key: always this one; a drag or a resize asks the application's own dialog.
+  chooseScope: async ({ kind }) => (kind === 'delete' ? 'this' : (await askScope()) ?? null),
+});
+
+declare function askScope(): Promise<'this' | 'following' | 'all' | null>;
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ chooseScope: thisOne }" />`,
+})
+export class Agenda {
+  // A drag, a resize or the Delete key changes the one occurrence touched.
+  readonly thisOne = () => 'this' as const;
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable chooseScope={() => 'this'} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+
+const thisOne = () => 'this' as const;
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ chooseScope: thisOne }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Voir aussi
+
+- [`editable`](../editable/) — les gestes sur les événements.
+- [`events`](../events/) — les événements répétés (rrule).
+- [Récurrence](../../guides/recurrence/).

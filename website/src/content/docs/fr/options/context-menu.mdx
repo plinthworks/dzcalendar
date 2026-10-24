@@ -1,0 +1,117 @@
+---
+title: contextMenu
+description: "Les entrées du menu contextuel : garder, réordonner, ajouter, remplacer."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Décide de ce que propose le menu contextuel sur une case, un jour ou un événement.
+
+<OptionFacts name="contextMenu" />
+
+## Ce qu'elle fait
+
+Le calendrier ouvre un menu sur un clic droit, un appui long sur un écran
+tactile, ou la touche Menu / Maj+F10 sur la case ou l'événement qui a le
+focus. Ses entrées intégrées dépendent de la cible : « Nouvel événement à
+14:30 », « Aller à ce jour » sur une plage horaire ; « Ouvrir », « Déplacer… »,
+« Changer la durée… », « Supprimer » sur un événement. Une entrée
+qui ne s'applique pas est omise — « Nouvel événement » sans
+`onCreateRequest`, « Ouvrir » sans `onEventOpen`, les entrées d'édition sans
+le droit de modifier ; dans une heure sautée, « Nouvel événement à… » porte
+une raison. Sans aucune d'elles, le menu du navigateur reste.
+
+`contextMenu(ctx, defaults)` renvoie les entrées à montrer : `ctx` contient la
+`target` (`kind` `'slot'`, `'day'` ou `'event'`, avec son moment, sa date, sa
+ressource ou son instance d'événement) et le `state` du calendrier ;
+`defaults` sont les entrées intégrées (leurs identifiants : `event.create`,
+`view.goToDay`, `event.open`, `event.move`, `event.resize`, `event.delete` —
+sur une occurrence, ses enfants `event.delete.this`, `.following`, `.all`).
+Gardez-les, réordonnez-les, ajoutez les vôtres — chacune `{ id, label,
+enabled, run?, command?, reason?, shortcut?, icon?, children? }` ; une entrée
+`enabled: false` avec une `reason` est montrée grisée avec elle — ou renvoyez
+`null` (ou `[]`) pour laisser le menu du navigateur. La cible est
+`{ kind: 'slot', date, instant, ambiguous, … }`, `{ kind: 'day', date }` ou
+`{ kind: 'event', instance }`, avec `resourceId` dans une vue ressources.
+Le menu lui-même — clavier, focus, sous-menus, placement, thème — est celui
+du calendrier.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  contextMenu: ({ target }, defaults) =>
+    target.kind === 'event'
+      ? [...defaults, { id: 'invoice', label: 'Send the invoice', enabled: true, run: () => console.log('invoice', target.instance.event.id) }]
+      : defaults,
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { ActionItem } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { ContextMenuCtx } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ contextMenu: menu }" />`,
+})
+export class Agenda {
+  // No deleting from the menu here.
+  readonly menu = (_ctx: ContextMenuCtx, defaults: readonly ActionItem[]) => defaults.filter((item) => !item.id.startsWith('event.delete'));
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import type { ActionItem } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const withoutDelete = (_ctx: unknown, defaults: readonly ActionItem[]) => defaults.filter((item) => !item.id.startsWith('event.delete'));
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable contextMenu={withoutDelete} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { ActionItem } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const withoutDelete = (_ctx: unknown, defaults: readonly ActionItem[]) => defaults.filter((item) => !item.id.startsWith('event.delete'));
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ contextMenu: withoutDelete }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Voir aussi
+
+- `onEventChange` — ce que devient une modification du menu.
+- [`editable`](../editable/) — les entrées d'édition.
+- [Clavier et accessibilité](../../guides/keyboard-accessibility/).

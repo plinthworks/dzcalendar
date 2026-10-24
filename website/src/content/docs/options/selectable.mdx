@@ -1,0 +1,144 @@
+---
+title: selectable
+description: "Whether a person can select a stretch of time."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Lets a person select a stretch of empty time — to book it, to block it.
+
+<OptionFacts name="selectable" />
+
+## What it does
+
+With `selectable: true`, dragging across empty time selects it: hours in
+a time grid, days in a month. On the keyboard, Enter on a slot selects it
+and Shift+arrows grow it (said as it grows); Enter gives it to the
+application.
+
+`onSelect(selection)` hears it: `{ start, end, allDay, resourceId? }`, the
+start and end in the calendar's zone (`ZonedDateTime`s), or dates for whole
+days — the end then the day after the last one. On a touch screen, a tap on
+empty time selects one slot, with handles to stretch it. Enter (or Space) on
+a slot is also a date click. The selection stays drawn until a click elsewhere, Escape or
+another period (`onUnselect`); `calendar.select(selection | null)` shows or
+clears one from your code. A mouse click does not select: a click is a date
+click (`onDateClick`).
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  selectable: true,
+  onSelect: ({ start, end }) => console.log(`book ${start.toString()} → ${end.toString()}`),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import type { Selection } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" [selectable]="true" [(selection)]="selection" />
+    @if (selection(); as s) { <p>From {{ s.start.toString() }} to {{ s.end.toString() }}</p> }`,
+})
+export class Agenda {
+  readonly selection = signal<Selection | null>(null);
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [selection, setSelection] = useState<Selection | null>(null);
+  return <DzCalendar timeZone="Europe/Paris" selectable selection={selection} onSelectionChange={setSelection} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { shallowRef } from 'vue';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const selection = shallowRef<Selection | null>(null);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" selectable v-model:selection="selection" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an input: Angular's `selectable` (and the two-way `[(selection)]`), React's `selectable` (with `selection` and `onSelectionChange`), Vue's `selectable` (with `v-model:selection`).
+
+## Live demo
+
+Drag across empty hours to select them.
+
+<LiveDemo
+  label={"A week where empty time can be selected"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "selectable": true,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- `onSelect` — what was selected.
+- `onUnselect` — the selection gone.
+- [Selection](../../guides/selection/).

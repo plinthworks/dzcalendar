@@ -1,0 +1,122 @@
+---
+title: snapMinutes
+description: "The minutes gestures snap to in a time grid."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The step, in minutes, that drags, resizes, selections and context-menu moments snap to in a time grid.
+
+<OptionFacts name="snapMinutes" />
+
+## What it does
+
+A dragged event lands on a multiple of this many minutes; a resize, a
+selection, the keyboard's arrows and "New event at 14:30" from the context
+menu use the same step. It is independent of how the grid is drawn
+(`timeGrid.slotMinutes`): a grid labelled every hour can still snap to five
+minutes. Days in a month are whole days, whatever this says. A value that is
+not whole minutes from 1 to 1440 throws a `RangeError`.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', editable: true, snapMinutes: 5 });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ snapMinutes: 5 }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable snapMinutes={5} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ snapMinutes: 5 }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+Drag an event: it moves by five minutes.
+
+<LiveDemo
+  label={"An editable week snapping to 5 minutes"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "editable": true,
+    "snapMinutes": 5,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`editable`](../editable/) — moving and resizing.
+- [`selectable`](../selectable/) — selecting.
+- [`timeGrid`](../time-grid/) — how the grid's hours are drawn.

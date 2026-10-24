@@ -248,6 +248,8 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
         return moveCursor(at, f && typeof f === 'object' ? f : keys!.home(), false);
       }
       case 'enter': {
+        // A selection being made: Enter gives it to the application, even on a day that holds events (18j review).
+        if (anchor && shared.selection) return activate(at);
         const items = keys!.itemsAt(at);
         if (items.length > 0) {
           items[0]!.focus();

@@ -2,20 +2,13 @@
   "$comment": "Options whose page (EN and FR) is not written yet: website/test/option-pages.test.ts holds every other option to its two pages. It only shrinks; the last batch deletes it (owner, 18j: online first, then batches).",
   "pending": [
     "autoPrint",
-    "chooseScope",
-    "contextMenu",
     "cssLayers",
     "density",
     "displayCalendar",
-    "dragEdgeNavigate",
-    "droppable",
-    "editable",
-    "eventResizableFromStart",
     "eventStyle",
     "formats",
     "hooks",
     "injectStyles",
-    "keyboardUndo",
     "look",
     "messages",
     "motion",
@@ -35,8 +28,6 @@
     "onUnselect",
     "scheme",
     "secondaryCalendar",
-    "selectable",
-    "snapMinutes",
     "theme"
   ]
 }

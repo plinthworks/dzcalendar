@@ -20,8 +20,12 @@ export function handles(el: HTMLElement, seg: Segment, bg: boolean): void {
  */
 export const mayMove = (ev: CalEvent, editable: boolean | undefined): boolean => ev.perms.start && (editable === true || ev.perms.own?.start === true);
 export const mayResize = (ev: CalEvent, editable: boolean | undefined): boolean => ev.perms.duration && (editable === true || ev.perms.own?.duration === true);
-/** Deleting: the calendar editable, or the event saying `true` for both its start and its length (`editable: true`). */
-export const mayDelete = (ev: CalEvent, editable: boolean | undefined): boolean => editable === true || (ev.perms.own?.start === true && ev.perms.own?.duration === true);
+/**
+ * Deleting: the calendar editable and the event not closed to every change (its own `editable: false` wins, as for a
+ * move — 18j review), or the event saying `true` for both its start and its length (`editable: true`).
+ */
+export const mayDelete = (ev: CalEvent, editable: boolean | undefined): boolean =>
+  (editable === true && (ev.perms.start || ev.perms.duration)) || (ev.perms.own?.start === true && ev.perms.own?.duration === true);
 
 /** An event's node, in any family (the time grid's, the day grid's bars, a timeline's): what gestures grab. */
 /** An event's node — never a leaving copy (the motion's, on its way out). */

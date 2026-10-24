@@ -1,0 +1,121 @@
+---
+title: eventResizableFromStart
+description: "Si les événements se redimensionnent aussi par leur début."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Permet de redimensionner un événement par son début, et pas seulement par sa fin.
+
+<OptionFacts name="eventResizableFromStart" />
+
+## Ce qu'elle fait
+
+Sans cette option, un événement (horaire ou d'une journée entière) ne se
+redimensionne que par sa fin ; avec elle, par son début aussi : un
+rendez-vous avancé en tirant son haut, la barre d'un congrès dans un mois
+étirée d'un jour vers l'arrière. Au clavier, Alt+Maj+flèches tirent le début
+d'un événement saisi.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', editable: true, eventResizableFromStart: true });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ eventResizableFromStart: true }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable eventResizableFromStart />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ eventResizableFromStart: true }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+Tirez le haut ou le bas d'un événement.
+
+<LiveDemo
+  label={"Une semaine modifiable dont les événements se redimensionnent par les deux bouts"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "editable": true,
+    "eventResizableFromStart": true,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`editable`](../editable/) — ce qui peut changer.
+- [`snapMinutes`](../snap-minutes/) — le pas sur lequel s'aligne un redimensionnement.
+- [`rules`](../rules/) — les limites de là où il peut aller.

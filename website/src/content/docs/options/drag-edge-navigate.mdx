@@ -1,0 +1,83 @@
+---
+title: dragEdgeNavigate
+description: "Holding a dragged event at the side goes to the previous or next period."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Holding a dragged event at the side of the calendar goes to the previous or the next period.
+
+<OptionFacts name="dragEdgeNavigate" />
+
+## What it does
+
+While an event is dragged, held near the start or the end side of the
+grid for a moment (0.6 s in a time grid, 0.9 s in a month or a timeline),
+the calendar moves to the previous or next week (month, day…) and the drag
+goes on there — an appointment moves to next Tuesday without dropping it
+and paging. With `false` a pointer drag stays in the period shown; the
+keyboard's held event still goes on to the next period when an arrow passes
+the edge. Only moves page, not resizes, and not an element dragged in from
+the page.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', editable: true, dragEdgeNavigate: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ dragEdgeNavigate: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable dragEdgeNavigate={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ dragEdgeNavigate: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`editable`](../editable/) — dragging events.
+- [`droppable`](../droppable/) — dropping from elsewhere.
+- [Drag and drop](../../guides/drag-and-drop/).

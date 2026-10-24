@@ -1,0 +1,114 @@
+---
+title: contextMenu
+description: "The context menu's entries: keep, reorder, add, replace."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Decides what the context menu offers on a slot, a day or an event.
+
+<OptionFacts name="contextMenu" />
+
+## What it does
+
+The calendar opens a menu on a right-click, a long press on a touch screen,
+or the Menu key / Shift+F10 on the focused slot or event. Its built-in
+entries depend on the target: "New event at 14:30", "Go to this day" on
+time; "Open", "Move…", "Change duration…", "Delete" on an event. An entry that does not apply is left out — "New event" without
+`onCreateRequest`, "Open" without `onEventOpen`, the editing entries
+without the right to edit; in a skipped hour "New event at…" carries a
+reason. With none of them, the browser's own menu stays.
+
+`contextMenu(ctx, defaults)` returns the entries to show: `ctx` holds the
+`target` (`kind` `'slot'`, `'day'` or `'event'`, with its moment, date,
+resource or event instance) and the calendar's `state`; `defaults` are the
+built-in entries (their ids: `event.create`, `view.goToDay`, `event.open`,
+`event.move`, `event.resize`, `event.delete` — on an occurrence its
+children `event.delete.this`, `.following`, `.all`). Keep them, reorder them,
+add your own — each `{ id, label, enabled, run?, command?, reason?,
+shortcut?, icon?, children? }`; one `enabled: false` with a `reason` is shown
+greyed out with it — or return `null` (or `[]`) to leave the browser's own
+menu. The target is `{ kind: 'slot', date, instant, ambiguous, … }`, `{ kind:
+'day', date }` or `{ kind: 'event', instance }`, with `resourceId` in a
+resource view. The menu itself — keyboard, focus,
+sub-menus, placement, theme — is the calendar's.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  contextMenu: ({ target }, defaults) =>
+    target.kind === 'event'
+      ? [...defaults, { id: 'invoice', label: 'Send the invoice', enabled: true, run: () => console.log('invoice', target.instance.event.id) }]
+      : defaults,
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { ActionItem } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { ContextMenuCtx } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ contextMenu: menu }" />`,
+})
+export class Agenda {
+  // No deleting from the menu here.
+  readonly menu = (_ctx: ContextMenuCtx, defaults: readonly ActionItem[]) => defaults.filter((item) => !item.id.startsWith('event.delete'));
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import type { ActionItem } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const withoutDelete = (_ctx: unknown, defaults: readonly ActionItem[]) => defaults.filter((item) => !item.id.startsWith('event.delete'));
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable contextMenu={withoutDelete} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { ActionItem } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const withoutDelete = (_ctx: unknown, defaults: readonly ActionItem[]) => defaults.filter((item) => !item.id.startsWith('event.delete'));
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ contextMenu: withoutDelete }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- `onEventChange` — what a menu change becomes.
+- [`editable`](../editable/) — the editing entries.
+- [Keyboard and accessibility](../../guides/keyboard-accessibility/).

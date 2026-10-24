@@ -226,3 +226,13 @@ describe('timeGrid hours checked at creation and in update(), not when a week is
     cal.destroy();
   });
 });
+
+describe('deleting and Enter, after the 18j review', () => {
+  it("an event's own editable: false is not deletable in an editable calendar (menu nor Delete key)", async () => {
+    const { mayDelete } = await import('../src/interact/handles.js');
+    const { cal } = mount({ editable: true, events: [{ id: 'locked', title: 'Locked', start: '2026-10-21T09:00[Africa/Algiers]', editable: false }, { id: 'free', title: 'Free', start: '2026-10-21T11:00[Africa/Algiers]' }] });
+    const byId = (id: string) => [...cal.kernel.store.snapshot.allEvents()].find((e) => e.id === id)!;
+    expect([mayDelete(byId('locked'), true), mayDelete(byId('free'), true), mayDelete(byId('free'), false)]).toEqual([false, true, false]);
+    cal.destroy();
+  });
+});

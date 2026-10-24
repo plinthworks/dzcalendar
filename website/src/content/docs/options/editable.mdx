@@ -1,0 +1,149 @@
+---
+title: editable
+description: "Whether a person can move, resize and delete events."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Lets a person move, resize and delete the calendar's events — with the pointer, the keyboard or the context menu.
+
+<OptionFacts name="editable" />
+
+## What it does
+
+With `editable: true`:
+
+- a timed event drags to another time or day, and resizes from its end
+  (from its start too with `eventResizableFromStart`); an all-day event
+  drags between days and stretches over more;
+- the keyboard does the same: **M** (or Alt+Enter) on an event holds it, the
+  arrows move it, Shift+arrows pull its end, Enter puts it down, Escape
+  puts it back;
+- the context menu offers "Move…", "Change duration…" and "Delete";
+- Ctrl/Cmd+Z undoes and Ctrl/Cmd+Shift+Z redoes (`keyboardUndo`).
+
+Every change is a command, checked against `rules` and undoable; when it is
+made, `onEventChange(change)` hears it — persist it, and `change.revert()`
+if your server refuses. An event's own `editable`, `startEditable` or
+`durationEditable` wins over the calendar's: a `true` of its own makes it
+editable in a calendar that is not (`durationEditable: true` alone: resized,
+not moved), and such an event carries `data-editable` (`move`, `resize`); an
+event closed to every change (`editable: false`) is neither moved, resized
+nor deleted in an editable calendar.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventChange: (change) => {
+    fetch(`/api/events/${change.after?.id}`, { method: 'PUT', body: JSON.stringify(change.after) })
+      .then((res) => { if (!res.ok) change.revert(); });
+  },
+});
+
+// Later: read-only.
+calendar.update({ editable: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { EventChange } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" (eventChange)="save($event)" />`,
+})
+export class Agenda {
+  save(change: EventChange): void {
+    console.log('changed', change.after?.id);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable onEventChange={(change) => console.log('changed', change.after?.id)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable @event-change="(change) => console.log(change.after?.id)" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an input: Angular's `editable`, React's `editable`, Vue's `editable`; the change is Angular's `(eventChange)`, React's `onEventChange`, Vue's `@event-change`.
+
+## Live demo
+
+Drag an event, resize it from its end, or focus it (Tab or a click) and press M then the arrows.
+
+<LiveDemo
+  label={"An editable week"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "editable": true,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- `onEventChange` — persist a change, or revert it.
+- [`rules`](../rules/) — where events may go.
+- [Drag and drop](../../guides/drag-and-drop/).

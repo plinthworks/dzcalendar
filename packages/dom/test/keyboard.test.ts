@@ -527,6 +527,16 @@ describe('grab mode covers every drag (acceptance)', () => {
     expect(got.map((s) => [String(s.start), String(s.end)])).toEqual([['2026-10-21', '2026-10-24']]);
   });
 
+  it('18j review: Enter gives the selection to the application on a month day that holds events', () => {
+    const got: Selection[] = [];
+    mount([{ id: 'x', title: 'Visite', start: '2026-10-23T09:00[Europe/Paris]' }], { selectable: true, onSelect: (s: Selection) => got.push(s) });
+    document.querySelector<HTMLElement>('.dz-dg__cell[data-date="2026-10-21"]')!.focus();
+    press('ArrowRight', { shiftKey: true });
+    press('ArrowRight', { shiftKey: true });
+    press('Enter');
+    expect(got.map((s) => [String(s.start), String(s.end)])).toEqual([['2026-10-21', '2026-10-24']]);
+  });
+
   it('the focus leaving the calendar lets go of a held event', () => {
     const host = mount([meeting], week);
     const outside = document.createElement('button');

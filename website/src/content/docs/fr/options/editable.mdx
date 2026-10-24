@@ -1,0 +1,151 @@
+---
+title: editable
+description: "Si une personne peut déplacer, redimensionner et supprimer les événements."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Permet à une personne de déplacer, redimensionner et supprimer les événements du calendrier — au pointeur, au clavier ou par le menu contextuel.
+
+<OptionFacts name="editable" />
+
+## Ce qu'elle fait
+
+Avec `editable: true` :
+
+- un événement horaire se glisse vers une autre heure ou un autre jour, et se
+  redimensionne par sa fin (par son début aussi avec
+  `eventResizableFromStart`) ; un événement d'une journée entière se glisse
+  entre les jours et s'étire sur plusieurs ;
+- le clavier fait de même : **M** (ou Alt+Entrée) sur un événement le saisit,
+  les flèches le déplacent, Maj+flèches tirent sa fin, Entrée le pose,
+  Échap le remet ;
+- le menu contextuel propose « Déplacer… », « Changer la durée… » et
+  « Supprimer » ;
+- Ctrl/Cmd+Z annule et Ctrl/Cmd+Maj+Z rétablit (`keyboardUndo`).
+
+Chaque modification est une commande, vérifiée par `rules` et annulable ;
+une fois faite, `onEventChange(change)` l'entend — enregistrez-la, et
+`change.revert()` si votre serveur refuse. Les `editable`, `startEditable` ou
+`durationEditable` propres à un événement l'emportent sur l'`editable` du
+calendrier : un `true` qui lui est propre le rend modifiable dans un calendrier qui ne
+l'est pas (`durationEditable: true` seul : redimensionné, pas déplacé) ; un
+tel événement porte `data-editable` (`move`, `resize`) ; un événement fermé à
+toute modification (`editable: false`) n'est pas supprimé non plus.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventChange: (change) => {
+    fetch(`/api/events/${change.after?.id}`, { method: 'PUT', body: JSON.stringify(change.after) })
+      .then((res) => { if (!res.ok) change.revert(); });
+  },
+});
+
+// Later: read-only.
+calendar.update({ editable: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { EventChange } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" (eventChange)="save($event)" />`,
+})
+export class Agenda {
+  save(change: EventChange): void {
+    console.log('changed', change.after?.id);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable onEventChange={(change) => console.log('changed', change.after?.id)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable @event-change="(change) => console.log(change.after?.id)" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `editable` en Angular, en React et en Vue ; la modification est `(eventChange)` en Angular, `onEventChange` en React, `@event-change` en Vue.
+
+## Démo en direct
+
+Glissez un événement, redimensionnez-le par sa fin, ou donnez-lui le focus (Tab ou un clic) et appuyez sur M puis les flèches.
+
+<LiveDemo
+  label={"Une semaine modifiable"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "editable": true,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- `onEventChange` — enregistrer une modification, ou l'annuler.
+- [`rules`](../rules/) — où peuvent aller les événements.
+- [Glisser-déposer](../../guides/drag-and-drop/).

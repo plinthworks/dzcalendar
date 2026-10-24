@@ -1,0 +1,83 @@
+---
+title: dragEdgeNavigate
+description: "Tenir un événement glissé sur le bord mène à la période précédente ou suivante."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Tenir un événement glissé sur le bord du calendrier mène à la période précédente ou suivante.
+
+<OptionFacts name="dragEdgeNavigate" />
+
+## Ce qu'elle fait
+
+Pendant qu'on glisse un événement, le tenir un instant près du bord de
+début ou de fin de la grille (0,6 s dans une grille horaire, 0,9 s dans un
+mois ou une timeline) fait passer le calendrier à la semaine (au mois, au
+jour…) précédente ou suivante, et le glissement continue là — un rendez-vous
+passe au mardi suivant sans le lâcher pour tourner la page. Avec `false`, un glissement au pointeur reste dans la période affichée ;
+l'événement saisi au clavier passe toujours à la période suivante quand une
+flèche dépasse le bord. Seuls les déplacements tournent la page, pas les
+redimensionnements, ni un élément glissé depuis la page.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', editable: true, dragEdgeNavigate: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ dragEdgeNavigate: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable dragEdgeNavigate={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ dragEdgeNavigate: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Voir aussi
+
+- [`editable`](../editable/) — glisser les événements.
+- [`droppable`](../droppable/) — déposer depuis ailleurs.
+- [Glisser-déposer](../../guides/drag-and-drop/).

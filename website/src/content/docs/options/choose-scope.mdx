@@ -1,0 +1,102 @@
+---
+title: chooseScope
+description: "How far a gesture on a repeating event reaches."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Decides how far a move, a resize or a deletion of one occurrence of a repeating event reaches.
+
+<OptionFacts name="chooseScope" />
+
+## What it does
+
+A person drags an occurrence of a weekly meeting: is it this one, this one
+and the following, or all of them? By default the calendar asks, with a
+small "this / following / all" menu where the event was dropped.
+
+Give a function to decide yourself — your own dialog, or a rule: it receives
+`{ instance, kind, proposal? }` (`kind` is `'move'`, `'resize'` or `'delete'`)
+(`proposal` for a move or a resize) and returns, or resolves to, `'this'`,
+`'following'` or `'all'` — or `null` to cancel, the event going back to its
+place. A promise lets the calendar wait for your dialog. It is asked for a
+drag, a resize and the Delete key; the context menu's "Delete" on an
+occurrence has its own this / following / all sub-menu (to forbid it, leave
+`event.delete` out with `contextMenu`). A drag that turns an occurrence
+timed to all-day, or back, changes that one only, without asking.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/core/recurrence';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  events: [{ id: 'staff', title: 'Staff meeting', start: '2026-10-19T09:00[Europe/Paris]', rrule: 'FREQ=WEEKLY' }],
+  // The Delete key: always this one; a drag or a resize asks the application's own dialog.
+  chooseScope: async ({ kind }) => (kind === 'delete' ? 'this' : (await askScope()) ?? null),
+});
+
+declare function askScope(): Promise<'this' | 'following' | 'all' | null>;
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ chooseScope: thisOne }" />`,
+})
+export class Agenda {
+  // A drag, a resize or the Delete key changes the one occurrence touched.
+  readonly thisOne = () => 'this' as const;
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable chooseScope={() => 'this'} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+
+const thisOne = () => 'this' as const;
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ chooseScope: thisOne }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`editable`](../editable/) — gestures on events.
+- [`events`](../events/) — repeating events (rrule).
+- [Recurrence](../../guides/recurrence/).

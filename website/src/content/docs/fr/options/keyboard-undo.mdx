@@ -1,0 +1,86 @@
+---
+title: keyboardUndo
+description: "Ctrl/Cmd+Z et Ctrl/Cmd+Maj+Z dans le calendrier."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Annuler et rétablir au clavier dans un calendrier modifiable.
+
+<OptionFacts name="keyboardUndo" />
+
+## Ce qu'elle fait
+
+Dans un calendrier `editable`, Ctrl/Cmd+Z annule la dernière modification et
+Ctrl/Cmd+Maj+Z (ou Ctrl+Y) la rétablit, annoncé à un lecteur d'écran — quand
+le focus est dans le calendrier, pas dans vos champs, et pas pendant qu'un
+événement est saisi. Avec `false`, ces touches restent à votre application
+(sa propre commande d'annulation, sur toute la page). `calendar.undo()` et
+`calendar.redo()` marchent dans les deux cas.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', editable: true, keyboardUndo: false });
+
+// The application's own undo, for the whole page.
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') calendar.undo();
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ keyboardUndo: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable keyboardUndo={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ keyboardUndo: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Voir aussi
+
+- [`historyLimit`](../history-limit/) — combien de modifications peuvent être annulées.
+- [`editable`](../editable/) — les modifications d'une personne.
+- [Clavier et accessibilité](../../guides/keyboard-accessibility/).

@@ -1,0 +1,146 @@
+---
+title: selectable
+description: "Si une personne peut sélectionner une plage horaire."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Permet à une personne de sélectionner une plage vide — pour la réserver, pour la bloquer.
+
+<OptionFacts name="selectable" />
+
+## Ce qu'elle fait
+
+Avec `selectable: true`, glisser sur une plage vide la sélectionne : des
+heures dans une grille horaire, des jours dans un mois. Au clavier, Entrée sur
+une case la sélectionne et Maj+flèches l'agrandissent (annoncé au fur et à
+mesure) ; Entrée la donne à l'application.
+
+`onSelect(selection)` l'entend : `{ start, end, allDay, resourceId? }`, le
+début et la fin dans le fuseau du calendrier (des `ZonedDateTime`), ou des
+dates pour des journées entières — la fin étant alors le lendemain du dernier
+jour. Sur un écran tactile, un appui sur une plage vide sélectionne une case,
+avec des poignées pour l'étirer. Entrée (ou Espace) sur une case est aussi un
+clic de date. La sélection reste dessinée jusqu'à un clic
+ailleurs, Échap ou une autre période (`onUnselect`) ;
+`calendar.select(selection | null)` en montre ou en efface une depuis votre
+code. Un clic de souris ne sélectionne pas : c'est un clic de date
+(`onDateClick`).
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  selectable: true,
+  onSelect: ({ start, end }) => console.log(`book ${start.toString()} → ${end.toString()}`),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import type { Selection } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" [selectable]="true" [(selection)]="selection" />
+    @if (selection(); as s) { <p>From {{ s.start.toString() }} to {{ s.end.toString() }}</p> }`,
+})
+export class Agenda {
+  readonly selection = signal<Selection | null>(null);
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [selection, setSelection] = useState<Selection | null>(null);
+  return <DzCalendar timeZone="Europe/Paris" selectable selection={selection} onSelectionChange={setSelection} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { shallowRef } from 'vue';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const selection = shallowRef<Selection | null>(null);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" selectable v-model:selection="selection" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée : `selectable` en Angular (et le double sens `[(selection)]`), `selectable` en React (avec `selection` et `onSelectionChange`), `selectable` en Vue (avec `v-model:selection`).
+
+## Démo en direct
+
+Glissez sur des heures vides pour les sélectionner.
+
+<LiveDemo
+  label={"Une semaine où les plages vides se sélectionnent"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "selectable": true,
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- `onSelect` — ce qui a été sélectionné.
+- `onUnselect` — la sélection partie.
+- [Sélection](../../guides/selection/).

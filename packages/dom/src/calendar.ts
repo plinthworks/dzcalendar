@@ -742,7 +742,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
         ...(live.onCreateRequest && { onCreateRequest: live.onCreateRequest }),
         ...(live.onEventOpen && { onOpen: live.onEventOpen }),
         // An event editable by its own say (owner, 18k) has its entries too, in a calendar that is not: as far as it said.
-        ...((live.editable || (target.kind === 'event' && mayDelete(target.instance.event, live.editable))) && {
+        // "Delete" as far as the event allows: its own `editable: false` wins in an editable calendar (18j review).
+        ...((target.kind === 'event' ? mayDelete(target.instance.event, live.editable) : live.editable) && {
           onCommand: (cmd: Command) => {
             // A person's choice from the menu: checked against the rules.
             const r = kernel.run(cmd, { validate: true });

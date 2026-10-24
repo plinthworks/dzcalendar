@@ -50,6 +50,10 @@
 - `createCalendar` checks `firstDay` and `hiddenDays` as `update()` does (a
   week with no day, a weekday outside 1–7: `RangeError`).
 - `messages: { views }` keeps the built-in views' labels beside the ones given.
+- An event's own `editable: false` is no longer deletable in an editable
+  calendar (the context menu and the Delete key).
+- Enter gives the selection being made to the application on a month day that
+  holds events (it went into the events).
 - `timeGrid.slotMin` / `slotMax` are checked at `createCalendar` and `update()`
   (merged with what is there), not when a week is first drawn.
 - A header view without its renderer is said once on the console, not at
