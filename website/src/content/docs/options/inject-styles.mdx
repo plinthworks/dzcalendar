@@ -1,0 +1,88 @@
+---
+title: injectStyles
+description: "Whether the calendar puts its own CSS in the page."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Whether the calendar adds its own stylesheet to the page (or its shadow root).
+
+<OptionFacts name="injectStyles" />
+
+## What it does
+
+The calendar's structural CSS — grids, positions, sizes — is put in the page
+once, in a `<style>`, so a calendar works with nothing else to include. A
+page under a Content Security Policy without inline styles cannot take it:
+set `false` and include `DZ_CSS` (exported by `@dzcalendar/dom`) yourself,
+in a stylesheet your policy allows, with the theme's CSS, any family made
+with `defineTheme` (`themeCss(name)`), the sheets of the entries you use
+(`LIST_CSS`, `MULTIMONTH_CSS`, the Pro's timeline and editor) and, under
+`look: 'none'`, `lookGuardedCss(…)`.
+
+It is read when the calendar is made.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar, DZ_CSS } from '@dzcalendar/dom';
+
+// Written once into a stylesheet the page's policy allows (a build step), not injected at run time.
+console.log(DZ_CSS.length);
+createCalendar(element, { timeZone: 'Europe/Paris', injectStyles: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { injectStyles: false } }],
+  template: `<dz-calendar timeZone="Europe/Paris"  />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" initial={{ injectStyles: false }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :initial="{ injectStyles: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+It is read when the calendar is made: in Angular through the defaults (`DZ_CALENDAR_DEFAULTS`, `provideDzCalendar`), in React and Vue through `initial`.
+
+## See also
+
+- [`cssLayers`](../css-layers/) — how that CSS meets yours.
+- [`theme`](../theme/) — the theme CSS.
+- [Unstyled](../../guides/unstyled/).

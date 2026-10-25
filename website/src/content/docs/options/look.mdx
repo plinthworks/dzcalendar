@@ -1,0 +1,82 @@
+---
+title: look
+description: "'none': the structure only, every colour and border yours."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+`'none'` draws the structure only — every colour, border, shadow and type is yours.
+
+<OptionFacts name="look" />
+
+## What it does
+
+With `'styled'` (the default) the calendar wears its theme. With `'none'` it
+keeps only what makes it work — the grids, the positions, the sizes — and
+draws no colour, border, shadow or font of its own. What is drawn only by
+colour is then yours too: the focus ring of the keyboard's cursor, the now
+line, today, the grid's lines. Style
+its classes (`.dz-ev`, `.dz-dg__cell`, `.dz-toolbar__btn`…) with Tailwind or
+your design system. Class names and structure are stable for that.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', look: 'none' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ look: 'none' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" look="none" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ look: 'none' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`theme`](../theme/) — a family of colours instead.
+- [`cssLayers`](../css-layers/) — how our CSS meets yours.
+- [Unstyled](../../guides/unstyled/).

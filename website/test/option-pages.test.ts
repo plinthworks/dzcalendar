@@ -1,8 +1,7 @@
 /**
  * Every option of createCalendar has its page in English and in French (owner,
  * 18j), its facts generated from the types: the generated file is what the
- * types say; each written page names its option and every member of a group;
- * an option without pages yet is listed as pending, and nothing else is.
+ * types say; each page names its option and every member of a group.
  */
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -15,7 +14,8 @@ import { FACTS } from '../src/i18n/facts';
 const site = fileURLToPath(new URL('..', import.meta.url));
 const docs = join(site, 'src', 'content', 'docs');
 const shipped = JSON.parse(readFileSync(join(site, 'src', 'generated', 'options.json'), 'utf8')) as { options: { name: string; default: { token?: string } | null; members?: { name: string; default: { token?: string } | null }[] }[] };
-const pending: string[] = JSON.parse(readFileSync(join(site, 'src', 'data', 'pending-options.json'), 'utf8')).pending;
+// Every option is written (the last batch, 18j-2): the pending list is gone, and an option added without its two pages fails here.
+const pending: string[] = [];
 const slug = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 const page = (lang: '' | 'fr', name: string) => join(docs, lang, 'options', `${slug(name)}.mdx`);
 const factsOn = (text: string) => [...text.matchAll(/<OptionFacts name="([^"]+)"/g)].map((m) => m[1]);

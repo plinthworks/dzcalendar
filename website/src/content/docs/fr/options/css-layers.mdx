@@ -1,0 +1,89 @@
+---
+title: cssLayers
+description: "Si la CSS du calendrier est dans des couches de cascade."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Si la CSS du calendrier est placée dans des couches de cascade, sous toute règle de la page hors couche.
+
+<OptionFacts name="cssLayers" />
+
+## Ce qu'elle fait
+
+En couches (`@layer dzcalendar.base, dzcalendar.theme`, par défaut), toute
+règle de votre page hors couche l'emporte sur les nôtres quel que soit son
+poids : rhabiller, c'est de la CSS simple. Une page dont la remise à zéro
+globale n'est pas en couche (Tailwind 3, le reboot de Bootstrap,
+normalize.css) l'emporterait alors aussi sur notre structure : mettez `false`,
+et la CSS est simple — nos sélecteurs de classes pèsent plus que ces remises à
+zéro, et une règle de la page de même poids venue après l'emporte toujours.
+Importez aussi le thème hors couche : `@dzcalendar/theme/unlayered.css` (ou
+`tailwind3.css`). Le
+premier calendrier d'un document décide pour tous.
+
+Elle est lue à la création du calendrier.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+// A page on Tailwind 3: its preflight is not in a layer (the theme: @dzcalendar/theme/tailwind3.css).
+createCalendar(element, { timeZone: 'Europe/Paris', cssLayers: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { cssLayers: false } }],
+  template: `<dz-calendar timeZone="Europe/Paris"  />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" initial={{ cssLayers: false }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :initial="{ cssLayers: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Elle est lue à la création du calendrier : en Angular par les valeurs par défaut (`DZ_CALENDAR_DEFAULTS`, `provideDzCalendar`), en React et en Vue par `initial`.
+
+## Voir aussi
+
+- [`injectStyles`](../inject-styles/) — inclure la CSS vous-même.
+- [`look`](../look/) — aucune apparence à nous.
+- [Tailwind](../../guides/tailwind/).

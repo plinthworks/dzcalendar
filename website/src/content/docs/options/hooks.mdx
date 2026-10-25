@@ -1,0 +1,239 @@
+---
+title: hooks
+description: "The calendar's elements made the application's: classes, content, mounts."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Makes any element of the calendar the application's: its classes, its content in place of ours, and code run when it comes and goes.
+
+<OptionFacts name="hooks" />
+
+## What it does
+
+Each member names an element, and takes up to four things (the holders —
+`dayLane`, `slotLane`, `morePopover`, `view`, `resourceLane`,
+`resourceGroupLane` — take `class`, `didMount` and `willUnmount` only):
+
+- `class`: a string, a list, or a function of the element's context
+  (`null`: none), read again at each drawing;
+- `content(ctx, el)`: a string or a node in place of ours (`null` keeps
+  ours);
+- `didMount({ el, ctx })`: once the element is in the page — it may return
+  its own clean-up;
+- `willUnmount({ el, ctx })`: before it leaves.
+
+Every context holds `view` (the view's type) and what the element is about —
+a day's `date`, an event's `instance`, a label's `time`. The frameworks draw
+the content with their own templates (listed per element below); `hooks`
+then adds classes and mounts. `update({ hooks })` redraws in place — and
+closes an open "+N" panel — when a member differs; elements whose mounts did
+not change are not mounted again, and the same functions again change
+nothing.
+
+## Its members
+
+### `allDayLabel`
+
+<OptionFacts name="hooks.allDayLabel" />
+
+The all-day row's label (`hooks.allDayLabel`; Angular `dzAllDayLabel`, React `renderAllDayLabel`, Vue `#all-day-label`).
+
+### `dayCell`
+
+<OptionFacts name="hooks.dayCell" />
+
+A day's cell in a month or a day grid: its `date`, `today`, `outside` (a day of another month), its `resource` — a count, a mark (Angular `dzDayCell`, React `renderDayCell`, Vue `#day-cell`).
+
+### `dayHeader`
+
+<OptionFacts name="hooks.dayHeader" />
+
+A day's head: a week's or a day's date, a month's weekday — a mark, a count, a button (Angular `dzDayHeader`, React `renderDayHeader`, Vue `#day-header`).
+
+### `dayLane`
+
+<OptionFacts name="hooks.dayLane" />
+
+A time grid's column for a day: classes (a closed day) and mounts; its content stays the calendar's.
+
+### `event`
+
+<OptionFacts name="hooks.event" />
+
+An event, in every view: classes from its data, its content in place of ours (Angular `dzEventContent`, React `renderEventContent`, Vue `#event-content`), mounts — `content` runs again only when the event changed.
+
+### `listDayHeader`
+
+<OptionFacts name="hooks.listDayHeader" />
+
+A list's day heading (Angular `dzListDayHeader`, React `renderListDayHeader`, Vue `#list-day-header`).
+
+### `monthHeader`
+
+<OptionFacts name="hooks.monthHeader" />
+
+A month's title in a multi-month view (Angular `dzMonthHeader`, React `renderMonthHeader`, Vue `#month-header`).
+
+### `moreLink`
+
+<OptionFacts name="hooks.moreLink" />
+
+"+N": its count and the day or the time it stands for (Angular `dzMoreLink`, React `renderMoreLink`, Vue `#more-link`).
+
+### `morePopover`
+
+<OptionFacts name="hooks.morePopover" />
+
+The panel "+N" opens: classes and mounts; its content is the day's events.
+
+### `noEvents`
+
+<OptionFacts name="hooks.noEvents" />
+
+The list's "nothing to show" (Angular `dzNoEvents`, React `renderNoEvents`, Vue `#no-events`).
+
+### `nowIndicator`
+
+<OptionFacts name="hooks.nowIndicator" />
+
+The line at the current time (Angular `dzNowIndicator`, React `renderNowIndicator`, Vue `#now-indicator`).
+
+### `resource`
+
+<OptionFacts name="hooks.resource" />
+
+A resource's head — a column's, a timeline row's: its content in place of the title (Angular `dzResource`, React `renderResource`, Vue `#resource`).
+
+### `resourceAreaHeader`
+
+<OptionFacts name="hooks.resourceAreaHeader" />
+
+A timeline's resource column head (Angular `dzResourceAreaHeader`, React `renderResourceAreaHeader`, Vue `#resource-area-header`).
+
+### `resourceGroupHeader`
+
+<OptionFacts name="hooks.resourceGroupHeader" />
+
+A group's head in resource views and its row in a timeline (Angular `dzResourceGroupHeader`, React `renderResourceGroupHeader`, Vue `#resource-group-header`).
+
+### `resourceGroupLane`
+
+<OptionFacts name="hooks.resourceGroupLane" />
+
+A group's row across a timeline's time: classes and mounts.
+
+### `resourceLane`
+
+<OptionFacts name="hooks.resourceLane" />
+
+A resource's row across a timeline's time: classes and mounts.
+
+### `slotLabel`
+
+<OptionFacts name="hooks.slotLabel" />
+
+A time label in a time grid's gutter: its `time` and its text (Angular `dzSlotLabel`, React `renderSlotLabel`, Vue `#slot-label`).
+
+### `slotLane`
+
+<OptionFacts name="hooks.slotLane" />
+
+A slot's row across a time grid — drawn as elements only when this hook is given: classes (a lunch break shaded) and mounts.
+
+### `view`
+
+<OptionFacts name="hooks.view" />
+
+The view's root: classes per view and mounts (a view's own banner).
+
+### `weekNumber`
+
+<OptionFacts name="hooks.weekNumber" />
+
+A week's number (Angular `dzWeekNumber`, React `renderWeekNumber`, Vue `#week-number`).
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  hooks: {
+    // Events of the urgent kind carry a class of yours.
+    event: { class: ({ instance }) => (instance.event.props['urgent'] ? 'is-urgent' : null) },
+    // Wednesdays closed: shaded in every week.
+    dayLane: { class: ({ date }) => (date.dayOfWeek === 3 ? 'is-closed' : null) },
+    dayHeader: { didMount: ({ el, ctx }) => el.setAttribute('title', ctx.date.toString()) },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" [hooks]="hooks">
+      <ng-template dzEventContent let-event><b>{{ event.title }}</b></ng-template>
+    </dz-calendar>`,
+})
+export class Agenda {
+  readonly hooks: CalendarHooks = { dayLane: { class: ({ date }) => (date.dayOfWeek === 3 ? 'is-closed' : null) } };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const HOOKS: CalendarHooks = { dayLane: { class: ({ date }) => (date.dayOfWeek === 3 ? 'is-closed' : null) } };
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" hooks={HOOKS} renderEventContent={(event) => <b>{event.title}</b>} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const hooks: CalendarHooks = { dayLane: { class: ({ date }) => (date.dayOfWeek === 3 ? 'is-closed' : null) } };
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :hooks="hooks">
+    <template #event-content="{ event }"><b>{{ event.title }}</b></template>
+  </DzCalendar>
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks `hooks` is an input or prop in all three (Angular `[hooks]`, React `hooks`, Vue `:hooks`), merged with the templates.
+
+## See also
+
+- [`formats`](../formats/) — only how dates are written.
+- [`headerItems`](../header-items/) — places of your own in the header.
+- [Theming](../../guides/theming/).

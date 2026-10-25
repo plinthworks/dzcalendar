@@ -1,0 +1,125 @@
+---
+title: scheme
+description: "Light, dark, or the page's."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Whether the calendar is drawn light, dark, or as the page is.
+
+<OptionFacts name="scheme" />
+
+## What it does
+
+- `'auto'`: as the page — the system's preference (`prefers-color-scheme`),
+  or a `data-theme="light"` / `"dark"` on an ancestor of the calendar (a
+  site's own switch).
+- `'light'`, `'dark'`: that side of the theme, whatever the page.
+
+Every family (`theme`) has both sides. It changes live: a site's own
+light/dark switch passes its value here.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', scheme: 'auto' });
+
+// The site's own switch.
+document.getElementById('dark-mode')!.addEventListener('change', (e) => calendar.update({ scheme: (e.target as HTMLInputElement).checked ? 'dark' : 'light' }));
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" scheme="dark" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" scheme="dark" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" scheme="dark" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an Angular input (`scheme`) and a React and Vue prop (`scheme`, `scheme`).
+
+## Live demo
+
+The week drawn dark, whatever the page.
+
+<LiveDemo
+  label={"The calendar drawn dark"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "scheme": "dark",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`theme`](../theme/) — the family.
+- [`look`](../look/) — no colour of ours at all.
+- [Theming](../../guides/theming/).

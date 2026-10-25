@@ -1,0 +1,134 @@
+---
+title: messages
+description: "Les mots du calendrier, au-dessus de ceux de la locale."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Les mots du calendrier lui-même — ses boutons, menus, annonces — au-dessus de ceux de la locale.
+
+<OptionFacts name="messages" />
+
+## Ce qu'elle fait
+
+Donnez-en autant que vous voulez : `today`, `previous`, `next`, `allDay`,
+`views` (un libellé par vue, fusionné avec les libellés intégrés), les entrées
+du menu, les annonces du lecteur d'écran… Les autres restent ceux de la
+locale : l'anglais et le français sont intégrés, l'arabe, l'espagnol et
+l'allemand s'importent en une ligne chacun (`@dzcalendar/dom/locales/ar`…).
+`defineLocale(code, messages)` enregistre une langue entière une fois pour
+tous les calendriers de la page. Les dates et les nombres ne sont pas des
+mots : la plateforme les écrit dans `locale` (et `formats`).
+
+`update({ messages })` remplace ce qu'un `messages` précédent avait donné.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  messages: { today: 'This week', views: { timeGridWeek: 'Consultations', dayGridMonth: 'Overview' } },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [messages]="{ today: 'This week' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" messages={{ today: 'This week' }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :messages="{ today: 'This week' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée en Angular (`messages`) et une prop en React (`messages`) et en Vue (`messages`).
+
+## Démo en direct
+
+« Aujourd'hui » devient « Cette semaine », et les vues portent les noms de la clinique.
+
+<LiveDemo
+  label={"Un calendrier avec les mots de la clinique"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "messages": {
+      "today": "Cette semaine",
+      "views": {
+        "timeGridWeek": "Consultations",
+        "dayGridMonth": "Vue d'ensemble"
+      }
+    },
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`locale`](../locale/) — la langue.
+- [`formats`](../formats/) — comment s'écrivent les dates.
+- [Langues](../../guides/languages/).

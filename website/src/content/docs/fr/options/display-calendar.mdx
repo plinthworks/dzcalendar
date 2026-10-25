@@ -1,0 +1,125 @@
+---
+title: displayCalendar
+description: "Le calendrier dans lequel les dates sont écrites."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Le calendrier dans lequel les dates sont écrites — hégirien, persan — la grille restant la même.
+
+<OptionFacts name="displayCalendar" />
+
+## Ce qu'elle fait
+
+Donnez l'un des calendriers de la plateforme (`'islamic-umalqura'`,
+`'persian'`, `'hebrew'`, `'buddhist'`…) : titres, numéros de jours et
+libellés y sont écrits ; les données, les jours et les grilles restent
+grégoriens — un événement du 21 octobre est le 21 octobre, écrit 10 joumada
+al-oula. Sans elle — ou avec `null` — le calendrier propre à la locale (`ar-SA`
+a l'hégirien ; les moteurs diffèrent là, écrivez-le) ; `'gregory'` impose le
+grégorien. Un nom inconnu de la plateforme lève une `RangeError`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Asia/Riyadh', locale: 'en-GB', initialView: 'dayGridMonth', displayCalendar: 'islamic-umalqura' });
+
+// Later: the Gregorian (null would give the locale's own calendar back).
+calendar.update({ displayCalendar: 'gregory' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" displayCalendar="islamic-umalqura" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" displayCalendar="islamic-umalqura" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" display-calendar="islamic-umalqura" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée en Angular (`displayCalendar`) et une prop en React (`displayCalendar`) et en Vue (`display-calendar`).
+
+## Démo en direct
+
+Octobre 2026, son titre et ses jours écrits dans le calendrier hégirien.
+
+<LiveDemo
+  label={"Un mois écrit dans le calendrier hégirien Umm al-Qura"}
+  height={560}
+  options={{
+    "initialView": "dayGridMonth",
+    "initialDate": "2026-10-21",
+    "displayCalendar": "islamic-umalqura",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`secondaryCalendar`](../secondary-calendar/) — un second calendrier à côté des dates.
+- [`locale`](../locale/) — la langue.
+- [Langues](../../guides/languages/).

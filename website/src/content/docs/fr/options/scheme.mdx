@@ -1,0 +1,125 @@
+---
+title: scheme
+description: "Clair, sombre, ou celui de la page."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Si le calendrier est dessiné clair, sombre, ou comme la page.
+
+<OptionFacts name="scheme" />
+
+## Ce qu'elle fait
+
+- `'auto'` : comme la page — la préférence du système
+  (`prefers-color-scheme`), ou un `data-theme="light"` / `"dark"` sur un
+  ancêtre du calendrier (le bouton propre à un site).
+- `'light'`, `'dark'` : ce côté du thème, quelle que soit la page.
+
+Chaque famille (`theme`) a les deux côtés. Elle change à chaud : le bouton
+clair/sombre d'un site lui passe sa valeur.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', scheme: 'auto' });
+
+// The site's own switch.
+document.getElementById('dark-mode')!.addEventListener('change', (e) => calendar.update({ scheme: (e.target as HTMLInputElement).checked ? 'dark' : 'light' }));
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" scheme="dark" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" scheme="dark" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" scheme="dark" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée en Angular (`scheme`) et une prop en React (`scheme`) et en Vue (`scheme`).
+
+## Démo en direct
+
+La semaine dessinée sombre, quelle que soit la page.
+
+<LiveDemo
+  label={"Le calendrier dessiné sombre"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "scheme": "dark",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`theme`](../theme/) — la famille.
+- [`look`](../look/) — aucune couleur à nous.
+- [Thèmes](../../guides/theming/).

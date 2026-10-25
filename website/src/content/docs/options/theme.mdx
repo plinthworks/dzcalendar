@@ -1,0 +1,138 @@
+---
+title: theme
+description: "The family of colours the calendar is drawn in."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+The calendar's family of colours, ready-made or your own.
+
+<OptionFacts name="theme" />
+
+## What it does
+
+Seven ready-made families come with the stylesheet `@dzcalendar/theme`
+(`import '@dzcalendar/theme/dzcalendar.css'`): `'standard'`, `'slate'`,
+`'night'`, `'pastel'`, `'frost'`, `'solar'` and `'contrast'` — each with its
+light and dark side (`scheme`). `defineTheme(name, tokens)`
+(`@dzcalendar/dom`) makes one of yours from a palette (`bg`, `fg`, `accent`,
+`border`, `radius`, `font`…), the calendar's own tokens (`todayBg`, `now`,
+`eventBg`…) and named event `tones` — each colour one value or `[light,
+dark]` (`radius` and `font` one value). The ready-made names need the
+stylesheet imported; `defineTheme` refuses (a `RangeError`) a ready-made
+name, an unknown token or an unsafe value.
+
+The palette is tzslot's too (`--tz-*`): a page that sets it themes the
+calendar and tzslot's pickers at once, and a page's own `--tz-*` and
+`--dz-*` variables win over any family. A name that is neither ready-made nor
+defined throws a `RangeError`.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+import { createCalendar, defineTheme } from '@dzcalendar/dom';
+
+// A family of the clinic's own: its green, each side its own.
+defineTheme('clinic', { accent: ['#0f766e', '#2dd4bf'], todayBg: ['#f0fdfa', '#042f2e'], tones: { urgent: '#b91c1c' } });
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', theme: 'clinic' });
+
+// Later: a ready-made one.
+calendar.update({ theme: 'slate' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" theme="night" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" theme="night" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" theme="night" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an Angular input (`theme`) and a React and Vue prop (`theme`, `theme`).
+
+## Live demo
+
+The same week in the night family, drawn dark (`scheme: 'dark'`).
+
+<LiveDemo
+  label={"The night family, its dark side"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "theme": "night",
+    "scheme": "dark",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`scheme`](../scheme/) — light, dark or the page's.
+- [`density`](../density/) — how tall an hour is.
+- [Theming](../../guides/theming/).

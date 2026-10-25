@@ -1,0 +1,142 @@
+---
+title: formats
+description: "Comment chaque endroit écrit ses dates et ses heures."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Comment chaque endroit du calendrier écrit ses dates et ses heures — les options de la plateforme, ou une fonction.
+
+<OptionFacts name="formats" />
+
+## Ce qu'elle fait
+
+Une entrée par endroit : `title` (celui de l'en-tête, voir `titleFormat`),
+`dayHeader`, `dayCell`, `slotLabel` (les libellés des heures), `eventTime`,
+`eventTimeRange`, `listDay`, `listDaySide`, `monthHeader`, `morePopover`, et
+`weekNumber`. Chacune prend des options de `Intl.DateTimeFormat`
+(`{ hour: 'numeric' }`) ou une fonction de son contexte (`{ date | time |
+start, end, locale, … }`) qui renvoie le texte — `weekNumber` une fonction
+seulement. Un endroit non donné s'écrit comme par défaut, dans `locale` (et
+`displayCalendar`).
+
+`update({ formats })` remplace les formats donnés avant.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  weekNumbers: true,
+  formats: {
+    slotLabel: { hour: 'numeric' },
+    dayHeader: { weekday: 'short', day: 'numeric' },
+    // A function: the week's number with a prefix of the clinic's.
+    weekNumber: ({ week }) => `Wk ${week}`,
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ formats: { slotLabel: { hour: 'numeric' } } }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" formats={{ slotLabel: { hour: 'numeric' } }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ formats: { slotLabel: { hour: 'numeric' } } }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+La gouttière étiquetée par l'heure seule (09 h, 10 h…), les jours par leur jour court et leur numéro (lun. 19).
+
+<LiveDemo
+  label={"Des heures étiquetées par l'heure seule, et des en-têtes de jour courts"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "formats": {
+      "slotLabel": {
+        "hour": "numeric"
+      },
+      "dayHeader": {
+        "weekday": "short",
+        "day": "numeric"
+      }
+    },
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`titleFormat`](../title-format/) — le titre, à la création.
+- [`locale`](../locale/) — la langue.
+- [`displayEventTime`](../display-event-time/) — l'heure d'un événement montrée ou non.

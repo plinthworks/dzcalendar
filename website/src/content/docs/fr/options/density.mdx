@@ -1,0 +1,121 @@
+---
+title: density
+description: "La place que prend le calendrier."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+La place que prennent les rangées et les marges du calendrier.
+
+<OptionFacts name="density" />
+
+## Ce qu'elle fait
+
+`'compact'`, `'comfortable'` (par défaut) ou `'spacious'` : une heure d'une
+grille horaire fait 48, 72 ou 96 px de haut, et la hauteur des barres et des
+en-têtes de jour, les semaines du mois et la taille du texte suivent. Un
+panneau latéral étroit prend compact, un écran mural spacious. `--dz-minute`
+(les pixels d'une minute) et les autres variables `--dz-*` fixent toute autre
+taille — sur `.dz-cal` lui-même, puisqu'une densité les y fixe.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', density: 'compact' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" density="compact" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" density="compact" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" density="compact" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée en Angular (`density`) et une prop en React (`density`) et en Vue (`density`).
+
+## Démo en direct
+
+La semaine, compacte : une heure de 48 px.
+
+<LiveDemo
+  label={"Une semaine compacte"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "density": "compact",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`theme`](../theme/) — les couleurs.
+- [`timeGrid`](../time-grid/) — les heures dessinées.
+- [Thèmes](../../guides/theming/).

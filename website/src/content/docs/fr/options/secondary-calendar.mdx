@@ -1,0 +1,122 @@
+---
+title: secondaryCalendar
+description: "Un second calendrier montré à côté des dates."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+La date d'un second calendrier montrée à côté de chaque date — l'hégirienne sous la grégorienne.
+
+<OptionFacts name="secondaryCalendar" />
+
+## Ce qu'elle fait
+
+Chaque case de jour et chaque en-tête de jour montre aussi sa date dans ce
+calendrier, en petit, à côté de la première (`displayCalendar` ou celle de la
+locale). Il sert deux lecteurs à la fois : une clinique d'Alger dont les
+patients comptent dans les deux. N'importe quel calendrier de la plateforme
+(un nom inconnu lève une `RangeError`) ; `null` (par défaut) aucun, et rien
+n'est montré quand c'est le calendrier dans lequel les dates sont déjà
+écrites.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Africa/Algiers', locale: 'fr-DZ', initialView: 'dayGridMonth', secondaryCalendar: 'islamic-umalqura' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" secondaryCalendar="islamic-umalqura" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" secondaryCalendar="islamic-umalqura" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" secondary-calendar="islamic-umalqura" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée en Angular (`secondaryCalendar`) et une prop en React (`secondaryCalendar`) et en Vue (`secondary-calendar`).
+
+## Démo en direct
+
+Octobre 2026, chaque jour avec sa date hégirienne.
+
+<LiveDemo
+  label={"Un mois avec la date hégirienne sous chaque jour"}
+  height={560}
+  options={{
+    "initialView": "dayGridMonth",
+    "initialDate": "2026-10-21",
+    "secondaryCalendar": "islamic-umalqura",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`displayCalendar`](../display-calendar/) — le premier calendrier.
+- [`locale`](../locale/) — la langue.
+- [Langues](../../guides/languages/).

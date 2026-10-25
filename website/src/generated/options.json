@@ -344,7 +344,7 @@
           "name": "event",
           "type": "EventHooks",
           "resolved": null,
-          "doc": "",
+          "doc": "An event, in every view: its classes, its content in place of ours, its mounts.",
           "default": null,
           "source": "packages/dom/src/host.ts"
         },
@@ -400,7 +400,7 @@
           "name": "resource",
           "type": "ResourceHooks",
           "resolved": null,
-          "doc": "",
+          "doc": "A resource's head (a column's, a timeline row's): its classes, its content in place of the title.",
           "default": null,
           "source": "packages/dom/src/host.ts"
         },
@@ -424,7 +424,7 @@
           "name": "resourceGroupLane",
           "type": "ElementHooks<ResourceGroupCtx>",
           "resolved": null,
-          "doc": "",
+          "doc": "A group's row across a timeline's time.",
           "default": null,
           "source": "packages/dom/src/host.ts"
         },

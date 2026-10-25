@@ -70,7 +70,9 @@ export interface ResourceHooks extends ElementHooks<ResourceContentCtx> {
 }
 
 export interface CalendarHooks {
+  /** An event, in every view: its classes, its content in place of ours, its mounts. */
   readonly event?: EventHooks;
+  /** A resource's head (a column's, a timeline row's): its classes, its content in place of the title. */
   readonly resource?: ResourceHooks;
   /** A day's head (a week's or a day's date, a month's weekday): a mark, a count, a button. */
   readonly dayHeader?: ElementHooks<DayHeaderCtx>;
@@ -104,6 +106,7 @@ export interface CalendarHooks {
   readonly resourceLane?: ElementHooks<ResourceLaneCtx>;
   /** A group's head (resource views) and its row (a timeline). */
   readonly resourceGroupHeader?: ElementHooks<ResourceGroupCtx>;
+  /** A group's row across a timeline's time. */
   readonly resourceGroupLane?: ElementHooks<ResourceGroupCtx>;
   /** A timeline's resource column head. */
   readonly resourceAreaHeader?: ElementHooks<ResourceAreaHeaderCtx>;

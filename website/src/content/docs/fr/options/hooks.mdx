@@ -1,0 +1,239 @@
+---
+title: hooks
+description: "Les éléments du calendrier rendus à l'application : classes, contenu, montages."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Rend n'importe quel élément du calendrier à l'application : ses classes, son contenu à la place du nôtre, et du code exécuté quand il arrive et part.
+
+<OptionFacts name="hooks" />
+
+## Ce qu'elle fait
+
+Chaque membre nomme un élément, et prend jusqu'à quatre choses (les
+conteneurs — `dayLane`, `slotLane`, `morePopover`, `view`, `resourceLane`,
+`resourceGroupLane` — ne prennent que `class`, `didMount` et `willUnmount`) :
+
+- `class` : une chaîne, une liste, ou une fonction du contexte de l'élément
+  (`null` : aucune), relue à chaque dessin ;
+- `content(ctx, el)` : une chaîne ou un nœud à la place du nôtre (`null`
+  garde le nôtre) ;
+- `didMount({ el, ctx })` : une fois l'élément dans la page — elle peut
+  renvoyer sa propre fonction de nettoyage ;
+- `willUnmount({ el, ctx })` : avant qu'il parte.
+
+Chaque contexte contient `view` (le type de la vue) et ce dont parle
+l'élément — la `date` d'un jour, l'`instance` d'un événement, le `time` d'un
+libellé. Les frameworks dessinent le contenu avec leurs propres gabarits
+(donnés par élément ci-dessous) ; `hooks` ajoute alors classes et montages.
+`update({ hooks })` redessine sur place — et ferme un panneau « +N » ouvert —
+quand un membre diffère ; les éléments dont les montages n'ont pas changé ne
+sont pas remontés, et les mêmes fonctions ne changent rien.
+
+## Ses membres
+
+### `allDayLabel`
+
+<OptionFacts name="hooks.allDayLabel" />
+
+Le libellé de la rangée « toute la journée » (`hooks.allDayLabel` ; `dzAllDayLabel` en Angular, `renderAllDayLabel` en React, `#all-day-label` en Vue).
+
+### `dayCell`
+
+<OptionFacts name="hooks.dayCell" />
+
+La case d'un jour dans un mois ou une grille de jours : sa `date`, `today`, `outside` (un jour d'un autre mois), sa `resource` — un compte, une marque (`dzDayCell` en Angular, `renderDayCell` en React, `#day-cell` en Vue).
+
+### `dayHeader`
+
+<OptionFacts name="hooks.dayHeader" />
+
+L'en-tête d'un jour : la date d'une semaine ou d'un jour, le jour de la semaine d'un mois — une marque, un compte, un bouton (`dzDayHeader` en Angular, `renderDayHeader` en React, `#day-header` en Vue).
+
+### `dayLane`
+
+<OptionFacts name="hooks.dayLane" />
+
+La colonne d'un jour dans une grille horaire : des classes (un jour fermé) et des montages ; son contenu reste celui du calendrier.
+
+### `event`
+
+<OptionFacts name="hooks.event" />
+
+Un événement, dans toutes les vues : des classes selon ses données, son contenu à la place du nôtre (`dzEventContent` en Angular, `renderEventContent` en React, `#event-content` en Vue), des montages — `content` ne s'exécute de nouveau que si l'événement a changé.
+
+### `listDayHeader`
+
+<OptionFacts name="hooks.listDayHeader" />
+
+Le titre d'un jour dans une liste (`dzListDayHeader` en Angular, `renderListDayHeader` en React, `#list-day-header` en Vue).
+
+### `monthHeader`
+
+<OptionFacts name="hooks.monthHeader" />
+
+Le titre d'un mois dans une vue multi-mois (`dzMonthHeader` en Angular, `renderMonthHeader` en React, `#month-header` en Vue).
+
+### `moreLink`
+
+<OptionFacts name="hooks.moreLink" />
+
+« +N » : son compte et le jour ou le moment qu'il représente (`dzMoreLink` en Angular, `renderMoreLink` en React, `#more-link` en Vue).
+
+### `morePopover`
+
+<OptionFacts name="hooks.morePopover" />
+
+Le panneau qu'ouvre « +N » : des classes et des montages ; son contenu est fait des événements du jour.
+
+### `noEvents`
+
+<OptionFacts name="hooks.noEvents" />
+
+Le « rien à montrer » d'une liste (`dzNoEvents` en Angular, `renderNoEvents` en React, `#no-events` en Vue).
+
+### `nowIndicator`
+
+<OptionFacts name="hooks.nowIndicator" />
+
+La ligne à l'heure actuelle (`dzNowIndicator` en Angular, `renderNowIndicator` en React, `#now-indicator` en Vue).
+
+### `resource`
+
+<OptionFacts name="hooks.resource" />
+
+L'en-tête d'une ressource — d'une colonne, d'une ligne de timeline : son contenu à la place du titre (`dzResource` en Angular, `renderResource` en React, `#resource` en Vue).
+
+### `resourceAreaHeader`
+
+<OptionFacts name="hooks.resourceAreaHeader" />
+
+L'en-tête d'une colonne de la zone des ressources d'une timeline (`dzResourceAreaHeader` en Angular, `renderResourceAreaHeader` en React, `#resource-area-header` en Vue).
+
+### `resourceGroupHeader`
+
+<OptionFacts name="hooks.resourceGroupHeader" />
+
+L'en-tête d'un groupe dans les vues ressources et sa ligne dans une timeline (`dzResourceGroupHeader` en Angular, `renderResourceGroupHeader` en React, `#resource-group-header` en Vue).
+
+### `resourceGroupLane`
+
+<OptionFacts name="hooks.resourceGroupLane" />
+
+La ligne d'un groupe à travers le temps d'une timeline : des classes et des montages.
+
+### `resourceLane`
+
+<OptionFacts name="hooks.resourceLane" />
+
+La ligne d'une ressource à travers le temps d'une timeline : des classes et des montages.
+
+### `slotLabel`
+
+<OptionFacts name="hooks.slotLabel" />
+
+Un libellé d'heure dans la gouttière d'une grille horaire : son `time` et son texte (`dzSlotLabel` en Angular, `renderSlotLabel` en React, `#slot-label` en Vue).
+
+### `slotLane`
+
+<OptionFacts name="hooks.slotLane" />
+
+La rangée d'un créneau à travers une grille horaire — dessinée en éléments seulement quand ce hook est donné : des classes (une pause de midi grisée) et des montages.
+
+### `view`
+
+<OptionFacts name="hooks.view" />
+
+La racine de la vue : des classes par vue et des montages (une bannière propre à la vue).
+
+### `weekNumber`
+
+<OptionFacts name="hooks.weekNumber" />
+
+Le numéro d'une semaine (`dzWeekNumber` en Angular, `renderWeekNumber` en React, `#week-number` en Vue).
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  hooks: {
+    // Events of the urgent kind carry a class of yours.
+    event: { class: ({ instance }) => (instance.event.props['urgent'] ? 'is-urgent' : null) },
+    // Wednesdays closed: shaded in every week.
+    dayLane: { class: ({ date }) => (date.dayOfWeek === 3 ? 'is-closed' : null) },
+    dayHeader: { didMount: ({ el, ctx }) => el.setAttribute('title', ctx.date.toString()) },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" [hooks]="hooks">
+      <ng-template dzEventContent let-event><b>{{ event.title }}</b></ng-template>
+    </dz-calendar>`,
+})
+export class Agenda {
+  readonly hooks: CalendarHooks = { dayLane: { class: ({ date }) => (date.dayOfWeek === 3 ? 'is-closed' : null) } };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const HOOKS: CalendarHooks = { dayLane: { class: ({ date }) => (date.dayOfWeek === 3 ? 'is-closed' : null) } };
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" hooks={HOOKS} renderEventContent={(event) => <b>{event.title}</b>} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const hooks: CalendarHooks = { dayLane: { class: ({ date }) => (date.dayOfWeek === 3 ? 'is-closed' : null) } };
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :hooks="hooks">
+    <template #event-content="{ event }"><b>{{ event.title }}</b></template>
+  </DzCalendar>
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, `hooks` est une entrée ou une prop dans les trois (`[hooks]` en Angular, `hooks` en React, `:hooks` en Vue), fusionnée avec les gabarits.
+
+## Voir aussi
+
+- [`formats`](../formats/) — seulement l'écriture des dates.
+- [`headerItems`](../header-items/) — des emplacements à vous dans l'en-tête.
+- [Thèmes](../../guides/theming/).

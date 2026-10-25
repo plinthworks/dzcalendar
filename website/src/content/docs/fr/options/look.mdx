@@ -1,0 +1,83 @@
+---
+title: look
+description: "'none' : la structure seule, chaque couleur et bordure à vous."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+`'none'` ne dessine que la structure — chaque couleur, bordure, ombre et police est à vous.
+
+<OptionFacts name="look" />
+
+## Ce qu'elle fait
+
+Avec `'styled'` (par défaut), le calendrier porte son thème. Avec `'none'`,
+il ne garde que ce qui le fait fonctionner — les grilles, les positions, les
+tailles — et ne dessine aucune couleur, bordure, ombre ni police à lui. Ce qui
+n'est dessiné que par la couleur est alors à vous aussi : l'anneau de focus du
+curseur clavier, la ligne de l'heure actuelle, aujourd'hui, les lignes de la
+grille. Habillez ses classes (`.dz-ev`, `.dz-dg__cell`,
+`.dz-toolbar__btn`…) avec Tailwind ou votre système de design. Les noms de
+classes et la structure sont stables pour cela.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', look: 'none' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ look: 'none' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" look="none" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ look: 'none' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Voir aussi
+
+- [`theme`](../theme/) — une famille de couleurs à la place.
+- [`cssLayers`](../css-layers/) — comment notre CSS rencontre la vôtre.
+- [Sans style](../../guides/unstyled/).

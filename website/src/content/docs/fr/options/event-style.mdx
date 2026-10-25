@@ -1,0 +1,122 @@
+---
+title: eventStyle
+description: "Des événements teintés avec un bord, ou des blocs pleins."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Comment sont dessinés les événements : teintés avec le bord de leur ton, ou en blocs pleins.
+
+<OptionFacts name="eventStyle" />
+
+## Ce qu'elle fait
+
+- `'tinted'` (par défaut) : un lavis clair du ton de l'événement avec un bord
+  marqué du côté de son début — lisible, discret sur une semaine chargée.
+- `'solid'` : un bloc rempli du ton, le texte dessus — l'aspect classique.
+
+Le `tone` d'un événement (un nom des `tones` du thème) ou ses propres couleurs
+choisissent le ton ; `--dz-event-tint`, `--dz-event-shade` et `--dz-event-edge`
+règlent l'aspect teinté.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', eventStyle: 'solid' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ eventStyle: 'solid' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" eventStyle="solid" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ eventStyle: 'solid' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Démo en direct
+
+La semaine, ses événements en blocs pleins.
+
+<LiveDemo
+  label={"Des événements en blocs pleins"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "eventStyle": "solid",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`theme`](../theme/) — les tons.
+- [`density`](../density/) — leur place.
+- [Thèmes](../../guides/theming/).

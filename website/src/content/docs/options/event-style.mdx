@@ -1,0 +1,122 @@
+---
+title: eventStyle
+description: "Events tinted with an edge, or filled blocks."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+How events are drawn: tinted with their tone's edge, or as filled blocks.
+
+<OptionFacts name="eventStyle" />
+
+## What it does
+
+- `'tinted'` (the default): a light wash of the event's tone with a strong
+  edge on its start side — easy to read, quiet on a busy week.
+- `'solid'`: a block filled with the tone, its text on it — the classic look.
+
+An event's `tone` (a name of the theme's `tones`) or its own colours choose
+the tone; `--dz-event-tint`, `--dz-event-shade` and `--dz-event-edge` tune
+the tinted look.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', eventStyle: 'solid' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ eventStyle: 'solid' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" eventStyle="solid" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ eventStyle: 'solid' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## Live demo
+
+The week, its events as filled blocks.
+
+<LiveDemo
+  label={"Events as filled blocks"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "eventStyle": "solid",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Call Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Day off",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## See also
+
+- [`theme`](../theme/) — the tones.
+- [`density`](../density/) — their room.
+- [Theming](../../guides/theming/).

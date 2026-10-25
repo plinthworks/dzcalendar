@@ -1,0 +1,93 @@
+---
+title: motion
+description: "How the calendar moves: the built-in motion, or an adapter."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+How the calendar moves between periods, and as events come, go and drop.
+
+<OptionFacts name="motion" />
+
+## What it does
+
+By default the calendar moves with the Web Animations API, briefly, and not
+at all when the system asks for reduced motion. An adapter of yours replaces
+it: `createGsapMotion({ preset: 'sober' | 'expressive' })` from
+`@dzcalendar/motion-gsap` (GSAP, optional, never a dependency of the
+calendar) gives a richer motion, still behind `prefers-reduced-motion`. The
+calendar owns the adapter it is given: it is destroyed with the calendar,
+or when replaced by `update({ motion })` — so one adapter is never given to
+two calendars alive at once: the factories make one per calendar.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import { createGsapMotion } from '@dzcalendar/motion-gsap';
+
+createCalendar(element, { timeZone: 'Europe/Paris', motion: createGsapMotion({ preset: 'expressive' }) });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, provideDzMotion } from '@dzcalendar/angular';
+import { createGsapMotion } from '@dzcalendar/motion-gsap';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  // One adapter per calendar of this component.
+  providers: [provideDzMotion(() => createGsapMotion({ preset: 'sober' }))],
+  template: `<dz-calendar timeZone="Europe/Paris" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+import { createGsapMotion } from '@dzcalendar/motion-gsap';
+
+export function Agenda() {
+  const [motion] = useState(() => createGsapMotion({ preset: 'sober' }));
+  return <DzCalendar timeZone="Europe/Paris" motion={motion} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import { createGsapMotion } from '@dzcalendar/motion-gsap';
+
+const motion = createGsapMotion({ preset: 'sober' });
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :motion="motion" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular, `provideDzMotion(() => adapter)` makes one per calendar (or `[options]`); in React and Vue it is a prop (`motion`), made once at creation (`DzCalendarProvider`'s or the plugin's `motion` makes one per calendar).
+
+## See also
+
+- [`theme`](../theme/) — the look.
+- [`editable`](../editable/) — the drops it animates.
+- [Theming](../../guides/theming/).

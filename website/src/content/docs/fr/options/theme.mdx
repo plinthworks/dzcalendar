@@ -1,0 +1,139 @@
+---
+title: theme
+description: "La famille de couleurs dans laquelle le calendrier est dessiné."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+La famille de couleurs du calendrier, toute faite ou à vous.
+
+<OptionFacts name="theme" />
+
+## Ce qu'elle fait
+
+Sept familles toutes faites viennent avec la feuille de style
+`@dzcalendar/theme` (`import '@dzcalendar/theme/dzcalendar.css'`) :
+`'standard'`, `'slate'`, `'night'`, `'pastel'`, `'frost'`, `'solar'` et
+`'contrast'` — chacune avec son côté clair et sombre (`scheme`).
+`defineTheme(name, tokens)` (`@dzcalendar/dom`) en fait une à vous à partir
+d'une palette (`bg`, `fg`, `accent`, `border`, `radius`, `font`…), des jetons
+propres au calendrier (`todayBg`, `now`, `eventBg`…) et de `tones` nommés
+pour les événements — chaque couleur une valeur ou `[clair, sombre]` (`radius`
+et `font` une seule valeur). Les noms tout faits demandent la feuille de style
+importée ; `defineTheme` refuse (une `RangeError`) un nom tout fait, un jeton
+inconnu ou une valeur dangereuse.
+
+La palette est aussi celle de tzslot (`--tz-*`) : une page qui la fixe habille
+d'un coup le calendrier et les sélecteurs de tzslot, et les variables
+`--tz-*` et `--dz-*` propres à la page l'emportent sur toute famille. Un nom
+qui n'est ni tout fait ni défini lève une `RangeError`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+import { createCalendar, defineTheme } from '@dzcalendar/dom';
+
+// A family of the clinic's own: its green, each side its own.
+defineTheme('clinic', { accent: ['#0f766e', '#2dd4bf'], todayBg: ['#f0fdfa', '#042f2e'], tones: { urgent: '#b91c1c' } });
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', theme: 'clinic' });
+
+// Later: a ready-made one.
+calendar.update({ theme: 'slate' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" theme="night" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" theme="night" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" theme="night" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une entrée en Angular (`theme`) et une prop en React (`theme`) et en Vue (`theme`).
+
+## Démo en direct
+
+La même semaine dans la famille night, dessinée sombre (`scheme: 'dark'`).
+
+<LiveDemo
+  label={"La famille night, son côté sombre"}
+  height={560}
+  options={{
+    "initialView": "timeGridWeek",
+    "initialDate": "2026-10-21",
+    "theme": "night",
+    "scheme": "dark",
+    "timeZone": "Europe/Paris",
+    "events": [
+      {
+        "id": "a",
+        "title": "Consultation",
+        "start": "2026-10-21T09:00[Europe/Paris]",
+        "duration": {
+          "minutes": 45
+        }
+      },
+      {
+        "id": "b",
+        "title": "Appel Chicago",
+        "start": "2026-10-22T10:00[America/Chicago]",
+        "duration": {
+          "hours": 1
+        }
+      },
+      {
+        "id": "c",
+        "title": "Congé",
+        "start": "2026-10-23",
+        "allDay": true
+      }
+    ]
+  }}
+/>
+
+## Voir aussi
+
+- [`scheme`](../scheme/) — clair, sombre ou celui de la page.
+- [`density`](../density/) — la hauteur d'une heure.
+- [Thèmes](../../guides/theming/).

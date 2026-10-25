@@ -1,0 +1,92 @@
+---
+title: autoPrint
+description: "Prépare le calendrier à l'impression de lui-même."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Laisse l'impression du navigateur dessiner tout le calendrier : tout monté avant, remis après.
+
+<OptionFacts name="autoPrint" />
+
+## Ce qu'elle fait
+
+Un calendrier fenêtre ce qui est hors de l'écran (`virtualizeAbove`) et
+limite par « +N » (`dayMaxLanes`, `eventMaxStack`) : une impression perdrait
+des événements. Avec `autoPrint: true`, au `beforeprint` du navigateur le
+calendrier dessine tout (`calendar.preparePrint()`), et au `afterprint` remet
+ses fenêtres. Sans elle, appelez vous-même `preparePrint()` avant
+`window.print()` et la fonction qu'elle renvoie après — ou utilisez
+l'impression paginée du Pro (`@dzcalendar/pro/print`).
+
+Elle est lue à la création du calendrier.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris' });
+
+// Without autoPrint: by hand around the print.
+document.getElementById('print')!.addEventListener('click', () => {
+  const restore = calendar.preparePrint();
+  window.print();
+  restore();
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { autoPrint: true } }],
+  template: `<dz-calendar timeZone="Europe/Paris"  />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" initial={{ autoPrint: true }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :initial="{ autoPrint: true }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Elle est lue à la création du calendrier : en Angular par les valeurs par défaut (`DZ_CALENDAR_DEFAULTS`, `provideDzCalendar`), en React et en Vue par `initial`.
+
+## Voir aussi
+
+- [`virtualizeAbove`](../virtualize-above/) — ce qui est fenêtré.
+- [`dayMaxLanes`](../day-max-lanes/) — ce que cache « +N ».
+- [Impression et exports](../../guides/print-export/).
