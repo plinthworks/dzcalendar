@@ -1,0 +1,101 @@
+---
+title: onSelect
+description: "Une personne a sélectionné une plage horaire."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Écoute une plage horaire qu'une personne a sélectionnée, dans un calendrier `selectable`.
+
+<OptionFacts name="onSelect" />
+
+## Ce qu'elle fait
+
+Elle reçoit `{ start, end, allDay, resourceId? }` quand une personne
+termine une sélection : un glissement sur une plage vide, un appui sur un écran
+tactile (ou une poignée tirée), ou Maj+flèches puis Entrée au clavier. Horaire : des `ZonedDateTime` dans le fuseau du
+calendrier. Journée entière : des dates, la fin étant le lendemain du dernier
+jour. `skipped: true` dit qu'un moment est tombé dans le trou d'un
+changement d'heure et a été décalé.
+
+La sélection reste dessinée : ouvrez votre formulaire, puis effacez-la avec
+`calendar.select(null)` (ou laissez un clic ailleurs le faire,
+`onUnselect`). Une sélection montrée par votre code (`calendar.select(…)`)
+n'est pas signalée ici.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  selectable: true,
+  onSelect: (selection) => {
+    if (confirm(`Block ${selection.start.toString()} → ${selection.end.toString()}?`)) console.log('blocked');
+    calendar.select(null);
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { Selection } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [selectable]="true" (selected)="block($event)" />`,
+})
+export class Agenda {
+  block(selection: Selection): void {
+    console.log('block', selection.start.toString(), selection.end.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" selectable onSelect={(s) => console.log('block', s.start.toString(), s.end.toString())} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const block = (s: Selection) => console.log('block', s.start.toString(), s.end.toString());
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" selectable @selected="block" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une sortie : `(selected)` en Angular, `onSelect` en React, `@selected` en Vue. La sélection à double sens des frameworks la suit aussi (`[(selection)]` en Angular, `selection` et `onSelectionChange` en React, `v-model:selection` en Vue).
+
+## Voir aussi
+
+- [`selectable`](../selectable/) — activer la sélection.
+- [`onUnselect`](../on-unselect/) — la sélection partie.
+- [Sélection](../../guides/selection/).

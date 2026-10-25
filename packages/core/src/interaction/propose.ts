@@ -24,6 +24,8 @@ export type Hit =
       /** The pointer is in a skipped hour: `instant` is the first moment after it, and what lands there is announced. */
       readonly gap?: true;
       readonly resourceId?: ResourceId;
+      /** The start of the slot the point is in (on `snapMinutes`): what a click says (owner, 18j: as the menu does). */
+      readonly slotStart?: Instant;
     }
   /** A whole day: a month cell, or the all-day row of a time grid (`allDayRow`). */
   | { readonly kind: 'day'; readonly date: PlainDate; readonly allDayRow?: boolean; readonly resourceId?: ResourceId };

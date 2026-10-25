@@ -1,0 +1,104 @@
+---
+title: onDrop
+description: "An element of the page was dropped on the calendar."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears an element of the page (`makeDraggable`) dropped on a `droppable` calendar.
+
+<OptionFacts name="onDrop" />
+
+## What it does
+
+It receives `{ data, date, allDay, resourceId, element }`: your element's
+`data` (a patient's id), the moment in the calendar's zone or the day it was
+put on, the resource of the column or row (or the element's own), and the
+element itself. It is called once the event is made, then `onEventReceive` —
+not when the drop is refused — or,
+for a draggable made with `create: false`, alone, no event made: create
+what you want yourself. Take the card off your waiting list here; the event
+itself comes to `onEventReceive`.
+
+In Angular it is `dropped`, not `drop` (which would also hear the browser's
+own drop event); Vue follows for consistency. An event dragged from another
+calendar is not a drop: it comes to `onEventReceive`.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import { makeDraggable } from '@dzcalendar/dom/drag';
+
+const card = document.getElementById('patient-42')!;
+makeDraggable(card, { event: { title: 'Consultation', duration: { minutes: 30 } }, data: { patientId: 42 } });
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  droppable: true,
+  // Booked: off the waiting list.
+  onDrop: (drop) => drop.element?.remove(),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { DropInfo } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ droppable: true }" (dropped)="taken($event)" />`,
+})
+export class Agenda {
+  taken(drop: DropInfo): void {
+    console.log('dropped', drop.data, drop.date.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" droppable onDrop={(drop) => console.log('dropped', drop.data)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { DropInfo } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const taken = (drop: DropInfo) => console.log('dropped', drop.data);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ droppable: true }" @dropped="taken" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an output: Angular's `(dropped)`, React's `onDrop`, Vue's `@dropped`.
+
+## See also
+
+- [`droppable`](../droppable/) — what may be dropped.
+- [`onEventReceive`](../on-event-receive/) — the event made.
+- [Drag and drop](../../guides/drag-and-drop/).

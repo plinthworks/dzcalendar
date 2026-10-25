@@ -1,0 +1,97 @@
+---
+title: onCommandRefused
+description: "A command from the calendar's own UI was refused."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears a change the calendar's own interface asked for refused — and why.
+
+<OptionFacts name="onCommandRefused" />
+
+## What it does
+
+A deletion (from the menu or the Delete key), the scope chosen for an
+occurrence, a gesture or a drop whose command is refused after it was shown
+valid — each is a command checked against the rules; when one is refused,
+this option receives the result and the command: `result.problems` (each `{ code, severity, path,
+detail }`) and `result.violations` (`constraint`, `overlap`, `allow`,
+`valid-range`, `not-editable`, each with its `eventId`). Say it to the
+person — nothing changed. A gesture let go where the rules refuse it is said
+by `onProposalRefused` instead; your own `calendar.run()` returns its result to
+you directly.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  rules: { overlap: false },
+  onCommandRefused: (result, command) => {
+    if (!result.ok) console.warn(command.type, 'refused:', result.violations?.map((v) => v.code), result.problems);
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { Command, CommandResult } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ onCommandRefused: refused }" />`,
+})
+export class Agenda {
+  readonly refused = (result: CommandResult, command: Command) => console.warn(command.type, result);
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable onCommandRefused={(result, command) => console.warn(command.type, result)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { Command, CommandResult } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const refused = (result: CommandResult, command: Command) => console.warn(command.type, result);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ onCommandRefused: refused }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`onProposalRefused`](../on-proposal-refused/) — a gesture the rules refused.
+- [`rules`](../rules/) — what refuses.
+- [`contextMenu`](../context-menu/) — the menu's entries.

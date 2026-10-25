@@ -1,0 +1,102 @@
+---
+title: onDateClick
+description: "Une plage vide ou un jour a été cliqué."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Écoute un clic sur une plage vide d'une grille horaire, ou sur un jour — et Entrée sur le curseur clavier.
+
+<OptionFacts name="onDateClick" />
+
+## Ce qu'elle fait
+
+Elle reçoit `{ allDay, date, instant?, resourceId? }` :
+
+- dans une grille horaire, `allDay: false`, le jour et le début du créneau
+  cliqué (sur `snapMinutes` : un clic à 10:37 dit 10:30, comme le menu
+  contextuel) ;
+- sur une case de jour ou la rangée « toute la journée », `allDay: true` et la
+  `date` ;
+- dans une vue ressources, le `resourceId` de la colonne.
+
+Espace, ou Entrée sur un créneau vide, au curseur clavier est aussi un clic de
+date — et, dans un calendrier `selectable`, sélectionne aussi le créneau
+(Entrée sur un jour qui porte des événements entre dans ses événements ;
+pendant une sélection par Maj+flèches, Entrée la donne à la place ; sur un
+créneau libre avec `onSlotClick`, c'est celle-ci qui est appelée). Un clic de
+souris ne sélectionne jamais ; un glissement, si, de même qu'un appui sur un
+écran tactile.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  onDateClick: (click) => console.log(click.allDay ? `day ${click.date}` : `at ${click.instant.toString()}`),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { DateClick } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" (dateClick)="clicked($event)" />`,
+})
+export class Agenda {
+  clicked(click: DateClick): void {
+    console.log(click.date.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" onDateClick={(click) => console.log(click.date.toString())} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { DateClick } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const clicked = (click: DateClick) => console.log(click.date.toString());
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" @date-click="clicked" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une sortie : `(dateClick)` en Angular, `onDateClick` en React, `@date-click` en Vue.
+
+## Voir aussi
+
+- [`onSelect`](../on-select/) — une plage horaire sélectionnée.
+- [`onCreateRequest`](../on-create-request/) — « Nouvel événement ici » depuis le menu.
+- [`selectable`](../selectable/) — sélectionner du temps.

@@ -1,0 +1,102 @@
+---
+title: onProblem
+description: "Something the calendar could not do as asked, found while drawing."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears what the calendar could not do as asked — found while drawing, not in the data.
+
+<OptionFacts name="onProblem" />
+
+## What it does
+
+It receives `{ code, detail, element? }`:
+
+- `events-not-drawn`: events the view cannot show — all-day events in a
+  time grid without its all-day row, timed events entirely outside
+  `slotMin`–`slotMax`;
+- `host-no-height`: the calendar has no height of its own (an inline host,
+  or `--dz-height: 100%` with no ancestor of a given height) and grows with
+  its content;
+- `zone-from-browser`: no `timeZone` given, the device's is used.
+
+Each is told once per code, view and reason, and again if it comes back after
+going away. Without `onProblem`, each code is said once on the console. Bad data — an event that
+cannot be read — is not here: it is in `calendar.kernel.getProblems()` and
+`onSource`.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  onProblem: (problem) => monitoring.report(`calendar ${problem.code}: ${problem.detail}`),
+});
+
+declare const monitoring: { report(message: string): void };
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { CalendarProblem } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" (problem)="said($event)" />`,
+})
+export class Agenda {
+  said(problem: CalendarProblem): void {
+    console.warn(problem.code, problem.detail);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" onProblem={(problem) => console.warn(problem.code, problem.detail)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { CalendarProblem } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const said = (problem: CalendarProblem) => console.warn(problem.code, problem.detail);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" @problem="said" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an output: Angular's `(problem)`, React's `onProblem`, Vue's `@problem`. Angular says them on the console too.
+
+## See also
+
+- [`onSource`](../on-source/) — the data's problems.
+- [`timeZone`](../time-zone/) — zone-from-browser.
+- [`allDaySlot`](../all-day-slot/) — events-not-drawn.

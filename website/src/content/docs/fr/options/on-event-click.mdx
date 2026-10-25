@@ -1,0 +1,97 @@
+---
+title: onEventClick
+description: "Un événement a été cliqué."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Écoute un clic sur un événement — ou Entrée sur un événement qui a le focus.
+
+<OptionFacts name="onEventClick" />
+
+## Ce qu'elle fait
+
+Elle reçoit l'instance de l'événement : `instance.event` (son `id`, `title`,
+`start`, `end`, `props`…) et, pour une occurrence d'un événement répété,
+laquelle. Elle est appelée pour un clic et pour Entrée (ou Espace) sur un
+événement qui a le focus, dans toutes les vues — le panneau « +N » et la liste
+compris. Un clic qui termine un glissement n'est pas un clic.
+
+Rien ne se passe par défaut : ouvrez votre propre fiche, sélectionnez
+l'événement dans votre page. Pour le « Ouvrir » du menu contextuel, voir
+`onEventOpen`. Sans `onEventClick`, Entrée sur un événement qui a le focus dans
+les grilles, et un clic ou Entrée dans la vue liste, appellent `onEventOpen` à
+la place ; le panneau « +N » n'appelle que `onEventClick`.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  onEventClick: (instance) => console.log(instance.event.id, instance.event.title, instance.event.start.toString()),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventInstance } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" (eventClick)="show($event)" />`,
+})
+export class Agenda {
+  show(instance: EventInstance): void {
+    console.log(instance.event.title);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" onEventClick={(instance) => console.log(instance.event.title)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventInstance } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const show = (instance: EventInstance) => console.log(instance.event.title);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" @event-click="show" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une sortie : `(eventClick)` en Angular, `onEventClick` en React, `@event-click` en Vue.
+
+## Voir aussi
+
+- [`onEventOpen`](../on-event-open/) — « Ouvrir » depuis le menu contextuel.
+- [`onDateClick`](../on-date-click/) — un clic sur du temps à la place.
+- [`events`](../events/) — les champs d'un événement.

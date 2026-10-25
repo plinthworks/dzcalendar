@@ -878,6 +878,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       undo: () => (finishEvents(), history.undo()),
       redo: () => (finishEvents(), history.redo()),
       revert: (applied) => (finishEvents(), history.revert(applied)),
+      canRevert: (applied) => (finishEvents(), history.canRevert(applied)),
       transaction: (label, fn) => (finishEvents(), history.transaction(label, fn)),
       clear: () => history.clear(),
       destroy: () => history.destroy(),

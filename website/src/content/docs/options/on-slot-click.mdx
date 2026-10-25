@@ -1,0 +1,96 @@
+---
+title: onSlotClick
+description: "A bookable slot was clicked."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears a bookable slot (`availableSlots`) clicked — or Enter on it.
+
+<OptionFacts name="onSlotClick" />
+
+## What it does
+
+It receives the slot exactly as you gave it — its `start`, `end` and any
+field of yours (`resourceId`, `seats` from `@dzcalendar/pro/slots`, an id). The calendar creates
+nothing: book it, and have your server check it again (`checkSlot` from
+`@dzcalendar/slots`) before saving, since someone else may have taken it.
+Without `onSlotClick`, slots are only shown, not clickable.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  availableSlots: [],
+  onSlotClick: async (slot) => {
+    const res = await fetch('/api/bookings', { method: 'POST', body: JSON.stringify({ start: slot.start.toString() }) });
+    if (!res.ok) alert('Just taken, sorry.');
+    calendar.refetch();
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [availableSlots]="[]" (slotClick)="book($event)" />`,
+})
+export class Agenda {
+  book(slot: AvailableSlot): void {
+    console.log('book', slot.start.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" availableSlots={[]} onSlotClick={(slot) => console.log('book', slot.start.toString())} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const book = (slot: AvailableSlot) => console.log('book', slot.start.toString());
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :available-slots="[]" @slot-click="book" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an output: Angular's `(slotClick)`, React's `onSlotClick`, Vue's `@slot-click`.
+
+## See also
+
+- [`availableSlots`](../available-slots/) — the slots drawn.
+- [`onDateClick`](../on-date-click/) — a click on other time.
+- [`businessHours`](../business-hours/) — a provider's hours.

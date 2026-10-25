@@ -817,7 +817,10 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       const px = c.height / axis.length;
       const minutes = Math.max(0, Math.min(axis.length - 1e-6, (cy - (c.top - scrollY)) / px));
       const at = axis.fromPosition(minutes);
-      if (at.exists) return own({ kind: 'slot', date: c.column.date, instant: at.instant }, c.column);
+      // The slot the point is in, on the snap's grid (a click at 10:37 means the 10:30 slot, as the menu reads it).
+      const step = ctx.snapMinutes > 0 ? ctx.snapMinutes : 1;
+      const slot = axis.fromPosition(Math.floor(minutes / step) * step);
+      if (at.exists) return own({ kind: 'slot', date: c.column.date, instant: at.instant, ...(slot.exists && { slotStart: slot.instant }) }, c.column);
       // In a skipped hour: the first moment after it (03:00), flagged so the drop is announced.
       const band = axis.bands.find((x) => x.kind === 'gap' && minutes >= x.from && minutes < x.to);
       return own({ kind: 'slot', date: c.column.date, instant: band ? axis.fromPosition(band.to).instant : at.instant, gap: true }, c.column);

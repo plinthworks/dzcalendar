@@ -17,8 +17,9 @@ export type DateClick =
 /**
  * What a person changed — a drag, a resize, the keyboard, the menu, the
  * editor: the command, each event (and series) before and after, and how to
- * take it back when the server refuses. A program's own `calendar.run()` and a
- * source's deliveries are not said here.
+ * take it back when the server refuses — `calendar.undo()` / `redo()` and
+ * `calendar.run(cmd, { validate: true })` too. A program's own `calendar.run()`
+ * without `validate` and a source's deliveries are not said here.
  */
 export interface EventChange {
   /** A command a person asked for, or their undo / redo (Ctrl+Z, `undo()`): persist each. */
@@ -44,7 +45,7 @@ export interface EventChange {
 /** What `onEventLeave` is told: the event that went, the calendar it went to, the way back. */
 export interface EventLeave {
   readonly event: CalEvent;
-  /** The calendar's element it was dropped on. */
+  /** The other calendar's view element it was dropped on (`to.closest('.dz-cal')` for the calendar). */
   readonly to: HTMLElement;
   /** Both sides undone: the event back here, gone from there. False when either changed since. */
   revert(): boolean;

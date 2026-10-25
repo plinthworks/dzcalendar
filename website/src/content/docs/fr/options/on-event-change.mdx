@@ -1,0 +1,114 @@
+---
+title: onEventChange
+description: "Une personne a modifié un événement : enregistrez-le, ou annulez-le."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Écoute chaque modification d'une personne — un glissement, un redimensionnement, le clavier, le menu, l'éditeur, une annulation — pour l'enregistrer.
+
+<OptionFacts name="onEventChange" />
+
+## Ce qu'elle fait
+
+Elle reçoit une modification à la fois :
+
+- `cause` : `'command'` (la modification d'une personne), `'undo'` ou
+  `'redo'` — enregistrez chacune, une annulation est aussi une modification ;
+- `command` : ce qui a été demandé (absent pour une annulation ou un
+  rétablissement) ;
+- `before` et `after` : le premier événement touché tel qu'il était et tel
+  qu'il est (`before` à null quand il est créé, `after` à null quand il est
+  supprimé), ses données dans `props` ; `changes` : tous les événements et
+  séries touchés ;
+- `revert()` : annule exactement cette modification — votre serveur l'a
+  refusée — même si d'autres sont venues après. Elle renvoie `false`, sans
+  rien faire, quand les événements ont changé de nouveau entre-temps, ou pour
+  une étape d'un geste fusionné ou d'une transaction.
+
+`calendar.undo()`, `calendar.redo()` et `calendar.run(cmd, { validate: true })`
+sont signalés ici aussi ; votre propre `calendar.run()` sans `validate` et les
+livraisons d'une source ne le sont pas — une source avec `save` réécrit
+elle-même ses modifications.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventChange: async (change) => {
+    const ev = change.after ?? change.before;
+    const res = await fetch(`/api/events/${ev?.id}`, {
+      method: change.after ? 'PUT' : 'DELETE',
+      body: change.after ? JSON.stringify({ start: change.after.start.toString(), end: change.after.end.toString() }) : null,
+    });
+    // Refused by the server: exactly this change taken back.
+    if (!res.ok) change.revert();
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventChange } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" (eventChange)="save($event)" />`,
+})
+export class Agenda {
+  save(change: EventChange): void {
+    if (change.after) console.log('save', change.after.id, change.after.start.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable onEventChange={(change) => change.after && console.log('save', change.after.id)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventChange } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const save = (change: EventChange) => change.after && console.log('save', change.after.id);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable @event-change="save" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une sortie : `(eventChange)` en Angular, `onEventChange` en React, `@event-change` en Vue.
+
+## Voir aussi
+
+- [`editable`](../editable/) — ce qu'une personne peut changer.
+- [`onCommandRefused`](../on-command-refused/) — une modification que les règles ont refusée.
+- [`sources`](../sources/) — l'enregistrement propre d'une source.

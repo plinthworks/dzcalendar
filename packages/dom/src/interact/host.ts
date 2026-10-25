@@ -10,6 +10,7 @@ import type { Box, InteractionSurface } from './surface.js';
 import { activeIn } from '../focus.js';
 import { dropTarget, registerTarget, tellReceive, targetAt } from './drop.js';
 import type { Carried, DropTarget } from './drop.js';
+import { canRevertOf } from './revertable.js';
 
 /** Pixels past the calendar's edge a pointer is still on it (an overshoot, the scrollbar). */
 const OUT_MARGIN = 8;
@@ -382,7 +383,8 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     const live = ctx.live();
     // "Unassigned" is the view's own row, not a resource: the application hears none.
     const resource = hit.resourceId !== undefined && hit.resourceId !== UNASSIGNED ? { resourceId: hit.resourceId } : {};
-    live.onDateClick?.(hit.kind === 'slot' ? { allDay: false, date: hit.date, instant: hit.instant, ...resource } : { allDay: true, date: hit.date, ...resource });
+    // A moment on the slot grid (`snapMinutes`), as the menu and the keyboard give it (owner, 18j).
+    live.onDateClick?.(hit.kind === 'slot' ? { allDay: false, date: hit.date, instant: hit.slotStart ?? hit.instant, ...resource } : { allDay: true, date: hit.date, ...resource });
     // A tap on a touch screen selects one slot, with two handles to pull its ends.
     if (p.type === 'touch' && live.selectable) {
       const sel = selectionBetween(interaction(null), hit, hit);
@@ -542,8 +544,13 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
         ctx.refused(left.result, command);
         return;
       }
-      // There first: if it cannot be taken back there (changed since), it is not put back here either — never on both.
-      const revert = () => there.revert() && (left.change?.revert() ?? false);
+      // Both sides or neither: each asked first whether it can still be taken back (changed since), then both taken
+      // back — never on both calendars, never on none (18j review).
+      const here = left.change;
+      const revert = () => {
+        if (!here || canRevertOf.get(there)?.() === false || canRevertOf.get(here)?.() === false) return false;
+        return there.revert() && here.revert();
+      };
       if (!to.ctx.scope.isDisposed) to.ctx.announce(received.words);
       tellReceive(to.ctx, { ...there, revert });
       try {

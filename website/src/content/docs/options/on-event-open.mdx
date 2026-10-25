@@ -1,0 +1,90 @@
+---
+title: onEventOpen
+description: "\"Open\" chosen in the context menu."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears "Open" chosen in the context menu of an event.
+
+<OptionFacts name="onEventOpen" />
+
+## What it does
+
+With it, an event's context menu offers "Open"; chosen, you receive the
+event's instance — show your details or your editor. Without `onEventClick`,
+Enter on a focused event calls this one too. The Pro's editor
+(`@dzcalendar/pro/editor`) is one way to answer it.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  onEventOpen: (instance) => location.assign(`/appointments/${instance.event.id}`),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventInstance } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" (eventOpen)="open($event)" />`,
+})
+export class Agenda {
+  open(instance: EventInstance): void {
+    console.log('open', instance.event.id);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" onEventOpen={(instance) => console.log('open', instance.event.id)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventInstance } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const open = (instance: EventInstance) => console.log('open', instance.event.id);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" @event-open="open" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an output: Angular's `(eventOpen)`, React's `onEventOpen`, Vue's `@event-open`.
+
+## See also
+
+- [`onEventClick`](../on-event-click/) — a plain click on an event.
+- [`contextMenu`](../context-menu/) — the menu's entries.
+- [The event editor (Pro)](../../guides/editor/).

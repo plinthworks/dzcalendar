@@ -1,0 +1,94 @@
+---
+title: onEventLeave
+description: "An event of this calendar was dropped on another one."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears an event of this calendar dragged onto another calendar.
+
+<OptionFacts name="onEventLeave" />
+
+## What it does
+
+It receives `{ event, to, revert() }`: the event as it was here, the other
+calendar's view element (`to.closest('.dz-cal')` for the calendar), and
+`revert()`, which takes both sides back — the event here again, gone from
+there — or neither, returning `false`, when either side changed since. Two
+calendars on one store share the event: a drag between them is a move, and
+this is not called. The other calendar hears `onEventReceive`; persist the move once,
+from one side.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventLeave: (leave) => console.log(`${leave.event.title} went to another calendar`),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventLeave } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" (eventLeave)="left($event)" />`,
+})
+export class Agenda {
+  left(leave: EventLeave): void {
+    console.log(leave.event.title, 'left');
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable onEventLeave={(leave) => console.log(leave.event.title, 'left')} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventLeave } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const left = (leave: EventLeave) => console.log(leave.event.title, 'left');
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable @event-leave="left" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an output: Angular's `(eventLeave)`, React's `onEventLeave`, Vue's `@event-leave`.
+
+## See also
+
+- [`onEventReceive`](../on-event-receive/) — the other side.
+- [`droppable`](../droppable/) — what the other calendar takes.
+- [`editable`](../editable/) — dragging out needs it.

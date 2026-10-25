@@ -346,6 +346,26 @@ try {
       await p.close();
     }
 
+    // 18j (owner): a click on time gives the slot's start on snapMinutes (15 by default), as the menu does: 10:37 → 10:30.
+    {
+      const { p } = await fresh();
+      await p.evaluate(() => window.__dz().update({ onDateClick: (c) => (window.__clicks = [...(window.__clicks ?? []), c.allDay ? 'day' : c.instant.toZonedDateTimeISO('Europe/Paris').toPlainTime().toString().slice(0, 5)]) }));
+      const at = await p.evaluate(() => {
+        const ticks = [...document.querySelectorAll('.dz-tick')];
+        const ten = ticks.find((t) => t.dataset.time === '10:00');
+        const eleven = ticks.find((t) => t.dataset.time === '11:00');
+        ten.scrollIntoView({ block: 'center' });
+        const col = document.querySelectorAll('.dz-tg__col')[1].getBoundingClientRect();
+        const y10 = ten.getBoundingClientRect().top;
+        const y11 = eleven.getBoundingClientRect().top;
+        return { x: col.left + 4, y: y10 + (37 / 60) * (y11 - y10) };
+      });
+      await p.mouse.click(at.x, at.y);
+      const clicks = await p.evaluate(() => window.__clicks ?? []);
+      check('18j: a click at 10:37 in a time grid says 10:30 (the slot on snapMinutes)', JSON.stringify(clicks) === JSON.stringify(['10:30']), JSON.stringify(clicks));
+      await p.close();
+    }
+
     // Right to left: the column under the pointer is where it lands.
     {
       const { p, errors } = await fresh();
@@ -1451,6 +1471,16 @@ try {
         const r = await p.evaluate(() => window.__dd.lastReceive.revert());
         const both = { r, a: await titles('a'), b: await titles('b') };
         check('between calendars: a revert after a change there returns false and leaves it on one side only', r === false && !both.a.some((x) => x.startsWith('Contrôle') || x.startsWith('Renommé')) && both.b.some((x) => x.startsWith('Renommé')), JSON.stringify(both));
+      }
+      // 18j review: moved from Dr B to Dre A, then a new event takes its id on Dr B's side: the revert cannot put it back
+      // there, so it is not taken from Dre A either — on one side, never on none.
+      {
+        await p.locator('#b [data-event-id="r2"]').scrollIntoViewIfNeeded();
+        await dragTo(await centre('#b [data-event-id="r2"]'), await at('#a', '15:00'));
+        await p.evaluate(() => window.__dd.b.kernel.run({ type: 'event.create', event: { id: 'r2', title: 'Autre', start: '2026-10-21T16:00[Africa/Algiers]', duration: { minutes: 30 } } }));
+        const r = await p.evaluate(() => window.__dd.lastReceive.revert());
+        const sides = { r, a: await titles('a'), b: await titles('b') };
+        check('between calendars: a revert after a change on the side it left returns false and takes nothing — never on neither', r === false && sides.a.some((x) => x.startsWith('Réunion')), JSON.stringify(sides));
       }
       // Held near the bottom of a doctor's day: the hours scroll up under the card.
       {

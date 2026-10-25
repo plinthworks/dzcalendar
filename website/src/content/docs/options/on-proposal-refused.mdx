@@ -1,0 +1,98 @@
+---
+title: onProposalRefused
+description: "A gesture was dropped where the rules refuse it."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears a drag, a resize or a drop let go where the rules refuse it — and why.
+
+<OptionFacts name="onProposalRefused" />
+
+## What it does
+
+While a person drags, the place shown says whether it may go there; let go
+where it may not, the event goes back and this receives the proposal: the
+event, the `start` and `end` it would have had, its `resourceIds`, and
+`violations` — `constraint` (outside business hours, a group, given spans),
+`overlap`, `allow` (your function said no), `valid-range`, `not-editable`,
+each with its `eventId`. A keyboard grab and an element dropped from the page
+are said here too (for those, `proposal.event` is the event the element
+would have made, not one of the store). Tell the person why ("Outside
+opening hours") — the calendar only says it was refused.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  businessHours: true,
+  rules: { constraint: 'businessHours' },
+  onProposalRefused: (proposal) => {
+    if (proposal.violations.some((v) => v.code === 'constraint')) alert('Outside opening hours');
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { Proposal } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [businessHours]="true" [options]="{ rules: { constraint: 'businessHours' }, onProposalRefused: refused }" />`,
+})
+export class Agenda {
+  readonly refused = (proposal: Proposal) => console.warn(proposal.violations.map((v) => v.code));
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable businessHours rules={{ constraint: 'businessHours' }} onProposalRefused={(p) => console.warn(p.violations.map((v) => v.code))} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { Proposal } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const refused = (proposal: Proposal) => console.warn(proposal.violations.map((v) => v.code));
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :business-hours="true" :options="{ rules: { constraint: 'businessHours' }, onProposalRefused: refused }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`rules`](../rules/) — what refuses.
+- [`editable`](../editable/) — gestures on events.
+- [`onCommandRefused`](../on-command-refused/) — a menu command refused.

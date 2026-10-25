@@ -40,3 +40,38 @@ describe('<dz-calendar> with a refused input at creation', () => {
     expect({ told: told.map((e) => (e as Error).name), zone: k.getState().timeZone, drawn: (f.nativeElement as HTMLElement).querySelector('.dz-cal') !== null }).toEqual({ told: ['RangeError'], zone: 'Asia/Tokyo', drawn: true });
   });
 });
+
+@Component({ standalone: true, imports: [DZ_CALENDAR], template: `<dz-calendar timeZone="Europe/Paris" view="timeGridWeek" [date]="date" [events]="events" />` })
+class Unbound {
+  readonly date = (globalThis as unknown as { __d: unknown }).__d as never;
+  readonly events = [{ id: 'a', title: 'Visite', start: '2026-10-21T09:00[Europe/Paris]' }];
+}
+@Component({ standalone: true, imports: [DZ_CALENDAR], template: `<dz-calendar timeZone="Europe/Paris" view="timeGridWeek" [date]="date" [events]="events" (eventOpen)="opened = true" />` })
+class Bound {
+  opened = false;
+  readonly date = (globalThis as unknown as { __d: unknown }).__d as never;
+  readonly events = [{ id: 'a', title: 'Visite', start: '2026-10-21T09:00[Europe/Paris]' }];
+}
+
+describe('<dz-calendar> offers "Open" only when (eventOpen) is listened to (owner, 18j)', () => {
+  it('unbound: no "Open" in the menu; bound: there, and it reaches the output', async () => {
+    const { Temporal } = await import('@dzcalendar/core');
+    (globalThis as unknown as { __d: unknown }).__d = Temporal.PlainDate.from('2026-10-21');
+    const entries = async (type: typeof Unbound | typeof Bound) => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideDzCalendar()] });
+      const f = TestBed.createComponent(type);
+      await f.whenStable();
+      const el = f.nativeElement as HTMLElement;
+      el.querySelector('.dz-ev[data-event-id="a"]')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 5, clientY: 5 }));
+      const items = [...el.querySelectorAll('.dz-menu [role="menuitem"]')].map((x) => x.textContent?.trim() ?? '');
+      return { f, el, items };
+    };
+    const unbound = await entries(Unbound);
+    expect(unbound.items.some((t) => /^Open/.test(t))).toBe(false);
+    const bound = await entries(Bound);
+    expect(bound.items.some((t) => /^Open/.test(t))).toBe(true);
+    bound.el.querySelector<HTMLElement>('.dz-menu [role="menuitem"]')!.click();
+    expect((bound.f.componentInstance as Bound).opened).toBe(true);
+  });
+});

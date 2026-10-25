@@ -1,3 +1,4 @@
+import type { OutputEmitterRef } from '@angular/core';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -62,6 +63,33 @@ import {
 } from './templates.js';
 
 /** The callbacks the component turns into outputs: not options (they would silence the outputs). */
+/**
+ * Outputs whose listeners are counted: a template's `(eventOpen)="…"` subscribes through `subscribe`, the public way,
+ * so wrapping it tells whether anyone listens — read when the calendar is made (ngOnInit, after the bindings).
+ */
+const LISTENERS = new WeakMap<object, { n: number }>();
+function listened<V>(out: OutputEmitterRef<V>): OutputEmitterRef<V> {
+  const count = { n: 0 };
+  LISTENERS.set(out, count);
+  const subscribe = out.subscribe.bind(out);
+  out.subscribe = (fn: (value: V) => void) => {
+    count.n++;
+    const sub = subscribe(fn);
+    let gone = false;
+    return {
+      unsubscribe: () => {
+        if (!gone) {
+          gone = true;
+          count.n--;
+        }
+        sub.unsubscribe();
+      },
+    };
+  };
+  return out;
+}
+const isListened = (out: object): boolean => (LISTENERS.get(out)?.n ?? 0) > 0;
+
 const OWN_CALLBACKS = ['onEventClick', 'onDateClick', 'onEventOpen', 'onCreateRequest', 'onSelect', 'onUnselect', 'onSlotClick', 'onResourceProblems', 'onEventChange', 'onDrop', 'onEventReceive', 'onEventLeave', 'onProblem'] as const;
 
 /** What `[options]` takes: what `update()` takes, less what has an input or an output of its own. */
@@ -154,6 +182,8 @@ export class DzCalendar implements OnInit, OnDestroy {
   readonly eventClick = output<EventInstance>();
   readonly eventOpen = output<EventInstance>();
   readonly createRequest = output<CreateRequest>();
+  // Counted apart: `listened(output())` in place would hide them from the compiler, which sees only a bare `output()`.
+  private readonly counted = [listened(this.slotClick), listened(this.eventOpen), listened(this.createRequest)];
   /** A selection made by a person (`selection` follows it too). */
   readonly selected = output<Selection>();
   /** Loading, a failed fetch, problems in a delivery, a save refused. */
@@ -311,15 +341,16 @@ export class DzCalendar implements OnInit, OnDestroy {
       ...(view !== undefined && { initialView: view }),
       ...(date !== undefined && { initialDate: date }),
       onDateClick: (c) => this.emit(() => this.dateClick.emit(c)),
-      onSlotClick: (x) => this.emit(() => this.slotClick.emit(x)),
+      // Offered only when listened to, as React and Vue do (owner, 18j): no "Open" with nobody to open it.
+      ...(isListened(this.slotClick) && { onSlotClick: (x: AvailableSlot) => this.emit(() => this.slotClick.emit(x)) }),
       onResourceProblems: (ps) => this.emit(() => this.resourceProblems.emit(ps)),
       onEventClick: (i) => this.emit(() => this.eventClick.emit(i)),
       onEventChange: (c) => this.emit(() => this.eventChange.emit(c)),
       onDrop: (d) => this.emit(() => this.dropped.emit(d)),
       onEventReceive: (c) => this.emit(() => this.eventReceive.emit(c)),
       onEventLeave: (l) => this.emit(() => this.eventLeave.emit(l)),
-      onEventOpen: (i) => this.emit(() => this.eventOpen.emit(i)),
-      onCreateRequest: (r) => this.emit(() => this.createRequest.emit(r)),
+      ...(isListened(this.eventOpen) && { onEventOpen: (i: EventInstance) => this.emit(() => this.eventOpen.emit(i)) }),
+      ...(isListened(this.createRequest) && { onCreateRequest: (r: CreateRequest) => this.emit(() => this.createRequest.emit(r)) }),
       onSelect: (sel) =>
         this.emit(() => {
           this.lastSelection = sel;

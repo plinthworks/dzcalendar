@@ -37,6 +37,8 @@ export interface History {
    * and nothing changed, when something else has changed those events since.
    */
   revert(applied: readonly Mutation[]): boolean;
+  /** Whether `revert(applied)` would take it back now — the same checks, nothing written (two sides reverted together). */
+  canRevert(applied: readonly Mutation[]): boolean;
   /**
    * Every `run` inside `fn` becomes a single entry. If `fn` throws, what it
    * already applied stays applied and stays undoable as that entry.
@@ -209,10 +211,16 @@ export function createHistory(store: EventStore, ctx: CommandContext | (() => Co
    * history (refused when merged with others or in a transaction), an undo's
    * goes back to the done stack, a redo's back to the undone one.
    */
-  function takeBack(applied: readonly Mutation[], kind: 'command' | 'undo' | 'redo', entry: Entry | undefined): boolean {
+  /** Whether this change can be taken back as it stands: its events unchanged since, its entry where it should be. */
+  function mayTakeBack(applied: readonly Mutation[], kind: 'command' | 'undo' | 'redo', entry: Entry | undefined): boolean {
     if (!entry || !stillApplies(store, applied)) return false;
+    if (restoresOrphan(store, [...applied].reverse().map(invert))) return false;
+    if (kind === 'command') return !((commands.get(entry) ?? 0) > 1 || entry === open);
+    return kind === 'undo' ? undone.includes(entry) : done.includes(entry);
+  }
+  function takeBack(applied: readonly Mutation[], kind: 'command' | 'undo' | 'redo', entry: Entry | undefined): boolean {
+    if (!entry || !mayTakeBack(applied, kind, entry)) return false;
     const steps = [...applied].reverse().map(invert);
-    if (restoresOrphan(store, steps)) return false;
     if (kind === 'command') {
       if ((commands.get(entry) ?? 0) > 1 || entry === open) return false;
       done = done.filter((e) => e !== entry);
@@ -272,6 +280,10 @@ export function createHistory(store: EventStore, ctx: CommandContext | (() => Co
       return kind ? takeBack(applied, kind, origin.get(applied)) : false;
     },
     redo: () => replay(undone, done, false),
+    canRevert(applied) {
+      const kind = kindOf.get(applied);
+      return applied.length > 0 && kind !== undefined && mayTakeBack(applied, kind, origin.get(applied));
+    },
 
     transaction(label, fn) {
       if (open) return fn();

@@ -1,0 +1,91 @@
+---
+title: onEventOpen
+description: "« Ouvrir » choisi dans le menu contextuel."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Écoute « Ouvrir » choisi dans le menu contextuel d'un événement.
+
+<OptionFacts name="onEventOpen" />
+
+## Ce qu'elle fait
+
+Avec elle, le menu contextuel d'un événement propose « Ouvrir » ; une fois
+choisi, vous recevez l'instance de l'événement — montrez votre fiche ou votre
+éditeur. Sans `onEventClick`, Entrée sur un événement qui a le focus appelle
+aussi celle-ci. L'éditeur du Pro (`@dzcalendar/pro/editor`) est une façon d'y
+répondre.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  onEventOpen: (instance) => location.assign(`/appointments/${instance.event.id}`),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventInstance } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" (eventOpen)="open($event)" />`,
+})
+export class Agenda {
+  open(instance: EventInstance): void {
+    console.log('open', instance.event.id);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" onEventOpen={(instance) => console.log('open', instance.event.id)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventInstance } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const open = (instance: EventInstance) => console.log('open', instance.event.id);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" @event-open="open" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une sortie : `(eventOpen)` en Angular, `onEventOpen` en React, `@event-open` en Vue.
+
+## Voir aussi
+
+- [`onEventClick`](../on-event-click/) — un simple clic sur un événement.
+- [`contextMenu`](../context-menu/) — les entrées du menu.
+- [L'éditeur d'événements (Pro)](../../guides/editor/).

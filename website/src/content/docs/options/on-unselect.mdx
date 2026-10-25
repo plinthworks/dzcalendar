@@ -1,0 +1,110 @@
+---
+title: onUnselect
+description: "The selection shown went away."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears the selection shown go away by itself — a click elsewhere, Escape, another period.
+
+<OptionFacts name="onUnselect" />
+
+## What it does
+
+A person's click outside the selection, Escape, a move to another period —
+or anything else that clears it: a new drag (then `onSelect`), the cursor
+moved without Shift, a change of view — clears the selection shown; this
+says so, with no argument — close a
+form that was open for it. It is not called when your code clears it
+(`calendar.select(null)`) or replaces it.
+
+In the frameworks the two-way selection says the same, becoming `null`: use
+it there instead.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const form = document.getElementById('booking-form')!;
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  selectable: true,
+  onSelect: () => (form.hidden = false),
+  onUnselect: () => (form.hidden = true),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import type { Selection } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar timeZone="Europe/Paris" [selectable]="true" [(selection)]="selection" />
+    <!-- The form goes when the selection does. -->
+    @if (selection()) { <form>…</form> }`,
+})
+export class Agenda {
+  readonly selection = signal<Selection | null>(null);
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [selection, setSelection] = useState<Selection | null>(null);
+  return (
+    <>
+      <DzCalendar timeZone="Europe/Paris" selectable selection={selection} onSelectionChange={setSelection} />
+      {selection && <form>…</form>}
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { shallowRef } from 'vue';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const selection = shallowRef<Selection | null>(null);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" selectable v-model:selection="selection" />
+  <form v-if="selection">…</form>
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In plain JavaScript it is an option. In the frameworks, follow the two-way selection: Angular's `[(selection)]`, React's `onSelectionChange(null)`, Vue's `v-model:selection` (or `update:selection`) becoming `null`.
+
+## See also
+
+- [`onSelect`](../on-select/) — what was selected.
+- [`selectable`](../selectable/) — turning selection on.
+- [Selection](../../guides/selection/).

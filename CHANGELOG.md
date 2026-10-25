@@ -50,6 +50,13 @@
 - `createCalendar` checks `firstDay` and `hiddenDays` as `update()` does (a
   week with no day, a weekday outside 1–7: `RangeError`).
 - `messages: { views }` keeps the built-in views' labels beside the ones given.
+- A click on time (`onDateClick`) gives the slot's start on `snapMinutes`
+  (10:37 → 10:30), as the context menu and the keyboard do.
+- Angular: "Open", "New event here" and clickable bookable slots are offered
+  only when `(eventOpen)`, `(createRequest)` or `(slotClick)` is listened to.
+- An event moved between two calendars: its revert takes both sides back or
+  neither (it could end on neither).
+- A context-menu command refused is said to screen readers, as other refusals.
 - An event's own `editable: false` is no longer deletable in an editable
   calendar (the context menu and the Delete key).
 - Enter gives the selection being made to the application on a month day that

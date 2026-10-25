@@ -17,6 +17,7 @@ import type { DzMessages } from './messages.js';
 import { WAAPI_MOTION } from './motion-waapi.js';
 import type { MotionAdapter, MotionChange, MotionEnter } from './motion.js';
 import { EVENT_NODE, mayDelete, mayMove, mayResize } from './interact/handles.js';
+import { canRevertOf } from './interact/revertable.js';
 import { createPopover } from './popover.js';
 import { FrameScheduler } from './render/frame.js';
 import { h } from './render/reconcile.js';
@@ -645,6 +646,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
     // This change by its own entry (an undo's revert redoes that entry, not whatever is on top).
     const revert = () => kernel.history.revert(applied);
     const change: EventChange = { cause: cause as EventChange['cause'], ...(e.command && cause === 'command' && { command: e.command }), changes, before: first?.before ?? null, after: first?.after ?? null, revert: revertWith(revert) };
+    canRevertOf.set(change, () => kernel.history.canRevert(applied));
     // A drop's change is told once, to `onEventReceive` (and paired across calendars): not to `onEventChange` too.
     if (captured) captured.push(change);
     else tell?.(change);
@@ -747,8 +749,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
           onCommand: (cmd: Command) => {
             // A person's choice from the menu: checked against the rules.
             const r = kernel.run(cmd, { validate: true });
-            // Read again: the callback may have been replaced since the menu opened.
-            if (!r.ok) settings.current.onCommandRefused?.(r, cmd);
+            // Told and said as every other refusal is (onCommandRefused, and the live region: 18j review).
+            if (!r.ok) ctx.refused(r, cmd);
           },
         }),
         ...((live.editable || (target.kind === 'event' && target.instance.event.perms.own !== undefined)) && interactions && {

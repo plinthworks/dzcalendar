@@ -1,0 +1,104 @@
+---
+title: onCreateRequest
+description: "\"New event here\" from the context menu."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears "New event here" chosen in the context menu: the application opens its own editor.
+
+<OptionFacts name="onCreateRequest" />
+
+## What it does
+
+With it, the context menu on empty time offers "New event at 14:30" (on a
+day: "New all-day event on …"); chosen, the calendar creates nothing and gives you
+`{ allDay, start, resourceId? }`:
+
+- in a time grid, `allDay: false` and `start` an `Instant`, snapped to
+  `snapMinutes` — on a repeated hour, two entries, one per reading, so the
+  moment is never a guess;
+- on a day, `allDay: true` and `start` a date.
+
+Open your editor there, then create the event with `calendar.run({ type:
+'event.create', event })` or your server. Without `onCreateRequest`, the
+menu has no such entry.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onCreateRequest: (request) => {
+    const title = prompt('Title?');
+    if (!title) return;
+    const start = request.allDay ? request.start.toString() : request.start.toZonedDateTimeISO('Europe/Paris').toString();
+    calendar.run({ type: 'event.create', event: { title, start, ...(request.allDay ? { allDay: true } : { duration: { minutes: 30 } }) } });
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { CreateRequest } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" (createRequest)="create($event)" />`,
+})
+export class Agenda {
+  create(request: CreateRequest): void {
+    console.log('new event at', request.start.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" onCreateRequest={(request) => console.log('new event at', request.start.toString())} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { CreateRequest } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const create = (request: CreateRequest) => console.log('new event at', request.start.toString());
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" @create-request="create" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an output: Angular's `(createRequest)`, React's `onCreateRequest`, Vue's `@create-request`.
+
+## See also
+
+- [`contextMenu`](../context-menu/) — the menu's entries.
+- [`onDateClick`](../on-date-click/) — a plain click on time.
+- [`onSelect`](../on-select/) — a stretch of time selected.

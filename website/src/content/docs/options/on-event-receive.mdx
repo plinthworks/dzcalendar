@@ -1,0 +1,97 @@
+---
+title: onEventReceive
+description: "An event came in: dropped from the page or from another calendar."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears an event that came into this calendar — made from an element of the page, or dragged from another calendar.
+
+<OptionFacts name="onEventReceive" />
+
+## What it does
+
+It receives the change, as `onEventChange` does: `after` is the event as it
+is here now, `command` the creation. Persist it; `change.revert()` takes it
+back — for an event from another calendar, on both sides: it goes back
+there. The calendar it left hears `onEventLeave`. Two calendars on one store
+(`store`) share the event: there it is a move, `command` is the move, and
+`onEventLeave` is not called.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  droppable: true,
+  onEventReceive: async (change) => {
+    const res = await fetch('/api/events', { method: 'POST', body: JSON.stringify({ title: change.after?.title, start: change.after?.start.toString() }) });
+    if (!res.ok) change.revert();
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventChange } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ droppable: true }" (eventReceive)="received($event)" />`,
+})
+export class Agenda {
+  received(change: EventChange): void {
+    console.log('received', change.after?.id);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" droppable onEventReceive={(change) => console.log('received', change.after?.id)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventChange } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const received = (change: EventChange) => console.log('received', change.after?.id);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ droppable: true }" @event-receive="received" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an output: Angular's `(eventReceive)`, React's `onEventReceive`, Vue's `@event-receive`.
+
+## See also
+
+- [`onDrop`](../on-drop/) — the element dropped.
+- [`onEventLeave`](../on-event-leave/) — the other side.
+- [`droppable`](../droppable/) — what may come in.
