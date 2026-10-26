@@ -11,7 +11,7 @@ import { Temporal } from '../temporal.js';
 import type { Instant, PlainDate, ZoneId } from '../temporal.js';
 import { chunksCovering } from './chunks.js';
 import type { Chunk } from './chunks.js';
-import type { AbortSignalLike, EventSourceSpec, SourceEdit, SourceResult } from './source.js';
+import type { AbortSignalLike, EventSourceSpec, FetchRequest, SourceEdit, SourceResult } from './source.js';
 
 /** What the manager tells its owner. */
 export type SourceNotice =
@@ -272,7 +272,8 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
     const window = src.spec.chunk.unit === 'none' || !range ? null : datesWindow(chunks[0]!.start, chunks[chunks.length - 1]!.end, range.zone);
     let answer: Promise<SourceResult> | SourceResult;
     try {
-      answer = src.spec.fetch({ window, signal: req.ctrl.signal, sourceId: src.spec.id });
+      // The platform's AbortController's own signal where there is one (see controller()).
+      answer = src.spec.fetch({ window, signal: req.ctrl.signal as FetchRequest['signal'], sourceId: src.spec.id });
     } catch (err) {
       failed(req, err);
       return;

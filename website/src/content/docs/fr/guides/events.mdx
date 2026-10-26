@@ -1,0 +1,472 @@
+---
+title: "Événements"
+description: "Donner les événements, les changer par des commandes, annuler et rétablir, enregistrer ce qu'une personne a changé, lire ce qui n'a pas pu être pris."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Un événement, ce sont des données simples : un id, un titre, un début avec son
+fuseau, une durée. Vous donnez une liste au calendrier ; ensuite, chaque
+changement — le vôtre, le glisser d'une personne, une annulation — est une
+**commande**, des données simples elles aussi, que le calendrier applique,
+enregistre et sait reprendre.
+
+## Donner les événements
+
+Passez-les dans `events`. Un début est une chaîne ISO 8601 ou une valeur
+Temporal ; un événement horaire nomme son fuseau, un événement sur la journée
+est une date :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  events: [
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    // Son propre fuseau : 10 h à Chicago, dessiné à 17 h à Paris.
+    { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', end: '2026-10-22T11:00[America/Chicago]' },
+    { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+    { id: 'd', title: 'Congrès', start: '2026-10-26', end: '2026-10-29', allDay: true, tone: 'violet' },
+  ],
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [events]="events" />`,
+})
+export class Agenda {
+  readonly events: EventInput[] = [
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+  ];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const EVENTS: EventInput[] = [
+  { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+  { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" events={EVENTS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const events: EventInput[] = [
+  { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+  { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :events="events" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Ce qu'il faut savoir de ces champs — tous sont dans le tableau de
+[`events`](../../options/events/) :
+
+- **Chaque événement garde son propre fuseau.** L'appel ci-dessus est à 10 h à
+  Chicago ; le calendrier, dessiné à Paris, le place à 17 h, et le garde à
+  10 h à Chicago si le fuseau du calendrier change. Un début écrit sans
+  fuseau (`'2026-10-21T09:00'`) est lu dans le fuseau du calendrier, et
+  signalé comme une supposition.
+- **`end` ou `duration`.** Dans une durée, un jour suit l'horloge locale et une
+  heure est une heure écoulée : `{ days: 1 }` depuis 9 h finit à 9 h le
+  lendemain même au changement d'heure, `{ hours: 24 }` à 8 h ou à 10 h.
+- **La fin d'un événement sur la journée est exclusive** : le congrès
+  ci-dessus couvre le 26, le 27 et le 28.
+- **Donnez un `id` à chaque événement.** C'est lui qui garde un événement le
+  même à travers un déplacement, une annulation, une nouvelle liste.
+- **Une couleur est un ton** (`tone: 'violet'`), un nom que le thème dessine,
+  pas une valeur hexadécimale — il suit donc les côtés clair et sombre du thème.
+  Vos propres données vont dans `extendedProps`, relues dans `event.props`.
+
+<Aside>
+Jamais de `Date` JavaScript : elle n'a pas de fuseau, et elle est refusée
+(`date-object-rejected`). Écrivez la chaîne ISO, ou un `Temporal.ZonedDateTime`.
+</Aside>
+
+## Remplacer la liste
+
+Pour montrer une autre liste, donnez-la entière : `calendar.update({ events })`
+— ou, dans un framework, un nouveau tableau à la même entrée. Le calendrier
+la compare à celle qu'il tient, par id et par valeur : un événement qui n'a
+pas changé n'est pas redessiné, et la même liste redonnée ne change rien. Un
+nouveau tableau à chaque fois convient. Dans un framework, un tableau modifié
+sur place et redonné est le même tableau — rien n'est vu ; `calendar.update`
+relit le tableau qu'on lui donne.
+
+Pour des événements qui viennent d'un serveur à mesure que la personne
+parcourt les semaines, prenez plutôt une source :
+[Sources d'événements](../event-sources/).
+
+## Changer un événement : les commandes
+
+Chaque changement est une commande, donnée à `calendar.run(…)` :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris' });
+
+calendar.run({ type: 'event.create', event: { id: 'x', title: 'Visite', start: '2026-10-21T14:00[Europe/Paris]', duration: { hours: 1 } } });
+// Sa durée est gardée.
+calendar.run({ type: 'event.move', id: 'x', start: '2026-10-22T15:00[Europe/Paris]' });
+calendar.run({ type: 'event.resize', id: 'x', edge: 'end', to: '2026-10-22T16:30[Europe/Paris]' });
+calendar.run({ type: 'event.update', id: 'x', patch: { title: 'Visite à domicile', tone: 'green' } });
+
+const result = calendar.run({ type: 'event.delete', id: 'inconnu' });
+if (!result.ok) console.warn(result.problems); // [{ code: 'unknown-event', … }] — aucune exception, rien de modifié
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, viewChild } from '@angular/core';
+import { DZ_CALENDAR, DzCalendar } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <button (click)="add()">Nouvelle visite</button>
+    <dz-calendar timeZone="Europe/Paris" />`,
+})
+export class Agenda {
+  private readonly cal = viewChild.required(DzCalendar);
+  add(): void {
+    const result = this.cal().controller.dispatch({ type: 'event.create', event: { title: 'Visite', start: '2026-10-21T14:00[Europe/Paris]', duration: { hours: 1 } } });
+    if (!result.ok) console.warn(result.problems);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+
+export function Agenda() {
+  const cal = useCalendarController();
+  const add = () => {
+    const result = cal.dispatch({ type: 'event.create', event: { title: 'Visite', start: '2026-10-21T14:00[Europe/Paris]', duration: { hours: 1 } } });
+    if (!result.ok) console.warn(result.problems);
+  };
+  return (
+    <>
+      <button onClick={add}>Nouvelle visite</button>
+      <DzCalendar controller={cal} timeZone="Europe/Paris" />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+
+const cal = createCalendarController();
+function add() {
+  const result = cal.dispatch({ type: 'event.create', event: { title: 'Visite', start: '2026-10-21T14:00[Europe/Paris]', duration: { hours: 1 } } });
+  if (!result.ok) console.warn(result.problems);
+}
+</script>
+
+<template>
+  <button @click="add">Nouvelle visite</button>
+  <DzCalendar :controller="cal" time-zone="Europe/Paris" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+| Commande | Fait |
+|---|---|
+| `event.create` | Ajoute `event` (avec une `rrule`, une série) |
+| `event.move` | Un nouveau `start`, la durée gardée sauf si `end` est donné ; `resourceIds` pour changer ses ressources |
+| `event.resize` | Un bord (`edge` : `'start'` ou `'end'`) amené à un nouveau moment (`to`), l'autre gardé |
+| `event.update` | Pose `patch` sur l'événement ; `null` efface `end`, `tone`, `url` ou `groupId` |
+| `event.delete` | Le supprime |
+| `batch` | Plusieurs commandes comme une seule, annulées d'un coup |
+
+Une série a ses propres commandes, et ses occurrences prennent une portée
+(`scope`) — voir [Récurrence](../recurrence/).
+
+Une commande ne lève jamais d'exception. Elle renvoie `{ ok: true, … }`, ou
+`{ ok: false, problems }` sans rien changer : un id inconnu, un début
+illisible — ou, depuis le contrôleur d'un framework, un calendrier pas encore
+dessiné (`not-mounted`). Votre propre `run` n'est pas vérifié par les règles (`rules`,
+`editable`) : elles s'appliquent aux gestes d'une personne, et on suppose
+votre code fiable. Passez `{ validate: true }` pour qu'il soit vérifié comme
+un geste. Les commandes sont des données simples : on peut les journaliser,
+les envoyer à un serveur ou les faire écrire par un assistant —
+`@dzcalendar/core/commands.schema.json` les décrit en JSON Schema.
+
+<Aside>
+Pourquoi des commandes plutôt qu'un objet événement modifiable ? Parce qu'une
+commande se reprend exactement, se compare, s'envoie, se rejoue dans un test —
+et la même commande, lancée par un glisser, une touche ou votre code, est
+vérifiée et dessinée de la même façon.
+</Aside>
+
+## Annuler et rétablir
+
+Chaque commande passée par le calendrier — celle d'une personne ou la vôtre —
+entre dans son historique. `calendar.undo()` et `calendar.redo()` la reprennent
+et la remettent (toutes deux renvoient `false` s'il n'y a rien à faire — une entrée
+disparaît aussi quand une source livre une nouvelle version des événements
+qu'elle touchait) ;
+<kbd>Ctrl</kbd>+<kbd>Z</kbd> et <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>Z</kbd> (ou <kbd>Ctrl</kbd>+<kbd>Y</kbd>) font
+de même au clavier dans un calendrier modifiable
+([`keyboardUndo`](../../options/keyboard-undo/)). Un glisser est une seule
+entrée, quel que soit le nombre de fois où l'événement a bougé, et un `batch`
+aussi. L'historique garde 200 entrées
+([`historyLimit`](../../options/history-limit/)).
+
+Dans les frameworks, le contrôleur a `undo()`, `redo()` et `canUndo`,
+`canRedo` pour dessiner vos propres boutons (un signal en Angular,
+`useCalendarState` en React, une ref en Vue).
+
+Essayez : déplacez ou redimensionnez les événements, puis appuyez sur
+<kbd>Ctrl</kbd>+<kbd>Z</kbd> (<kbd>⌘</kbd>+<kbd>Z</kbd> sur Mac).
+
+<LiveDemo
+  label="Une semaine modifiable : glisser, redimensionner, puis annuler"
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    editable: true,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## Enregistrer ce qu'une personne a changé
+
+Le glisser d'une personne, son redimensionnement, sa touche, son entrée de
+menu ou son éditeur se terminent aussi par une commande. Pour l'écrire sur
+votre serveur, écoutez [`onEventChange`](../../options/on-event-change/). Il
+reçoit un changement à la fois :
+
+- `changes` — chaque événement et chaque série touchés, chacun `{ kind,
+  before, after }` (`kind` vaut `'event'` ou `'series'` ; `before` est `null`
+  pour un élément créé, `after` pour un élément supprimé). C'est ce qu'il faut
+  enregistrer : modifier « toutes » les occurrences d'une série, ou en
+  supprimer une, touche la série et aucun événement isolé.
+- `before` et `after` — le premier événement touché, tel qu'il était et tel
+  qu'il est : suffisant pour un calendrier sans séries.
+- `command` — ce qui a été demandé ; `cause` — `'command'`, `'undo'` ou
+  `'redo'` : une annulation est aussi un changement à enregistrer.
+
+Si votre serveur refuse, appelez `change.revert()` : exactement ce changement
+est repris, même si d'autres sont venus après. Il renvoie `false`, sans rien
+changer, quand ces événements ont été modifiés de nouveau depuis, ou pour une
+étape d'un geste fusionné ou d'une transaction.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { eventInput, seriesInput } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+import type { EventChange } from '@dzcalendar/dom';
+
+// Chaque événement ou série touché, tel que votre serveur le stocke : null si supprimé.
+const toWire = (change: EventChange) =>
+  change.changes.map((c) => ({
+    kind: c.kind,
+    id: (c.after ?? c.before)!.id,
+    data: c.kind === 'event' ? c.after && eventInput(c.after) : c.after && seriesInput(c.after),
+  }));
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventChange: async (change) => {
+    const res = await fetch('/api/changes', { method: 'POST', body: JSON.stringify({ cause: change.cause, changes: toWire(change) }) });
+    if (!res.ok) change.revert();
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { eventInput, seriesInput } from '@dzcalendar/core';
+import type { EventChange } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" (eventChange)="save($event)" />`,
+})
+export class Agenda {
+  private readonly http = inject(HttpClient);
+  save(change: EventChange): void {
+    const changes = change.changes.map((c) => ({
+      kind: c.kind,
+      id: (c.after ?? c.before)!.id,
+      data: c.kind === 'event' ? c.after && eventInput(c.after) : c.after && seriesInput(c.after),
+    }));
+    this.http.post('/api/changes', { cause: change.cause, changes }).subscribe({ error: () => change.revert() });
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { eventInput, seriesInput } from '@dzcalendar/core';
+import type { EventChange } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/react';
+
+async function save(change: EventChange) {
+  const changes = change.changes.map((c) => ({
+    kind: c.kind,
+    id: (c.after ?? c.before)!.id,
+    data: c.kind === 'event' ? c.after && eventInput(c.after) : c.after && seriesInput(c.after),
+  }));
+  const res = await fetch('/api/changes', { method: 'POST', body: JSON.stringify({ cause: change.cause, changes }) });
+  if (!res.ok) change.revert();
+}
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable onEventChange={save} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { eventInput, seriesInput } from '@dzcalendar/core';
+import type { EventChange } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+async function save(change: EventChange) {
+  const changes = change.changes.map((c) => ({
+    kind: c.kind,
+    id: (c.after ?? c.before)!.id,
+    data: c.kind === 'event' ? c.after && eventInput(c.after) : c.after && seriesInput(c.after),
+  }));
+  const res = await fetch('/api/changes', { method: 'POST', body: JSON.stringify({ cause: change.cause, changes }) });
+  if (!res.ok) change.revert();
+}
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable @event-change="save" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Ce que `onEventChange` reçoit, et ce qu'il ne reçoit pas :
+
+- **Le changement d'une personne, sur n'importe quel événement** — ceux
+  d'une source compris.
+- **Pas votre propre `calendar.run()`** : vous savez ce que vous avez lancé —
+  sauf avec `{ validate: true }`, qui le lance comme un geste et le signale
+  ici.
+- **Mais chaque annulation et chaque rétablissement sont signalés**,
+  `calendar.undo()` compris, même d'une commande que vous avez lancée
+  vous-même (`cause: 'undo'`, sans `command`). Si vous enregistrez depuis ce
+  rappel, lancez aussi vos propres commandes avec `{ validate: true }`, pour
+  que le serveur ait vu ce qu'une annulation reprend.
+- **Pas ce qu'une source livre.** Une source dotée d'une fonction `save`
+  écrit aussi les changements d'une personne sur ses événements —
+  enregistrez-les à un seul endroit : voir
+  [Sources d'événements](../event-sources/#renvoyer-les-changements).
+- **Pas un dépôt** : un événement déposé depuis la page ou depuis un autre
+  calendrier est signalé une seule fois, à
+  [`onEventReceive`](../../options/on-event-receive/).
+- **Pas un refus** : un changement refusé par les règles n'a jamais eu lieu ;
+  il est signalé par [`onCommandRefused`](../../options/on-command-refused/)
+  ou [`onProposalRefused`](../../options/on-proposal-refused/).
+
+Qui peut changer quoi, c'est [`editable`](../../options/editable/) qui le
+décide, avec les `editable`, `startEditable` et `durationEditable` propres à
+chaque événement.
+
+## Quand un événement ne peut pas être lu
+
+Des données invalides ne lèvent jamais d'exception. Un événement sans début,
+avec un fuseau inconnu ou une fin avant son début est laissé de côté, et le
+reste est montré. Demandez ce qui a été écarté :
+
+```ts
+const report = calendar.kernel.getProblems();
+for (const p of report?.problems ?? []) console.warn(p.severity, p.code, p.path, p.detail);
+// error   unknown-zone   … Europe/Pariss
+// warning zone-defaulted … — accepté, lu dans le fuseau du calendrier
+```
+
+Chaque problème a un `code` (`missing-start`, `unknown-zone`,
+`end-before-start`, `duplicate-id`…), une gravité (`severity` : `'error'`
+écarté, `'warning'` accepté, mais supposé ou ajusté), un chemin (`path`) vers le
+champ et un `detail`. Les problèmes d'une source passent plutôt par
+[`onSource`](../../options/on-source/). Dans les frameworks, le rapport de
+l'entrée `events` est signalé par `(problems)` en Angular, `onProblems` en
+React et `@problems` en Vue ; le `problems` du contrôleur tient le dernier
+rapport, des événements ou d'une source.
+
+## Voir aussi
+
+- [`events`](../../options/events/) — chaque champ d'un événement.
+- [Récurrence](../recurrence/) — les événements qui se répètent et leurs occurrences.
+- [Sources d'événements](../event-sources/) — des événements venus d'un serveur.
+- [Glisser-déposer](../drag-and-drop/) — ce que lancent les gestes d'une personne.

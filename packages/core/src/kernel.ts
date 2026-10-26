@@ -16,7 +16,7 @@ import type { History } from './commands/history.js';
 import type { Command, CommandContext, CommandResult } from './commands/types.js';
 import type { RulesContext } from './rules/validate.js';
 import { createEventStore } from './store/store.js';
-import type { EventStore, StoreSnapshot } from './store/store.js';
+import type { EventStore, QueryOptions, StoreSnapshot, ViewWindow } from './store/store.js';
 import { Temporal } from './temporal.js';
 import type { Instant, PlainDate, Weekday, ZoneId } from './temporal.js';
 import { BUILTIN_VIEWS, registeredViewSpecs } from './views/builtin.js';
@@ -300,6 +300,8 @@ export interface CalendarKernel {
   refreshToday(): boolean;
   /** Memoized; after a store change only what changed is rebuilt (where the family can). */
   viewModel(): ViewModel;
+  /** What building the shown model had to say: a series cut short there (`too-many-occurrences`, its path `series:<id>`). */
+  viewProblems(): readonly Problem[];
   /**
    * Another view or date, as it would be shown — its state (range, title) and
    * its model — without changing what is shown (printing, exports). Null for
@@ -563,6 +565,22 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   });
   let state = computeState();
   let model: ViewModel | null = null;
+  /** Series the shown model had to cut short (`too-many-occurrences`), by path: what the DOM layer says. */
+  let cut = new Map<string, Problem>();
+  /** The snapshot, its queries telling `cut` which series they cut. */
+  const watched = (snap: StoreSnapshot): StoreSnapshot => {
+    const query = snap.queryInstances.bind(snap);
+    return Object.assign(Object.create(snap) as StoreSnapshot, {
+      queryInstances: (w: ViewWindow, q: QueryOptions = {}) =>
+        query(w, {
+          ...q,
+          onProblem: (p: Problem) => {
+            q.onProblem?.(p);
+            cut.set(p.path, p);
+          },
+        }),
+    });
+  };
   const fetchShown = () => sources.setRange(state.range.start, state.range.end, timeZone);
   let held = 0;
   let pending: StateCause[] = [];
@@ -673,7 +691,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       return;
     }
     const family = model ? FAMILIES.get(model.family) : undefined;
-    model = model && family?.update ? { family: model.family, model: family.update(model.model, store.snapshot, change) } : null;
+    model = model && family?.update ? { family: model.family, model: family.update(model.model, watched(store.snapshot), change) } : null;
     emit(change.cause === 'command' && running ? { type: 'store', change, command: running, validated: validating } : { type: 'store', change });
   });
   fetchShown();
@@ -834,9 +852,11 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       if (!family) throw new Error(`no model family registered for ${view.family}`);
       // Another calendar's load on a shared store may not have reached this period yet.
       ensureShown(state.range);
-      model = { family: view.family, model: family.build(state.range, store.snapshot, { displayZone: timeZone, view, options, resources: resourceTree, columns }) };
+      cut = new Map();
+      model = { family: view.family, model: family.build(state.range, watched(store.snapshot), { displayZone: timeZone, view, options, resources: resourceTree, columns }) };
       return model;
     },
+    viewProblems: () => [...cut.values()],
     now,
     getProblems: () => problems,
     whenLoaded: () => (deferred && !deferred.done ? new Promise<void>((resolve) => waiting.push(resolve)) : Promise.resolve()),

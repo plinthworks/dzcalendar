@@ -1,0 +1,289 @@
+---
+title: "Event sources"
+description: "Events fetched as the calendar moves: a JSON URL, your own function, an iCalendar feed — loading, errors, and saving changes back."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../components/CodeTabs.astro';
+
+The `events` option is a list you hold. A **source** is events the calendar
+fetches itself, for the weeks it shows, as the person moves through them —
+from a URL answering JSON, from your own function, or from an iCalendar feed.
+Give them in [`sources`](../../options/sources/); several sources show
+together.
+
+## From a URL answering JSON
+
+```ts
+import { jsonSource } from '@dzcalendar/core';
+
+jsonSource('appointments', { url: '/api/rendez-vous' });
+// GET /api/rendez-vous?start=…Z&end=…Z&timeZone=Europe%2FParis
+```
+
+Each request names the stretch it wants as two instants, `start` and `end`,
+and the calendar's zone. The answer is the list of events, written as in
+`events`. What you can change:
+
+| Option | |
+|---|---|
+| `map` | From your server's JSON to the list: `(raw) => raw.items` |
+| `params` | Sent with every request: `{ clinic: '12' }` |
+| `startParam`, `endParam`, `zoneParam` | Other names for the three (`'from'`), or `null` to leave one out |
+| `method` | `'POST'` sends them in a form body instead of the query |
+| `headers` | `{ authorization: 'Bearer …' }` |
+| `chunk` | How the time is cut into requests — see below |
+| `defaults` | Fields every event of the source takes under its own: `{ tone: 'green', editable: false }` |
+| `staleAfter`, `retry`, `save` | See below (`fnSource` takes them too; `icalSource` only `save`) |
+
+<Aside>
+The stretch asked is wider than the screen: whole days around a whole month,
+taken for every zone on earth (from UTC+14 to UTC−12). An event that starts
+on the 1st in Auckland is the 31st in Paris; asking wide is what keeps it
+from falling between two requests. Answer everything that touches the
+stretch — the calendar keeps what it shows.
+</Aside>
+
+## From your own function
+
+When the events come from somewhere else — a client library, GraphQL, a
+local database — `fnSource` calls your function with the stretch and an
+abort signal:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { fnSource } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  sources: [
+    fnSource('holidays', async ({ window, signal }) => {
+      // window.startDate and window.endDate: dates, the end exclusive.
+      const res = await fetch(`/api/holidays?from=${window!.startDate}&to=${window!.endDate}`, { signal });
+      return res.json();
+    }),
+  ],
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import { fnSource } from '@dzcalendar/core';
+import type { EventInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [sources]="sources" />`,
+})
+export class Agenda {
+  private readonly http = inject(HttpClient);
+  // Made once, for the component's life.
+  readonly sources = [
+    fnSource('holidays', ({ window }) =>
+      firstValueFrom(this.http.get<EventInput[]>('/api/holidays', { params: { from: String(window!.startDate), to: String(window!.endDate) } })),
+    ),
+  ];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { fnSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+// Outside the component: one source, not a new one at each render.
+const SOURCES = [
+  fnSource('holidays', async ({ window, signal }) => {
+    const res = await fetch(`/api/holidays?from=${window!.startDate}&to=${window!.endDate}`, { signal });
+    return res.json();
+  }),
+];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" sources={SOURCES} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { fnSource } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const sources = [
+  fnSource('holidays', async ({ window, signal }) => {
+    const res = await fetch(`/api/holidays?from=${window!.startDate}&to=${window!.endDate}`, { signal });
+    return res.json();
+  }),
+];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :sources="sources" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+`window` also has `start` and `end` (the same stretch as instants) and
+`displayZone`; it is `null` for a source with `chunk: { unit: 'none' }`,
+asked once for all of time (a `jsonSource` then sends no stretch). The function may answer at once or with a promise, the list
+or `{ events, problems }` — problems of your own, said like the calendar's.
+
+## From an iCalendar feed
+
+```ts
+import { icalSource } from '@dzcalendar/ical';
+
+icalSource('team', { url: 'https://example.org/team.ics' }); // webcal:// links work too
+icalSource('imported', { text: fileContents });               // a file the person chose
+```
+
+`@dzcalendar/ical` reads RFC 5545: repeating events with their `RRULE`,
+`EXDATE`, `RDATE` and changed occurrences (`RECURRENCE-ID`), each `TZID`
+whether it is an IANA name, a prefixed one or a Windows name ("Romance
+Standard Time"), and a custom `VTIMEZONE` matched to the IANA zone that
+keeps the same clock changes — a warning says which (`zone-guessed`; none
+matching, a fixed offset with `zone-fixed-offset`). What it cannot take
+(`EXRULE`, a period in `RDATE`, `RANGE=THISANDFUTURE`) is said with
+`ical-unsupported`. A feed has no ranges: it is fetched whole, once — again
+on `refetch()`. `defaultZone` says where to read times the file writes
+without a zone (its own `X-WR-TIMEZONE` wins). It brings recurrence itself:
+no other import needed.
+
+## How fetching works
+
+- **By chunks, not by screen.** A source is asked for whole months by
+  default (`chunk: { unit: 'month', prefetch: 0 }`; `'week'`, `'year'` or
+  `'none'` for everything at once). A week view and the month around it share
+  what was fetched; months missing side by side go out as one request;
+  `prefetch: 1` asks one more on each side, so the next month is already
+  there.
+- **Kept, then dropped.** What was fetched stays while the person moves
+  around; twelve chunks are kept beyond what is shown, the least recently
+  shown dropped first. `staleAfter: { minutes: 5 }` asks a chunk again when
+  it is shown after that long.
+- **Nothing stale, nothing twice.** A request nobody needs any more (the
+  person moved on) is aborted through its signal; at most four run at once;
+  an answer from before a `refetch` is ignored.
+- **Changing the calendar's zone fetches nothing**: the chunks are dates as
+  they exist everywhere. If your server's answer depends on the zone it was
+  sent, call `calendar.refetch()` after changing it.
+- **`calendar.refetch('appointments')`** asks one source again (no id: all).
+  The events on screen stay until the answer replaces them — no flash.
+
+## Loading and errors
+
+While a source is loading, the calendar has `aria-busy` (and the class
+`dz-loading`), so assistive technology knows its content is changing. A
+failed request leaves what was shown and is said to a screen reader once. A
+period never loaded is asked again when the shown period changes; one loaded
+before keeps its events until it is stale or fetched again. There is no
+retry by default: `retry: { attempts: 2, backoffMs: 500 }` tries again
+first, 500 ms then 1 s later.
+
+[`onSource`](../../options/on-source/) tells you all of it, for a spinner or
+a message of your own:
+
+| `notice.type` | When |
+|---|---|
+| `'loading'` | Loading starts (`loading: true`) or every source is done (`false`) |
+| `'error'` | A request failed after its retries (`sourceId`, `error`) |
+| `'problems'` | A delivery held events that could not be read (`report.problems`) |
+| `'saved'` | A `save` resolved |
+| `'save-error'` | A `save` rejected (`reverted`: put back or not) |
+
+In the frameworks: Angular's `(sourceNotice)`, React's `onSourceNotice`,
+Vue's `@source-notice`; the controllers' `loading` follows it.
+
+## Save changes back
+
+Without `save`, the server is the authority: a person may drag a source's
+event, but the next fetch puts it back where the server says. Give `save`
+to write the change, and it holds:
+
+```ts
+import { jsonSource, eventInput, seriesInput } from '@dzcalendar/core';
+
+jsonSource('appointments', {
+  url: '/api/rendez-vous',
+  save: async ({ edits, cause }) => {
+    // edits: what this change touched, in order — { kind, id, before?, after? }
+    // null: deleted.
+    const body = edits.map((e) => ({ kind: e.kind, id: e.id, data: e.kind === 'event' ? e.after && eventInput(e.after) : e.after && seriesInput(e.after) }));
+    const res = await fetch('/api/rendez-vous', { method: 'PATCH', body: JSON.stringify({ cause, edits: body }) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`); // a rejection puts it back
+  },
+});
+```
+
+- **The change shows at once.** If the promise rejects, it is put back as it
+  was and said — "Consultation could not be saved. It is back as it was." —
+  with nothing left to undo. If the events changed again meanwhile, what can
+  be put back is, and the source is fetched again.
+- **One save at a time per source, in order**: your server sees the edits as
+  they happened. While one is out, a fetch does not overwrite the edit;
+  once it settles, the source is asked again if it sent something meanwhile.
+- **Every change to its events is saved**: a person's, your own
+  `calendar.run()`, an undo and a redo (`cause: 'undo'`, `'redo'`).
+- **A series sends what the edit made**: the changed series, and for "this
+  occurrence" its override, for "this and following" the new series.
+  `eventInput` and `seriesInput` write them back as inputs; `after` absent
+  is a deletion.
+- **Created events are not a source's.** A new event — from the menu's
+  "New event at …" ([`onCreateRequest`](../../options/on-create-request/)),
+  from a selection ([`onSelect`](../../options/on-select/)) — is yours to
+  place: `save` does not see it.
+
+<Aside type="caution">
+A person's change to a source's event is said to
+[`onEventChange`](../../options/on-event-change/) too. Save it in one place:
+the source's `save`, or `onEventChange` — not both. Both at once would write
+it twice, and a `change.revert()` from `onEventChange` is itself a change
+the source then saves (as an undo).
+</Aside>
+
+## Change the sources
+
+`calendar.update({ sources })` takes the whole list: sources gone are
+removed with their events, new ones are fetched, the others kept as they
+are. They are compared **by identity** — the same spec object is the same
+source, a new one is fetched again. In a framework, make the specs once (a
+field of the component, a module constant, `useMemo`), not in the template
+or the render.
+
+The id `'events'` belongs to the `events` option; a source given it is
+refused (`duplicate-id`).
+
+## What a server should do
+
+- Answer a repeating event **with its changed occurrences in the same
+  answer**: they are linked within one delivery. An override that arrives
+  alone is shown as a plain event, with an `orphan-override` warning.
+- Answer what touches the stretch asked, wider than the screen; the
+  calendar keeps what it shows, and an event over two chunks (a night from
+  the 31st to the 1st) belongs to both.
+- Write zones as IANA names (`Europe/Paris`), or instants with `Z`; a time
+  without either is read in the calendar's zone, as a guess.
+
+## See also
+
+- [`sources`](../../options/sources/) and [`onSource`](../../options/on-source/).
+- [Events](../events/) — the `events` option, commands, `onEventChange`.
+- [Recurrence](../recurrence/) — series in a source.
+- [Time zones](../time-zones/).

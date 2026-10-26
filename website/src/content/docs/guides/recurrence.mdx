@@ -1,0 +1,244 @@
+---
+title: "Recurrence"
+description: "Repeating events with RFC 5545 rules: writing a series, its exceptions, the clock changes it crosses, and editing this occurrence, this and following, or all."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../components/CodeTabs.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+An event with an `rrule` is a **series**: its start is the first
+occurrence, its length every occurrence's length, and the rule — the
+RFC 5545 rule calendars exchange in `.ics` files — says when it comes back.
+
+## A series
+
+The rules engine is loaded once, by one import; without it an event with an
+`rrule` is left out, with the problem `recurrence-not-loaded`
+(`@dzcalendar/ical` brings it itself):
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import '@dzcalendar/core/recurrence';
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  events: [
+    // Mondays and Wednesdays, 08:00–10:00.
+    { id: 'rounds', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+    // The second Tuesday of each month, ten times.
+    { id: 'board', title: 'Board', start: '2026-10-13T18:00[Europe/Paris]', duration: { hours: 1 }, rrule: 'FREQ=MONTHLY;BYDAY=TU;BYSETPOS=2;COUNT=10' },
+    // Every day of the week, all day, until the end of November.
+    { id: 'duty', title: 'On duty', start: '2026-10-19', allDay: true, rrule: 'FREQ=DAILY;UNTIL=20261130' },
+  ],
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import '@dzcalendar/core/recurrence';
+import type { EventInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [events]="events" />`,
+})
+export class Agenda {
+  readonly events: EventInput[] = [
+    { id: 'rounds', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import '@dzcalendar/core/recurrence';
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const EVENTS: EventInput[] = [
+  { id: 'rounds', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" events={EVENTS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import '@dzcalendar/core/recurrence';
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const events: EventInput[] = [
+  { id: 'rounds', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :events="events" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+The whole of RFC 5545's rule is read: every `FREQ` from `YEARLY` to
+`SECONDLY`, `INTERVAL`, `COUNT` or `UNTIL`, and every `BY…` part (`BYDAY`
+with its positions — `2TU`, `-1FR` —, `BYMONTHDAY`, `BYSETPOS`,
+`BYWEEKNO`…). Several rules in an array make one series of their union.
+The occurrences are computed for the weeks shown, never stored ahead: a
+series without an end is fine.
+
+## Exceptions: dates taken out, dates added
+
+```ts
+{
+  id: 'rounds',
+  title: 'Rounds',
+  start: '2026-10-19T08:00[Europe/Paris]',
+  duration: { hours: 2 },
+  rrule: 'FREQ=WEEKLY;BYDAY=MO,WE',
+  exdate: ['2026-11-11T08:00[Europe/Paris]'], // a holiday: not that Wednesday
+  rdate: ['2026-11-13T08:00[Europe/Paris]'],  // the Friday instead
+}
+```
+
+An `exdate` names an occurrence by its start, written as the series writes
+it; an all-day series takes dates (`'2026-11-11'`). A single occurrence
+changed — moved, renamed — is an event of its own linked to the series:
+`seriesId` (the series' id) and `recurrenceId` (the start of the occurrence
+it replaces), given in the same list — or the same delivery of a source —
+as its series; alone, it is shown as a plain event, with an
+`orphan-override` warning. That is what iCalendar's `RECURRENCE-ID` is, and what the
+calendar makes itself when a person changes "this occurrence".
+
+## Clock changes
+
+A series lives on the wall clock of its zone. "Every Monday at 08:00 in
+Paris" is at 08:00 on the Monday after the clocks go back too — 07:00 UTC in
+winter, 06:00 in summer — and, drawn in New York, it moves by an hour for
+the weeks when Europe and America do not change on the same Sunday. That is
+what a person means by "every Monday at 8", and what the other calendars do.
+
+- An occurrence whose wall time falls in the hour skipped in spring (02:30
+  in Paris on the last Sunday of March) is moved forward, to 03:30.
+- In the hour repeated in autumn, it takes the first 02:30.
+- `HOURLY`, `MINUTELY` and `SECONDLY` count hours that pass instead: "every
+  two hours" stays two hours apart across the change.
+
+An occurrence is known by its **original start, offset included**
+(`2026-10-25T02:30:00+02:00[Europe/Paris]`): the two 02:30s of the night the
+clocks go back are two occurrences, never one — a series counting hours
+(`HOURLY`) has both; a daily one, as said above, the first.
+
+## Editing an occurrence: this, following, all
+
+When a person drags, resizes or deletes an occurrence, the calendar asks how
+far the change reaches — try it: drag one of the Rounds to another day.
+
+<LiveDemo
+  label="A weekly series: drag an occurrence, choose how far it reaches"
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    editable: true,
+    scrollTime: { hours: 7 },
+    events: [
+      { id: 'rounds', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+      { id: 'a', title: 'Consultation', start: '2026-10-22T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    ],
+  }}
+/>
+
+- **This event** — only that occurrence changes; the series skips it, or
+  holds it where it was moved.
+- **This and following events** — the series is cut there: before, unchanged;
+  from it on, the change. A series of ten keeps ten in all; one ending on a
+  date keeps its date — moved with the days when the change moves the days.
+- **All events** — every occurrence changes the same way. Moved from Monday
+  08:00 to Tuesday 09:00, the Mondays and Wednesdays become Tuesdays and
+  Thursdays at 09:00 — still 09:00 on the wall after the clocks change. The
+  changed occurrences and the dates taken out move with it.
+
+Undo takes back exactly what was there, both halves of a cut included.
+To ask in your own way, or to decide without asking, give
+[`chooseScope`](../../options/choose-scope/) a function returning `'this'`,
+`'following'`, `'all'`, or `null` to cancel.
+
+## Editing a series from code
+
+The event commands take a `scope`, and an occurrence is named by the
+`key` of the instance a callback gave you (`series@originalStart`):
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import '@dzcalendar/core/recurrence';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  events: [{ id: 'rounds', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' }],
+  onEventClick: (instance) => {
+    if (instance.origin !== 'occurrence' || instance.event.allDay) return;
+    // This one only: an hour later.
+    calendar.run({ type: 'event.move', id: instance.key, start: instance.event.start.add({ hours: 1 }) });
+  },
+});
+
+// The series' id with the occurrence's original start, and a scope.
+calendar.run({ type: 'event.update', id: 'rounds', key: '2026-11-04T08:00[Europe/Paris]', scope: 'following', patch: { title: 'Rounds (new wing)' } });
+```
+
+</Fragment>
+</CodeTabs>
+
+| Command | Does |
+|---|---|
+| `event.move`, `event.resize`, `event.update`, `event.delete` | With `scope` (`'this'`, `'following'`, `'all'`) and `key` — an instance key alone is `'this'`; a `key` without its offset, in the hour repeated, is the first |
+| `series.delete` | The whole series, every occurrence and every change |
+| `series.split` | "This and following" without a gesture: the series cut `at` an occurrence, a `patch` from there |
+| `series.rule` | A new `rrule` for the whole series, its exceptions kept; `null` stops it repeating |
+| `event.repeat` | A single event made a series, the same id |
+
+A whole series cannot switch between all-day and timed (`invalid-edit`);
+one occurrence can, without being asked.
+
+## Week starts and rules from elsewhere
+
+`FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,SU` depends on the day a week starts.
+A rule created in the calendar — a person's "repeats" in the editor,
+`event.create` or `event.repeat` run by your code — gets `WKST` written in — the calendar's first day of the week
+(`firstDay`, else the locale's) — so it means the same anywhere it is read. A rule read from elsewhere without `WKST` is
+read with Monday, as RFC 5545 and the other calendars read it; `series.rule`
+keeps the series' own.
+
+<Aside>
+More than 2 000 occurrences of one series in what is shown (a rule every
+minute, a year view) are cut there, and said to
+[`onProblem`](../../options/on-problem/) (`too-many-occurrences`) once for
+that series.
+</Aside>
+
+## See also
+
+- [`chooseScope`](../../options/choose-scope/) — how far a person's change reaches.
+- [Events](../events/) — the commands and the history.
+- [Event sources](../event-sources/) — series from a server or a `.ics` feed.
+- [Time zones](../time-zones/).

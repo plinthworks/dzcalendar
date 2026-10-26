@@ -69,7 +69,7 @@ export { createHistory } from './commands/history.js';
 export type { History, HistoryOptions } from './commands/history.js';
 export type { Command, CommandContext, CommandResult, EventPatch, Reach } from './commands/types.js';
 export { arraySource, loadStaticSource } from './source/array-source.js';
-export type { AbortSignalLike, FetchRequest, SourceFetch, SourceResult, ChunkPolicy, EventSourceSpec, SourceEdit, SaveRequest } from './source/source.js';
+export type { AbortSignalLike, PlatformAbortSignal, FetchRequest, SourceFetch, SourceResult, ChunkPolicy, EventSourceSpec, SourceEdit, SaveRequest } from './source/source.js';
 export { exportInputs, eventInput, seriesInput } from './source/export.js';
 export { createSourceManager } from './source/manager.js';
 export type { SourceManager, SourceManagerOptions, SourceNotice, Timers } from './source/manager.js';

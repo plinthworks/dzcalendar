@@ -13,6 +13,13 @@ export interface AbortSignalLike {
   addEventListener(type: 'abort', listener: () => void, options?: { once?: boolean }): void;
 }
 
+/**
+ * The platform's own `AbortSignal` where its types are known (a browser's DOM
+ * lib, Node's types) — what a source's fetch hands to `fetch` — else nothing
+ * more than `AbortSignalLike`. Resolved in the application's compilation, not ours.
+ */
+export type PlatformAbortSignal = typeof globalThis extends { readonly AbortSignal: { readonly prototype: infer S } } ? S : unknown;
+
 export interface FetchRequest {
   /**
    * The stretch to fetch. Null for an unchunked source, which answers for all
@@ -21,7 +28,8 @@ export interface FetchRequest {
    * are in it whatever zone the calendar shows — changing zone fetches nothing.
    */
   readonly window: ViewWindow | null;
-  readonly signal: AbortSignalLike;
+  /** A real `AbortSignal` wherever the platform has one: pass it to `fetch`. */
+  readonly signal: AbortSignalLike & PlatformAbortSignal;
   readonly sourceId: string;
 }
 

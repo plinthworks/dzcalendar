@@ -22,9 +22,12 @@ Elle reçoit `{ code, detail, element? }` :
   `display: inline`, ou `--dz-height: 100%` sans ancêtre de hauteur donnée) et grandit
   avec son contenu ;
 - `zone-from-browser` : aucun `timeZone` donné, celui de l'appareil est
-  utilisé.
+  utilisé ;
+- `too-many-occurrences` : une série a plus de 2 000 occurrences dans ce qui
+  est montré (une règle chaque minute, une année) : les 2 000 premières sont
+  dessinées.
 
-Chacun est dit une fois par code, vue et raison, et de nouveau s'il revient
+Chacun est dit une fois par code, vue et raison (une série pour le dernier), et de nouveau s'il revient
 après être parti. Sans `onProblem`, chaque code est dit une fois dans la
 console. Une mauvaise donnée
 — un événement illisible — n'est pas ici : elle est dans

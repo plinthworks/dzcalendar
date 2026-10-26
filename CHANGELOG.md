@@ -40,6 +40,23 @@
 
 ### Fixed
 
+- A series cut short in what is shown (more than 2 000 occurrences: a rule
+  every minute, a year) is said (18j-3): `onProblem` receives
+  `too-many-occurrences`, once a series, again if it comes back — without
+  `onProblem`, the console once. It was cut in silence. `kernel.viewProblems()`
+  holds what building the shown view had to say.
+- Angular's `CalendarController` no longer throws when no `<dz-calendar>` is
+  attached (before it is drawn, after it is destroyed): `dispatch` answers
+  `{ ok: false, problems: [{ code: 'invalid-option', detail: 'not-mounted' }] }`,
+  `undo`/`redo` `false`, the others do nothing — as React's and Vue's
+  controllers (owner, 18j-3).
+
+- A source's fetch is given the platform's `AbortSignal` in its types too
+  (18j-3): `fnSource('id', ({ signal }) => fetch(url, { signal }))` compiles
+  without a cast. `FetchRequest['signal']` is `AbortSignalLike &
+  PlatformAbortSignal` (exported) — the platform's own `AbortSignal` wherever
+  the application's types know one (the DOM lib, Node's types).
+
 - The Pro editor takes tzslot's widgets from `@tzslot/dom/lazy` (`@tzslot/dom`
   ^2.4.0): the Temporal polyfill is no longer in its chunk for every browser.
 

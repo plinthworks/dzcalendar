@@ -140,6 +140,14 @@ describe('<dz-calendar> under provideZonelessChangeDetection', () => {
 });
 
 describe('CalendarController', () => {
+  it('before a calendar is attached: refuses as React and Vue do, throws nothing (18j-3)', () => {
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), CalendarController] });
+    const ctl = TestBed.inject(CalendarController);
+    expect(ctl.dispatch({ type: 'event.delete', id: 'a' })).toEqual({ ok: false, problems: [{ code: 'invalid-option', severity: 'error', path: 'calendar', detail: 'not-mounted' }] });
+    expect([ctl.undo(), ctl.redo()]).toEqual([false, false]);
+    expect(() => (ctl.next(), ctl.goTo(d('2026-10-21')), ctl.changeView('dayGridMonth'), ctl.refetch())).not.toThrow();
+  });
+
   @Component({
     standalone: true,
     imports: [DzCalendar, Header],
@@ -283,7 +291,9 @@ describe('review fixes', () => {
     const ctl = f.debugElement.children[0]!.injector.get(CalendarController);
     f.destroy();
     expect(ctl.instance()).toBeNull();
-    expect(() => ctl.next()).toThrow(/no <dz-calendar>/);
+    // Nothing reached, nothing thrown (owner, 18j-3: as React's and Vue's controllers).
+    expect(() => ctl.next()).not.toThrow();
+    expect(ctl.dispatch({ type: 'event.delete', id: 'a' }).ok).toBe(false);
   });
 });
 

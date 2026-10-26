@@ -2,6 +2,9 @@ import { Injectable, computed, signal } from '@angular/core';
 import type { Command, CommandResult, KernelState, NormalizationReport, PlainDate, ViewRange } from '@dzcalendar/core';
 import type { CalendarInstance } from '@dzcalendar/dom';
 
+/** What `dispatch` answers before the calendar is drawn: the refusal React's and Vue's controllers give. */
+const NOT_ATTACHED: CommandResult = { ok: false, problems: [{ code: 'invalid-option', severity: 'error', path: 'calendar', detail: 'not-mounted' }] };
+
 /**
  * The calendar as signals, for what sits around it: a header of one's own,
  * a side panel, a status line. Provided by each `<dz-calendar>`; a child
@@ -48,45 +51,43 @@ export class CalendarController {
     this.canRedo.set(k.history.canRedo);
   }
 
-  private get cal(): CalendarInstance {
+  /**
+   * Calls the calendar outside the zone, then reads what can be undone at once (not a microtask later).
+   * No calendar attached yet (or any more): `none`, as React's and Vue's controllers answer — nothing thrown.
+   */
+  private call<T>(fn: (c: CalendarInstance) => T, none: T): T {
     const c = this.current();
-    if (!c) throw new Error('CalendarController: no <dz-calendar> is attached yet');
-    return c;
-  }
-
-  /** Calls the calendar outside the zone, then reads what can be undone at once (not a microtask later). */
-  private call<T>(fn: (c: CalendarInstance) => T): T {
-    const c = this.cal;
+    if (!c) return none;
     const r = this.outside(() => fn(c));
     this.read(c);
     return r;
   }
 
   dispatch(cmd: Command, opts?: { readonly validate?: boolean }): CommandResult {
-    return this.call((c) => c.run(cmd, opts));
+    return this.call((c) => c.run(cmd, opts), NOT_ATTACHED);
   }
   undo(): boolean {
-    return this.call((c) => c.undo());
+    return this.call((c) => c.undo(), false);
   }
   redo(): boolean {
-    return this.call((c) => c.redo());
+    return this.call((c) => c.redo(), false);
   }
   prev(): void {
-    this.call((c) => c.navigate('prev'));
+    this.call((c) => c.navigate('prev'), undefined);
   }
   next(): void {
-    this.call((c) => c.navigate('next'));
+    this.call((c) => c.navigate('next'), undefined);
   }
   today(): void {
-    this.call((c) => c.navigate('today'));
+    this.call((c) => c.navigate('today'), undefined);
   }
   goTo(date: PlainDate): void {
-    this.call((c) => c.update({ date }));
+    this.call((c) => c.update({ date }), undefined);
   }
   changeView(view: string): void {
-    this.call((c) => c.update({ view }));
+    this.call((c) => c.update({ view }), undefined);
   }
   refetch(sourceId?: string): void {
-    this.call((c) => c.refetch(sourceId));
+    this.call((c) => c.refetch(sourceId), undefined);
   }
 }

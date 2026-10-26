@@ -3,7 +3,7 @@ import type { NormalizationReport, NormalizeContext } from '../event/normalize.j
 import type { EventInput } from '../event/types.js';
 import type { StoreChange } from '../store/changes.js';
 import type { EventStore } from '../store/store.js';
-import type { EventSourceSpec } from './source.js';
+import type { EventSourceSpec, FetchRequest } from './source.js';
 
 /**
  * A fixed list, one chunk for all of time. `defaults` are laid under each
@@ -27,7 +27,7 @@ export function loadStaticSource(
   ctx: NormalizeContext,
 ): { change: StoreChange; report: NormalizationReport } {
   if (spec.chunk.unit !== 'none') throw new Error(`source ${spec.id} is chunked: use the source manager`);
-  const raw = spec.fetch({ sourceId: spec.id, signal: NEVER, window: null });
+  const raw = spec.fetch({ sourceId: spec.id, signal: NEVER as unknown as FetchRequest['signal'], window: null }); // synchronous: never aborted
   if (typeof (raw as PromiseLike<unknown>).then === 'function') throw new Error(`source ${spec.id} is asynchronous: use the source manager`);
   const inputs = (raw as readonly EventInput[]).map((e) => (spec.defaults ? { ...spec.defaults, ...e } : e));
   const { items, report } = normalizeMany(inputs, ctx, spec.id);

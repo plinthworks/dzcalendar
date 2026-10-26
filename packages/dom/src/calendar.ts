@@ -577,6 +577,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   checkLook(look);
   /** Problems told already (`onProblem`), and codes said on the console: the same is told once. */
   const toldProblems = new Set<string>();
+  /** The series said cut short at the last drawing (`too-many-occurrences`). */
+  let toldCuts: string[] = [];
   const warnedCodes = new Set<string>();
   let saidUnguarded = false;
   const applyLook = () => {
@@ -936,6 +938,11 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
     ctx.zone = state.timeZone;
     toolbar.draw(state, ctx.messages, root.dir === 'rtl');
     const vm = kernel.viewModel();
+    // A series cut short in what is shown is said, once a series; one no longer cut may be said again.
+    const cuts = kernel.viewProblems().filter((p) => p.code === 'too-many-occurrences');
+    for (const p of cuts) ctx.problem({ code: 'too-many-occurrences', detail: `${p.path.replace(/^series:/, 'series ')}: ${p.detail ?? ''} — the first ones are drawn`, element: root }, p.path);
+    for (const path of toldCuts) if (!cuts.some((p) => p.path === path)) ctx.problemGone('too-many-occurrences', path);
+    toldCuts = cuts.map((p) => p.path);
     let v: ViewController;
     try {
       v = mount(vm.family);

@@ -20,9 +20,11 @@ It receives `{ code, detail, element? }`:
 - `host-no-height`: the calendar has no height of its own (an inline host,
   or `--dz-height: 100%` with no ancestor of a given height) and grows with
   its content;
-- `zone-from-browser`: no `timeZone` given, the device's is used.
+- `zone-from-browser`: no `timeZone` given, the device's is used;
+- `too-many-occurrences`: a series has more than 2 000 occurrences in what
+  is shown (a rule every minute, a year): the first 2 000 are drawn.
 
-Each is told once per code, view and reason, and again if it comes back after
+Each is told once per code, view and reason (a series for the last), and again if it comes back after
 going away. Without `onProblem`, each code is said once on the console. Bad data — an event that
 cannot be read — is not here: it is in `calendar.kernel.getProblems()` and
 `onSource`.

@@ -1,0 +1,255 @@
+---
+title: "Récurrence"
+description: "Des événements qui se répètent selon les règles RFC 5545 : écrire une série, ses exceptions, les changements d'heure qu'elle traverse, et modifier un événement, celui-ci et les suivants, ou tous."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Un événement doté d'une `rrule` est une **série** : son début est la
+première occurrence, sa durée celle de chaque occurrence, et la règle — la
+règle RFC 5545 que les calendriers échangent dans les fichiers `.ics` — dit
+quand il revient.
+
+## Une série
+
+Le moteur des règles se charge une fois, par un import ; sans lui, un
+événement doté d'une `rrule` est écarté, avec le problème
+`recurrence-not-loaded` (`@dzcalendar/ical` l'apporte lui-même) :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import '@dzcalendar/core/recurrence';
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  events: [
+    // Les lundis et mercredis, 8 h – 10 h.
+    { id: 'rounds', title: 'Visite des services', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+    // Le deuxième mardi de chaque mois, dix fois.
+    { id: 'board', title: 'Conseil', start: '2026-10-13T18:00[Europe/Paris]', duration: { hours: 1 }, rrule: 'FREQ=MONTHLY;BYDAY=TU;BYSETPOS=2;COUNT=10' },
+    // Chaque jour, sur la journée, jusqu'à fin novembre.
+    { id: 'duty', title: 'De garde', start: '2026-10-19', allDay: true, rrule: 'FREQ=DAILY;UNTIL=20261130' },
+  ],
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import '@dzcalendar/core/recurrence';
+import type { EventInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [events]="events" />`,
+})
+export class Agenda {
+  readonly events: EventInput[] = [
+    { id: 'rounds', title: 'Visite des services', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+  ];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import '@dzcalendar/core/recurrence';
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const EVENTS: EventInput[] = [
+  { id: 'rounds', title: 'Visite des services', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" events={EVENTS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import '@dzcalendar/core/recurrence';
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const events: EventInput[] = [
+  { id: 'rounds', title: 'Visite des services', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :events="events" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Toute la règle de la RFC 5545 est lue : chaque `FREQ` de `YEARLY` à
+`SECONDLY`, `INTERVAL`, `COUNT` ou `UNTIL`, et chaque partie `BY…` (`BYDAY`
+avec ses positions — `2TU`, `-1FR` —, `BYMONTHDAY`, `BYSETPOS`,
+`BYWEEKNO`…). Plusieurs règles dans un tableau font une seule série, leur
+union. Les occurrences sont calculées pour les semaines montrées, jamais
+stockées d'avance : une série sans fin ne pose aucun problème.
+
+## Les exceptions : des dates retirées, des dates ajoutées
+
+```ts
+{
+  id: 'rounds',
+  title: 'Visite des services',
+  start: '2026-10-19T08:00[Europe/Paris]',
+  duration: { hours: 2 },
+  rrule: 'FREQ=WEEKLY;BYDAY=MO,WE',
+  exdate: ['2026-11-11T08:00[Europe/Paris]'], // un jour férié : pas ce mercredi
+  rdate: ['2026-11-13T08:00[Europe/Paris]'],  // le vendredi à la place
+}
+```
+
+Un `exdate` désigne une occurrence par son début, écrit comme la série
+l'écrit ; une série sur la journée prend des dates (`'2026-11-11'`). Une
+seule occurrence modifiée — déplacée, renommée — est un événement à part
+relié à la série : `seriesId` (l'id de la série) et `recurrenceId` (le début
+de l'occurrence qu'il remplace), donné dans la même liste — ou la même
+livraison d'une source — que sa série ; seul, il est montré comme un
+événement simple, avec un avertissement `orphan-override`. C'est ce qu'est le
+`RECURRENCE-ID`
+d'iCalendar, et ce que le calendrier crée lui-même quand une personne modifie
+« cette occurrence ».
+
+## Les changements d'heure
+
+Une série vit à l'heure locale de son fuseau. « Chaque lundi à 8 h à Paris »
+est à 8 h aussi le lundi qui suit le passage à l'heure d'hiver — 7 h UTC en
+hiver, 6 h en été — et, dessinée à New York, elle se décale d'une heure les
+semaines où l'Europe et l'Amérique ne changent pas le même dimanche. C'est ce
+qu'une personne veut dire par « chaque lundi à 8 h », et ce que font les
+autres calendriers.
+
+- Une occurrence dont l'heure locale tombe dans l'heure sautée au printemps
+  (2 h 30 à Paris le dernier dimanche de mars) est avancée, à 3 h 30.
+- Dans l'heure répétée à l'automne, elle prend le premier 2 h 30.
+- `HOURLY`, `MINUTELY` et `SECONDLY` comptent au contraire des heures qui
+  passent : « toutes les deux heures » reste à deux heures d'écart à travers
+  le changement.
+
+Une occurrence se reconnaît à son **début d'origine, décalage compris**
+(`2026-10-25T02:30:00+02:00[Europe/Paris]`) : les deux 2 h 30 de la nuit où
+l'on recule les horloges sont deux occurrences, jamais une seule — une série
+qui compte des heures (`HOURLY`) a les deux ; une série quotidienne, on l'a
+vu, la première.
+
+## Modifier une occurrence : celle-ci, les suivantes, toutes
+
+Quand une personne glisse, redimensionne ou supprime une occurrence, le
+calendrier demande jusqu'où va le changement — essayez : glissez l'une des
+visites à un autre jour.
+
+<LiveDemo
+  label="Une série hebdomadaire : glissez une occurrence, choisissez jusqu'où"
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    editable: true,
+    scrollTime: { hours: 7 },
+    events: [
+      { id: 'rounds', title: 'Visite des services', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+      { id: 'a', title: 'Consultation', start: '2026-10-22T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    ],
+  }}
+/>
+
+- **Cet événement** — seule cette occurrence change ; la série la saute, ou
+  la tient là où elle a été déplacée.
+- **Cet événement et les suivants** — la série est coupée là : avant, inchangée ;
+  à partir de lui, le changement. Une série de dix en garde dix en tout ;
+  une série qui finit à une date garde sa date — décalée avec les jours
+  quand le changement décale les jours.
+- **Tous les événements** — chaque occurrence change de la même façon.
+  Déplacés du lundi 8 h au mardi 9 h, les lundis et mercredis deviennent des
+  mardis et jeudis à 9 h — toujours 9 h à l'horloge locale après le changement d'heure.
+  Les occurrences modifiées et les dates retirées suivent.
+
+Annuler reprend exactement ce qui était là, les deux moitiés d'une coupe
+comprises. Pour demander à votre façon, ou décider sans demander, donnez à
+[`chooseScope`](../../options/choose-scope/) une fonction qui renvoie
+`'this'`, `'following'`, `'all'`, ou `null` pour annuler.
+
+## Modifier une série par le code
+
+Les commandes des événements prennent une portée (`scope`), et une
+occurrence se nomme par la clé (`key`) de l'instance qu'un rappel vous a
+donnée (`idSérie@débutOrigine`) :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import '@dzcalendar/core/recurrence';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  events: [{ id: 'rounds', title: 'Visite des services', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' }],
+  onEventClick: (instance) => {
+    if (instance.origin !== 'occurrence' || instance.event.allDay) return;
+    // Celle-ci seulement : une heure plus tard.
+    calendar.run({ type: 'event.move', id: instance.key, start: instance.event.start.add({ hours: 1 }) });
+  },
+});
+
+// L'id de la série avec le début d'origine de l'occurrence, et une portée.
+calendar.run({ type: 'event.update', id: 'rounds', key: '2026-11-04T08:00[Europe/Paris]', scope: 'following', patch: { title: 'Visite (nouvelle aile)' } });
+```
+
+</Fragment>
+</CodeTabs>
+
+| Commande | Fait |
+|---|---|
+| `event.move`, `event.resize`, `event.update`, `event.delete` | Avec `scope` (`'this'`, `'following'`, `'all'`) et `key` — une clé d'instance seule vaut `'this'` ; une `key` sans son décalage, dans l'heure répétée, désigne la première |
+| `series.delete` | La série entière, chaque occurrence et chaque modification |
+| `series.split` | « Cet événement et les suivants » sans geste : la série coupée à une occurrence (`at`), un `patch` à partir de là |
+| `series.rule` | Une nouvelle `rrule` pour toute la série, ses exceptions gardées ; `null` arrête la répétition |
+| `event.repeat` | Un événement simple devenu série, le même id |
+
+Une série entière ne peut pas passer de la journée à l'horaire ou l'inverse
+(`invalid-edit`) ; une occurrence le peut, sans qu'on demande.
+
+## Le début de semaine et les règles venues d'ailleurs
+
+`FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,SU` dépend du jour où commence une semaine.
+Une règle créée dans le calendrier — le « se répète » d'une personne dans
+l'éditeur, `event.create` ou `event.repeat` lancés par votre code — reçoit
+un `WKST` écrit — le premier jour de la
+semaine du calendrier (`firstDay`, sinon celui de la locale) — et veut donc
+dire la même chose partout où elle est lue. Une règle venue d'ailleurs sans
+`WKST` est lue avec le lundi, comme la RFC 5545 et les autres calendriers la
+lisent ; `series.rule` garde celui de la série.
+
+<Aside>
+Plus de 2 000 occurrences d'une même série dans ce qui est montré (une règle
+chaque minute, une vue année) sont coupées là, et signalées à
+[`onProblem`](../../options/on-problem/) (`too-many-occurrences`) une fois
+pour cette série.
+</Aside>
+
+## Voir aussi
+
+- [`chooseScope`](../../options/choose-scope/) — jusqu'où va le changement d'une personne.
+- [Événements](../events/) — les commandes et l'historique.
+- [Sources d'événements](../event-sources/) — des séries venues d'un serveur ou d'un flux `.ics`.
+- [Fuseaux horaires](../time-zones/).

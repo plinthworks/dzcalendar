@@ -62,9 +62,11 @@ export interface CalendarProblem {
    * `host-no-height`: the calendar has no height of its own (an inline host, or `--dz-height: 100%` with no
    * ancestor of a given height: it grows with its content);
    * `zone-from-browser`: no `timeZone` given — the browser's is used (a device set elsewhere draws another day;
-   * pass `timeZone`, `Temporal.Now.timeZoneId()` for the browser's on purpose).
+   * pass `timeZone`, `Temporal.Now.timeZoneId()` for the browser's on purpose);
+   * `too-many-occurrences`: a series has more than 2 000 occurrences in what is shown (a rule every minute,
+   * a year): the first 2 000 are drawn — said once a series, again if it comes back.
    */
-  readonly code: 'events-not-drawn' | 'host-no-height' | 'zone-from-browser';
+  readonly code: 'events-not-drawn' | 'host-no-height' | 'zone-from-browser' | 'too-many-occurrences';
   readonly detail: string;
   readonly element?: HTMLElement;
 }

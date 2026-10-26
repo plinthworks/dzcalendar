@@ -303,7 +303,7 @@ describe('serializeICal', () => {
 });
 
 describe('icalSource', () => {
-  const signal = { aborted: false, addEventListener() {} };
+  const signal = new AbortController().signal;
 
   it('fetches the URL with the signal, and gives the events and what was wrong', async () => {
     const calls: unknown[] = [];
@@ -372,7 +372,7 @@ describe('review fixes (Phase 9)', () => {
   it('a webcal:// link is fetched over https', async () => {
     const urls: string[] = [];
     const src = icalSource('w', { url: 'webcal://example.com/team.ics', fetchImpl: async (url) => (urls.push(url), { ok: true, status: 200, text: async () => cal() }) });
-    await src.fetch({ window: null, signal: { aborted: false, addEventListener() {} }, sourceId: 'w' });
+    await src.fetch({ window: null, signal: new AbortController().signal, sourceId: 'w' });
     expect(urls).toEqual(['https://example.com/team.ics']);
   });
 
