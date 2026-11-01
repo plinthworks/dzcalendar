@@ -92,6 +92,28 @@ Phases and acceptance criteria: `ARCHITECTURE.md`, section J.
   options (time and week; data and resources; layout and grids; gestures;
   callbacks; look, language and lifecycle). Then npm publication, licences,
   Phase 19.
+- **Guide batch recipe (18j-3; owner, 2026-11-01: one fresh session per
+  batch, first drafts by Sonnet sub-agents, review and checks kept).** For
+  each guide of the batch: `git mv website/src/content/docs/guides/<slug>.md
+  …/<slug>.mdx` and the same under `fr/guides/`; imports
+  `../../../components/{CodeTabs,LiveDemo}.astro` (EN) and
+  `../../../../components/…` (FR); remove the `:::note[Being written]` /
+  `:::note[En cours de rédaction]` stub; add the slug to `WRITTEN` in
+  `website/test/guides.test.ts` (EN/FR same shape: sections, tabs, flavours,
+  demos, fences, tables, option and guide links; every link and anchor
+  lands). Models: `guides/events.mdx`, `event-sources.mdx`, `recurrence.mdx`.
+  Tasks, not facts: link the option pages (`../../options/<slug>/`) for
+  defaults and types. `<CodeTabs>` slots js/angular/react/vue (a missing slot
+  is no tab), all compiled by `npm run docs:check`; plain fences are not.
+  `<LiveDemo options={{…}}>` takes JSON options (locale en-GB on EN pages,
+  fr-FR on FR pages). FR is French written as French, not a calque. CLEANROOM:
+  FullCalendar's docs for behaviour only, never their words. Then: an accuracy
+  review agent against the code, fixes (library defects found are fixed and
+  said), every check (test, test:ci, typecheck, build, check:entries, size,
+  test:browser, perf:browser, test:package, gen:llms/gen:schema --check,
+  docs:check, `cd website && npm run build`, the changed pages in Chrome on a
+  port of its own — never 4600/4700/4701), ROADMAP + CHANGELOG, commit
+  "Phase 18j-3, batch N: …", push.
 - **Sehhaty's second pass done (2026-10-20):** the five workarounds removed,
   compat problems 105 → 2 (`height`, `expandRows`: CSS, on purpose), no
   `zone-guessed` left, revert on a server 409 checked on both engines, 154
