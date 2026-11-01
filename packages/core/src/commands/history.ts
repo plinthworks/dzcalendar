@@ -76,9 +76,12 @@ function stillApplies(store: EventStore, mutations: readonly Mutation[]): boolea
 /**
  * A source event may come back only while its source still delivers it.
  * Restored after the source withdrew it, nothing would ever remove it again.
+ * The source delivers an id: made a series (`event.repeat`) or a single
+ * event again (`series.rule` null), it is still the one it delivered.
  */
 function restoresOrphan(store: EventStore, steps: readonly Mutation[]): boolean {
-  return [...finalStates(steps).values()].some((m) => m.after?.sourceId !== undefined && !store.snapshot.isSourceOwned(mutationId(m), m.kind));
+  const owned = (id: string) => store.snapshot.isSourceOwned(id, 'event') || store.snapshot.isSourceOwned(id, 'series');
+  return [...finalStates(steps).values()].some((m) => m.after?.sourceId !== undefined && !owned(mutationId(m)));
 }
 
 /**

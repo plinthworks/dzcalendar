@@ -600,3 +600,78 @@ describe('the editor’s batch: the new rule first, then the move rebases it', (
     expect(dates(store)).toEqual(['2026-10-22', '2026-11-26', '2026-12-24']);
   });
 });
+
+describe('a source’s item made the other kind here (event.repeat, series.rule null)', () => {
+  const feed = (input: Record<string, unknown>) => normalizeMany([{ title: 'E', start: `2026-10-05T09:00${P}`, ...input }], ctx().normalize, 'feed').items;
+  const kinds = (store: EventStore, id: string) => [store.snapshot.getSeries(id) ? 'series' : null, store.snapshot.getEvent(id) ? 'event' : null];
+
+  it('repeat, undo, redo: the series comes back (the source still delivers the id)', () => {
+    const store = createEventStore();
+    store.replaceSourceChunk('feed', 'all', feed({ id: 'e' }));
+    const h = createHistory(store, ctx());
+    h.run({ type: 'event.repeat', id: 'e', rrule: 'FREQ=DAILY;COUNT=3' });
+    expect(h.undo()).toBe(true);
+    expect(h.redo()).toBe(true);
+    expect(kinds(store, 'e')).toEqual(['series', null]);
+  });
+
+  it('stop a source series, undo, redo: the single event comes back', () => {
+    const store = createEventStore();
+    store.replaceSourceChunk('feed', 'all', feed({ id: 's', rrule: 'FREQ=DAILY;COUNT=3' }));
+    const h = createHistory(store, ctx());
+    h.run({ type: 'series.rule', id: 's', rrule: null });
+    expect(h.undo()).toBe(true);
+    expect(h.redo()).toBe(true);
+    expect(kinds(store, 's')).toEqual([null, 'event']);
+  });
+
+  it('the source withdraws the id: the series made of its event goes too, and a redo after that is dropped', () => {
+    const store = createEventStore();
+    store.replaceSourceChunk('feed', 'all', feed({ id: 'e' }));
+    const h = createHistory(store, ctx());
+    h.run({ type: 'event.repeat', id: 'e', rrule: 'FREQ=DAILY;COUNT=3' });
+    store.replaceSourceChunk('feed', 'all', []);
+    expect(kinds(store, 'e')).toEqual([null, null]);
+
+    const again = createEventStore();
+    again.replaceSourceChunk('feed', 'all', feed({ id: 'e' }));
+    const h2 = createHistory(again, ctx());
+    h2.run({ type: 'event.repeat', id: 'e', rrule: 'FREQ=DAILY;COUNT=3' });
+    h2.undo();
+    again.replaceSourceChunk('feed', 'all', []);
+    expect(h2.redo()).toBe(false);
+    expect(kinds(again, 'e')).toEqual([null, null]);
+  });
+
+  it('the source delivers the id again as it was: it wins, no duplicate-id, and it still owns it', () => {
+    const store = createEventStore();
+    store.replaceSourceChunk('feed', 'all', feed({ id: 'e' }));
+    const h = createHistory(store, ctx());
+    h.run({ type: 'event.repeat', id: 'e', rrule: 'FREQ=DAILY;COUNT=3' });
+    const change = store.replaceSourceChunk('feed', 'all', feed({ id: 'e', title: 'Renamed on the server' }));
+    expect(change.problems).toEqual([]);
+    expect([...kinds(store, 'e'), store.snapshot.getEvent('e')?.title]).toEqual([null, 'event', 'Renamed on the server']);
+    store.replaceSourceChunk('feed', 'all', []);
+    expect(kinds(store, 'e')).toEqual([null, null]);
+  });
+
+  it('the server saved it as a series: delivered so, it is the source’s series, the old event’s place withdrawn quietly', () => {
+    const store = createEventStore();
+    store.replaceSourceChunk('feed', 'all', feed({ id: 'e' }));
+    const h = createHistory(store, ctx());
+    h.run({ type: 'event.repeat', id: 'e', rrule: 'FREQ=DAILY;COUNT=3' });
+    const change = store.replaceSourceChunk('feed', 'all', feed({ id: 'e', rrule: 'FREQ=DAILY;COUNT=3' }));
+    expect(change.problems).toEqual([]);
+    expect(kinds(store, 'e')).toEqual(['series', null]);
+    expect([store.snapshot.isSourceOwned('e', 'series'), store.snapshot.isSourceOwned('e', 'event')]).toEqual([true, false]);
+  });
+
+  it('a user’s own series under an id the source then delivers as an event is still refused (duplicate-id)', () => {
+    const store = createEventStore();
+    const h = createHistory(store, ctx());
+    h.run({ type: 'event.create', event: { id: 'x', start: `2026-10-05T09:00${P}`, rrule: 'FREQ=DAILY;COUNT=3' } });
+    const change = store.replaceSourceChunk('feed', 'all', feed({ id: 'x' }));
+    expect(change.problems.map((p) => p.code)).toEqual(['duplicate-id']);
+    expect(kinds(store, 'x')).toEqual(['series', null]);
+  });
+});

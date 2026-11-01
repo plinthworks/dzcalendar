@@ -30,8 +30,8 @@ failed fetch is retried when `retry` asks, then told through `onSource`; what
 was shown stays. With `save`, the changes to its events (a person's, a
 command's, an undo) are written back: shown at once, put back if the promise
 rejects — or, when the events changed again meanwhile, fetched again.
-(`icalSource` takes `url`, `text`, `headers`, `defaults` and `save`, not
-`staleAfter` or `retry`.)
+(`icalSource` takes `url`, `text`, `headers`, `defaults`, `staleAfter`,
+`retry` and `save`.)
 
 `update({ sources })` takes the whole list: sources gone are removed, new
 ones added, the others kept — compared by identity, so keep the same spec

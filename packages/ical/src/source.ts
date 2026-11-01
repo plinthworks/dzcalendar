@@ -18,6 +18,10 @@ export interface ICalSourceOptions {
   /** Where floating times are read when the file names no zone. */
   readonly defaultZone?: string;
   readonly save?: (req: SaveRequest) => Promise<unknown> | unknown;
+  /** Fetched again when shown after this long (a feed that changes); as `jsonSource`'s. */
+  readonly staleAfter?: EventSourceSpec['staleAfter'];
+  /** A failed fetch tried again, the wait doubling each time; as `jsonSource`'s. No default: tried once. */
+  readonly retry?: EventSourceSpec['retry'];
 }
 
 /**
@@ -30,6 +34,8 @@ export function icalSource(id: string, o: ICalSourceOptions): EventSourceSpec {
     chunk: { unit: 'none', prefetch: 0 },
     ...(o.defaults && { defaults: o.defaults }),
     ...(o.save && { save: o.save }),
+    ...(o.staleAfter && { staleAfter: o.staleAfter }),
+    ...(o.retry && { retry: o.retry }),
     async fetch(req) {
       let text: string;
       if (o.text !== undefined) text = typeof o.text === 'function' ? await o.text() : o.text;

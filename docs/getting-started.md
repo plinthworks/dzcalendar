@@ -116,7 +116,7 @@ first: it is on screen sooner, and nothing else changes —
   meanwhile `update`, `navigate`, `select` and `refetch` wait in line, `run`
   refuses (`calendar-not-ready`) and reading `kernel` throws. `<dz-calendar>`,
   React, Vue and the FullCalendar translation wait too (`<dz-calendar>` has
-  `ready`), and so does Angular's `<dz-calendar>`; `provideDzCalendar()`
+  `ready`, rejected as `calendar.ready` when it is not drawn), and so does Angular's `<dz-calendar>`; `provideDzCalendar()`
   holds the application's start instead, so nothing waits once it runs. What takes a calendar (the
   Pro editor, the exports) takes it drawn: after `ready`. A polyfill that
   cannot be fetched is said on the console (`temporal-load-failed`).

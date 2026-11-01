@@ -7,7 +7,7 @@ export type FetchLike = (
   init: { method: string; headers: Record<string, string>; body?: string; signal: unknown },
 ) => Promise<{ readonly ok: boolean; readonly status: number; json(): Promise<unknown> }>;
 
-type Common = Pick<EventSourceSpec, 'staleAfter' | 'retry' | 'defaults' | 'save'>;
+type Common = Pick<EventSourceSpec, 'staleAfter' | 'retry' | 'defaults' | 'save' | 'zoneDependent'>;
 
 export interface JsonSourceOptions extends Common {
   readonly url: string;
@@ -59,7 +59,8 @@ export function jsonSource(id: string, o: JsonSourceOptions): EventSourceSpec {
     const raw = await res.json();
     return o.map ? o.map(raw) : (raw as readonly EventInput[]);
   };
-  return withCommon({ id, fetch, chunk: o.chunk ?? MONTH }, o);
+  // The zone sent (a whole feed, `unit: 'none'`, is sent none): the server may answer by it, asked again when it changes.
+  return withCommon({ id, fetch, chunk: o.chunk ?? MONTH }, { ...o, zoneDependent: o.zoneDependent ?? (o.zoneParam !== null && o.chunk?.unit !== 'none') });
 }
 
 /** Events from a function of the stretch asked; synchronous or not. */
@@ -74,5 +75,6 @@ function withCommon(spec: EventSourceSpec, o: Common): EventSourceSpec {
     ...(o.retry && { retry: o.retry }),
     ...(o.defaults && { defaults: o.defaults }),
     ...(o.save && { save: o.save }),
+    ...(o.zoneDependent && { zoneDependent: true }),
   };
 }

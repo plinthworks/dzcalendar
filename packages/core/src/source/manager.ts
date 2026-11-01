@@ -377,12 +377,12 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
       if (!src.pending.has(tag)) return [item];
       // A save is out for it: what the person sees stays until it settles.
       src.shielded.add(tag);
+      // Whichever kind it is here now (made a series, or a single event again, by the edit being saved).
       const snap = store.snapshot;
-      if (item.kind === 'event') {
-        const ev = snap.getEvent(item.event.id);
-        return ev && ev.sourceId === id ? [{ kind: 'event', event: ev }] : [];
-      }
-      const sr = snap.getSeries(item.series.id);
+      const key = item.kind === 'event' ? item.event.id : item.series.id;
+      const ev = snap.getEvent(key);
+      if (ev && ev.sourceId === id) return [{ kind: 'event', event: ev }];
+      const sr = snap.getSeries(key);
       return sr && sr.sourceId === id ? [{ kind: 'series', series: sr }] : [];
     });
     const entries: [string, Normalized[]][] = chunks.map((c) => [c.key, []]);
@@ -545,8 +545,13 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
       // The same range again (a locale or an option changed): nothing to fetch,
       // and a chunk that just failed is not asked again in a loop.
       if (range && range.start.equals(start) && range.end.equals(end) && range.zone === zone) return;
+      // Another zone: what a source was told in the old one is asked again (owner, 2026-11-01).
+      const rezoned = range !== null && range.zone !== zone;
       range = { start, end, zone };
-      for (const src of sources.values()) sync(src);
+      for (const src of sources.values()) {
+        if (rezoned && src.spec.zoneDependent) refetch(src.spec.id);
+        else sync(src);
+      }
     },
     refetch,
     get loading() {

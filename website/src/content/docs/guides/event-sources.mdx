@@ -30,11 +30,12 @@ and the calendar's zone. The answer is the list of events, written as in
 | `map` | From your server's JSON to the list: `(raw) => raw.items` |
 | `params` | Sent with every request: `{ clinic: '12' }` |
 | `startParam`, `endParam`, `zoneParam` | Other names for the three (`'from'`), or `null` to leave one out |
+| `zoneDependent` | Asked again when the calendar's zone changes — `true` while the zone is sent |
 | `method` | `'POST'` sends them in a form body instead of the query |
 | `headers` | `{ authorization: 'Bearer …' }` |
 | `chunk` | How the time is cut into requests — see below |
 | `defaults` | Fields every event of the source takes under its own: `{ tone: 'green', editable: false }` |
-| `staleAfter`, `retry`, `save` | See below (`fnSource` takes them too; `icalSource` only `save`) |
+| `staleAfter`, `retry`, `save` | See below (`fnSource` and `icalSource` take them too) |
 
 <Aside>
 The stretch asked is wider than the screen: whole days around a whole month,
@@ -181,9 +182,11 @@ no other import needed.
 - **Nothing stale, nothing twice.** A request nobody needs any more (the
   person moved on) is aborted through its signal; at most four run at once;
   an answer from before a `refetch` is ignored.
-- **Changing the calendar's zone fetches nothing**: the chunks are dates as
-  they exist everywhere. If your server's answer depends on the zone it was
-  sent, call `calendar.refetch()` after changing it.
+- **Changing the calendar's zone asks again only the sources told it**: a
+  `jsonSource` sending the zone (the default) is asked again in the new one,
+  its events shown until the answer. The others fetch nothing — the chunks are
+  dates as they exist everywhere; give `zoneDependent: true` to an `fnSource`
+  whose answer depends on the zone.
 - **`calendar.refetch('appointments')`** asks one source again (no id: all).
   The events on screen stay until the answer replaces them — no flash.
 

@@ -536,10 +536,16 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   // input) or `locale: ''` (an empty lang attribute) must not erase them.
   // Checked as update() checks them: a week with no day, a weekday 8, a first day 0 never make a calendar.
   if (!options.kernel) checkDays(options.firstDay, options.hiddenDays, options.weekends);
+  // What the sources said while the kernel was made (a source failing at once), before anything here listened: said once drawn.
+  let earlyNotices: SourceNotice[] | null = [];
   const kernel =
     options.kernel ??
     createKernel({
       ...options,
+      onSource: (n: SourceNotice) => {
+        earlyNotices?.push(n);
+        options.onSource?.(n);
+      },
       timeZone: options.timeZone || Temporal.Now.timeZoneId(),
       hiddenDays: hiddenOf(options.hiddenDays, options.weekends),
       locale: withCalendar(baseLocale, displayCalendar),
@@ -1222,6 +1228,9 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
     } else if (n.type === 'error') ctx.announce(ctx.messages.loadFailed);
   };
   if (kernel.sources.loading) sourceNotice({ type: 'loading', loading: true });
+  // Loading is read above from the state, not from what was said.
+  for (const n of earlyNotices.splice(0)) if (n.type !== 'loading') sourceNotice(n);
+  earlyNotices = null;
   scope.add(
     kernel.subscribe((e) => {
       // Another view, nothing asked: its default number of lanes first (a year: "+N"; a month: every event).

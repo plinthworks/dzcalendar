@@ -88,8 +88,13 @@ export class DzCalendarElement extends Base {
   /** While Temporal's polyfill loads (Safari): what was asked of the calendar, run once it is drawn (18i). */
   #waiting: ((cal: CalendarInstance) => void)[] | null = null;
   #drawn: () => void = () => {};
-  /** Resolved once the calendar is first drawn: at once where Temporal is native, after its polyfill on Safari. */
-  readonly ready: Promise<void> = new Promise<void>((resolve) => (this.#drawn = resolve));
+  #gaveUp: (e: unknown) => void = () => {};
+  /**
+   * Resolved once the calendar is first drawn: at once where Temporal is native, after its polyfill on Safari.
+   * Rejected, as `calendar.ready`, when it is not drawn: its options refused, Temporal's polyfill not loaded, or
+   * an Angular `<dz-calendar>` already there (each said too).
+   */
+  readonly ready: Promise<void> = new Promise<void>((resolve, reject) => ((this.#drawn = resolve), (this.#gaveUp = reject)));
   #options: CalendarOptions = {};
   #events: readonly EventInput[] | undefined;
   #resources: readonly ResourceInput[] | undefined;
@@ -106,6 +111,8 @@ export class DzCalendarElement extends Base {
 
   constructor() {
     super();
+    // Rejected for whoever awaits it; never an unhandled rejection for a page that does not (it is said anyway).
+    this.ready.catch(() => {});
     // Properties set before the element was defined (a framework rendering first): taken back through the setters.
     for (const prop of ['options', 'events', 'resources', 'sources'] as const) {
       if (Object.hasOwn(this, prop)) {
@@ -324,12 +331,18 @@ export class DzCalendarElement extends Base {
       this.#waiting ??= [];
       loadTemporal().then(
         () => this.isConnected && !this.#cal && this.#mount(keep),
-        (e: unknown) => console.error("dzcalendar: temporal-load-failed — Temporal's polyfill could not be loaded; the calendar is not drawn", e),
+        (e: unknown) => {
+          console.error("dzcalendar: temporal-load-failed — Temporal's polyfill could not be loaded; the calendar is not drawn", e);
+          this.#gaveUp(e);
+        },
       );
       return;
     }
     // An Angular <dz-calendar> already drew here (the same tag name): left alone.
-    if (!this.shadowRoot && this.querySelector(':scope > .dz-cal')) return this.#problem(problem('element', 'already-a-calendar'));
+    if (!this.shadowRoot && this.querySelector(':scope > .dz-cal')) {
+      this.#problem(problem('element', 'already-a-calendar'));
+      return this.#gaveUp(new Error('dzcalendar: <dz-calendar> already holds a calendar (Angular’s, the same tag name): left alone'));
+    }
     const shadow = (this.#shadow ??= this.hasAttribute('shadow'));
     let host: HTMLElement = this;
     if (shadow) {
@@ -380,19 +393,22 @@ export class DzCalendarElement extends Base {
       { view: true, data: false, blame: () => this.#problem(problem(this.#resources ? 'property:resources' : 'property:sources', 'refused')) },
       { view: false, data: false, blame: () => view && this.#problem(problem('attribute:view', 'unknown-view')) },
     ];
+    let refusal: unknown = null;
     for (const a of attempts) {
       try {
         this.#cal = make(a);
         if (a !== attempts[0]) a.blame();
         break;
-      } catch {
+      } catch (e) {
+        refusal = e;
         host.replaceChildren();
         this.#cal = null;
       }
     }
     if (!this.#cal) {
       this.#problem(problem('property:options', 'refused'));
-      return;
+      // The last attempt's refusal (an option it could not take), as `calendar.ready` gives it.
+      return this.#gaveUp(refusal);
     }
     // The sources, one by one (one that cannot be read is said and left out); what the events had to say.
     if (this.#sources) this.#sources = this.#addSources(this.#cal, this.#sources);

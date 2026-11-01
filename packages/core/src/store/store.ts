@@ -462,10 +462,13 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
           const current = kind === 'event' ? events.get(id) : series.get(id);
           // An id is one thing: an event and a series may not share it, whoever brought them.
           const other = kind === 'event' ? series.get(id) : events.get(id);
+          // This source's own item made the other kind here (`event.repeat`,
+          // `series.rule` null): the source is its authority, what it says wins.
+          const turned = other !== undefined && other.sourceId === sourceId && !owners.has(`${kind === 'event' ? 'series' : 'event'}:${id}`);
           // A local object made on this source's series (an override saved to
           // the server, now delivered back under the same id) is adopted.
           const adopt = current !== undefined && current.sourceId === undefined && sourceOf(current, (sid) => series.get(sid)) === sourceId;
-          if ((current && current.sourceId !== sourceId && !adopt) || other) {
+          if ((current && current.sourceId !== sourceId && !adopt) || (other && !turned)) {
             // Someone else holds this id now (a user's, another source's):
             // refuse, and stop counting this chunk among the id's owners.
             problems.push(problem('duplicate-id', 'error', `${sourceId}/${chunk}`, id));
@@ -480,6 +483,7 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
           else if (!own.includes(chunkKey)) owners = owners.set(tag, [...own, chunkKey]);
           if (emitted.has(tag)) continue;
           emitted.add(tag);
+          if (turned) mutations.push(kind === 'event' ? { kind: 'series', before: other as Series } : { kind: 'event', before: other as CalEvent });
           if (kind === 'event') {
             const tagged = item.event.sourceId === sourceId ? item.event : ({ ...item.event, sourceId } as CalEvent);
             mutations.push({ kind: 'event', ...(current && { before: current as CalEvent }), after: tagged });
@@ -503,14 +507,12 @@ export function createEventStore(initial: StoreSnapshot = StoreSnapshot.EMPTY): 
           owners = owners.delete(tag);
           const [kind, ...idParts] = tag.split(':');
           const id = idParts.join(':');
-          // Only what this source still owns: the id may now be a user's.
-          if (kind === 'event') {
-            const current = events.get(id);
-            if (current && current.sourceId === sourceId) mutations.push({ kind: 'event', before: current });
-          } else {
-            const current = series.get(id);
-            if (current && current.sourceId === sourceId) mutations.push({ kind: 'series', before: current });
-          }
+          // Only what this source still owns: the id may now be a user's. Made
+          // the other kind here, it is still the source's (unless delivered so too).
+          const ev = events.get(id);
+          const sr = series.get(id);
+          if (ev && ev.sourceId === sourceId && (kind === 'event' || !owners.has(`event:${id}`))) mutations.push({ kind: 'event', before: ev });
+          if (sr && sr.sourceId === sourceId && (kind === 'series' || !owners.has(`series:${id}`))) mutations.push({ kind: 'series', before: sr });
         }
         chunks = delivered.size > 0 ? chunks.set(chunkKey, [...delivered]) : chunks.delete(chunkKey);
       }

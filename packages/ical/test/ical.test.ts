@@ -327,6 +327,13 @@ describe('icalSource', () => {
     const inline = icalSource('mem', { text: () => fixture('07-kolkata') });
     expect(((await inline.fetch({ window: null, signal, sourceId: 'mem' })) as unknown as { events: EventInput[] }).events[0]!.duration).toBe('PT45M');
   });
+
+  it('staleAfter and retry as the other sources have them; none unless given', () => {
+    const feed = icalSource('feed', { url: 'u', staleAfter: Temporal.Duration.from({ minutes: 15 }), retry: { attempts: 3, backoffMs: 500 } });
+    expect([String(feed.staleAfter), feed.retry]).toEqual(['PT15M', { attempts: 3, backoffMs: 500 }]);
+    const plain = icalSource('feed', { url: 'u' });
+    expect(['staleAfter' in plain, 'retry' in plain]).toEqual([false, false]);
+  });
 });
 
 describe('review fixes (Phase 9)', () => {

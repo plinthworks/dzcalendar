@@ -393,6 +393,23 @@ describe('writing edits back (save)', () => {
     expect(start()).toBe('2026-10-07T09:00:00+02:00[Europe/Paris]');
   });
 
+  it('made a series while its save is out: a refetch answering the old event keeps the series (it was withdrawn before)', async () => {
+    const pending = deferred<void>();
+    const { store, history, m, answers } = editable(() => pending.promise);
+    expect(history.run({ type: 'event.repeat', id: 'a', rrule: 'FREQ=DAILY;COUNT=3' }).ok).toBe(true);
+    m.refetch();
+    answers[0]!.resolve([event]); // the server has not seen the edit yet
+    await flush();
+    expect([!!store.snapshot.getSeries('a'), !!store.snapshot.getEvent('a')]).toEqual([true, false]);
+    pending.resolve();
+    await flush();
+    await flush();
+    // Asked again once saved: the server's series now.
+    answers[1]!.resolve([{ ...event, rrule: 'FREQ=DAILY;COUNT=3' }]);
+    await m.idle();
+    expect([!!store.snapshot.getSeries('a'), !!store.snapshot.getEvent('a'), store.snapshot.isSourceOwned('a', 'series')]).toEqual([true, false, true]);
+  });
+
   it('edits to a source without save stay local (until fetched again)', () => {
     const { store, m } = setup();
     m.add(fnSource('s', () => [event]));
@@ -443,6 +460,51 @@ describe('jsonSource', () => {
     await m.idle();
     const err = notices.find((n) => n.type === 'error');
     expect(err?.type === 'error' && (err.error as Error).message).toBe('HTTP 503');
+  });
+
+  it('the zone sent: another zone asks again, in it; the events shown until the answer (owner, 2026-11-01)', async () => {
+    let answer = 'Paris';
+    const fetchImpl = vi.fn(async (_url: string, _init: unknown) => ({ ok: true, status: 200, json: async () => [{ id: 'a', title: answer, start: '2026-10-06T09:00:00Z' }] }));
+    const { m, store } = setup();
+    m.add(jsonSource('j', { url: '/e', fetchImpl }));
+    m.setRange(d('2026-10-05'), d('2026-10-12'), PARIS);
+    await m.idle();
+    answer = 'New York';
+    m.setRange(d('2026-10-05'), d('2026-10-12'), 'America/New_York');
+    expect(titles(store)).toEqual(['Paris']);
+    await m.idle();
+    expect(fetchImpl.mock.calls.map(([url]) => url.slice(url.lastIndexOf('=') + 1))).toEqual(['Europe%2FParis', 'America%2FNew_York']);
+    expect(titles(store)).toEqual(['New York']);
+  });
+
+  it('the zone not sent (zoneParam null), or a source that does not say it depends on it: no request for another zone', async () => {
+    const fetchImpl = vi.fn(async (_url: string, _init: unknown) => ({ ok: true, status: 200, json: async () => [] }));
+    const { m } = setup();
+    m.add(jsonSource('j', { url: '/e', fetchImpl, zoneParam: null }));
+    const plain = manual('s');
+    const told = manual('z', undefined, { zoneDependent: true });
+    m.add(plain.spec);
+    m.add(told.spec);
+    m.setRange(d('2026-10-05'), d('2026-10-12'), PARIS);
+    for (const c of [...plain.calls, ...told.calls]) c.answer.resolve([]);
+    await m.idle();
+    m.setRange(d('2026-10-05'), d('2026-10-12'), 'America/New_York');
+    for (const c of told.calls.slice(1)) c.answer.resolve([]);
+    await m.idle();
+    expect([fetchImpl.mock.calls.length, plain.calls.length, told.calls.length]).toEqual([1, 1, 2]);
+    expect(told.calls[1]!.req.window!.displayZone).toBe('America/New_York');
+  });
+
+  it('a whole feed (unit none) is sent no zone: not asked again for another one', async () => {
+    const fetchImpl = vi.fn(async (_url: string, _init: unknown) => ({ ok: true, status: 200, json: async () => [] }));
+    const { m } = setup();
+    const spec = jsonSource('j', { url: '/e', fetchImpl, chunk: { unit: 'none', prefetch: 0 } });
+    m.add(spec);
+    m.setRange(d('2026-10-05'), d('2026-10-12'), PARIS);
+    await m.idle();
+    m.setRange(d('2026-10-05'), d('2026-10-12'), 'America/New_York');
+    await m.idle();
+    expect([spec.zoneDependent, fetchImpl.mock.calls.length, fetchImpl.mock.calls[0]![0]]).toEqual([undefined, 1, '/e']);
   });
 });
 

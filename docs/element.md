@@ -2,6 +2,7 @@
 
 > `<dz-calendar>` (`@dzcalendar/element/define`) brings the recurrence engine itself: repeating events work as they come.
 > On Safari (no Temporal of its own), `<dz-calendar>` draws once Temporal's polyfill has arrived; `dz-dates-set` says when.
+> `ready` resolves once it is first drawn, and is rejected, as `calendar.ready`, when it is not: its options refused, the polyfill not loaded, an Angular `<dz-calendar>` already there (each said too). It is settled once: a later connection that draws does not resolve it again.
 
 
 `<dz-calendar>` for any page or framework (plain HTML, React, Vue, Svelte,

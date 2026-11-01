@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { createApp, defineComponent, h, inject, nextTick, provide, ref, shallowRef } from 'vue';
+import { createApp, defineComponent, h, inject, nextTick, provide, ref, shallowRef, watch } from 'vue';
 import type { App } from 'vue';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput, PlainDate, PlainTime, ZonedDateTime } from '@dzcalendar/core';
@@ -246,5 +246,19 @@ describe('slots for every element (18f-2, Vue)', () => {
       el.querySelector('.dz-dg__cell[data-date="2026-09-28"]')?.classList.contains('muted'),
       el.querySelector('.dz-toolbar__item select option')?.textContent,
     ]).toEqual(['j21', 1, true, 'Tous (filter)']);
+  });
+  it('changeView with v-model:view: the binding told once, the state and the view ref changed once', async () => {
+    const view = ref('timeGridWeek');
+    const told: string[] = [];
+    const cal = createCalendarController();
+    await mount(defineComponent({ setup: () => () => h(DzCalendar, { ...base, controller: cal, view: view.value, 'onUpdate:view': (v: string) => (told.push(v), (view.value = v)) }) }));
+    told.length = 0;
+    const seen: string[] = [];
+    watch(cal.view, (v) => seen.push(`view ${v}`));
+    watch(cal.state, (s) => seen.push(`state ${s?.view.type}`));
+    cal.changeView('dayGridMonth');
+    await nextTick();
+    await nextTick();
+    expect([told, seen.sort()]).toEqual([['dayGridMonth'], ['state dayGridMonth', 'view dayGridMonth']]);
   });
 });

@@ -92,4 +92,13 @@ describe('sources in the calendar', () => {
     await cal!.kernel.sources.idle();
     expect(await said()).toContain('n’a pas pu être enregistré');
   });
+  it('a source failing at once, while the calendar is made: said once drawn (it was lost before anything listened), told once', async () => {
+    const told: string[] = [];
+    mount({
+      sources: [fnSource('broken', () => { throw new Error('offline'); })],
+      onSource: (n: SourceNotice) => told.push(n.type),
+    });
+    expect(await said()).toBe('Des événements n’ont pas pu être chargés.');
+    expect(told.filter((t) => t === 'error')).toEqual(['error']);
+  });
 });

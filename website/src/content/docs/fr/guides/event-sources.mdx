@@ -31,11 +31,12 @@ dans `events`. Ce que vous pouvez changer :
 | `map` | Du JSON de votre serveur à la liste : `(raw) => raw.items` |
 | `params` | Envoyés à chaque requête : `{ clinic: '12' }` |
 | `startParam`, `endParam`, `zoneParam` | D'autres noms pour les trois (`'from'`), ou `null` pour en retirer un |
+| `zoneDependent` | Redemandé quand le fuseau du calendrier change — `true` tant que le fuseau est envoyé |
 | `method` | `'POST'` les envoie dans un corps de formulaire plutôt que dans la requête |
 | `headers` | `{ authorization: 'Bearer …' }` |
 | `chunk` | Comment le temps est découpé en requêtes — voir plus bas |
 | `defaults` | Des valeurs par défaut pour chaque événement de la source, ses propres champs l'emportant : `{ tone: 'green', editable: false }` |
-| `staleAfter`, `retry`, `save` | Voir plus bas (`fnSource` les prend aussi ; `icalSource` seulement `save`) |
+| `staleAfter`, `retry`, `save` | Voir plus bas (`fnSource` et `icalSource` les prennent aussi) |
 
 <Aside>
 L'étendue demandée est plus large que l'écran : des jours entiers autour d'un
@@ -186,9 +187,12 @@ lui-même : aucun autre import.
   besoin (la personne est passée à autre chose) est abandonnée par son
   signal ; quatre au plus tournent à la fois ; une réponse antérieure à un
   `refetch` est ignorée.
-- **Changer le fuseau du calendrier ne charge rien** : les morceaux sont des
-  dates telles qu'elles existent partout. Si la réponse de votre serveur
-  dépend du fuseau envoyé, appelez `calendar.refetch()` après l'avoir changé.
+- **Changer le fuseau du calendrier ne redemande que les sources qui
+  l'envoient** : un `jsonSource` qui envoie le fuseau (par défaut) est
+  redemandé dans le nouveau, ses événements montrés jusqu'à la réponse. Les
+  autres ne chargent rien — les morceaux sont des dates telles qu'elles
+  existent partout ; donnez `zoneDependent: true` à un `fnSource` dont la
+  réponse dépend du fuseau.
 - **`calendar.refetch('appointments')`** redemande une source (sans id :
   toutes). Les événements à l'écran restent jusqu'à ce que la réponse les
   remplace — pas de clignotement.

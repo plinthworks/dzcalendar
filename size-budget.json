@@ -31,6 +31,6 @@
   "vue (without Vue, core, dom)": 4224,
   "pro-react (without React, core, dom, pro)": 760,
   "pro-vue (without Vue, core, dom, pro)": 700,
-  "dom/base (without core)": 39339,
+  "dom/base (without core)": 40538,
   "core/recurrence (with rrule, without the rest of core)": 15730
 }

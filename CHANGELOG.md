@@ -40,6 +40,17 @@
 
 ### Fixed
 
+- A source's event made a series (`event.repeat`), or a source's series made
+  a single event (`series.rule` null), stays the source's: undo then redo
+  works (redo failed), the source withdrawing the id takes it away (the series
+  stayed for ever), the source delivering the id again wins (it was refused
+  with `duplicate-id` and the id was lost to it), and a refetch while its save
+  is out keeps it.
+- `<dz-calendar>`'s `ready` is rejected, as `calendar.ready`, when the element
+  gives up: options refused (their `RangeError`), Temporal's polyfill not
+  loaded, an Angular `<dz-calendar>` already there. It never settled.
+- A source failing while the calendar is made (a synchronous `fnSource` that
+  throws) is announced: its notice reached `onSource` but not the live region.
 - A series cut short in what is shown (more than 2 000 occurrences: a rule
   every minute, a year) is said (18j-3): `onProblem` receives
   `too-many-occurrences`, once a series, again if it comes back — without
@@ -89,6 +100,12 @@
   `onResourceProblems`.
 
 ### Added
+
+- `icalSource` takes `staleAfter` and `retry`, as the other sources.
+- A change of the calendar's zone asks again the sources whose answer depends
+  on it: `zoneDependent` on a source spec, set by `jsonSource` when it sends
+  the zone (owner, 2026-11-01); the events stay shown until the answer. It
+  fetched nothing (`refetch()` was needed).
 
 - `loadTemporal`, `temporalReady` (`@dzcalendar/core`); `calendar.ready`;
   `deferredCalendar` (`@dzcalendar/dom/toolkit`, for a package that makes a

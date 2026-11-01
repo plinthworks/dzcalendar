@@ -65,6 +65,11 @@ export interface EventSourceSpec {
   readonly staleAfter?: Duration;
   /** Attempts after the first, each `backoffMs` × 2ⁿ later. Default: none. */
   readonly retry?: { readonly attempts: number; readonly backoffMs: number };
+  /**
+   * The answer depends on the calendar's zone (the server is told it): fetched again when the zone
+   * changes, the events shown until the answers arrive. `jsonSource` sets it when it sends the zone.
+   */
+  readonly zoneDependent?: boolean;
   /** Inherited by every event of the source, under its own fields. */
   readonly defaults?: Partial<EventInput>;
   /**

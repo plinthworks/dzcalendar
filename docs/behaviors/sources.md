@@ -56,9 +56,9 @@ month to month, edits an event, reloads, imports a `.ics` file.
   same answer (they are linked within one delivery; an override alone is
   shown as a plain event, with an `orphan-override` warning). The stretch
   asked is wider than what is shown (a chunk's dates everywhere on earth);
-  `timeZone` is sent for servers that format local times, but changing the
-  calendar's zone does not fetch again — call `refetch()` if the server's
-  answer depends on it.
+  `timeZone` is sent for servers that format local times, and changing the
+  calendar's zone asks such a source again (`zoneDependent`, set by
+  `jsonSource` when it sends the zone; owner, 2026-11-01).
 - **Specs are compared by identity**: `update({ sources })` fetches again a
   source whose spec object is new. A framework wrapper keeps its specs stable.
 - A chunk scrolled far away is dropped (twelve kept per source): a local edit
