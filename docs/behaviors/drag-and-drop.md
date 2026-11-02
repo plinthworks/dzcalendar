@@ -29,7 +29,8 @@ an event first, then drags it.
   twice, the calendar asks which ("First 02:00 (+02:00)" / "Second 02:00
   (+01:00)").
 - **Rules during the drag**: a preview that may not land is red; dropped
-  anyway, it goes back where it came from ("Not allowed here" is announced).
+  anyway, it goes back where it came from ("Not allowed here" is announced; a refused action — a delete, a menu
+  entry, a hand-over — says "Action refused").
   The application's own `run(cmd)` calls are not checked — only gestures.
 - **Series**: dropping an occurrence asks "this / following / all" (or the
   application's `chooseScope`).

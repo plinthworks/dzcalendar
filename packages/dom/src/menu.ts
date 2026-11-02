@@ -1,7 +1,7 @@
 import type { ActionItem, ActionTarget } from '@dzcalendar/core';
 import type { ViewCtx } from './host.js';
 import { h } from './render/reconcile.js';
-import { activeIn, targetOf } from './focus.js';
+import { activeIn, inAppControl, targetOf } from './focus.js';
 
 /** `focus`: where the focus returns when the menu closes (default: the anchor if focusable, else what had it). */
 export type ResolveTarget = (el: Element, point: { x: number; y: number } | null) => { target: ActionTarget; anchor: HTMLElement; focus?: HTMLElement } | null;
@@ -24,7 +24,7 @@ export function attachMenuTriggers(ctx: ViewCtx, root: HTMLElement, resolve: Res
 
   ctx.scope.on(root, 'contextmenu', (e) => {
     const me = e as MouseEvent;
-    if (me.target instanceof Element && open(me.target, { x: me.clientX, y: me.clientY })) me.preventDefault();
+    if (me.target instanceof Element && !inAppControl(me.target) && open(me.target, { x: me.clientX, y: me.clientY })) me.preventDefault();
   });
 
   let press: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null;
@@ -34,7 +34,7 @@ export function attachMenuTriggers(ctx: ViewCtx, root: HTMLElement, resolve: Res
   };
   ctx.scope.on(root, 'pointerdown', (e) => {
     const pe = e as PointerEvent;
-    if (pe.pointerType !== 'touch' || !(pe.target instanceof Element)) return;
+    if (pe.pointerType !== 'touch' || !(pe.target instanceof Element) || inAppControl(pe.target)) return;
     const target = pe.target;
     cancel();
     press = { x: pe.clientX, y: pe.clientY, timer: setTimeout(() => {
@@ -53,7 +53,8 @@ export function attachMenuTriggers(ctx: ViewCtx, root: HTMLElement, resolve: Res
   ctx.scope.on(root, 'keydown', (e) => {
     const ke = e as KeyboardEvent;
     const isMenuKey = ke.key === 'ContextMenu' || (ke.key === 'F10' && ke.shiftKey);
-    if (!isMenuKey || !(ke.target instanceof Element)) return;
+    // A field or a link an application put inside an event keeps its own keys (and the browser's menu).
+    if (!isMenuKey || !(ke.target instanceof Element) || inAppControl(ke.target)) return;
     if (open(ke.target, null)) ke.preventDefault();
   });
 }

@@ -77,8 +77,8 @@ createCalendar(el, {
 
 ## Not done
 
-- No autoscroll while dragging in from the page or another calendar (the
-  hour must be in view); an in-calendar drag scrolls as before.
+- Dragging in from the page scrolls the calendar near its edges (18f-4
+  review) but never changes its period: the day must be in the period shown.
 - A calendar in an iframe is not reached from the page around it.
 
 ## Where we differ on purpose

@@ -828,9 +828,9 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       };
       return choose<Proposal>(ctx.messages.whichReading({ time: hm(read(a)) }), [option(a, true), option(b, false)], at);
     },
-    refused(result, command) {
+    refused(result, command, placed = false) {
       settings.current.onCommandRefused?.(result, command);
-      ctx.announce(ctx.messages.dropRefused);
+      ctx.announce(placed ? ctx.messages.dropRefused : ctx.messages.commandRefused);
     },
     openMore(anchor, title, nodes, onClose, about) {
       const panel = popover.element;

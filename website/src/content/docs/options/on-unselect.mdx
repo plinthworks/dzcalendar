@@ -17,7 +17,9 @@ or anything else that clears it: a new drag (then `onSelect`), the cursor
 moved without Shift, a change of view — clears the selection shown; this
 says so, with no argument — close a
 form that was open for it. It is not called when your code clears it
-(`calendar.select(null)`) or replaces it.
+(`calendar.select(null)`) or replaces it. A press outside the calendar
+counts, except on an element of your page marked `data-dz-keep-selection`
+(or inside one): a form beside the calendar keeps the selection it is about.
 
 In the frameworks the two-way selection says the same, becoming `null`: use
 it there instead.

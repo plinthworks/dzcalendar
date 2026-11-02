@@ -33,6 +33,8 @@ return {
   openEvent: 'Abrir',
   deleteEvent: 'Eliminar',
   dropRefused: 'No se permite aquí',
+  dropRefusedFor: ({ reasons }) => `No se permite aquí: ${reasons}`,
+  commandRefused: 'Acción rechazada',
   eventMoved: ({ title, time }) => (time ? `«${title}» movido a ${time}` : `«${title}» movido`),
   eventReceived: ({ title, when }) => `«${title}» colocado: ${when}`,
   pickedUp: ({ title }) => `«${title}» tomado. Tab hasta un calendario, las flechas para elegir el lugar, Intro para dejarlo, Escape para cancelar.`,

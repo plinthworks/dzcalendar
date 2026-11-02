@@ -1,0 +1,530 @@
+---
+title: "Drag and drop"
+description: "Moving and resizing events with the pointer, a finger or the keyboard; what refuses a drop; repeating events; dragging in from the page and from one calendar to another."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Once a calendar is [`editable`](../../options/editable/), a person drags an
+event to another time or day, pulls its edge to make it longer or shorter,
+and can undo it. Nothing changes while the pointer moves: a preview follows
+it, and only the drop becomes a **command** — checked against your rules,
+recorded in the history, and told to you once.
+
+A mouse, a pen, a finger and the keyboard (see
+[Keyboard and accessibility](../keyboard-accessibility/)) all end in the
+same proposal: the rules, the questions and the callbacks below are the same
+for the four.
+
+## Let people move and resize
+
+Switch `editable` on. A timed event then drags to another time or day and
+is pulled from its bottom edge; an all-day event drags between days and
+stretches over more. In the month, every event moves by whole days, but
+only an all-day one is resized there — a timed one keeps its hours.
+
+Three settings shape the gesture:
+
+- [`snapMinutes`](../../options/snap-minutes/) is the step a time grid lands
+  on, whatever the grid's lines: an hourly grid can snap to five minutes.
+- [`eventResizableFromStart`](../../options/event-resizable-from-start/)
+  lets a person pull the start of an event too, not only its end.
+- An event's own `editable`, `startEditable` or `durationEditable` wins over
+  the calendar's: one event can be fixed in an editable calendar, or only
+  resizable. See [`editable`](../../options/editable/).
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'timeGridWeek',
+  editable: true,
+  snapMinutes: 5,
+  eventResizableFromStart: true,
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="timeGridWeek" [editable]="true"
+    [options]="{ snapMinutes: 5, eventResizableFromStart: true }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="timeGridWeek" editable snapMinutes={5} eventResizableFromStart />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="timeGridWeek" editable :options="{ snapMinutes: 5, eventResizableFromStart: true }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Try it: drag an event, then pull its top or its bottom. The preview shows the
+time it will land on, in steps of five minutes. Paris puts its clocks back on
+Sunday 25: drop an event between 02:00 and 03:00 that night and the calendar
+asks which 02:00.
+
+<LiveDemo
+  label="A week to drag and resize, snapping to 5 minutes"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'en-GB',
+    timeZone: 'Europe/Paris',
+    editable: true,
+    snapMinutes: 5,
+    eventResizableFromStart: true,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+### What a drop keeps
+
+A timed event keeps its **own zone** and its **elapsed length**: "Call
+Chicago" stays a Chicago event wherever it lands, and one hour stays one hour
+across a clock change. The start is snapped on the wall clock of the
+calendar's zone, then read again in the event's.
+
+- Dropped in an hour that does not exist (the clocks went forward), the event
+  is pushed forward by the skipped time — 02:30 becomes 03:30 — and the
+  calendar says so.
+- Dropped at a wall time that happens twice (the clocks went back), the
+  calendar asks which one — "First 02:00 (+02:00)" or "Second 02:00
+  (+01:00)" — before it changes anything. Close the question and the event
+  stays where it was.
+- Dragged onto the all-day row of a week, a timed event becomes an all-day
+  one; dropped in the time grid, an all-day event becomes timed, with a
+  default length. The change of kind is announced too.
+- In a resource view, dropping on another resource moves the event there; an
+  event on two resources keeps the other one.
+
+[Time zones](../time-zones/) explains the days of 23 and 25 hours these
+rules are made for.
+
+## Change period without dropping
+
+While an event is dragged, the grid scrolls when the pointer nears its top
+or bottom edge, and holding the pointer against the left or right side of the
+calendar goes to the previous or next period — after 0.6 s in a time grid,
+0.9 s in a month or a timeline. The drag goes on in the new period: an
+appointment travels to next Tuesday in one gesture. A timeline first scrolls
+along time, and changes period only at the end.
+
+Only a **move** pages; a resize, or an element dragged in from the page,
+stays in the period shown. Set
+[`dragEdgeNavigate`](../../options/drag-edge-navigate/) to `false` to keep
+every drag in its period.
+
+## With a finger
+
+Dragging an event needs no long press (that opens its menu). A tap
+**selects** it — an outline and larger handles — and a drag on the selected
+event starts at once; on empty time or on an event that is not selected, the
+finger scrolls the page as usual. The event stays selected where it lands,
+ready for the next move.
+
+An element dragged in from the page is not in a scrolling grid: there, the
+finger holds still for 300 ms first.
+
+## Refusing a drop
+
+A move or a resize is checked as the pointer travels. The preview turns red
+where the event may not land; let go there and the event goes back, the
+calendar announces "Not allowed here", and nothing is recorded.
+
+What refuses is declared in [`rules`](../../options/rules/):
+
+| Rule | Refuses |
+|---|---|
+| `constraint` | Leaving business hours, a group's events, or spans you give |
+| `overlap` | An event over another (`false`), or pair by pair with a function |
+| `allow` | Whatever your function says no to |
+| `validRange` | Days outside a range |
+
+What a person does is checked — a gesture, the keyboard, the menu. A
+`calendar.run(command)` of yours is not, unless you ask:
+`calendar.run(command, { validate: true })`.
+
+The calendar says *that* a drop was refused, not why in your words. Two
+callbacks let you say it:
+
+- [`onProposalRefused`](../../options/on-proposal-refused/) hears a drag, a
+  resize, a keyboard move or a drop from the page let go where the rules say
+  no. Its proposal carries the `violations`, each with its `code`.
+- [`onCommandRefused`](../../options/on-command-refused/) hears a command
+  refused although nothing was drawn refused: the Delete key, a menu entry,
+  the scope chosen for a repeating event.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  businessHours: true,
+  rules: { constraint: 'businessHours', overlap: false },
+  onProposalRefused: (proposal) => {
+    const codes = proposal.violations.map((v) => v.code);
+    if (codes.includes('constraint')) alert('Outside opening hours');
+    else if (codes.includes('overlap')) alert('Already something at that time');
+  },
+  onCommandRefused: (result, command) => console.warn(command.type, 'refused', result.problems),
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+In React, `rules` and both callbacks are props; in Angular and Vue they go in `options`.
+
+Drag an event outside the hours, or onto another one:
+
+<LiveDemo
+  label="Business hours only, never over another event"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'en-GB',
+    timeZone: 'Europe/Paris',
+    editable: true,
+    businessHours: { daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '18:00' },
+    rules: { constraint: 'businessHours', overlap: false },
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Review', start: '2026-10-21T14:00[Europe/Paris]', duration: { hours: 1 } },
+      { id: 'c', title: 'Training', start: '2026-10-22T10:00[Europe/Paris]', duration: { hours: 2 } },
+    ],
+  }}
+/>
+
+## Hear what changed
+
+A drop that is made reaches [`onEventChange`](../../options/on-event-change/)
+once, whichever way it came — drag, resize, keyboard, menu, undo. Persist it
+there, and take it back if your server says no: `change.revert()` undoes
+that change, not "the last one" (it returns `false`, doing nothing, if those
+events changed again since). [Events](../events/) goes further into saving.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventChange: async (change) => {
+    if (!change.after) return;
+    const res = await fetch(`/api/events/${change.after.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ start: change.after.start.toString(), end: change.after.end.toString() }),
+    });
+    // The server said no: the event goes back where it was.
+    if (!res.ok) change.revert();
+  },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks it is an output: Angular's `(eventChange)`, React's `onEventChange`, Vue's `@event-change`.
+
+Every drop is one step of the history. With the focus in the calendar,
+Ctrl/Cmd+Z undoes it and Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y redoes it;
+[`keyboardUndo: false`](../../options/keyboard-undo/) leaves those keys to
+your application, and `calendar.undo()` / `calendar.redo()` work either way.
+An undo reaches `onEventChange` too, with `cause: 'undo'`, so your server
+follows.
+
+## Repeating events
+
+Drag one occurrence of a weekly meeting: is it this one, this one and the
+following, or all of them? By default the calendar asks, in a small menu
+where the event was dropped — "This event", "This and following events",
+"All events"; close the menu and the event goes back. The same question comes
+for a resize and for the Delete key (the menu has its own entries). A drag
+that turns an occurrence from timed to all-day, or back, changes that
+occurrence only and does not ask.
+
+To answer yourself — your own dialog, or a rule — give
+[`chooseScope`](../../options/choose-scope/) a function. It is told the
+occurrence and the `kind` of change, and returns `'this'`, `'following'`,
+`'all'` or `null` to cancel, at once or as a promise.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+declare function askScope(): Promise<'this' | 'following' | 'all' | null>;
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  events: [{ id: 'staff', title: 'Staff meeting', start: '2026-10-19T09:00[Europe/Paris]', rrule: 'FREQ=WEEKLY' }],
+  // Delete key: only this one. A drag or a resize: your own dialog, which may cancel.
+  chooseScope: async ({ kind }) => (kind === 'delete' ? 'this' : ((await askScope()) ?? null)),
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+[Recurrence](../recurrence/) shows what the store keeps for each answer.
+Try it: drag "Rounds" in the month and choose.
+
+<LiveDemo
+  label="The month: move one occurrence, the following ones, or all"
+  height={560}
+  options={{
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    locale: 'en-GB',
+    timeZone: 'Europe/Paris',
+    editable: true,
+    events: [
+      { id: 'w', title: 'Rounds', start: '2026-10-05T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'c', title: 'Conference', start: '2026-10-26', end: '2026-10-29', allDay: true },
+    ],
+  }}
+/>
+
+## Dragging in from the page
+
+A waiting list, a task, a template "Consultation, 30 min": an element of the
+page becomes an event when it is dropped on the calendar. It takes two
+things:
+
+- [`droppable`](../../options/droppable/) on the calendar: `true`, or a
+  filter given the element's data that says whether this one is welcome.
+- `makeDraggable(element, spec)`, from `@dzcalendar/dom/drag`, on each
+  element. `spec.event` is the event it becomes, without a start — the drop
+  gives one; `spec.data` is yours (a patient's id) and comes back in
+  [`onDrop`](../../options/on-drop/). It returns its own clean-up.
+
+The event is made by a command checked as a gesture is — your `rules` apply,
+and `allow` is told the event comes from outside (`placement.external`). Once
+it is made, `onDrop` hears the place and your data, then
+[`onEventReceive`](../../options/on-event-receive/) the change, with
+`revert()`; one undo takes it back. It does **not** reach `onEventChange`:
+persist it once, in `onEventReceive`.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import { makeDraggable } from '@dzcalendar/dom/drag';
+
+const card = document.getElementById('patient-42')!;
+const stop = makeDraggable(card, {
+  event: { title: 'Consultation', duration: { minutes: 30 } },
+  data: { patientId: 42 },
+});
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  // Only patients' cards, not the other draggable things of the page.
+  droppable: (data) => typeof data === 'object' && data !== null && 'patientId' in data,
+  // Booked: the card leaves the waiting list.
+  onDrop: (drop) => drop.element?.remove(),
+  // The event that was made: persist it, or take it back.
+  onEventReceive: (change) => {
+    fetch('/api/events', { method: 'POST', body: JSON.stringify({ start: change.after?.start.toString() }) })
+      .then((res) => { if (!res.ok) change.revert(); });
+  },
+});
+
+// When the card goes away from the page for good:
+stop();
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventChange } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+// The cards: makeDraggable, as in plain JS.
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ droppable: true }"
+    (dropped)="$event.element?.remove()" (eventReceive)="save($event)" />`,
+})
+export class Agenda {
+  save(change: EventChange): void {
+    console.log('persist', change.after?.id); // change.revert() if the server says no
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { DropInfo, EventChange } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const booked = (drop: DropInfo) => drop.element?.remove();
+// change.revert() if the server says no.
+const save = (change: EventChange) => console.log('persist', change.after?.id);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ droppable: true }" @dropped="booked" @event-receive="save" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In React they are props of the same names; Angular's output is `(dropped)`, not `(drop)`, and Vue's `@dropped`.
+
+With the pointer, the drag starts after a press and a short move on the
+element (a finger holds still 300 ms first). Over a calendar that takes it,
+the place under the pointer is drawn as the event would be, and the calendar
+scrolls when the pointer nears its edge — but it does not change period, so
+the day must be in the period shown. Release to drop; Escape, or releasing
+outside every calendar, cancels. A refused place is drawn as such and reaches
+`onProposalRefused`; nothing is made.
+
+With the keyboard, `makeDraggable` makes the element focusable and gives it
+`role="button"` when it has no role. Enter or Space picks it up, Tab reaches a
+calendar, the arrows move the place as they move an event, Enter puts it
+down, Escape cancels; each step is announced in the calendar's language.
+Someone who cannot drag can still put a patient on an hour.
+
+To get the drop without the event, give the element `create: false`:
+nothing is made and `onDrop` alone is told. `event` can also be a function,
+read when each drag starts, so a list whose cards change stays right:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { makeDraggable } from '@dzcalendar/dom/drag';
+
+declare const row: HTMLElement;
+declare const task: { id: string; title: string; minutes: number };
+
+makeDraggable(row, {
+  // Read at the start of each drag.
+  event: () => ({ title: task.title, duration: { minutes: task.minutes } }),
+  data: task,
+  // The application books it itself, from onDrop.
+  create: false,
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+A calendar inside an iframe cannot be reached from the page around it.
+
+## Between two calendars
+
+An event dragged out of a calendar can be dropped on another one of the page
+when the first is `editable` and the second `droppable` — and `editable` too,
+unless the event says it is editable itself. A `droppable` filter is given
+the event. The calendar under the pointer shows the place.
+
+The event is made on the receiving side first, then removed from the first.
+If the first can no longer let it go, the second takes it back without being
+told, the first's `onCommandRefused` hears the refused removal, and "Action
+refused" is announced. Once both
+are done, the second hears
+[`onEventReceive`](../../options/on-event-receive/) and the first
+[`onEventLeave`](../../options/on-event-leave/), with the event and `to`,
+the other calendar's view element.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+declare const left: HTMLElement;
+declare const right: HTMLElement;
+
+createCalendar(left, { timeZone: 'Europe/Paris', editable: true, onEventLeave: (leave) => console.log(leave.event.title, 'left') });
+// Persist the move once, from the receiving side.
+createCalendar(right, { timeZone: 'Europe/Paris', editable: true, droppable: true, onEventReceive: (change) => console.log('received', change.after?.id) });
+```
+
+</Fragment>
+</CodeTabs>
+
+In the frameworks they are outputs: Angular's `(eventLeave)` and `(eventReceive)`, React's `onEventLeave` and `onEventReceive`, Vue's `@event-leave` and `@event-receive`.
+
+What to know about this drop:
+
+- Each calendar has its own history: a create on one side, a delete on the
+  other. An undo on one side alone would leave the event on both or on
+  neither; use `revert()`, from either callback, which takes back both sides
+  — or returns `false`, doing nothing, if either changed since.
+- An occurrence of a series goes alone; the series stays.
+- Two calendars on **one store** (several zones of one agenda) share the
+  event: the drag is a plain move, told to the receiving side's
+  `onEventReceive`, and `onEventLeave` is not called.
+- An event released outside every calendar lands nowhere; a few pixels past
+  the edge still count as on it.
+
+## See also
+
+- [`editable`](../../options/editable/), [`snapMinutes`](../../options/snap-minutes/), [`eventResizableFromStart`](../../options/event-resizable-from-start/), [`dragEdgeNavigate`](../../options/drag-edge-navigate/) — what a person may do.
+- [`rules`](../../options/rules/), [`onProposalRefused`](../../options/on-proposal-refused/) and [`onCommandRefused`](../../options/on-command-refused/) — what refuses a drop, and why.
+- [`droppable`](../../options/droppable/), [`onDrop`](../../options/on-drop/) and [`onEventLeave`](../../options/on-event-leave/) — events coming in and going out.
+- [Events](../events/) — commands, the history and saving.
+- [Recurrence](../recurrence/) — the series behind the scope question.
+- [Keyboard and accessibility](../keyboard-accessibility/) — the same moves without a pointer.
+- [Selection](../selection/) — dragging across empty time.

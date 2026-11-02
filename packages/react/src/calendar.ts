@@ -287,8 +287,9 @@ function Calendar(props: DzCalendarProps, ref: ForwardedRef<DzCalendarHandle>) {
       onEventClick: (i: EventInstance) => latest.current.onEventClick?.(i),
       onSelect: (sel: Selection) => {
         reported.current.selection = sel;
-        latest.current.onSelect?.(sel);
+        // The binding first, as Vue and Angular: a `setSelection(null)` in `onSelect` then has the last word.
         latest.current.onSelectionChange?.(sel);
+        latest.current.onSelect?.(sel);
       },
       onUnselect: () => {
         if (reported.current.selection === null) return;

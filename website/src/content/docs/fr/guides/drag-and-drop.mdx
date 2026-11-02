@@ -1,0 +1,550 @@
+---
+title: "Glisser-déposer"
+description: "Déplacer et redimensionner des événements à la souris, au doigt ou au clavier ; ce qui refuse un dépôt ; les événements récurrents ; glisser depuis la page et d'un calendrier à l'autre."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Dès qu'un calendrier est [`editable`](../../options/editable/), on peut
+faire glisser un événement vers une autre heure ou un autre jour, tirer sur
+son bord pour l'allonger ou le raccourcir, et annuler. Rien ne change tant
+que le pointeur bouge : un aperçu le suit, et seul le dépôt devient une
+**commande** — vérifiée par vos règles, inscrite dans l'historique, et
+signalée une seule fois.
+
+Souris, stylet, doigt et clavier (voir
+[Clavier et accessibilité](../keyboard-accessibility/)) aboutissent à la
+même proposition : les règles, les questions et les rappels qui suivent
+valent pour les quatre.
+
+## Laisser déplacer et redimensionner
+
+Activez `editable`. Un événement horaire se glisse alors vers une autre heure
+ou un autre jour et s'étire par son bord du bas ; un événement sur la journée
+passe d'un jour à l'autre et s'étend sur plusieurs. Dans le mois, tout
+événement se déplace par jours entiers, mais seul un événement sur la journée
+s'y redimensionne : un événement horaire garde ses heures.
+
+Trois réglages façonnent le geste :
+
+- [`snapMinutes`](../../options/snap-minutes/) est le pas sur lequel tombe
+  une grille horaire, quelles que soient ses lignes : une grille graduée à
+  l'heure peut caler sur cinq minutes.
+- [`eventResizableFromStart`](../../options/event-resizable-from-start/)
+  permet de tirer aussi le début d'un événement, pas seulement sa fin.
+- Le `editable`, le `startEditable` ou le `durationEditable` d'un événement
+  l'emporte sur celui du calendrier : un événement peut rester figé dans un
+  calendrier modifiable, ou n'être que redimensionnable. Voir
+  [`editable`](../../options/editable/).
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'timeGridWeek',
+  editable: true,
+  snapMinutes: 5,
+  eventResizableFromStart: true,
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="timeGridWeek" [editable]="true"
+    [options]="{ snapMinutes: 5, eventResizableFromStart: true }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="timeGridWeek" editable snapMinutes={5} eventResizableFromStart />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="timeGridWeek" editable :options="{ snapMinutes: 5, eventResizableFromStart: true }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+À vous : faites glisser un événement, puis tirez son haut ou son bas.
+L'aperçu affiche l'heure d'arrivée, de cinq en cinq minutes. Paris recule
+ses horloges dans la nuit du dimanche 25 : déposez un événement entre 02:00
+et 03:00 cette nuit-là, et le calendrier demande quel 02:00.
+
+<LiveDemo
+  label="Une semaine à déplacer et redimensionner, au pas de 5 minutes"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    timeZone: 'Europe/Paris',
+    editable: true,
+    snapMinutes: 5,
+    eventResizableFromStart: true,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Jour de congé', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+### Ce qu'un dépôt conserve
+
+Un événement horaire garde **son propre fuseau** et **sa durée écoulée** :
+l'« Appel Chicago » reste un événement de Chicago où qu'il atterrisse, et une
+heure reste une heure même à travers un changement d'heure. Le début est
+calé sur l'horloge du fuseau du calendrier, puis relu dans celui de
+l'événement.
+
+- Déposé dans une heure qui n'existe pas (les horloges ont avancé),
+  l'événement est repoussé d'autant que le temps sauté — 02:30 devient
+  03:30 — et le calendrier le signale.
+- Déposé à une heure d'horloge qui revient deux fois (les horloges ont
+  reculé), le calendrier demande laquelle — « Premier 02:00 (+02:00) » ou
+  « Second 02:00 (+01:00) » — avant de rien modifier. Fermez la question et
+  l'événement reste où il était.
+- Glissé sur la ligne « toute la journée » d'une semaine, un événement
+  horaire devient un événement sur la journée ; déposé dans la grille
+  horaire, un événement sur la journée devient horaire, avec une durée par
+  défaut. Ce changement de nature est annoncé lui aussi.
+- Dans une vue à ressources, déposer sur une autre ressource y transfère
+  l'événement ; un événement sur deux ressources garde l'autre.
+
+[Fuseaux horaires](../time-zones/) explique les journées de 23 et 25 heures
+pour lesquelles ces règles existent.
+
+## Changer de période sans lâcher
+
+Pendant qu'on fait glisser un événement, la grille défile quand le pointeur
+approche de son bord haut ou bas, et maintenir le pointeur contre le côté
+gauche ou droit du calendrier passe à la période précédente ou suivante —
+au bout de 0,6 s dans une grille horaire, 0,9 s dans un mois ou une frise.
+Le glissement continue dans la nouvelle période : un rendez-vous rejoint
+mardi prochain en un seul geste. Une frise défile d'abord dans le temps, et
+ne change de période qu'une fois arrivée au bout.
+
+Seul un **déplacement** change de période ; un redimensionnement, ou un
+élément glissé depuis la page, reste dans la période affichée. Passez
+[`dragEdgeNavigate`](../../options/drag-edge-navigate/) à `false` pour
+garder chaque glissement dans sa période.
+
+## Au doigt
+
+Pas besoin d'appui long pour glisser un événement (il ouvre son menu). Un
+toucher le **sélectionne** — un contour et des poignées plus grandes — et
+glisser l'événement sélectionné démarre aussitôt ; sur du temps vide ou sur
+un événement non sélectionné, le doigt fait défiler la page comme
+d'habitude. L'événement reste sélectionné là où il atterrit, prêt pour le
+déplacement suivant.
+
+Un élément glissé depuis la page n'est pas dans une grille qui défile : là,
+le doigt reste d'abord immobile 300 ms.
+
+## Refuser un dépôt
+
+Un déplacement ou un redimensionnement est vérifié tout au long du trajet.
+L'aperçu passe au rouge là où l'événement ne peut pas atterrir ; lâchez-le
+là, et il revient à sa place, le calendrier annonce « Impossible ici », et
+rien n'est enregistré.
+
+Ce qui refuse se déclare dans [`rules`](../../options/rules/) :
+
+| Règle | Refuse |
+|---|---|
+| `constraint` | Sortir des horaires d'ouverture, des événements d'un groupe, ou des plages que vous donnez |
+| `overlap` | Un événement sur un autre (`false`), ou paire par paire avec une fonction |
+| `allow` | Tout ce que votre fonction refuse |
+| `validRange` | Les jours hors d'une plage |
+
+Ce que fait une personne est vérifié — un geste, le clavier, le menu. Un
+`calendar.run(command)` de votre code ne l'est pas, sauf si vous le
+demandez : `calendar.run(command, { validate: true })`.
+
+Le calendrier dit *que* le dépôt est refusé, pas pourquoi avec vos mots. Deux
+rappels vous permettent de le dire :
+
+- [`onProposalRefused`](../../options/on-proposal-refused/) entend un
+  glissement, un redimensionnement, un déplacement au clavier ou un dépôt
+  depuis la page lâché là où les règles disent non. Sa proposition porte les
+  `violations`, chacune avec son `code`.
+- [`onCommandRefused`](../../options/on-command-refused/) entend une commande
+  refusée alors que rien n'était dessiné comme refusé : la touche Suppr, une
+  entrée du menu, la portée choisie pour un événement récurrent.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  businessHours: true,
+  rules: { constraint: 'businessHours', overlap: false },
+  onProposalRefused: (proposal) => {
+    const codes = proposal.violations.map((v) => v.code);
+    if (codes.includes('constraint')) alert('Hors des horaires d’ouverture');
+    else if (codes.includes('overlap')) alert('Il y a déjà quelque chose à cette heure');
+  },
+  onCommandRefused: (result, command) => console.warn(command.type, 'refusée', result.problems),
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans React, `rules` et les deux rappels sont des props ; dans Angular et Vue, ils vont dans `options`.
+
+Faites glisser un événement hors des horaires, ou sur un autre :
+
+<LiveDemo
+  label="Horaires d'ouverture seulement, jamais sur un autre événement"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    timeZone: 'Europe/Paris',
+    editable: true,
+    businessHours: { daysOfWeek: [1, 2, 3, 4, 5], start: '08:30', end: '18:00' },
+    rules: { constraint: 'businessHours', overlap: false },
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Bilan', start: '2026-10-21T14:00[Europe/Paris]', duration: { hours: 1 } },
+      { id: 'c', title: 'Formation', start: '2026-10-22T10:00[Europe/Paris]', duration: { hours: 2 } },
+    ],
+  }}
+/>
+
+## Savoir ce qui a changé
+
+Un dépôt abouti arrive une fois à
+[`onEventChange`](../../options/on-event-change/), quelle que soit sa voie —
+glissement, redimensionnement, clavier, menu, annulation. Enregistrez-le là,
+et reprenez-le si votre serveur dit non : `change.revert()` défait ce
+changement-là, pas « le dernier » (il renvoie `false` sans rien faire si ces
+événements ont changé depuis). [Événements](../events/) va plus loin sur
+l'enregistrement.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventChange: async (change) => {
+    if (!change.after) return;
+    const res = await fetch(`/api/events/${change.after.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ start: change.after.start.toString(), end: change.after.end.toString() }),
+    });
+    // Le serveur a dit non : l'événement retourne où il était.
+    if (!res.ok) change.revert();
+  },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, c'est une sortie : `(eventChange)` pour Angular, `onEventChange` pour React, `@event-change` pour Vue.
+
+Chaque dépôt est une étape de l'historique. Quand le focus est dans le
+calendrier, Ctrl/Cmd+Z l'annule et Ctrl/Cmd+Maj+Z ou Ctrl/Cmd+Y le rétablit ;
+[`keyboardUndo: false`](../../options/keyboard-undo/) laisse ces touches à
+votre application, et `calendar.undo()` / `calendar.redo()` marchent dans
+les deux cas. Une annulation arrive elle aussi à `onEventChange`, avec
+`cause: 'undo'` : votre serveur suit.
+
+## Événements récurrents
+
+Vous faites glisser une occurrence d'une réunion hebdomadaire : est-ce
+celle-ci, celle-ci et les suivantes, ou toutes ? Par défaut, le calendrier
+pose la question dans un petit menu à l'endroit du dépôt — « Cet
+événement », « Cet événement et les suivants », « Tous les événements » ;
+fermez le menu et l'événement revient à sa place. La même question se pose
+pour un redimensionnement et pour la touche Suppr (le menu a ses propres
+entrées). Un glissement qui fait passer une occurrence d'horaire à sur la
+journée, ou l'inverse, ne change que cette occurrence et ne demande rien.
+
+Pour répondre vous-même — par votre propre dialogue, ou selon une règle —,
+donnez une fonction à [`chooseScope`](../../options/choose-scope/). Elle
+reçoit l'occurrence et le `kind` de changement, et renvoie `'this'`,
+`'following'`, `'all'`, ou `null` pour annuler, tout de suite ou par une
+promesse.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+declare function askScope(): Promise<'this' | 'following' | 'all' | null>;
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  events: [{ id: 'staff', title: 'Réunion d’équipe', start: '2026-10-19T09:00[Europe/Paris]', rrule: 'FREQ=WEEKLY' }],
+  // Touche Suppr : celle-ci seulement. Un glissement ou un redimensionnement : votre dialogue, qui peut annuler.
+  chooseScope: async ({ kind }) => (kind === 'delete' ? 'this' : ((await askScope()) ?? null)),
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+[Récurrence](../recurrence/) montre ce que le magasin conserve pour chaque
+réponse. À vous : faites glisser « Tournée » dans le mois et choisissez.
+
+<LiveDemo
+  label="Le mois : déplacer une occurrence, les suivantes, ou toutes"
+  height={560}
+  options={{
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    timeZone: 'Europe/Paris',
+    editable: true,
+    events: [
+      { id: 'w', title: 'Tournée', start: '2026-10-05T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'c', title: 'Congrès', start: '2026-10-26', end: '2026-10-29', allDay: true },
+    ],
+  }}
+/>
+
+## Glisser depuis la page
+
+Une liste d'attente, une tâche, un modèle « Consultation, 30 min » : un
+élément de la page devient un événement quand on le dépose sur le
+calendrier. Il faut deux choses :
+
+- [`droppable`](../../options/droppable/) sur le calendrier : `true`, ou un
+  filtre qui reçoit les données de l'élément et dit s'il est le bienvenu.
+- `makeDraggable(element, spec)`, de `@dzcalendar/dom/drag`, sur chaque
+  élément. `spec.event` est l'événement qu'il deviendra, sans début — le
+  dépôt lui en donne un ; `spec.data` est à vous (l'identifiant d'un
+  patient) et vous revient dans [`onDrop`](../../options/on-drop/). La
+  fonction renvoie son propre nettoyage.
+
+L'événement est créé par une commande vérifiée comme un geste — vos `rules`
+s'appliquent, et `allow` apprend que l'événement vient de l'extérieur
+(`placement.external`). Une fois créé, `onDrop` reçoit l'endroit et vos
+données, puis [`onEventReceive`](../../options/on-event-receive/) le
+changement, avec `revert()` ; une seule annulation le reprend. Il n'arrive
+**pas** à `onEventChange` : enregistrez-le une fois, dans `onEventReceive`.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import { makeDraggable } from '@dzcalendar/dom/drag';
+
+const card = document.getElementById('patient-42')!;
+const stop = makeDraggable(card, {
+  event: { title: 'Consultation', duration: { minutes: 30 } },
+  data: { patientId: 42 },
+});
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  // Seulement les fiches de patients, pas les autres éléments déplaçables de la page.
+  droppable: (data) => typeof data === 'object' && data !== null && 'patientId' in data,
+  // Rendez-vous pris : la fiche quitte la liste d'attente.
+  onDrop: (drop) => drop.element?.remove(),
+  // L'événement créé : enregistrez-le, ou reprenez-le.
+  onEventReceive: (change) => {
+    fetch('/api/events', { method: 'POST', body: JSON.stringify({ start: change.after?.start.toString() }) })
+      .then((res) => { if (!res.ok) change.revert(); });
+  },
+});
+
+// Quand la fiche quitte la page pour de bon :
+stop();
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventChange } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+// Les fiches : makeDraggable, comme en JS.
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ droppable: true }"
+    (dropped)="$event.element?.remove()" (eventReceive)="save($event)" />`,
+})
+export class Agenda {
+  save(change: EventChange): void {
+    console.log('à enregistrer', change.after?.id); // change.revert() si le serveur refuse
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { DropInfo, EventChange } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const booked = (drop: DropInfo) => drop.element?.remove();
+// change.revert() si le serveur refuse.
+const save = (change: EventChange) => console.log('à enregistrer', change.after?.id);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ droppable: true }" @dropped="booked" @event-receive="save" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans React, ce sont des props du même nom ; la sortie d'Angular est `(dropped)`, pas `(drop)`, et celle de Vue `@dropped`.
+
+Au pointeur, le glissement démarre après un appui suivi d'un petit mouvement
+sur l'élément (un doigt reste d'abord immobile 300 ms). Au-dessus d'un
+calendrier qui l'accepte, l'endroit sous le pointeur est dessiné comme le
+serait l'événement, et le calendrier défile quand le pointeur approche de
+son bord — mais il ne change pas de période : le jour visé doit être dans la
+période affichée. Relâcher dépose ; Échap, ou relâcher hors de tout
+calendrier, annule. Un endroit refusé est dessiné comme tel et arrive à
+`onProposalRefused` ; rien n'est créé.
+
+Au clavier, `makeDraggable` rend l'élément focalisable et lui donne
+`role="button"` s'il n'a pas de rôle. Entrée ou Espace le saisit, Tab
+rejoint un calendrier, les flèches déplacent l'endroit comme elles
+déplacent un événement, Entrée le pose, Échap annule ; chaque étape est
+annoncée dans la langue du calendrier. Qui ne peut pas glisser peut quand
+même placer un patient sur une heure.
+
+Pour recevoir le dépôt sans l'événement, donnez `create: false` à l'élément :
+rien n'est créé et seul `onDrop` est prévenu. `event` peut aussi être une
+fonction, lue au début de chaque glissement : une liste dont les fiches
+changent reste juste.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { makeDraggable } from '@dzcalendar/dom/drag';
+
+declare const row: HTMLElement;
+declare const task: { id: string; title: string; minutes: number };
+
+makeDraggable(row, {
+  // Lu au début de chaque glissement.
+  event: () => ({ title: task.title, duration: { minutes: task.minutes } }),
+  data: task,
+  // L'application la planifie elle-même, depuis onDrop.
+  create: false,
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+Un calendrier dans une iframe n'est pas atteignable depuis la page qui
+l'entoure.
+
+## D'un calendrier à l'autre
+
+Un événement sorti d'un calendrier peut être déposé sur un autre de la page
+si le premier est `editable` et le second `droppable` — et `editable` aussi,
+sauf si l'événement se déclare lui-même modifiable. Un filtre `droppable`
+reçoit alors l'événement. Le calendrier sous le pointeur montre l'endroit.
+
+L'événement est d'abord créé côté récepteur, puis retiré du premier. Si le
+premier ne peut plus le lâcher, le second le reprend sans être prévenu, et
+l'`onCommandRefused` du premier entend le retrait refusé, et « Action refusée »
+est annoncé. Une fois les deux
+faits, le second entend [`onEventReceive`](../../options/on-event-receive/)
+et le premier [`onEventLeave`](../../options/on-event-leave/), avec
+l'événement et `to`, l'élément de vue de l'autre calendrier.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+declare const left: HTMLElement;
+declare const right: HTMLElement;
+
+createCalendar(left, { timeZone: 'Europe/Paris', editable: true, onEventLeave: (leave) => console.log(leave.event.title, 'parti') });
+// Enregistrez le déplacement une seule fois, côté récepteur.
+createCalendar(right, { timeZone: 'Europe/Paris', editable: true, droppable: true, onEventReceive: (change) => console.log('reçu', change.after?.id) });
+```
+
+</Fragment>
+</CodeTabs>
+
+Dans les frameworks, ce sont des sorties : `(eventLeave)` et `(eventReceive)` pour Angular, `onEventLeave` et `onEventReceive` pour React, `@event-leave` et `@event-receive` pour Vue.
+
+À savoir sur ce dépôt :
+
+- Chaque calendrier a son propre historique : une création d'un côté, une
+  suppression de l'autre. Annuler d'un seul côté laisserait l'événement des
+  deux côtés ou d'aucun ; utilisez `revert()`, depuis l'un ou l'autre rappel,
+  qui reprend les deux côtés — ou renvoie `false` sans rien faire si l'un
+  d'eux a changé depuis.
+- Une occurrence de série part seule ; la série reste.
+- Deux calendriers sur **un même magasin** (plusieurs fuseaux d'un même
+  agenda) partagent l'événement : le glissement est un simple déplacement,
+  signalé à l'`onEventReceive` du récepteur, et `onEventLeave` n'est pas
+  appelé.
+- Un événement relâché hors de tout calendrier n'atterrit nulle part ;
+  quelques pixels au-delà du bord comptent encore comme dessus.
+
+## Voir aussi
+
+- [`editable`](../../options/editable/), [`snapMinutes`](../../options/snap-minutes/), [`eventResizableFromStart`](../../options/event-resizable-from-start/), [`dragEdgeNavigate`](../../options/drag-edge-navigate/) — ce qu'une personne peut faire.
+- [`rules`](../../options/rules/), [`onProposalRefused`](../../options/on-proposal-refused/) et [`onCommandRefused`](../../options/on-command-refused/) — ce qui refuse un dépôt, et pourquoi.
+- [`droppable`](../../options/droppable/), [`onDrop`](../../options/on-drop/) et [`onEventLeave`](../../options/on-event-leave/) — les événements qui arrivent et qui partent.
+- [Événements](../events/) — les commandes, l'historique et l'enregistrement.
+- [Récurrence](../recurrence/) — la série derrière la question de portée.
+- [Clavier et accessibilité](../keyboard-accessibility/) — les mêmes gestes sans pointeur.
+- [Sélection](../selection/) — glisser sur du temps vide.

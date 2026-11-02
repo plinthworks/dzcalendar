@@ -57,6 +57,10 @@ export interface DzMessages {
   readonly deleteEvent: string;
   /** Said when a drop is refused (a constraint, an overlap, not editable). */
   readonly dropRefused: string;
+  /** The same, with the rules it breaks (already joined as a list in the calendar's language). */
+  dropRefusedFor(parts: { reasons: string }): string;
+  /** Said when an action is refused (a delete, a menu entry, an event handed to another calendar). */
+  readonly commandRefused: string;
   eventMoved(parts: { title: string; time: string }): string;
   /** Something dropped in (from the page, another calendar) and made here: when — an hour, or a day. */
   eventReceived(parts: { title: string; when: string }): string;
@@ -169,6 +173,8 @@ export const EN: DzMessages = {
   openEvent: 'Open',
   deleteEvent: 'Delete',
   dropRefused: 'Not allowed here',
+  dropRefusedFor: ({ reasons }) => `Not allowed here: ${reasons}`,
+  commandRefused: 'Action refused',
   eventMoved: ({ title, time }) => (time ? `${title} moved to ${time}` : `${title} moved`),
   eventReceived: ({ title, when }) => `${title} placed: ${when}`,
   pickedUp: ({ title }) => `${title} picked up. Tab to a calendar, arrows to choose the place, Enter to put it down, Escape to cancel.`,
@@ -263,6 +269,8 @@ export const FR: DzMessages = {
   openEvent: 'Ouvrir',
   deleteEvent: 'Supprimer',
   dropRefused: 'Impossible ici',
+  dropRefusedFor: ({ reasons }) => `Impossible ici : ${reasons}`,
+  commandRefused: 'Action refusée',
   eventMoved: ({ title, time }) => (time ? `« ${title} » déplacé à ${time}` : `« ${title} » déplacé`),
   eventReceived: ({ title, when }) => `« ${title} » placé : ${when}`,
   pickedUp: ({ title }) => `« ${title} » pris. Tab jusqu'à un calendrier, les flèches pour choisir la place, Entrée pour le poser, Échap pour annuler.`,

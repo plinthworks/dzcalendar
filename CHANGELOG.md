@@ -40,6 +40,31 @@
 
 ### Fixed
 
+- A selection made with Shift+arrows is handed to `onSelect` once (18j-3,
+  batch 3): Enter again gave it again (a double Enter booked twice), and once
+  the application cleared it in `onSelect` the next Enter was a new tap (a
+  date click and a one-slot selection).
+- A press anywhere outside the calendar clears a shown selection and calls
+  `onUnselect` (owner, 2026-11-02), as the option pages said; only a click on
+  the calendar's empty time did. An element of the page marked
+  `data-dz-keep-selection` (a form beside the calendar) keeps it.
+- React: `onSelectionChange` is called before `onSelect`, as Vue's and
+  Angular's bindings are: a bound `selection` cleared in `onSelect` was put
+  back.
+- A link, a button or a field an application puts inside an event keeps its
+  keys in every view: the Menu key, Shift+F10, a right-click and a touch long
+  press there opened the event's menu (and took the browser's own); in a list
+  row Backspace deleted the event and Space and the arrows were taken; in the
+  "+N" panel Enter and Space were taken.
+- A refused action — a delete, a menu entry, an event handed to another
+  calendar — is said "Action refused" (`DzMessages.commandRefused`, owner,
+  2026-11-02); "Not allowed here" stays for a refused place (a drop, a
+  resize, its scope). A held event's refused step names its reasons through
+  `DzMessages.dropRefusedFor` and `Intl.ListFormat` (it wrote " : " in every
+  language).
+- In a week or a day, today's column carries `aria-current="date"`: it sat
+  on the day heads only, which are hidden from screen readers.
+
 - A view's days and fixed period (every day hidden, `hiddenDays` outside 1–7,
   a `visibleRange` that ends before it starts or shows no day) are refused
   when the calendar is made, for every view in `views` (18j-3, batch 2). A
@@ -114,6 +139,9 @@
   `onResourceProblems`.
 
 ### Added
+
+- Guides: drag and drop, selection, keyboard and accessibility, in English
+  and French (18j-3, batch 3).
 
 - A `CalendarProblem`'s `detail` is in the calendar's language (owner,
   2026-11-01): `DzMessages.problem(p)` (`ProblemWords`: `host-no-height`,

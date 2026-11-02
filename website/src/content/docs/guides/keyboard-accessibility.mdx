@@ -1,0 +1,474 @@
+---
+title: "Keyboard & accessibility"
+description: "Every gesture from the keyboard, what a screen reader hears, focus, motion and contrast, the WCAG 2.2 status, and what your application still owes."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Everything a mouse can do in the calendar, the keyboard can do too: move
+around, select, open, move and resize an event, delete, undo. A screen reader
+is told where the focus goes and what each step did. This guide lists the
+keys, says what is announced and how to translate it, and ends with the part
+that stays your application's.
+
+## Reaching the calendar
+
+The grid is **one tab stop**, not one per day. In a month it is the
+cursor's cell (today when it is shown); in a week or a day it is a cursor on
+the hours, with a stop for each event, which are buttons; in a list it is one
+of the entries. Arrows then move the cursor from day to day or from slot to
+slot, as in the ARIA date grid. The cursor waits at the top of the hours
+shown; focused, it goes to now when today is shown and now is in the hours in
+view, else to the first slot in view. The toolbar's buttons come before the
+grid, in the page's order.
+
+Nothing else changes with the keyboard that a mouse would not change: the
+focus never switches view by itself, and crossing the last day shown turns the
+period, which is what the key is for. Where days are of 23 or 25 hours, the
+cursor steps in elapsed time: on a 25-hour Sunday it visits both 02:00s, told
+apart by their offset, and on a 23-hour one it goes from 01:45 to 03:00.
+
+## The keys, place by place
+
+What a key does depends on where the focus is. Right to left, ← and → swap:
+the next day is on the left. Write Cmd for Ctrl on a Mac.
+
+### On the grid (the cursor)
+
+| Key | What it does |
+|---|---|
+| ← → | The previous or next day. |
+| ↑ ↓ | The previous or next slot (a week back or ahead in a month). Up from a day's first slot is its all-day row. |
+| Home, End | The first or last place of the line: the week row, the day's hours. |
+| Page Up, Page Down | The previous or next period, the cursor moved by as much (a week on in a week, a month on in a month). |
+| Shift + arrows, Shift + Home or End | Select as the cursor moves, when the calendar is [`selectable`](../../options/selectable/). |
+| Enter | In a month, on a day that holds events, goes into them (all of them, those behind "+N" too). Elsewhere, as Space. When a selection is being made, gives it to your application. |
+| Space | A date click; when `selectable`, it also selects the slot, which `onSelect` hears. |
+| Alt + ← →, resource views | The previous or next resource, same day and time. Plain arrows stay in the days of one resource. In a timeline, ← → go along time and ↑ ↓ from resource to resource. |
+| Escape | Clears the selection. |
+| Menu key, Shift + F10 | The [context menu](../../options/context-menu/) of the slot or day. |
+
+### On an event
+
+| Key | What it does |
+|---|---|
+| ← → ↑ ↓ | The previous or next event of the same day (of the whole all-day row, in a week). |
+| Enter, Space | Opens it: `onEventClick`, else [`onEventOpen`](../../options/on-event-open/). |
+| M, Alt + Enter | Holds it, to move it (below). Needs [`editable`](../../options/editable/) and an event that may move or be resized. |
+| Delete, Backspace | Deletes it. A repeating event asks how far ([`chooseScope`](../../options/choose-scope/)); the deletion is said, with the key that undoes it. |
+| Escape | Back to the day, on the cursor. |
+| Menu key, Shift + F10 | The event's context menu: Open (with `onEventOpen`); Move…, Change duration… and Delete (when it may be changed); then your own entries. |
+
+### Holding an event
+
+M or Alt+Enter on an event is the keyboard's drag. Each key makes the step a
+pointer would make and goes through the same checks: a place that
+[`rules`](../../options/rules/) refuse is said, with the reason, and Enter
+there puts nothing down: the event goes back. Opened from the menu, "Change duration…"
+holds the event the same way, but the plain arrows then pull its end.
+
+| Key | What it does |
+|---|---|
+| ← → ↑ ↓ | Moves it by a day or a slot (a week in a month). |
+| Page Up, Page Down | A week back or ahead. |
+| Shift + arrows | Pulls its end. |
+| Alt + Shift + arrows | Pulls its start, with [`eventResizableFromStart`](../../options/event-resizable-from-start/). |
+| Alt + ← →, resource views | Into the previous or next resource. |
+| Enter, Space | Puts it down: refused (said, and it goes back), how far for a series, which reading of a repeated hour, the history, the announcement. |
+| Escape | Lets go; nothing changed. |
+| Tab | Lets go, and the focus moves on. |
+
+While an event is held, Ctrl+Z is idle and Alt+arrows do not reach the browser's
+history. A click on the calendar's time puts the held event there, as a drag
+would: with "Move…" in the menu, moving needs no dragging at all
+([drag and drop](../drag-and-drop/)).
+
+### Menus, the "+N" panel, the list
+
+| Where | Keys |
+|---|---|
+| Context menu | ↑ ↓ and Home, End go through the entries; typing a letter jumps to the entry that starts with it; Enter or Space runs it; the arrow towards the sub-menu (→, ← right to left) opens it, the other one or Escape closes it; Escape closes the menu and gives the focus back; Tab closes it. |
+| "+N" panel | Tab goes round inside the panel; Enter or Space on an event calls `onEventClick`; the Menu key opens its menu; Escape closes the panel, the focus back on "+N". |
+| List views | ↑ ↓ the previous or next entry; Home, End the first or last; Page Up, Page Down the previous or next day with entries; Enter or Space opens; Delete or Backspace deletes. |
+
+### Everywhere in an editable calendar
+
+Ctrl/Cmd+Z undoes the last change; Ctrl/Cmd+Shift+Z or Ctrl+Y redoes it. Each
+is said ("Undone", "Redone"). They work wherever the focus is in the calendar,
+but not in a field you placed there, nor in a menu, nor while an event is
+held. [`keyboardUndo: false`](../../options/keyboard-undo/) leaves them to your
+application; `calendar.undo()` and `calendar.redo()` work either way.
+
+## Turning the keys on
+
+The cursor, the arrows and opening work in any calendar. Moving, resizing and
+deleting want [`editable`](../../options/editable/); selecting wants
+[`selectable`](../../options/selectable/); what "open" and "new event" do is
+yours to say, with `onEventOpen` and `onCreateRequest`. An event that says
+`editable: true` itself can be moved and deleted in a calendar that is not.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  selectable: true,
+  onEventOpen: (instance) => console.log('open', instance.event.id),
+  onSelect: ({ start, end }) => console.log('book', start.toString(), end.toString()),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventInstance } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [selectable]="true" (eventOpen)="open($event)" />`,
+})
+export class Agenda {
+  open(instance: EventInstance): void {
+    console.log('open', instance.event.id);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable selectable onEventOpen={(instance) => console.log('open', instance.event.id)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventInstance } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const open = (instance: EventInstance) => console.log('open', instance.event.id);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable selectable @event-open="open" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Try the keys on this week: Tab into the grid, move with the arrows, press
+Shift+↓ to select, then Tab to an event, M, the arrows, Enter; Delete, then
+Ctrl+Z.
+
+<LiveDemo
+  label="A week to try the keyboard on"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'en-GB',
+    editable: true,
+    selectable: true,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Team lunch', start: '2026-10-21T12:30[Europe/Paris]', duration: { hours: 1 } },
+      { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## Keys of your own
+
+The calendar claims the keys of the tables only while the focus is on its
+cursor, an event, a menu or the "+N" panel, and Ctrl/Cmd+Z anywhere in it but
+a field. A link, a button or a field you put inside an event keeps its own
+keys in every view, the "+N" panel included — the Menu key and Shift+F10 too,
+which then open the browser's menu, not the event's. The rest of the page is
+yours. If your
+application has an undo of its own for the whole page, give it Ctrl+Z by
+turning [`keyboardUndo`](../../options/keyboard-undo/) off:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', editable: true, keyboardUndo: false });
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') calendar.undo();
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ keyboardUndo: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable keyboardUndo={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ keyboardUndo: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+The `M` key acts only while an event has the focus, and cannot be remapped yet.
+
+## What a screen reader hears
+
+**Roles and names.** A month is a `grid` of `row`s, with `columnheader`s and
+`gridcell`s. Each cell is named by its date and how many events it holds
+("Wednesday 21 October 2026, 2 events") and contains a button for every event
+of the day, including those behind "+N" (the drawn bars are presentation,
+their focus ring mirrored); today's cell carries `aria-current="date"`. A week
+or a day is made of `group`s named by their date (today's with `aria-current="date"`), and by their real length on
+a 23- or 25-hour day. Events are buttons named "title, time"; a repeated or
+skipped hour is a `note` ("02:00–03:00 does not exist"). In a week, "+N" is a
+button named "3 more events, Wednesday 21 October, 09:00"; in a month it is
+hidden from screen readers, the day already listing its events. The context
+menu is a `menu` of `menuitem`s named "Actions", the panel a `dialog` titled
+by its date, the view switcher a group of buttons with `aria-pressed`, and
+the toolbar's title is a heading that is also a polite live region.
+
+**The cursor.** Each move moves the focus (a week's cursor is a new node each
+time), so a move is spoken as a change of focus: "Wednesday 21 October,
+09:00". In a resource view the sentence starts with the resource.
+
+**The live region.** One polite `role="status"` region says what has no
+focus to carry it:
+
+| When | Said (English) | Message |
+|---|---|---|
+| An event is picked up | "Consultation grabbed. Arrows move it, Page Up and Page Down by a week…" | `grabbed`, `grabHelp`, `grabHelpResize`, `grabHelpStart` |
+| Each step of a held event | The new place, "Wednesday 21 October, 10:00 to 10:45", with "It becomes an all-day event" or "This hour does not exist today; the event starts when it ends" when it applies | `range`, `becomesAllDay`, `becomesTimed`, `skippedHour` |
+| A held event is put down | "Consultation moved to 10:00"; "Consultation now ends at 11:00" | `eventMoved`, `eventResized`, `eventResizedStart`, `movedIntoGap` |
+| A place is refused | "Not allowed here", or with the reasons: "Not allowed here: overlaps another event" | `dropRefused`, `dropRefusedFor`, `violation` |
+| An action is refused (a delete, a menu entry, a hand-over to another calendar) | "Action refused" | `commandRefused` |
+| A step that goes nowhere | "Cannot go further" | `noFurther` |
+| A selection grows or goes | "Selected: Wednesday 21 October, 09:00 to 10:00"; "Selection cleared" | `selected`, `selectionCleared` |
+| A key is refused | "This event cannot be changed"; "…moved"; "This length cannot be changed here" | `notEditable`, `cannotMove`, `cannotResize` |
+| A delete, an undo | "Consultation deleted. Ctrl+Z to undo."; "Undone"; "Redone" | `eventDeleted`, `undone`, `redone` |
+| A held event is let go | "Move cancelled" | `grabCancelled` |
+| A source fails | "Consultation could not be saved. It is back as it was."; "Some events could not be loaded." | `saveFailed`, `loadFailed` |
+
+A screen reader's bare click (VoiceOver, NVDA in browse mode, TalkBack) on the
+cursor does what Space does, and on an event what Enter does.
+
+## Saying it in your language
+
+All of those sentences, and the names above, are
+[`messages`](../../options/messages/), in the calendar's
+[`locale`](../../options/locale/): English and French are built in, Arabic,
+Spanish and German one import each, and `defineLocale` registers a language of
+your own ([languages](../languages/)). Give only the words you change:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  messages: { notEditable: 'This appointment is locked', noFurther: 'End of the day' },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [messages]="{ notEditable: 'This appointment is locked' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable messages={{ notEditable: 'This appointment is locked' }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :messages="{ notEditable: 'This appointment is locked' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Words that carry a name or a number are functions (`eventDeleted({ title,
+undo })`, `selected({ span })`). Dates and times inside the sentences are
+written by the platform in the locale. Event titles are yours, so put them in
+the right language and let the page's `lang` be set: the calendar does not set
+it.
+
+## Focus
+
+The roving is the cursor's: one cell or one cursor holds `tabindex="0"`, the
+others `-1`, and arrows move it, so a month is not sixty tab stops; a list
+roves the same way over its entries. Events are the exception, each a stop of
+its own in a time grid; in a month they sit behind their day, reached with
+Enter.
+
+Focus is given back where it came from: after a menu or the "+N" panel closes,
+after a held event is put down (on the event, where it now is), after a delete
+(on the day; in a list, on the next entry), and after an undo took the focused
+event away (on the event where it now is, else on the cursor). The time grid
+scrolls the cursor and a held event's edge into view, and the list keeps a
+focused row out from under its sticky heads.
+
+Every focusable element shows its focus: a 2 px ring in the accent colour, or
+a highlighted background for a menu entry.
+
+## Motion, contrast, forced colours
+
+[`motion`](../../options/motion/) is Web Animations by default, brief, only
+transform and opacity, and **nothing at all** when the system asks for reduced
+motion (`prefers-reduced-motion: reduce`) — also if it changes while the page
+is open. The optional GSAP adapter obeys the same rule. Nothing flashes, and
+the now line moves once a minute. To remove motion for everyone:
+
+```ts
+import { createCalendar, NO_MOTION } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', motion: NO_MOTION });
+```
+
+The default theme measures at least 4.5:1 for event text on its tint in the
+seven families, light and dark; colour is never the only signal (a refused
+place is red and said; today is filled and marked `aria-current`). Under
+`forced-colors`, focus rings, events, today and the pressed view are drawn in
+system colours. Colours you set yourself (`--tz-*`, `--dz-*`, an event's
+colour) are your responsibility: see [theming](../theming/) and
+[`theme`](../../options/theme/). Text sizes are in `rem` and follow the
+page's text size; nothing scrolls sideways at 320 px, except the hour grids
+themselves, where `timeGridDay` or `listWeek` read better on a phone.
+
+## What your application does itself
+
+- **Your own controls.** A button you add to the toolbar, a field in an editor
+  or content you put in an event is yours to label (`aria-label`, a visible
+  name that starts the accessible one) and to size at 24 px or more.
+- **Your own refusals.** The calendar says a gesture was refused when it
+  refused it. When your server refuses it afterwards, `change.revert()` puts the
+  event back silently, and the calendar has no method to speak your words: say
+  so in a status region of your own. (A failure of an event source's save is
+  said by the calendar.)
+- **A way to open and create.** Enter on an event calls `onEventClick`, else `onEventOpen`; Space
+  on a slot calls `onDateClick`, and `onSelect` when `selectable`. What they open is
+  your page, with focus managed there, and given back to the event on close.
+- **The page.** Its `lang` and its title are the page's, not the calendar's.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const status = document.querySelector<HTMLElement>('#status')!; // <p id="status" role="status"></p>
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventChange: async (change) => {
+    const res = await fetch(`/api/events/${change.after?.id}`, { method: 'PUT', body: JSON.stringify(change.after) });
+    if (res.ok) return;
+    change.revert();
+    status.textContent = `${change.after?.title ?? 'The event'} could not be saved. It is back as it was.`;
+  },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+## Conformance
+
+The calendar is checked against WCAG 2.2, levels A and AA, with axe-core in
+Chrome on every view, a themes and colour-scheme matrix and forced colours,
+and by keyboard scripts for every operation. Two criteria are met partly (the
+cursor and events do not yet expose their shortcuts before use, and a refused
+place is explained but no other is suggested), and the target size of events
+follows their duration, as the criterion's exception allows. Sessions with
+NVDA, JAWS, VoiceOver and TalkBack and an audit by users are still to come, so
+the report is still a draft. The full table, with the state of each
+criterion, is the [conformance
+report](https://github.com/plinthworks/dzcalendar/blob/main/site/a11y-conformance.md).
+
+## See also
+
+- [`editable`](../../options/editable/), [`selectable`](../../options/selectable/) and [`contextMenu`](../../options/context-menu/) — what the keys can do.
+- [`keyboardUndo`](../../options/keyboard-undo/) and [`chooseScope`](../../options/choose-scope/).
+- [`messages`](../../options/messages/) and [`motion`](../../options/motion/).
+- [Drag and drop](../drag-and-drop/) — the same gestures with a pointer.
+- [Selection](../selection/) — selecting by keyboard, mouse and touch.
+- [Languages](../languages/) — the words a screen reader hears.

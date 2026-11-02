@@ -1,0 +1,500 @@
+---
+title: "Sélection"
+description: "Laisser une personne sélectionner une plage de jours ou d'heures au pointeur, au doigt ou au clavier, en faire un événement, et distinguer une sélection d'un clic."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Une sélection, c'est une plage de temps libre qu'une personne délimite — pour
+la réserver, la bloquer, y commencer un événement. Le calendrier la dessine et
+vous dit ce qu'elle couvre ; il ne crée rien. Ce que la sélection devient,
+c'est à vous d'en décider. Ce guide explique comment en faire une, comment
+s'en servir, et comment la distinguer d'un clic.
+
+## Laisser une personne sélectionner
+
+Activez-la avec [`selectable`](../../options/selectable/). Rien d'autre n'est
+nécessaire :
+
+- **À la souris ou au stylet**, appuyez sur un temps libre et glissez. Dans
+  une grille horaire, cela sélectionne des heures ; dans un mois, des jours
+  entiers. Un simple clic n'est pas une sélection : c'est un clic sur une date,
+  décrit plus bas. Un appui sur un événement concerne l'événement (son clic, son
+  glissement), jamais le temps qui se trouve derrière.
+- **Au doigt**, un tap sur un temps libre sélectionne un créneau, avec une
+  poignée à chaque bout pour l'étirer. Un doigt qui part d'une zone vide fait
+  défiler la page, comme il se doit : les poignées sont la manière d'étendre
+  une sélection sur un écran tactile.
+- **Au clavier**, une section à part plus bas.
+
+Les heures s'alignent sur un pas, [`snapMinutes`](../../options/snap-minutes/)
+(15 par défaut), le même que celui des glissements, des redimensionnements et
+des flèches. Dans un mois, ce sont des jours entiers quoi qu'il dise.
+
+Essayez : glissez sur des heures libres ; cliquez sur un temps libre pour
+l'effacer.
+
+<LiveDemo
+  label="Une semaine où le temps libre se sélectionne, par demi-heures"
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    selectable: true,
+    snapMinutes: 30,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Congé', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## Transformer une sélection en événement
+
+Quand une personne termine une sélection, [`onSelect`](../../options/on-select/)
+la reçoit : `{ start, end, allDay, resourceId? }`. Une sélection horaire porte
+des `ZonedDateTime` dans le fuseau du calendrier ; une sélection sur des jours
+porte des dates, le `end` étant le jour **suivant** le dernier — la même
+convention qu'un événement sur la journée, si bien que la sélection se passe
+telle quelle à `event.create`.
+
+La sélection reste dessinée pendant que vous décidez de ce qu'on en fait.
+Effacez-la quand vous avez fini : en JavaScript pur `calendar.select(null)` ;
+en Angular, React et Vue en remettant `selection`, la liaison bidirectionnelle,
+à `null`, depuis `onSelect` même si vous voulez.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  selectable: true,
+  snapMinutes: 30,
+  onSelect: (selection) => {
+    const title = prompt('Titre ?');
+    if (title) {
+      calendar.run({
+        type: 'event.create',
+        event: { title, start: selection.start, end: selection.end, allDay: selection.allDay },
+      });
+    }
+    calendar.select(null);
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal, viewChild } from '@angular/core';
+import type { Selection } from '@dzcalendar/core';
+import { DZ_CALENDAR, DzCalendar } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar
+      timeZone="Europe/Paris"
+      [selectable]="true"
+      [options]="{ snapMinutes: 30 }"
+      [(selection)]="selection"
+      (selected)="book($event)" />`,
+})
+export class Agenda {
+  private readonly cal = viewChild.required(DzCalendar);
+  readonly selection = signal<Selection | null>(null);
+
+  book(selection: Selection): void {
+    const title = prompt('Titre ?');
+    if (title) {
+      this.cal().controller.dispatch({
+        type: 'event.create',
+        event: { title, start: selection.start, end: selection.end, allDay: selection.allDay },
+      });
+    }
+    this.selection.set(null);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+
+export function Agenda() {
+  const cal = useCalendarController();
+  const [selection, setSelection] = useState<Selection | null>(null);
+
+  const book = (s: Selection) => {
+    const title = prompt('Titre ?');
+    if (title) {
+      cal.dispatch({ type: 'event.create', event: { title, start: s.start, end: s.end, allDay: s.allDay } });
+    }
+    setSelection(null);
+  };
+
+  return (
+    <DzCalendar controller={cal} timeZone="Europe/Paris" selectable snapMinutes={30}
+      selection={selection} onSelectionChange={setSelection} onSelect={book} />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { shallowRef } from 'vue';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+
+const cal = createCalendarController();
+const selection = shallowRef<Selection | null>(null);
+
+function book(s: Selection) {
+  const title = prompt('Titre ?');
+  if (title) {
+    cal.dispatch({
+      type: 'event.create',
+      event: { title, start: s.start, end: s.end, allDay: s.allDay },
+    });
+  }
+  selection.value = null;
+}
+</script>
+
+<template>
+  <DzCalendar
+    :controller="cal"
+    time-zone="Europe/Paris"
+    selectable
+    :options="{ snapMinutes: 30 }"
+    v-model:selection="selection"
+    @selected="book"
+  />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Deux précisions utiles :
+
+- **`onSelect` entend une personne, pas votre code.** Une sélection que vous
+  montrez avec `calendar.select(selection)` est dessinée, sans être redite.
+- **`onUnselect` entend la sélection disparaître d'elle-même** : un clic sur un
+  temps libre du calendrier ou n'importe où en dehors, Échap, un passage à une autre période
+  ou une autre vue, un nouveau glissement. Il ne vous entend pas l'effacer. Un formulaire à
+  vous, à côté du calendrier, garde la sélection le temps qu'on le remplisse s'il porte
+  `data-dz-keep-selection`. Servez-vous-en
+  pour fermer un formulaire ouvert pour la sélection — voir
+  [`onUnselect`](../../options/on-unselect/) ; la liaison bidirectionnelle
+  `selection` des frameworks passe à `null` dans les mêmes cas.
+
+## Sélectionner au clavier
+
+Un pointeur glisse ; un clavier n'a rien à glisser, il fait donc grandir la
+sélection. Le focus dans la grille, dans un calendrier
+[`selectable`](../../options/selectable/) :
+
+- **Entrée ou Espace sur un créneau** est un clic sur une date et sélectionne
+  aussi ce créneau, qui arrive alors à `onSelect`. (Un clic de souris ne
+  sélectionne pas ; le clavier n'ayant pas de glissement, c'est son « tap » qui
+  le fait.)
+- **Maj et les flèches** font grandir la sélection depuis l'endroit où Maj a
+  commencé. Chaque pas est annoncé à un lecteur d'écran (« Sélection :
+  mercredi 21 octobre, 09:00 à 10:00 »), avec le même pas et les mêmes heures
+  qu'au pointeur.
+- **Entrée** (ou Espace) donne la sélection à `onSelect`. Dans un mois, Entrée sur un jour
+  qui contient des événements entre dans ces événements — sauf si une sélection
+  est en cours.
+- **Une flèche sans Maj**, ou **Échap**, l'efface (`onUnselect` ; Échap
+  annonce « Sélection effacée »).
+
+Tout ce que fait le clavier dans le calendrier est dans
+[Clavier et accessibilité](../keyboard-accessibility/).
+
+## Un clic n'est pas une sélection
+
+Quatre gestes peuvent partir d'un temps libre, chacun avec son rappel :
+
+| La personne | Le calendrier appelle |
+|---|---|
+| Clique sur un jour ou un créneau libre | [`onDateClick`](../../options/on-date-click/) — `{ allDay, date, instant?, resourceId? }`, rien n'est dessiné |
+| Glisse sur du temps libre, ou tape sur un écran tactile | [`onSelect`](../../options/on-select/) — une plage, qui reste dessinée |
+| Clique sur un créneau libre que vous avez proposé avec [`availableSlots`](../../options/available-slots/) | [`onSlotClick`](../../options/on-slot-click/) — le créneau tel que vous l'avez donné |
+| Choisit « Nouvel événement à … » dans le menu contextuel | [`onCreateRequest`](../../options/on-create-request/) — `{ allDay, start, resourceId? }` |
+
+Un clic sur une date n'a pas besoin de `selectable`. Dans une grille horaire,
+son `instant` est le début du créneau cliqué, aligné sur `snapMinutes` : un
+clic à 10 h 37 dit 10 h 30. Sur un écran tactile, un tap fait les deux : un
+clic sur une date, puis une sélection d'un créneau.
+
+Un créneau libre est un bouton que vous avez dessiné exprès : quand
+`onSlotClick` est donné, un appui dessus est le sien — ni un clic sur une
+date, ni le début d'un glissement. Sans lui, les créneaux sont seulement
+montrés, et un appui dessus se comporte comme sur un temps libre.
+
+« Nouvel événement à … » (« Nouvel événement le … » dans un mois) est la
+manière de commencer un événement au clic droit, à l'appui long ou à la touche
+Menu. Donnez `onCreateRequest` et le menu la propose, alignée
+sur `snapMinutes`, sur un jour ou à un instant ; c'est un point, là où la
+sélection est une plage. Les deux peuvent ouvrir le même éditeur.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  availableSlots: [{ start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'), end: Temporal.ZonedDateTime.from('2026-10-21T14:30[Europe/Paris]') }],
+  onDateClick: (click) => console.log(click.allDay ? `jour ${click.date}` : `temps libre à ${click.instant.toString()}`),
+  onSlotClick: (slot) => console.log('réserver le créneau de', slot.start.toString()),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { Temporal } from '@dzcalendar/core';
+import type { AvailableSlot } from '@dzcalendar/core';
+import type { DateClick } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [availableSlots]="slots" (dateClick)="clicked($event)" (slotClick)="book($event)" />`,
+})
+export class Agenda {
+  readonly slots: AvailableSlot[] = [{ start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'), end: Temporal.ZonedDateTime.from('2026-10-21T14:30[Europe/Paris]') }];
+  clicked(click: DateClick): void {
+    console.log(click.allDay ? `jour ${click.date}` : `temps libre à ${click.instant.toString()}`);
+  }
+  book(slot: AvailableSlot): void {
+    console.log('réserver le créneau de', slot.start.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { Temporal } from '@dzcalendar/core';
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const SLOTS: AvailableSlot[] = [{ start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'), end: Temporal.ZonedDateTime.from('2026-10-21T14:30[Europe/Paris]') }];
+
+export function Agenda() {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      availableSlots={SLOTS}
+      onDateClick={(click) => console.log(click.allDay ? `jour ${click.date}` : `temps libre à ${click.instant.toString()}`)}
+      onSlotClick={(slot) => console.log('réserver le créneau de', slot.start.toString())}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { Temporal } from '@dzcalendar/core';
+import type { AvailableSlot } from '@dzcalendar/core';
+import type { DateClick } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const slots: AvailableSlot[] = [{ start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'), end: Temporal.ZonedDateTime.from('2026-10-21T14:30[Europe/Paris]') }];
+const clicked = (click: DateClick) => console.log(click.allDay ? `jour ${click.date}` : `temps libre à ${click.instant.toString()}`);
+const book = (slot: AvailableSlot) => console.log('réserver le créneau de', slot.start.toString());
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :available-slots="slots" @date-click="clicked" @slot-click="book" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+## Limites et refus
+
+Une sélection n'est **pas** tenue par [`rules`](../../options/rules/) ni par
+[`businessHours`](../../options/business-hours/). Ces réglages vérifient ce
+qu'une personne fait à un *événement* — le déplacer, le redimensionner, le
+déposer — et un geste refusé est signalé par
+[`onProposalRefused`](../../options/on-proposal-refused/). Sélectionner du
+temps ne déplace aucun événement : rien n'est donc refusé. Les heures de
+fermeture sont grisées dans la grille, et on peut tout de même les
+sélectionner.
+
+Quand une sélection doit respecter une limite, décidez dans `onSelect` et
+effacez-la. Celle-ci n'accepte qu'une plage d'une seule journée, dans les
+heures d'ouverture de `businessHours: true` (du lundi au vendredi, de 9 h à
+17 h) :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  selectable: true,
+  businessHours: true,
+  onSelect: ({ start, end }) => {
+    const open =
+      start instanceof Temporal.ZonedDateTime &&
+      end instanceof Temporal.ZonedDateTime &&
+      start.toPlainDate().equals(end.toPlainDate()) &&
+      start.dayOfWeek <= 5 &&
+      start.hour >= 9 &&
+      end.hour * 60 + end.minute <= 17 * 60;
+    if (open) return console.log(`réserver ${start.toString()} → ${end.toString()}`);
+    alert("Hors des heures d'ouverture");
+    calendar.select(null);
+  },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+Pour des réservations, le plus solide est de ne pas laisser sélectionner du
+tout, mais de proposer les créneaux libres avec
+[`availableSlots`](../../options/available-slots/) et d'écouter
+[`onSlotClick`](../../options/on-slot-click/) : seul ce que vous avez proposé
+peut être choisi, et votre serveur le revérifie avant d'enregistrer. Dans tous
+les cas, validez aussi côté serveur : une sélection n'est qu'une proposition.
+
+Un événement que la personne crée puis déplace est tenu par les règles comme
+les autres : voir [Glisser-déposer](../drag-and-drop/).
+
+## Montrer et effacer une sélection depuis le code
+
+`calendar.select(selection)` dessine une sélection comme si une personne
+l'avait faite, sans appeler `onSelect` — pour présélectionner un créneau d'une
+liste, ou marquer ce dont parle un formulaire. `calendar.select(null)` l'efface,
+sans appeler `onUnselect`. Donnez la même forme que celle d'`onSelect` :
+
+```ts
+import { Temporal } from '@dzcalendar/core';
+
+calendar.select({
+  allDay: false,
+  start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'),
+  end: Temporal.ZonedDateTime.from('2026-10-21T15:00[Europe/Paris]'),
+});
+```
+
+Une sélection appartient à la période où elle a été faite : aller à une autre
+semaine ou à une autre vue l'efface. Dans les frameworks, la liaison
+bidirectionnelle `selection` est la même poignée, en lecture et en écriture.
+
+## Dans chaque vue
+
+- **Un mois, ou toute grille de jours** : des jours entiers. Glisser du 21 au
+  23 donne `start` le 21 et `end` le 24, `allDay: true`.
+- **Une grille horaire** : des heures, alignées sur `snapMinutes`. Glisser vers
+  le haut ou le bas dans une journée donne une plage de cette journée ; glisser
+  dans la colonne d'un autre jour donne une seule plage, du premier appui au
+  dernier. Glisser jusque dans la rangée « toute la journée » en haut
+  sélectionne des jours entiers.
+- **Une vue de ressources** : la sélection porte le `resourceId` de la colonne
+  ou de la ligne où elle a commencé — la frise du Pro fonctionne de même le
+  long de son axe de temps, une ressource par ligne. Lisez-le pour savoir de
+  qui est le temps choisi.
+- **La liste et l'année** servent à lire, pas à sélectionner du temps.
+
+<LiveDemo
+  label="Un mois où l'on peut sélectionner des jours"
+  height={520}
+  options={{
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    selectable: true,
+    events: [
+      { id: 'd', title: 'Congrès', start: '2026-10-26', end: '2026-10-29', allDay: true, tone: 'violet' },
+    ],
+  }}
+/>
+
+## À travers un changement d'heure
+
+Une sélection est faite de créneaux de l'horloge murale, lus dans le passage
+sous le pointeur ; elle a donc la bonne durée un jour de 23 h, de 25 h ou de
+23 h 30. Son `start` et son `end` portent leur décalage : mesurez-la avec
+`start.until(end)` et vous obtenez le temps réel, pas la différence de deux
+lectures de l'horloge.
+
+Au changement d'heure, la grille de créneaux suit l'horloge murale. À Paris, à
+02:00 le dernier dimanche de mars, l'heure 02:00–03:00 n'existe pas : elle est
+dessinée comme une bande, un pointeur qui s'y trouve vaut 03:00, le premier
+instant qui la suit, et une sélection de 01:00 à 03:00 dure une heure. Le
+dernier dimanche d'octobre, 02:00–03:00 a lieu deux fois : la grille ne la dessine
+qu'une fois, un pointeur qui s'y trouve lit le premier passage, et une
+sélection qui la traverse contient les deux — de 01:00 à 03:00, elle dure
+trois heures, son `end` à `03:00+01:00`. Le clavier parcourt les deux
+passages ; l'`axis: 'elapsed'` de [`timeGrid`](../../options/time-grid/) les
+dessine l'un après l'autre.
+
+Lord Howe, au large de l'Australie, montre la demi-heure : le dimanche 4
+octobre 2026, ses horloges passent de 02:00 à 02:30. Avec un `snapMinutes` d'une
+heure, un tap à 02:40 sélectionne 02:30–03:00 avec `skipped: true` — le début du
+créneau, 02:00, n'existe pas, et la sélection contient toujours l'instant
+touché. Essayez de
+glisser à travers 02:00 ce dimanche-là :
+
+<LiveDemo
+  label="Lord Howe, dimanche 4 octobre 2026 : sélectionner à travers la demi-heure manquante"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-04',
+    locale: 'fr-FR',
+    timeZone: 'Australia/Lord_Howe',
+    scrollTime: 'PT0H',
+    selectable: true,
+    snapMinutes: 30,
+    timeGrid: { slotMinutes: 30 },
+    events: [
+      { id: 'a', title: 'Traversier', start: '2026-10-04T09:00[Australia/Lord_Howe]', duration: { hours: 1 } },
+    ],
+  }}
+/>
+
+La manière dont la grille dessine ces jours est dans
+[Fuseaux horaires](../time-zones/).
+
+## Voir aussi
+
+- [`selectable`](../../options/selectable/), [`onSelect`](../../options/on-select/), [`onUnselect`](../../options/on-unselect/) — les options.
+- [`onDateClick`](../../options/on-date-click/), [`onSlotClick`](../../options/on-slot-click/), [`onCreateRequest`](../../options/on-create-request/) — les autres façons de partir d'un temps libre.
+- [Clavier et accessibilité](../keyboard-accessibility/) — toutes les touches de la grille.
+- [Glisser-déposer](../drag-and-drop/) — déplacer et redimensionner les événements, et les règles qui les refusent.
+- [Vues](../views/) — les grilles où se fait une sélection.

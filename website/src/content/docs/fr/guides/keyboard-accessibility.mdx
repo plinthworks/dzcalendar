@@ -1,0 +1,500 @@
+---
+title: "Clavier et accessibilité"
+description: "Chaque geste au clavier, ce qu'entend un lecteur d'écran, le focus, le mouvement et les contrastes, l'état WCAG 2.2, et ce qui reste à votre application."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Tout ce que la souris sait faire dans le calendrier, le clavier le sait aussi :
+se déplacer, sélectionner, ouvrir, déplacer et redimensionner un événement,
+supprimer, annuler. Un lecteur d'écran est prévenu de là où va le focus et de
+ce que chaque pas a fait. Ce guide dresse la liste des touches, dit ce qui est
+annoncé et comment le traduire, et finit par la part qui reste à votre
+application.
+
+## Arriver dans le calendrier
+
+La grille n'est qu'**un seul arrêt de tabulation**, pas un par jour. Dans
+un mois, c'est la cellule du curseur (aujourd'hui quand il est affiché) ; dans
+une semaine ou un jour, c'est un curseur posé sur les heures, plus un arrêt par
+événement, car les événements sont des boutons ; dans une liste, c'est l'une
+des entrées. Les flèches déplacent ensuite le curseur de jour en jour ou de
+créneau en créneau, comme dans la grille de dates d'ARIA. Le curseur attend en
+haut des heures affichées ; quand il reçoit le focus, il se pose sur
+maintenant si aujourd'hui est affiché et maintenant dans les heures visibles,
+sinon sur le premier créneau visible. Les boutons de la barre d'outils passent avant la
+grille, dans l'ordre de la page.
+
+Le clavier ne change rien que la souris ne changerait pas : le focus ne
+change jamais de vue de lui-même, et franchir le dernier jour affiché fait changer
+de période, ce qui est le but de la touche. Les jours de 23 ou 25 heures se
+parcourent en temps écoulé : le dimanche de 25 heures, le curseur visite les
+deux 02:00, distingués par leur décalage, et celui de 23 heures passe de 01:45
+à 03:00.
+
+## Les touches, endroit par endroit
+
+Ce que fait une touche dépend d'où se trouve le focus. De droite à gauche, ←
+et → s'échangent : le jour suivant est à gauche. Lisez Cmd pour Ctrl sur Mac.
+
+### Sur la grille (le curseur)
+
+| Touche | Effet |
+|---|---|
+| ← → | Le jour précédent ou suivant. |
+| ↑ ↓ | Le créneau précédent ou suivant (une semaine avant ou après dans un mois). Depuis le premier créneau d'un jour, ↑ monte à sa ligne « journée ». |
+| Début, Fin | La première ou la dernière place de la ligne : la semaine, les heures du jour. |
+| Page précédente, Page suivante | La période précédente ou suivante, le curseur décalé d'autant (une semaine dans une semaine, un mois dans un mois). |
+| Maj + flèches, Maj + Début ou Fin | Sélectionne en déplaçant le curseur, si le calendrier est [`selectable`](../../options/selectable/). |
+| Entrée | Dans un mois, sur un jour qui contient des événements, y entre (tous, y compris ceux cachés derrière « +N »). Ailleurs, comme Espace. Pendant une sélection, la remet à votre application. |
+| Espace | Un clic sur la date ; avec `selectable`, il sélectionne aussi le créneau, ce qu'`onSelect` reçoit. |
+| Alt + ← →, vues de ressources | La ressource précédente ou suivante, même jour et même heure. Les flèches seules restent dans les jours d'une ressource. Dans une frise (timeline), ← → avancent dans le temps et ↑ ↓ passent d'une ressource à l'autre. |
+| Échap | Efface la sélection. |
+| Touche Menu, Maj + F10 | Le [menu contextuel](../../options/context-menu/) du créneau ou du jour. |
+
+### Sur un événement
+
+| Touche | Effet |
+|---|---|
+| ← → ↑ ↓ | L'événement précédent ou suivant du même jour (de toute la ligne « journée », dans une semaine). |
+| Entrée, Espace | L'ouvre : `onEventClick`, sinon [`onEventOpen`](../../options/on-event-open/). |
+| M, Alt + Entrée | Le saisit, pour le déplacer (voir plus bas). Demande [`editable`](../../options/editable/) et un événement qu'on peut déplacer ou redimensionner. |
+| Suppr, Retour arrière | Le supprime. Un événement récurrent demande jusqu'où ([`chooseScope`](../../options/choose-scope/)) ; la suppression est annoncée, avec la touche qui l'annule. |
+| Échap | Retour au jour, sur le curseur. |
+| Touche Menu, Maj + F10 | Le menu contextuel de l'événement : Ouvrir (avec `onEventOpen`) ; Déplacer…, Changer la durée… et Supprimer (s'il peut être modifié) ; puis vos propres entrées. |
+
+### Tenir un événement
+
+M ou Alt+Entrée sur un événement, c'est le glisser du clavier. Chaque touche
+fait le pas qu'un pointeur ferait et passe par les mêmes contrôles : une place
+que [`rules`](../../options/rules/) refuse est annoncée, avec sa raison, et
+Entrée n'y pose rien : l'événement revient à sa place. Ouvert depuis le menu, « Changer la
+durée… » tient l'événement de la même façon, mais les flèches seules tirent
+alors sa fin.
+
+| Touche | Effet |
+|---|---|
+| ← → ↑ ↓ | Le déplace d'un jour ou d'un créneau (d'une semaine dans un mois). |
+| Page précédente, Page suivante | Une semaine avant ou après. |
+| Maj + flèches | Tire sa fin. |
+| Alt + Maj + flèches | Tire son début, avec [`eventResizableFromStart`](../../options/event-resizable-from-start/). |
+| Alt + ← →, vues de ressources | Dans la ressource précédente ou suivante. |
+| Entrée, Espace | Le pose : refus annoncé (et il revient), portée pour une série, lecture d'une heure répétée, historique, annonce. |
+| Échap | Le lâche ; rien n'a changé. |
+| Tab | Le lâche, et le focus passe à la suite. |
+
+Tant qu'un événement est tenu, Ctrl+Z est sans effet et Alt+flèche n'atteint
+pas l'historique du navigateur. Un clic sur le temps du calendrier y pose
+l'événement tenu, comme un glisser le ferait : avec « Déplacer… » dans le menu,
+déplacer ne demande aucun glisser ([glisser-déposer](../drag-and-drop/)).
+
+### Menus, panneau « +N », liste
+
+| Où | Touches |
+|---|---|
+| Menu contextuel | ↑ ↓ et Début, Fin parcourent les entrées ; taper une lettre saute à l'entrée qui commence par elle ; Entrée ou Espace l'exécute ; la flèche vers le sous-menu (→, ← de droite à gauche) l'ouvre, l'autre ou Échap le ferme ; Échap ferme le menu et rend le focus ; Tab le ferme. |
+| Panneau « +N » | Tab tourne à l'intérieur du panneau ; Entrée ou Espace sur un événement appelle `onEventClick` ; la touche Menu ouvre son menu ; Échap ferme le panneau, le focus revient sur « +N ». |
+| Vues en liste | ↑ ↓ l'entrée précédente ou suivante ; Début, Fin la première ou la dernière ; Page précédente, Page suivante le jour précédent ou suivant qui a des entrées ; Entrée ou Espace ouvre ; Suppr ou Retour arrière supprime. |
+
+### Partout dans un calendrier modifiable
+
+Ctrl/Cmd+Z annule le dernier changement ; Ctrl/Cmd+Maj+Z ou Ctrl+Y le rétablit.
+Chacun est annoncé (« Annulé », « Rétabli »). Ils marchent où que soit le focus
+dans le calendrier, mais pas dans un champ que vous y avez placé, ni dans un
+menu, ni pendant qu'un événement est tenu.
+[`keyboardUndo: false`](../../options/keyboard-undo/) les laisse à votre
+application ; `calendar.undo()` et `calendar.redo()` fonctionnent dans les deux
+cas.
+
+## Activer les touches
+
+Le curseur, les flèches et l'ouverture marchent dans tout calendrier.
+Déplacer, redimensionner et supprimer demandent [`editable`](../../options/editable/) ;
+sélectionner demande [`selectable`](../../options/selectable/) ; ce que
+« ouvrir » et « nouvel événement » font, c'est à vous de le dire, avec
+`onEventOpen` et `onCreateRequest`. Un événement qui dit lui-même
+`editable: true` se déplace et se supprime dans un calendrier qui ne l'est pas.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  selectable: true,
+  onEventOpen: (instance) => console.log('ouvrir', instance.event.id),
+  onSelect: ({ start, end }) => console.log('réserver', start.toString(), end.toString()),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventInstance } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [selectable]="true" (eventOpen)="open($event)" />`,
+})
+export class Agenda {
+  open(instance: EventInstance): void {
+    console.log('ouvrir', instance.event.id);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable selectable onEventOpen={(instance) => console.log('ouvrir', instance.event.id)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventInstance } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const open = (instance: EventInstance) => console.log('ouvrir', instance.event.id);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable selectable @event-open="open" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Essayez les touches sur cette semaine : Tab jusque dans la grille, déplacez-vous
+aux flèches, Maj+↓ pour sélectionner, puis Tab jusqu'à un événement, M, les
+flèches, Entrée ; Suppr, puis Ctrl+Z.
+
+<LiveDemo
+  label="Une semaine pour essayer le clavier"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    editable: true,
+    selectable: true,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Déjeuner d’équipe', start: '2026-10-21T12:30[Europe/Paris]', duration: { hours: 1 } },
+      { id: 'c', title: 'Jour de congé', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## Des touches qui sont à vous
+
+Le calendrier ne prend les touches des tableaux que quand le focus est sur
+son curseur, sur un événement, dans un menu ou dans le panneau « +N », plus
+Ctrl/Cmd+Z partout en lui sauf dans un champ. Dans une semaine, un jour ou un
+mois comme dans une liste ou le panneau « +N », un lien, un bouton ou un champ
+que vous placez dans un événement garde ses touches — la touche Menu et Maj+F10
+aussi, qui ouvrent alors le menu du navigateur, pas celui de l'événement. Le
+reste de la page est à vous. Si votre
+application a sa propre annulation pour toute la page, donnez-lui Ctrl+Z en
+désactivant [`keyboardUndo`](../../options/keyboard-undo/) :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', editable: true, keyboardUndo: false });
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') calendar.undo();
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [options]="{ keyboardUndo: false }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable keyboardUndo={false} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :options="{ keyboardUndo: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+La touche `M` n'agit que lorsqu'un événement a le focus, et ne se remappe pas
+encore.
+
+## Ce qu'entend un lecteur d'écran
+
+**Rôles et noms.** Un mois est une `grid` de `row`, avec des `columnheader` et
+des `gridcell`. Chaque cellule est nommée par sa date et son nombre
+d'événements (« mercredi 21 octobre 2026, 2 événements ») et contient un
+bouton par événement du jour, y compris ceux cachés derrière « +N » (les barres
+dessinées sont de la présentation, leur anneau de focus est reflété) ; la
+cellule d'aujourd'hui porte `aria-current="date"`. Une semaine ou un jour est
+fait de `group` nommés par leur date (celui d'aujourd'hui avec `aria-current="date"`), et par leur vraie durée un jour de 23 ou
+25 heures. Les événements sont des boutons nommés « titre, heure » ; une heure
+répétée ou sautée est une `note` (« 02:00–03:00 n'existe pas »). Dans une
+semaine, « +N » est un bouton nommé « 3 autres événements, mercredi 21
+octobre, 09:00 » ; dans un mois, il est caché aux lecteurs d'écran, puisque le
+jour liste déjà ses événements. Le menu contextuel est un `menu` de `menuitem`
+nommé « Actions », le panneau un `dialog` titré par sa date, le sélecteur de
+vue un groupe de boutons à `aria-pressed`, et le titre de la barre d'outils
+est un titre de section qui est aussi une zone live polie.
+
+**Le curseur.** Chaque pas déplace le focus (le curseur d'une semaine est un
+nouveau nœud à chaque fois) : le pas est donc lu comme un changement de focus,
+« mercredi 21 octobre, 09:00 ». Dans une vue de ressources, la phrase commence
+par la ressource.
+
+**La zone live.** Une zone `role="status"` polie dit ce qu'aucun focus ne porte :
+
+| Quand | Dit (en français) | Message |
+|---|---|---|
+| Un événement est saisi | « Consultation » saisi. Flèches pour le déplacer, Page précédente et suivante d'une semaine… | `grabbed`, `grabHelp`, `grabHelpResize`, `grabHelpStart` |
+| Chaque pas d'un événement tenu | La nouvelle place, « mercredi 21 octobre, 10:00 à 10:45 », avec « Il devient un événement sur la journée » ou « Cette heure n'existe pas aujourd'hui ; l'événement commence à sa fin » le cas échéant | `range`, `becomesAllDay`, `becomesTimed`, `skippedHour` |
+| Un événement tenu est posé | « Consultation » déplacé à 10:00 ; « Consultation » finit maintenant à 11:00 | `eventMoved`, `eventResized`, `eventResizedStart`, `movedIntoGap` |
+| Une place est refusée | « Impossible ici », ou avec les raisons : « Impossible ici : chevauche un autre événement » | `dropRefused`, `dropRefusedFor`, `violation` |
+| Une action est refusée (une suppression, une entrée du menu, un passage à un autre calendrier) | « Action refusée » | `commandRefused` |
+| Un pas qui ne mène nulle part | « Impossible d'aller plus loin » | `noFurther` |
+| Une sélection grandit ou disparaît | « Sélection : mercredi 21 octobre, 09:00 à 10:00 » ; « Sélection effacée » | `selected`, `selectionCleared` |
+| Une touche est refusée | « Cet événement ne peut pas être modifié » ; « …déplacé » ; « Cette durée ne peut pas être changée ici » | `notEditable`, `cannotMove`, `cannotResize` |
+| Une suppression, un annuler | « Consultation » supprimé. Ctrl+Z pour annuler. ; « Annulé » ; « Rétabli » | `eventDeleted`, `undone`, `redone` |
+| Un événement tenu est lâché | « Déplacement annulé » | `grabCancelled` |
+| Une source échoue | « Consultation » n'a pas pu être enregistré. Il est revenu comme avant. ; « Des événements n'ont pas pu être chargés. » | `saveFailed`, `loadFailed` |
+
+Un clic « nu » du lecteur d'écran (VoiceOver, NVDA en mode navigation,
+TalkBack) fait sur le curseur ce que fait Espace, et sur un événement ce que
+fait Entrée.
+
+## Le dire dans votre langue
+
+Toutes ces phrases, et les noms ci-dessus, sont des
+[`messages`](../../options/messages/), dans la
+[`locale`](../../options/locale/) du calendrier : l'anglais et le français sont
+intégrés, l'arabe, l'espagnol et l'allemand s'importent chacun à part, et
+`defineLocale` enregistre une langue à vous ([langues](../languages/)). Ne
+donnez que les mots que vous changez :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  messages: { notEditable: 'Ce rendez-vous est verrouillé', noFurther: 'Fin de la journée' },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [messages]="{ notEditable: 'Ce rendez-vous est verrouillé' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" editable messages={{ notEditable: 'Ce rendez-vous est verrouillé' }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" editable :messages="{ notEditable: 'Ce rendez-vous est verrouillé' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Les mots qui portent un nom ou un nombre sont des fonctions
+(`eventDeleted({ title, undo })`, `selected({ span })`). Les dates et les
+heures à l'intérieur des phrases sont écrites par la plateforme, dans la
+locale. Les titres d'événements sont les vôtres : mettez-les dans la bonne
+langue, et renseignez le `lang` de la page, que le calendrier ne pose pas.
+
+## Le focus
+
+Le focus itinérant est celui du curseur : une cellule ou un curseur porte
+`tabindex="0"`, les autres `-1`, et les flèches le déplacent ; un mois ne fait
+donc pas soixante arrêts, et une liste se parcourt de même sur ses entrées.
+Les événements font exception, chacun étant un arrêt
+à part dans une grille horaire ; dans un mois, ils sont rangés derrière leur
+jour, qu'on atteint avec Entrée.
+
+Le focus est rendu là d'où il venait : après la fermeture d'un menu ou du
+panneau « +N », après qu'un événement tenu est posé (sur l'événement, là où il
+est maintenant), après une suppression (sur le jour ; dans une liste, sur
+l'entrée suivante), et après qu'un annuler a
+emporté l'événement focalisé (sur l'événement là où il est maintenant, sinon
+sur le curseur). La grille horaire fait défiler le curseur et le bord d'un
+événement tenu jusqu'à l'écran, et la liste garde une ligne focalisée hors de
+dessous ses en-têtes collants.
+
+Tout élément focalisable montre son focus : un anneau de 2 px à la couleur
+d'accent, ou un fond surligné pour une entrée de menu.
+
+## Mouvement, contraste, couleurs forcées
+
+[`motion`](../../options/motion/) est par défaut l'API Web Animations, brève,
+sur la seule transformation et l'opacité, et **rien du tout** quand le système
+demande moins de mouvement (`prefers-reduced-motion: reduce`) — même si cela
+change pendant que la page est ouverte. L'adaptateur GSAP optionnel obéit à la
+même règle. Rien ne clignote, et la ligne « maintenant » avance une fois par
+minute. Pour retirer le mouvement à tout le monde :
+
+```ts
+import { createCalendar, NO_MOTION } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', motion: NO_MOTION });
+```
+
+Le thème par défaut mesure au moins 4,5:1 pour le texte d'événement sur sa
+teinte, dans les sept familles, en clair et en sombre ; la couleur n'est jamais
+le seul signal (une place refusée est rouge et annoncée ; aujourd'hui est
+rempli et marqué `aria-current`). En `forced-colors`, les anneaux de focus, les
+événements, aujourd'hui et la vue pressée sont dessinés avec les couleurs du
+système. Les couleurs que vous posez vous-même (`--tz-*`, `--dz-*`, la couleur
+d'un événement) sont de votre responsabilité : voyez [les thèmes](../theming/)
+et [`theme`](../../options/theme/). Les tailles de texte sont en `rem` et
+suivent celle de la page ; rien ne défile en travers à 320 px, sauf les grilles
+d'heures elles-mêmes, pour lesquelles `timeGridDay` ou `listWeek` se lisent
+mieux sur un téléphone.
+
+## Ce que fait votre application
+
+- **Vos propres commandes.** Un bouton ajouté à la barre d'outils, un champ
+  d'éditeur ou un contenu mis dans un événement, c'est à vous de les nommer
+  (`aria-label`, un nom visible par lequel commence le nom accessible) et de
+  les faire d'au moins 24 px.
+- **Vos propres refus.** Le calendrier annonce qu'un geste est refusé quand il
+  le refuse. Quand c'est votre serveur qui le refuse ensuite, `change.revert()`
+  remet l'événement en silence, et le calendrier n'a pas de méthode pour
+  prononcer vos phrases : dites-le dans une zone d'état à vous. (L'échec
+  d'une sauvegarde par une source d'événements, lui, est annoncé par le
+  calendrier.)
+- **Un moyen d'ouvrir et de créer.** Entrée sur un événement appelle
+  `onEventClick`, sinon `onEventOpen` ; Espace sur un créneau appelle `onDateClick`, et `onSelect`
+  avec `selectable`. Ce qu'ils ouvrent est votre page, avec le focus géré chez
+  vous et rendu à l'événement à la fermeture.
+- **La page.** Son `lang` et son titre sont ceux de la page, pas du calendrier.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const status = document.querySelector<HTMLElement>('#status')!; // <p id="status" role="status"></p>
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventChange: async (change) => {
+    const res = await fetch(`/api/events/${change.after?.id}`, { method: 'PUT', body: JSON.stringify(change.after) });
+    if (res.ok) return;
+    change.revert();
+    status.textContent = `${change.after?.title ?? 'L’événement'} n’a pas pu être enregistré. Il est revenu comme avant.`;
+  },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+## Conformité
+
+Le calendrier est vérifié contre WCAG 2.2, niveaux A et AA, avec axe-core dans
+Chrome sur chaque vue, une matrice de thèmes et de modes clair/sombre et les
+couleurs forcées, et par des scénarios clavier pour chaque opération. Deux
+critères ne sont remplis qu'en partie (le curseur et les événements
+n'exposent pas encore leurs raccourcis avant usage, et une place refusée est
+expliquée mais aucune autre n'est suggérée), et la taille des cibles
+d'événements suit leur durée, comme l'exception du critère le permet. Les
+séances avec NVDA, JAWS, VoiceOver et TalkBack, et un audit par des
+utilisateurs, restent à faire : le rapport est donc encore un brouillon. Le
+tableau complet, critère par
+critère, est le [rapport de
+conformité](https://github.com/plinthworks/dzcalendar/blob/main/site/a11y-conformance.md)
+(en anglais).
+
+## Voir aussi
+
+- [`editable`](../../options/editable/), [`selectable`](../../options/selectable/) et [`contextMenu`](../../options/context-menu/) — ce que les touches peuvent faire.
+- [`keyboardUndo`](../../options/keyboard-undo/) et [`chooseScope`](../../options/choose-scope/).
+- [`messages`](../../options/messages/) et [`motion`](../../options/motion/).
+- [Glisser-déposer](../drag-and-drop/) — les mêmes gestes au pointeur.
+- [Sélection](../selection/) — sélectionner au clavier, à la souris et au doigt.
+- [Langues](../languages/) — les mots qu'entend un lecteur d'écran.

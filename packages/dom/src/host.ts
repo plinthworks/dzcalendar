@@ -191,8 +191,8 @@ export interface ViewCtx {
   chooseScope(info: ScopeRequest, at: { x: number; y: number }): Promise<EditScope | null>;
   /** A drop in a repeated hour: which of the two readings (a menu at the drop point). */
   chooseReading(p: Proposal, at: { x: number; y: number }): Promise<Proposal | null>;
-  /** A gesture's command was refused by the calendar. */
-  refused(result: CommandResult, command: Command): void;
+  /** A command was refused by the calendar. `placed`: the refusal of a place (a drop, a resize, its scope), said "Not allowed here"; else an action (a delete, a menu entry, a hand-over). */
+  refused(result: CommandResult, command: Command, placed?: boolean): void;
   /** Lists a day's events (`nodes`, drawn by the view) in the panel behind a "+N" link; `onClose` runs when it closes. */
   /** `about`: the day (and resource) the panel is for — what `hooks.morePopover` is told. */
   openMore(anchor: HTMLElement, title: string, nodes: Node[], onClose?: () => void, about?: { readonly date: PlainDate; readonly resource: Resource | null }): void;

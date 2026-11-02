@@ -4,7 +4,7 @@ import { buildListModel } from '@dzcalendar/core/views';
 import type { ListDay, ListEntry, ListModel } from '@dzcalendar/core/views';
 import { KeyedList, NodePool, altDate, RowWindow, onScrollFrame, applyEventLook, attachMenuTriggers, dayStates, drawNow, mayDelete, decorate, ensureStyles, written, fillEvent, formatMinutes, h, holder, registerView, startReadingOf, timeLabels, undecorateAll, unmountEvent } from '@dzcalendar/dom/toolkit';
 import type { ViewController, ViewCtx } from '@dzcalendar/dom/toolkit';
-import { activeIn } from '../focus.js';
+import { activeIn, inAppControl } from '../focus.js';
 
 /** Layout only; the look comes with the CSS pass. */
 export const LIST_CSS = `
@@ -466,7 +466,8 @@ export function createListView(ctx: ViewCtx): ViewController {
   ctx.scope.on(root, 'keydown', (e) => {
     const ke = e as KeyboardEvent;
     const hit = instanceOf(ke.target as Element);
-    if (!hit || ke.altKey || ke.ctrlKey || ke.metaKey || !model) return;
+    // A field or a link the application put in the row keeps its keys (Backspace, Space, the arrows).
+    if (!hit || ke.altKey || ke.ctrlKey || ke.metaKey || !model || inAppControl(ke.target as Element)) return;
     // Over the period's entries, mounted or not.
     const at = order.indexOf(hit.el.dataset['segment'] ?? '');
     const dayStart = (dir: 1 | -1) => {

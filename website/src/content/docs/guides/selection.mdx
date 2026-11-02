@@ -1,0 +1,477 @@
+---
+title: "Selection"
+description: "Let a person select a stretch of days or hours with the pointer, a finger or the keyboard, turn it into an event, and tell a selection from a click."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+A selection is a stretch of empty time that a person marks out — to book it,
+to block it, to start an event from it. The calendar draws it and tells you
+what it covers; it creates nothing. What the selection becomes is your
+decision. This guide covers making one, using it, and telling it from a click.
+
+## Let a person select
+
+Turn it on with [`selectable`](../../options/selectable/). Nothing else is
+needed:
+
+- **With a mouse or a pen**, press on empty time and drag. In a time grid that
+  selects hours, in a month whole days. A plain click is not a selection: it
+  is a date click, described below. A press on an event is about the event (its
+  click, its drag), never the time behind it.
+- **With a finger**, a tap on empty time selects one slot, with a handle at
+  each end to stretch it. A finger that moves from empty space scrolls the
+  page, as it should: the handles are how a touch screen extends a selection.
+- **With the keyboard**, a section of its own comes further down.
+
+Hours snap to a step, [`snapMinutes`](../../options/snap-minutes/) (15 by
+default), the same one that drags, resizes and the arrow keys use. Days in a
+month are whole days whatever it says.
+
+Try it: drag across empty hours; click on empty time to clear it.
+
+<LiveDemo
+  label="A week where empty time can be selected, in half hours"
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'en-GB',
+    selectable: true,
+    snapMinutes: 30,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## Turn a selection into an event
+
+When a person finishes a selection, [`onSelect`](../../options/on-select/)
+receives it: `{ start, end, allDay, resourceId? }`. A timed selection has
+`ZonedDateTime`s in the calendar's zone; an all-day one has dates, the `end`
+being the day **after** the last one — the same convention as an all-day
+event, so the selection can be handed to `event.create` as it is.
+
+The selection stays drawn while you ask what to do with it. Clear it when you
+are done: in plain JavaScript `calendar.select(null)`; in Angular, React and
+Vue by setting the two-way `selection` to `null`, from `onSelect` itself if
+you like.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  selectable: true,
+  snapMinutes: 30,
+  onSelect: (selection) => {
+    const title = prompt('Title?');
+    if (title) {
+      calendar.run({
+        type: 'event.create',
+        event: { title, start: selection.start, end: selection.end, allDay: selection.allDay },
+      });
+    }
+    calendar.select(null);
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal, viewChild } from '@angular/core';
+import type { Selection } from '@dzcalendar/core';
+import { DZ_CALENDAR, DzCalendar } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar
+      timeZone="Europe/Paris"
+      [selectable]="true"
+      [options]="{ snapMinutes: 30 }"
+      [(selection)]="selection"
+      (selected)="book($event)" />`,
+})
+export class Agenda {
+  private readonly cal = viewChild.required(DzCalendar);
+  readonly selection = signal<Selection | null>(null);
+
+  book(selection: Selection): void {
+    const title = prompt('Title?');
+    if (title) {
+      this.cal().controller.dispatch({
+        type: 'event.create',
+        event: { title, start: selection.start, end: selection.end, allDay: selection.allDay },
+      });
+    }
+    this.selection.set(null);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+
+export function Agenda() {
+  const cal = useCalendarController();
+  const [selection, setSelection] = useState<Selection | null>(null);
+
+  const book = (s: Selection) => {
+    const title = prompt('Title?');
+    if (title) {
+      cal.dispatch({ type: 'event.create', event: { title, start: s.start, end: s.end, allDay: s.allDay } });
+    }
+    setSelection(null);
+  };
+
+  return (
+    <DzCalendar controller={cal} timeZone="Europe/Paris" selectable snapMinutes={30}
+      selection={selection} onSelectionChange={setSelection} onSelect={book} />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { shallowRef } from 'vue';
+import type { Selection } from '@dzcalendar/core';
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+
+const cal = createCalendarController();
+const selection = shallowRef<Selection | null>(null);
+
+function book(s: Selection) {
+  const title = prompt('Title?');
+  if (title) {
+    cal.dispatch({
+      type: 'event.create',
+      event: { title, start: s.start, end: s.end, allDay: s.allDay },
+    });
+  }
+  selection.value = null;
+}
+</script>
+
+<template>
+  <DzCalendar
+    :controller="cal"
+    time-zone="Europe/Paris"
+    selectable
+    :options="{ snapMinutes: 30 }"
+    v-model:selection="selection"
+    @selected="book"
+  />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Two details worth knowing:
+
+- **`onSelect` hears a person, not your code.** A selection you show with
+  `calendar.select(selection)` is drawn, and not said back.
+- **`onUnselect` hears the selection go by itself**: a click on empty time in
+  the calendar or a press anywhere outside it, Escape, a move to another period or view, a new
+  drag. It does not hear you clear it. A form of yours beside the calendar keeps the
+  selection while it is filled in when it carries `data-dz-keep-selection`. Use it to close a form that was open for the selection —
+  see [`onUnselect`](../../options/on-unselect/); the two-way `selection` of
+  the frameworks becomes `null` in the same cases.
+
+## Select with the keyboard
+
+A pointer drags; a keyboard has nothing to drag, so it grows a selection
+instead. With the focus in the grid and a [`selectable`](../../options/selectable/)
+calendar:
+
+- **Enter or Space on a slot** is a date click and also selects that one slot,
+  which then reaches `onSelect`. (A mouse click does not select; the keyboard
+  has no drag, so its "tap" does.)
+- **Shift and the arrows** grow the selection from where Shift started. Each
+  step is said to a screen reader ("Selected: Wednesday 21 October, 09:00 to
+  10:00"), and the same snap and the same hours apply as for a pointer.
+- **Enter** (or Space) gives the selection to `onSelect`. In a month, Enter on a day that
+  holds events goes into them instead — unless a selection is being made.
+- **An arrow without Shift**, or **Escape**, clears it (`onUnselect`; Escape
+  says "Selection cleared").
+
+Everything the keyboard does in the calendar is in
+[Keyboard and accessibility](../keyboard-accessibility/).
+
+## A click is not a selection
+
+Four things can start from empty time, and each has its own callback:
+
+| The person | The calendar calls |
+|---|---|
+| Clicks a day or an empty slot | [`onDateClick`](../../options/on-date-click/) — `{ allDay, date, instant?, resourceId? }`, nothing drawn |
+| Drags across empty time, or taps on a touch screen | [`onSelect`](../../options/on-select/) — a range, left drawn |
+| Clicks a free slot you offered with [`availableSlots`](../../options/available-slots/) | [`onSlotClick`](../../options/on-slot-click/) — the slot as you gave it |
+| Chooses "New event at …" in the context menu | [`onCreateRequest`](../../options/on-create-request/) — `{ allDay, start, resourceId? }` |
+
+A date click needs no `selectable`. In a time grid its `instant` is the start
+of the slot clicked, on `snapMinutes`: a click at 10:37 says 10:30. On a touch
+screen a tap is both: a date click, then a one-slot selection.
+
+A free slot is a button you drew on purpose, so when `onSlotClick` is given a
+press on it is the slot's — not a date click, not the start of a drag. Without
+it, slots are only shown, and a press on one behaves as on empty time.
+
+"New event at …" ("New all-day event on …" in a month) is the right-click,
+long-press or Menu-key way of starting an event. Give `onCreateRequest` and the
+menu offers it, snapped to `snapMinutes`, on a
+day or at a moment; it is a point, where a selection is a range. Both can open
+the same editor.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  availableSlots: [{ start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'), end: Temporal.ZonedDateTime.from('2026-10-21T14:30[Europe/Paris]') }],
+  onDateClick: (click) => console.log(click.allDay ? `day ${click.date}` : `empty time at ${click.instant.toString()}`),
+  onSlotClick: (slot) => console.log('book the slot of', slot.start.toString()),
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { Temporal } from '@dzcalendar/core';
+import type { AvailableSlot } from '@dzcalendar/core';
+import type { DateClick } from '@dzcalendar/dom';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [availableSlots]="slots" (dateClick)="clicked($event)" (slotClick)="book($event)" />`,
+})
+export class Agenda {
+  readonly slots: AvailableSlot[] = [{ start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'), end: Temporal.ZonedDateTime.from('2026-10-21T14:30[Europe/Paris]') }];
+  clicked(click: DateClick): void {
+    console.log(click.allDay ? `day ${click.date}` : `empty time at ${click.instant.toString()}`);
+  }
+  book(slot: AvailableSlot): void {
+    console.log('book the slot of', slot.start.toString());
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { Temporal } from '@dzcalendar/core';
+import type { AvailableSlot } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const SLOTS: AvailableSlot[] = [{ start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'), end: Temporal.ZonedDateTime.from('2026-10-21T14:30[Europe/Paris]') }];
+
+export function Agenda() {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      availableSlots={SLOTS}
+      onDateClick={(click) => console.log(click.allDay ? `day ${click.date}` : `empty time at ${click.instant.toString()}`)}
+      onSlotClick={(slot) => console.log('book the slot of', slot.start.toString())}
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { Temporal } from '@dzcalendar/core';
+import type { AvailableSlot } from '@dzcalendar/core';
+import type { DateClick } from '@dzcalendar/dom';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const slots: AvailableSlot[] = [{ start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'), end: Temporal.ZonedDateTime.from('2026-10-21T14:30[Europe/Paris]') }];
+const clicked = (click: DateClick) => console.log(click.allDay ? `day ${click.date}` : `empty time at ${click.instant.toString()}`);
+const book = (slot: AvailableSlot) => console.log('book the slot of', slot.start.toString());
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :available-slots="slots" @date-click="clicked" @slot-click="book" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+## Limits and refusals
+
+A selection is **not** held to [`rules`](../../options/rules/) or to
+[`businessHours`](../../options/business-hours/). Those check what a person
+does to an *event* — move it, resize it, drop it — and a refused gesture is
+said by [`onProposalRefused`](../../options/on-proposal-refused/). Selecting
+time moves no event, so nothing is refused: the closed hours are shaded in the
+grid, and a person can still select them.
+
+When a selection must respect a limit, decide in `onSelect` and clear it. This
+one accepts only a single day's stretch inside the weekday opening hours of
+`businessHours: true` (Monday to Friday, 09:00 to 17:00):
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  selectable: true,
+  businessHours: true,
+  onSelect: ({ start, end }) => {
+    const open =
+      start instanceof Temporal.ZonedDateTime &&
+      end instanceof Temporal.ZonedDateTime &&
+      start.toPlainDate().equals(end.toPlainDate()) &&
+      start.dayOfWeek <= 5 &&
+      start.hour >= 9 &&
+      end.hour * 60 + end.minute <= 17 * 60;
+    if (open) return console.log(`book ${start.toString()} → ${end.toString()}`);
+    alert('Outside opening hours');
+    calendar.select(null);
+  },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+For bookings, the sturdier way is not to let a person select at all, but to
+offer the free slots with [`availableSlots`](../../options/available-slots/)
+and hear [`onSlotClick`](../../options/on-slot-click/): only what you offered
+can be chosen, and your server checks it again before saving. Whatever the
+way, validate on the server too: a selection is only a proposal.
+
+An event the person then creates and drags is held to the rules like any
+other: see [Drag and drop](../drag-and-drop/).
+
+## Show and clear a selection from code
+
+`calendar.select(selection)` draws a selection as if a person had made it,
+without calling `onSelect` — to preselect a slot from a list, or to mark what
+a form is about. `calendar.select(null)` clears it, without calling
+`onUnselect`. Pass the same shape `onSelect` gives:
+
+```ts
+import { Temporal } from '@dzcalendar/core';
+
+calendar.select({
+  allDay: false,
+  start: Temporal.ZonedDateTime.from('2026-10-21T14:00[Europe/Paris]'),
+  end: Temporal.ZonedDateTime.from('2026-10-21T15:00[Europe/Paris]'),
+});
+```
+
+A selection belongs to the period it was made in: going to another week or
+view clears it. In the frameworks, the two-way `selection` is the same handle,
+read and written.
+
+## In each view
+
+- **A month, or any grid of days**: whole days. Dragging from the 21st to the
+  23rd gives `start` the 21st and `end` the 24th, `allDay: true`.
+- **A time grid**: hours, snapped to `snapMinutes`. Dragging up or down inside
+  a day gives a stretch of that day; dragging into another day's column gives
+  one stretch of time from the first press to the last. Dragging into the
+  all-day row at the top selects whole days instead.
+- **A resource view**: the selection carries the `resourceId` of the column or
+  row where it started — the Pro's timeline works the same way along its time
+  axis, one resource per row. Read it to know whose time was chosen.
+- **The list and the year** are for reading, not for selecting time.
+
+<LiveDemo
+  label="A month where days can be selected"
+  height={520}
+  options={{
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    locale: 'en-GB',
+    selectable: true,
+    events: [
+      { id: 'd', title: 'Congress', start: '2026-10-26', end: '2026-10-29', allDay: true, tone: 'violet' },
+    ],
+  }}
+/>
+
+## Across a clock change
+
+A selection is made of wall-clock slots, read in the pass under the pointer,
+so it is the right length on a day of 23, 25 or 23 and a half hours. Its
+`start` and `end` carry their offsets: measure it with `start.until(end)` and
+you get the real time, not the difference of two clock readings.
+
+At a change, the slot grid follows the wall clock. In Paris, at 02:00 on the
+last Sunday of March, the hour 02:00–03:00 does not exist: it is drawn as a
+band, a pointer in it counts as 03:00, the first moment after it, and a
+selection from 01:00 to 03:00 is one hour long. On the last Sunday of October,
+02:00–03:00 happens twice: the grid draws it once, a pointer in it reads the
+first pass, and a selection across it holds both — from 01:00 to 03:00 is
+three hours, its `end` at `03:00+01:00`. The keyboard steps through both
+passes; [`timeGrid`](../../options/time-grid/)'s `axis: 'elapsed'` draws
+them one after the other.
+
+Lord Howe, off Australia, shows the half hour: on Sunday 4 October 2026 its
+clocks go from 02:00 to 02:30. With a one-hour `snapMinutes`, a tap at 02:40
+selects 02:30–03:00 with `skipped: true` — the slot's start, 02:00, does not
+exist, and the selection still holds the moment that was tapped. Try dragging across 02:00 on that Sunday:
+
+<LiveDemo
+  label="Lord Howe, Sunday 4 October 2026: select across the missing half hour"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-04',
+    locale: 'en-GB',
+    timeZone: 'Australia/Lord_Howe',
+    scrollTime: 'PT0H',
+    selectable: true,
+    snapMinutes: 30,
+    timeGrid: { slotMinutes: 30 },
+    events: [
+      { id: 'a', title: 'Ferry', start: '2026-10-04T09:00[Australia/Lord_Howe]', duration: { hours: 1 } },
+    ],
+  }}
+/>
+
+How the grid draws those days is in [Time zones](../time-zones/).
+
+## See also
+
+- [`selectable`](../../options/selectable/), [`onSelect`](../../options/on-select/), [`onUnselect`](../../options/on-unselect/) — the options.
+- [`onDateClick`](../../options/on-date-click/), [`onSlotClick`](../../options/on-slot-click/), [`onCreateRequest`](../../options/on-create-request/) — the other ways to start from empty time.
+- [Keyboard and accessibility](../keyboard-accessibility/) — every key of the grid.
+- [Drag and drop](../drag-and-drop/) — moving and resizing events, and the rules that refuse them.
+- [Views](../views/) — the grids a selection is made in.

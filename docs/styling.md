@@ -63,6 +63,7 @@ contract test fails, as for a part.
 | a view's surface: `.dz-tg`, `.dz-dg`, `.dz-tl` | `data-dragging`, `data-selecting`, `data-grabbing` (the keyboard holds an event), `data-dropping` (something dragged in is over it) |
 | a header button | `aria-pressed` (the view shown, a toggle on: Tailwind's `aria-pressed:`); a view button's `data-view` names the view it shows |
 | an ancestor of yours | `data-theme="dark"` / `"light"` on any ancestor is read as the scheme when `scheme` is `'auto'` |
+| any element of your page | `data-dz-keep-selection`: a press on it (or inside it) does not clear the calendar's selection, as a press elsewhere outside the calendar does — a form beside the calendar that makes the event |
 
 - **Past and future are read when drawn**: a day's when its view is drawn
   (and again when today moves); an event's when its content is drawn (a

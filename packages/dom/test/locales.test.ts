@@ -34,6 +34,7 @@ const SAMPLES: Record<string, unknown> = {
   seatsLeft: { count: 3 },
   range: { from: 'A', to: 'B' },
   selected: { span: 'S' },
+  dropRefusedFor: { reasons: 'R' },
   violation: 'overlap',
   problem: { code: 'events-not-drawn', count: 2, view: 'timeGridWeek', reason: 'hours' },
   grabbed: { title: 'T' },

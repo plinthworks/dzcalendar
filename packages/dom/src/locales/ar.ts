@@ -74,6 +74,8 @@ return {
   openEvent: 'فتح',
   deleteEvent: 'حذف',
   dropRefused: 'غير مسموح هنا',
+  dropRefusedFor: ({ reasons }) => `غير مسموح هنا: ${reasons}`,
+  commandRefused: 'تم رفض الإجراء',
   eventMoved: ({ title, time }) => (time ? `تم نقل «${title}» إلى ${iso(time)}` : `تم نقل «${title}»`),
   eventReceived: ({ title, when }) => `تمت إضافة «${title}»: ${iso(when)}`,
   pickedUp: ({ title }) => `تم أخذ «${title}». مفتاح Tab للوصول إلى تقويم، والأسهم لاختيار المكان، وEnter لوضعه، وEscape للإلغاء.`,

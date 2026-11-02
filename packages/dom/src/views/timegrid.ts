@@ -17,7 +17,7 @@ import { onScrollFrame } from '../render/window.js';
 import { NodePool } from '../render/pool.js';
 import { altDate } from '../render/alt.js';
 import { drawResourceHeads, noResourcesNote, resourceName } from '../render/resource-heads.js';
-import { activeIn } from '../focus.js';
+import { activeIn, inAppControl } from '../focus.js';
 
 const HM = { hour: '2-digit', minute: '2-digit' } as const;
 
@@ -287,6 +287,9 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     const length = column.axis.day.lengthMinutes;
     el.setAttribute('aria-label', length === 1440 ? name : length === 0 ? `${name}, ${ctx.messages.dayDoesNotExist}` : `${name}, ${formatMinutes(length, ctx.locale)}`);
     el.classList.toggle('dz-tg__col--today', it.today);
+    // Heard on the column's group (the day heads are seen, not read).
+    if (it.today) el.setAttribute('aria-current', 'date');
+    else el.removeAttribute('aria-current');
     dayStates(el, column.date, todayNow(), false, closedAll(column), column.folded);
     const per = model?.range.dates.length ?? 1;
     el.classList.toggle('dz-tg__col--resource-start', column.resource !== null && it.index > 0 && it.index % per === 0);
@@ -394,7 +397,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
   });
   ctx.scope.on(ctx.popoverElement, 'keydown', (e) => {
     const ke = e as KeyboardEvent;
-    if (ke.key !== 'Enter' && ke.key !== ' ') return;
+    // A link or a field the application put in the event keeps Enter and Space.
+    if ((ke.key !== 'Enter' && ke.key !== ' ') || inAppControl(ke.target as Element)) return;
     const p = panelEvent(ke.target);
     if (!p) return;
     ke.preventDefault();

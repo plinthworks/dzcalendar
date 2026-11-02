@@ -17,7 +17,10 @@ période — ou tout ce qui l'efface : un nouveau glissement (puis `onSelect`), 
 curseur déplacé sans Maj, un changement de vue — efface la sélection montrée ;
 cette option le dit, sans argument —
 fermez un formulaire ouvert pour elle. Elle n'est pas appelée quand votre code
-l'efface (`calendar.select(null)`) ou la remplace.
+l'efface (`calendar.select(null)`) ou la remplace. Un appui hors du
+calendrier compte, sauf sur un élément de votre page marqué
+`data-dz-keep-selection` (ou à l'intérieur) : un formulaire à côté du
+calendrier garde la sélection dont il parle.
 
 Dans les frameworks, la sélection à double sens dit la même chose en devenant
 `null` : utilisez-la plutôt.

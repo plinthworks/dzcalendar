@@ -68,6 +68,8 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
 
   /** Where Shift started: the selection runs from here to the cursor. */
   let anchor: Hit | null = null;
+  /** The selection last given to `onSelect` from the keyboard. */
+  let handed: Selection | null = null;
   let held: Held | null = null;
 
   // ── words ───────────────────────────────────────────────────────────────
@@ -130,7 +132,10 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
     let text = moved && p.resourceIds.length > 0 ? p.resourceIds.reduceRight((place, id) => m().ofResource({ resource: titleOf(id), place }), span) : span;
     if (p.allDay !== was.allDay) text += `. ${p.allDay ? m().becomesAllDay : m().becomesTimed({ length: lengthWords(p) })}`;
     if (p.skipped) text += `. ${m().skippedHour}`;
-    if (!p.valid) text += `. ${m().dropRefused}${p.violations.length > 0 ? ` : ${[...new Set(p.violations.map((v) => m().violation(v.code)))].join(', ')}` : ''}`;
+    if (!p.valid) {
+      const reasons = [...new Set(p.violations.map((v) => m().violation(v.code)))];
+      text += `. ${reasons.length > 0 ? m().dropRefusedFor({ reasons: new Intl.ListFormat(ctx.locale, { type: 'unit' }).format(reasons) }) : m().dropRefused}`;
+    }
     return text;
   }
 
@@ -197,8 +202,13 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
 
   function activate(at: Hit): boolean {
     const live = ctx.live();
-    if (anchor && shared.selection) {
-      live.onSelect?.(shared.selection);
+    // A Shift-made selection is handed once: Enter again does not book it twice, and once the
+    // application took it (cleared it in `onSelect`), that Enter is spent, not a new tap.
+    if (anchor) {
+      if (shared.selection && shared.selection !== handed) {
+        handed = shared.selection;
+        live.onSelect?.(shared.selection);
+      } else if (!shared.selection) anchor = null;
       return true;
     }
     const free = live.onSlotClick ? freeSlotAt(at) : null;
@@ -249,7 +259,7 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
       }
       case 'enter': {
         // A selection being made: Enter gives it to the application, even on a day that holds events (18j review).
-        if (anchor && shared.selection) return activate(at);
+        if (anchor) return activate(at);
         const items = keys!.itemsAt(at);
         if (items.length > 0) {
           items[0]!.focus();

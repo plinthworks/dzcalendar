@@ -13,3 +13,15 @@ export function activeIn(node: Node): Element | null {
 export function targetOf(e: Event): EventTarget | null {
   return (typeof e.composedPath === 'function' ? e.composedPath()[0] : undefined) ?? e.target;
 }
+
+/** What an application may put inside an event (through `eventContent`): its own control, with its own keys and its own context menu. */
+const APP_CONTROL = 'input, textarea, select, button, a[href], [contenteditable=""], [contenteditable="true"]';
+/** An event's node, in every view (the list's rows too). */
+const EVENT_LIKE = '.dz-ev, .dz-bar, .dz-tl__ev, .dz-list__ev';
+
+/** `t` is in a control an application put inside an event: the calendar leaves its keys and its context menu alone. */
+export function inAppControl(t: Element): boolean {
+  const control = t.closest(APP_CONTROL);
+  const event = control?.parentElement?.closest(EVENT_LIKE);
+  return event !== null && event !== undefined;
+}

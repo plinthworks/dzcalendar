@@ -489,3 +489,21 @@ describe('after the 18f-2 execution review', () => {
     expect(el.querySelector('.my')?.closest('[aria-hidden="true"]')).toBeNull();
   });
 });
+
+describe('after the 18j-3 guides review', () => {
+  it('a bound selection cleared in onSelect stays cleared (the binding is told first, as in Vue and Angular)', () => {
+    let seen: unknown = 'none';
+    function App() {
+      const [selection, setSelection] = useState<import('@dzcalendar/core').Selection | null>(null);
+      seen = selection;
+      return h(DzCalendar, { ...base, selectable: true, selection, onSelectionChange: setSelection, onSelect: () => setSelection(null) });
+    }
+    render(h(App));
+    const key = (k: string, mods: KeyboardEventInit = {}) =>
+      act(() => void document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...mods })));
+    act(() => el.querySelector<HTMLElement>('.dz-cursor')!.focus());
+    key('ArrowDown', { shiftKey: true });
+    key('Enter');
+    expect(seen).toBeNull();
+  });
+});

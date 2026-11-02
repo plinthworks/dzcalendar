@@ -70,7 +70,7 @@ export async function commitProposal(ctx: ViewCtx, req: CommitRequest): Promise<
   const layout = ctx.motion.captureLayout?.(others);
   const result = ctx.kernel.run(command, { validate: true });
   if (!result.ok) {
-    ctx.refused(result, command);
+    ctx.refused(result, command, true);
     return NOT_DONE;
   }
   const startEdge = kind === 'resize' && (req.edge === 'start' || proposal.ambiguity?.edge === 'start');

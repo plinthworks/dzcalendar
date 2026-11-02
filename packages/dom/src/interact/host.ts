@@ -7,7 +7,7 @@ import { commitProposal, timeOf } from './commit.js';
 import { clearGhosts, syncGhosts } from './ghosts.js';
 import { attachKeyboard } from './keyboard.js';
 import type { Box, InteractionSurface } from './surface.js';
-import { activeIn } from '../focus.js';
+import { activeIn, targetOf } from '../focus.js';
 import { dropTarget, registerTarget, tellReceive, targetAt } from './drop.js';
 import type { Carried, DropTarget } from './drop.js';
 import { canRevertOf } from './revertable.js';
@@ -359,6 +359,16 @@ export function attachInteractions<G>(ctx: ViewCtx, surface: InteractionSurface<
     },
     { passive: true, capture: true },
   );
+
+  // A press anywhere outside the calendar clears a shown selection (owner, 18j-3), but not on what
+  // the page marks `data-dz-keep-selection` (a form beside it that makes the event).
+  // The calendar's own menu, "+N" panel and dialogs are inside it: they keep it.
+  ctx.scope.on(root.ownerDocument, 'pointerdown', (e) => {
+    if (!shared.selection) return;
+    const t = targetOf(e);
+    if (!(t instanceof Element) || root.closest('.dz-cal')?.contains(t) || t.closest('[data-dz-keep-selection]')) return;
+    shared.showSelection(null);
+  }, { capture: true, passive: true });
 
   ctx.scope.add(() => {
     if (gesture) cancel();

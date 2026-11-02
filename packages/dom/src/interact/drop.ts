@@ -277,7 +277,7 @@ export async function commitDrop<G>(ctx: ViewCtx, shared: InteractionShared<G>, 
     shared.busy = false;
   }
   if (!made.result.ok) {
-    ctx.refused(made.result, command);
+    ctx.refused(made.result, command, true);
     return null;
   }
   const when = timeOf(ctx, chosen.start, chosen) || formatTemporal(chosen.start as PlainDate, { weekday: 'long', day: 'numeric', month: 'long' }, ctx.locale);

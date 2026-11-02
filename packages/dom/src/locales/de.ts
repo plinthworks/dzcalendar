@@ -33,6 +33,8 @@ return {
   openEvent: 'Öffnen',
   deleteEvent: 'Löschen',
   dropRefused: 'Hier nicht erlaubt',
+  dropRefusedFor: ({ reasons }) => `Hier nicht erlaubt: ${reasons}`,
+  commandRefused: 'Aktion abgelehnt',
   eventMoved: ({ title, time }) => (time ? `„${title}“ verschoben auf ${time}` : `„${title}“ verschoben`),
   eventReceived: ({ title, when }) => `„${title}“ eingetragen: ${when}`,
   pickedUp: ({ title }) => `„${title}“ aufgenommen. Tab bis zu einem Kalender, Pfeiltasten für den Platz, Eingabe zum Ablegen, Escape zum Abbrechen.`,
