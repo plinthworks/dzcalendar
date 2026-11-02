@@ -1,0 +1,379 @@
+---
+title: "Vues"
+description: "Choisir, changer et dimensionner les vues : le mois, les grilles de la semaine et du jour, la liste, l'année, et vos propres vues — un nombre de jours, une période fixe, ou une vue dessinée par vous."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Une **vue** est une façon de dessiner une période : un mois de cases, une
+semaine heure par heure, une liste. Le calendrier en montre une à la fois ;
+l'en-tête passe de l'une à l'autre, et la date affichée vous suit de l'une à
+l'autre.
+
+## Choisir les vues
+
+[`initialView`](../../options/initial-view/) nomme la vue montrée en premier,
+et [`headerViews`](../../options/header-views/) les boutons du sélecteur, dans
+l'ordre. Deux familles viennent avec `@dzcalendar/dom` : `dayGrid`, le mois,
+la semaine et le jour en cases (`dayGridMonth`, `dayGridWeek`, `dayGridDay`),
+et `timeGrid`, la semaine et le jour heure par heure (`timeGridWeek`,
+`timeGridDay`). L'entrée légère `@dzcalendar/dom/base` n'en a aucune. La liste (`listDay`, `listWeek`,
+`listMonth`, `listYear`) et l'année (`multiMonthYear`) s'importent une fois,
+pour qu'un calendrier qui s'en passe ne les embarque pas :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/dom/list';
+import '@dzcalendar/dom/multimonth';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'dayGridMonth',
+  headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek', 'multiMonthYear'],
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/dom/list';
+import '@dzcalendar/dom/multimonth';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="dayGridMonth"
+    [options]="{ headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek', 'multiMonthYear'] }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/dom/list';
+import '@dzcalendar/dom/multimonth';
+
+const VIEWS = ['dayGridMonth', 'timeGridWeek', 'listWeek', 'multiMonthYear'];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="dayGridMonth" headerViews={VIEWS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/dom/list';
+import '@dzcalendar/dom/multimonth';
+</script>
+
+<template>
+  <DzCalendar
+    time-zone="Europe/Paris"
+    view="dayGridMonth"
+    :options="{ headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek', 'multiMonthYear'] }"
+  />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Un nom que le calendrier ne connaît pas, ou une vue dont l'import manque, fait
+partie des rares choses qui lèvent une erreur : un nom inconnu est refusé par
+une `RangeError` (`unknown view: …`), et une vue connue dont le rendu n'est pas
+importé par une `RangeError` qui nomme l'import à ajouter. React et Vue
+passent cette erreur à `onError` au lieu de la lever. Une vue absente de `headerViews`
+peut toujours être montrée par le code, ou par un bouton que vous placez
+vous-même avec [`headerToolbar`](../../options/header-toolbar/) — qui, une
+fois donné, remplace `headerViews`. Les mots des boutons sont dans
+`messages.views`.
+
+<LiveDemo
+  label="Mois, semaine, liste et année, depuis l'en-tête"
+  height={600}
+  options={{
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    timeZone: 'Europe/Paris',
+    headerViews: ['dayGridMonth', 'timeGridWeek', 'listWeek', 'multiMonthYear'],
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'c', title: 'Jour de congé', start: '2026-10-23', allDay: true },
+      { id: 'w', title: 'Visite des services', start: '2026-10-05T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+    ],
+  }}
+/>
+
+## Changer de vue par le code
+
+`update({ view })` montre une autre vue ; `update({ date })` ou
+`navigate({ to })` va à un jour, et `navigate('prev' | 'next' | 'today')` fait
+ce que font les flèches de l'en-tête :
+
+```ts
+import { Temporal, loadTemporal } from '@dzcalendar/core';
+
+await loadTemporal();
+calendar.update({ view: 'listWeek' });
+calendar.navigate({ to: Temporal.PlainDate.from('2026-11-02') });
+calendar.navigate('next'); // la semaine du 9 novembre
+```
+
+Les flèches avancent du pas propre à la vue : un mois dans une vue mois, une
+semaine dans une vue semaine, un jour dans une vue jour.
+
+## Dimensionner une vue
+
+Les vues intégrées ont une taille fixe. Une vue à vous reprend une famille
+intégrée et n'en déclare que ce qui diffère, dans [`views`](../../options/views/) — sa
+clé est le nom qu'emploient `initialView`, `headerViews` et
+`update({ view })` :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'threeDays',
+  headerViews: ['threeDays', 'fortnight', 'workWeek', 'dayGridMonth'],
+  views: {
+    // Trois jours à partir de la date affichée ; précédent et suivant avancent de trois.
+    threeDays: { family: 'timeGrid', duration: { days: 3 } },
+    // Deux semaines, à partir du premier jour de la semaine, une semaine à la fois.
+    fortnight: { family: 'dayGrid', duration: { weeks: 2 }, alignment: 'week', dateIncrement: { weeks: 1 } },
+    // Cinq jours affichés, week-end écarté : une semaine de travail.
+    workWeek: { family: 'timeGrid', duration: { weeks: 1 }, alignment: 'week', hiddenDays: [6, 7] },
+  },
+  messages: { views: { threeDays: '3 jours', fortnight: 'Quinzaine', workWeek: 'Semaine de travail' } },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+| Réglage | Ce qu'il décide |
+|---|---|
+| `family` | Ce qui est dessiné : `timeGrid`, `dayGrid`, `list`, `multiMonth`, ou `timeline` de l'offre Pro |
+| `duration` | La longueur de la période (`{ days: 3 }`, `{ weeks: 2 }`, `{ months: 2 }`) |
+| `alignment` | Où elle commence : `'day'`, `'week'`, `'month'`, `'year'`, ou `'none'` (la date elle-même) |
+| `dateIncrement` | De combien avancent précédent et suivant |
+| `dayCount` | Un nombre de jours affichés : quatre jours ouvrés, les jours cachés sautés |
+| `hiddenDays` | Les jours cachés propres à la vue, jours ISO de 1 (lundi) à 7 (dimanche) |
+
+Les réglages sont vérifiés à la création du calendrier : une durée nulle, un
+nombre de jours inférieur à 1 ou une plage qui ne contient pas des dates sont
+refusés par une `RangeError`, pas découverts plus tard. Toutes les vues de
+`views` sont vérifiées, pas seulement celle qui est affichée, et il en va de
+même pour tous les jours cachés, des `hiddenDays` hors de 1–7 ou une
+`visibleRange` qui finit avant de commencer. Le bouton d'une vue
+prend son libellé dans `messages.views`.
+
+Deux choses encore :
+
+- [`hiddenDays`](../../options/hidden-days/) et
+  [`weekends`](../../options/weekends/), donnés au calendrier, retirent des
+  jours de toutes les vues qui n'en nomment pas elles-mêmes. Une vue qui a ses
+  propres `hiddenDays` les garde.
+- Une grille de plusieurs mois (`{ family: 'dayGrid', duration: { months: 2 },
+  alignment: 'month' }`) est une seule grille de semaines, de la première
+  semaine du premier mois à la dernière semaine du dernier mois
+  (`fixedWeekCount` n'y change rien). Une grille d'un seul mois montre six
+  semaines, pour que sa hauteur ne change pas d'un mois à
+  l'autre ; donnez à la vue `fixedWeekCount: false` pour ne garder que les
+  semaines que touche le mois, et `showNonCurrentDates: false` pour laisser
+  vides les jours des mois voisins. Ce sont deux réglages de la vue, comme
+  `duration`.
+
+### Une période fixe
+
+`visibleRange` montre une seule période, quelle que soit la date : un congrès,
+un trimestre scolaire. La fin est exclue, et les dates sont des
+`Temporal.PlainDate`.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+await loadTemporal();
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'congress',
+  // Rien à parcourir : précédent, suivant et aujourd'hui sont écartés.
+  headerToolbar: { start: '', center: 'title', end: 'congress,timeGridWeek' },
+  views: {
+    // Du 3 au 12 novembre 2026.
+    congress: {
+      family: 'timeGrid',
+      visibleRange: { start: Temporal.PlainDate.from('2026-11-03'), end: Temporal.PlainDate.from('2026-11-13') },
+    },
+  },
+  messages: { views: { congress: 'Congrès' } },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+Précédent, suivant et « aujourd'hui » restent sur la plage — les flèches sont
+désactivées tant qu'elle est affichée, d'où la barre ci-dessus qui les écarte.
+Dans une grille de jours, les lignes commencent au premier jour de la semaine.
+Une plage qui finit avant de commencer, ou dont tous les jours sont cachés,
+est refusée par une `RangeError` à la création du calendrier — pour toutes
+les vues de `views`, pas seulement celle qui est affichée.
+
+## La liste
+
+Les vues liste se lisent jour par jour : un titre par jour qui a des
+événements, puis une ligne par événement avec ses heures, un point de couleur
+et son titre. Les jours sans événement sont omis ; une période vide le dit. Un
+événement qui passe minuit est listé sur chaque jour qu'il touche, avec sa
+part de ce jour.
+
+La liste suit l'horloge comme les grilles : un titre dit la vraie longueur du
+jour quand elle n'est pas de 24 heures (« 25 h » le dimanche où l'on recule
+les horloges), et les deux passages d'une heure répétée sont listés, bien
+distingués. Toute la liste n'a qu'un seul arrêt de tabulation : ↑ et ↓ vont
+d'un événement à l'autre, Origine et Fin aux extrémités, Pg préc. et Pg suiv.
+au jour d'avant et d'après, et Entrée ou Espace ouvre un événement comme un
+clic. Suppr. et Retour arrière en suppriment un, quand le calendrier est
+[modifiable](../../options/editable/). On ne glisse rien dans une liste.
+
+Au-delà de [`virtualizeAbove`](../../options/virtualize-above/) événements
+(500 par défaut), seules les lignes visibles sont montées : une année de
+milliers d'événements reste légère.
+
+## L'année
+
+`multiMonthYear` étale l'année en petites grilles de mois, autant côte à côte
+que la largeur le permet, jusqu'à
+[`multiMonthMaxColumns`](../../options/multi-month-max-columns/) (`1` les
+empile). Chaque mois est la vue mois elle-même : barres, « +N »
+([`dayMaxLanes`](../../options/day-max-lanes/)), glisser, redimensionner et
+menu contextuel fonctionnent, et les flèches du clavier passent d'un mois au
+suivant. Les jours des mois voisins sont dessinés vides : un événement
+n'apparaît que dans son propre mois, jamais deux fois.
+
+<LiveDemo
+  label="L'année, deux mois par ligne"
+  height={640}
+  options={{
+    initialView: 'multiMonthYear',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    timeZone: 'Europe/Paris',
+    multiMonthMaxColumns: 2,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'c', title: 'Jour de congé', start: '2026-11-02', allDay: true },
+      { id: 'w', title: 'Visite des services', start: '2026-10-05T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO,WE' },
+    ],
+  }}
+/>
+
+Avec [`weekNumbers`](../../options/week-numbers/), chaque semaine porte son numéro, selon les règles de la
+locale (la semaine 53 de 2026 en France est la semaine 1 de 2027 aux
+États-Unis), et chaque numéro mène à sa semaine.
+
+## Une vue dessinée par vous
+
+Quand aucune famille ne dessine ce qu'il vous faut, `defineView` garde le
+calendrier autour de votre vue — en-tête, titre, navigation, sources — et vous
+laisse dessiner les jours. Elle a sa propre entrée, `@dzcalendar/dom/custom` :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import { defineView } from '@dzcalendar/dom/custom';
+
+const agenda = defineView({
+  type: 'agenda',
+  duration: { days: 3 },
+  render(el, data, api) {
+    // Chaque jour affiché, les vides aussi, avec ses événements dans le fuseau du calendrier.
+    const sections = data.days.map((day) => {
+      const section = document.createElement('section');
+      const title = document.createElement('h3');
+      title.textContent = day.date.toLocaleString(data.locale, { weekday: 'long', day: 'numeric', month: 'long' });
+      const list = document.createElement('ul');
+      for (const entry of day.entries) {
+        const item = document.createElement('li');
+        const button = document.createElement('button');
+        button.textContent = entry.instance.event.title;
+        button.addEventListener('click', () => api.open(entry.instance)); // ce que fait un clic ailleurs
+        item.append(button);
+        list.append(item);
+      }
+      section.append(title, list);
+      return section;
+    });
+    el.replaceChildren(...sections);
+  },
+});
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  views: { agenda },
+  initialView: 'agenda',
+  headerViews: ['agenda', 'timeGridWeek'],
+  messages: { views: { agenda: 'Agenda' } },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+`render` est rappelée à chaque changement, sur le même élément. `data` donne
+aussi `instances` (chaque événement une fois), `range`, `state`, `zone`,
+`locale` et `messages` ; `api` donne `open`, `menu` (le menu contextuel d'un
+événement ou d'un jour) et `announce` (une phrase pour les lecteurs d'écran).
+Un `destroy(el)` peut nettoyer quand la vue s'en va. Une fonction `render` qui lève une
+erreur la laisse dans la console (un rejet non géré, pas un problème donné à
+`onProblem`), et ce qui était dessiné reste. Le type d'une vue est son
+nom : le nom d'une famille intégrée est refusé, et définir deux fois un même
+type remplace la première définition.
+
+`defineView` accepte les réglages de taille du tableau ci-dessus (`duration`,
+`alignment`, `dateIncrement`, `dayCount`, `hiddenDays`). Sa vue est alignée sur
+le jour par défaut (`alignment: 'day'`) : `{ weeks: 1 }` ne commence pas au
+premier jour de la semaine sans `alignment: 'week'` — contrairement à une
+entrée de `views`, qui s'aligne sur ce que compte sa durée. Donnée dans
+`views`, la clé nomme la vue (son bouton, `view.type`), même si le `type` de la
+définition diffère. Elle dessine, mais ne
+permet pas de glisser : pour des gestes et un clavier comme ceux des vues
+intégrées, écrivez une famille — `registerModelFamily` dans le noyau (un
+modèle pur, tiré de la période et du magasin) et `registerView` de
+`@dzcalendar/dom/toolkit` (le rendu), comme sont écrits la liste, l'année et
+la timeline de l'offre Pro.
+
+## Voir aussi
+
+- [`initialView`](../../options/initial-view/) et [`headerViews`](../../options/header-views/) — la première vue et le sélecteur.
+- [`views`](../../options/views/) et [`viewOptions`](../../options/view-options/) — vos propres vues, et les options d'une famille.
+- [`headerToolbar`](../../options/header-toolbar/) — où vont les boutons.
+- [`timeGrid`](../../options/time-grid/) — les heures des vues semaine et jour.
+- [Événements](../events/) — ce que montrent les vues.
+- [Fuseaux horaires](../time-zones/) — les jours qu'une vue dessine sont ceux du fuseau.

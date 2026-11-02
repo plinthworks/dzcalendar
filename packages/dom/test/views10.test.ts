@@ -170,6 +170,14 @@ describe('custom views', () => {
     expect([...host.querySelectorAll('.dz-custom .day')].map((x) => x.firstChild!.textContent)).toContain('2026-10-25:A');
   });
 
+  it('defineView under another name: the name given is the view (its button pressed), its renderer still found', () => {
+    const board = defineView({ type: 'board3', duration: { days: 3 }, render(el, data) { el.textContent = `${data.days.length} days`; } });
+    const host = mount([], { initialView: 'mine', views: { mine: board }, headerViews: ['mine', 'dayGridMonth'] });
+    expect(cal!.kernel.getState().view.type).toBe('mine');
+    expect(host.querySelector('.dz-custom')!.textContent).toBe('3 days');
+    expect(host.querySelectorAll('[aria-pressed="true"]').length).toBe(1);
+  });
+
   it('registerView: a family of one’s own, with the kernel’s model family', async () => {
     const { registerModelFamily } = await import('@dzcalendar/core');
     registerModelFamily('testFamily', { build: (range) => ({ n: range.dates.length }) });

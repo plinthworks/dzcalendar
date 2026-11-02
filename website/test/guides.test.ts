@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const docs = join(fileURLToPath(new URL('..', import.meta.url)), 'src', 'content', 'docs');
 /** The guides written so far, batch by batch; the others are still stubs. */
-const WRITTEN = ['events', 'event-sources', 'recurrence'];
+const WRITTEN = ['events', 'event-sources', 'recurrence', 'views', 'time-zones', 'languages'];
 const STUB = /:::note\[(Being written|En cours de rédaction)\]/;
 
 const guides = readdirSync(join(docs, 'guides')).map((f) => f.replace(/\.mdx?$/, ''));

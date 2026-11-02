@@ -108,8 +108,9 @@ export interface TimedEvent extends EventCommon {
   readonly end: ZonedDateTime;
   /**
    * True when no zone was named and the display zone was assumed
-   * (`zone-defaulted`, `offset-only`). Such an event follows the calendar when
-   * its zone changes; one whose zone was named never does.
+   * (`zone-defaulted`, `offset-only`): the calendar's zone when the event was
+   * read, kept after (a later zone change does not read it again). A move by
+   * a person does not write that zone into it.
    */
   readonly zoneGuessed: boolean;
 }

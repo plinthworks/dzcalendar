@@ -1,0 +1,494 @@
+---
+title: "Languages"
+description: "Writing the calendar in a language: English and French built in, Arabic, Spanish and German as imports, your own words, right to left, the week's conventions, other calendars and changing language while running."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Two kinds of text appear in a calendar, and they do not come from the same
+place. **Dates, months, weekdays, times and numbers** are written by the
+platform's `Intl`, in every language, with nothing to import. **The
+calendar's own words** — "Today", "+3 more", the menus, what a screen reader
+is told — are DzCalendar's, and come in a bundle per language.
+
+## Choosing a language
+
+[`locale`](../../options/locale/) is a BCP 47 tag. It sets how dates and
+numbers are written, which bundle of words is used, the first day of the
+week (unless you give [`firstDay`](../../options/first-day/)) and the
+reading direction. English and French words are built in. Arabic, Spanish and
+German are one import each, paid for only when imported:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/dom/locales/es'; // also: …/locales/ar, …/locales/de
+
+createCalendar(element, { timeZone: 'Europe/Madrid', locale: 'es-ES' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/dom/locales/es';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Madrid" locale="es-ES" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/dom/locales/es';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Madrid" locale="es-ES" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/dom/locales/es';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Madrid" locale="es-ES" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+A tag is looked up whole (`es-MX`), then by its language (`es`), else the
+words are English. A language with no bundle is still written by the
+platform — `locale: 'ja-JP'` gives Japanese dates and numbers — beside
+English buttons: add its words as shown [below](#a-language-of-your-own).
+Left out, `locale` is the page's language (`<html lang>`), then `'en'`.
+Unicode extensions change the numbers, not the words: `ar-SA-u-nu-latn`
+counts in Latin digits.
+
+<LiveDemo
+  label="The same week in French, with one word changed"
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    messages: { today: 'Ce jour' },
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Garde', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## Changing a few words
+
+[`messages`](../../options/messages/) takes only the words that change; the
+others stay the locale's. The view switcher's labels are merged the same way,
+view by view:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  locale: 'fr-FR',
+  messages: { today: 'Ce jour', noEvents: 'Rien de prévu', views: { listWeek: 'Programme' } },
+});
+
+// Later: another word. What an earlier `messages` gave is replaced.
+calendar.update({ messages: { today: 'Maintenant' } });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" locale="fr-FR" [messages]="{ today: 'Ce jour' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" locale="fr-FR" messages={{ today: 'Ce jour' }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" locale="fr-FR" :messages="{ today: 'Ce jour' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+A word you do not give is the locale's, so a calendar in a language without
+a bundle shows English for it. Words that carry a number or a name are
+functions (`moreLink({ count })` for "+3 more"); a full bundle is below.
+
+## A language of your own
+
+`defineLocale(code, messages)` registers the words of a language, once, for
+every calendar of the page. `DzMessages` lists every word and TypeScript
+tells you when one is missing; start from a built-in bundle and change what
+differs. A language of your own defines `problem` too, the sentence for a
+problem given to `onProblem` (below):
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { EN, defineLocale } from '@dzcalendar/dom';
+import { DE } from '@dzcalendar/dom/locales/de';
+
+// A language: Portuguese.
+defineLocale('pt', {
+  ...EN,
+  today: 'Hoje',
+  previous: 'Anterior',
+  next: 'Próximo',
+  allDay: 'Dia inteiro',
+  moreLink: ({ count }) => `+${count} mais`,
+  views: { ...EN.views, timeGridWeek: 'Semana', dayGridMonth: 'Mês' },
+});
+
+// A region's own wording: wins over `de` for de-CH.
+defineLocale('de-CH', { ...DE, today: 'Hüt' });
+```
+
+</Fragment>
+</CodeTabs>
+
+The bundle may also be a function of the full tag, called once per locale tag (`pt-BR` and `pt-PT` each once).
+That is how the built-in Arabic, Spanish and German follow the tag's
+numbers; yours can do the same:
+
+```ts
+defineLocale('pt', (locale) => {
+  const n = new Intl.NumberFormat(locale);
+  return { ...EN, today: 'Hoje', moreLink: ({ count }) => `+${n.format(count)} mais` };
+});
+```
+
+Counts and plurals go through `Intl.PluralRules` and `Intl.NumberFormat`
+for the language — the Arabic bundle is the example to read for languages
+with several plural forms. `messagesForLocale(locale)` returns the words the
+calendar would use for a tag.
+
+## Right to left
+
+Nothing to switch on. The calendar reads the reading direction of
+[`locale`](../../options/locale/) — Arabic, Hebrew, Persian, Urdu and the
+other right-to-left languages — and sets `dir="rtl"` on itself. The grid is
+mirrored: days run from right to left, the toolbar's previous and next
+buttons swap sides, and the keyboard's left and right arrows follow the
+screen. Changing `locale` with `update()` changes the direction with it.
+
+Arabic words are one import (`@dzcalendar/dom/locales/ar`). The demo below
+does without it: only the locale and a few words given by `messages`, the
+rest in English.
+
+<LiveDemo
+  label="A week written in Arabic, laid out right to left"
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    locale: 'ar-SA',
+    messages: { today: 'اليوم', previous: 'السابق', next: 'التالي' },
+    events: [
+      { id: 'a', title: 'استشارة', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'مناوبة', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## The week: first day and numbers
+
+Left to the locale, the week starts on Monday in most of Europe, on Sunday
+in the United States and on Saturday in much of the Arabic-speaking world,
+and weeks are numbered by that locale's rule (ISO weeks in France, weeks
+holding 1 January in the United States). [`firstDay`](../../options/first-day/)
+overrides the first day, as an ISO weekday (1 Monday … 7 Sunday); the week
+numbers of [`weekNumbers`](../../options/week-numbers/) then follow it, with
+the locale's minimal days. `firstDay: null` gives the locale's back.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+// American words and dates, weeks starting on Monday.
+const calendar = createCalendar(element, {
+  timeZone: 'America/Chicago',
+  locale: 'en-US',
+  initialView: 'dayGridMonth',
+  weekNumbers: true,
+  firstDay: 1,
+});
+
+// Later: the locale's own.
+calendar.update({ firstDay: null });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="America/Chicago" locale="en-US" view="dayGridMonth" [weekNumbers]="true" [options]="{ firstDay: 1 }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+</CodeTabs>
+
+## Writing dates your way
+
+[`formats`](../../options/formats/) says how each place writes its dates and
+times: the header's title, a day's heading, the hours of the gutter, an
+event's time, the list's days, the week number. Each place takes
+`Intl.DateTimeFormat` options — still written in the calendar's language —
+or a function returning the text. [`titleFormat`](../../options/title-format/)
+is the title's shortcut at creation.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  locale: 'fr-FR',
+  weekNumbers: true,
+  titleFormat: { month: 'long', year: 'numeric' },
+  formats: {
+    slotLabel: { hour: 'numeric' },                       // « 09 h » for "09:00"
+    dayHeader: { weekday: 'short', day: 'numeric' },      // « lun. 19 »
+    weekNumber: ({ week }) => `Sem. ${week}`,             // a function: the platform has no week field
+  },
+});
+
+// Later: 24-hour labels with the minutes.
+calendar.update({ formats: { slotLabel: { hour: '2-digit', minute: '2-digit', hour12: false } } });
+```
+
+</Fragment>
+</CodeTabs>
+
+`update({ formats })` replaces the formats given before, so give them all
+again. A function that throws, or options the platform refuses, is reported
+once and that place falls back to its default.
+
+## Another calendar
+
+The grid and the data stay Gregorian; the dates can be written in another
+calendar. [`displayCalendar`](../../options/display-calendar/) writes
+titles and day numbers in it (`'islamic-umalqura'`, `'persian'`, `'hebrew'`,
+`'buddhist'`…). [`secondaryCalendar`](../../options/secondary-calendar/)
+keeps the first and adds a second date, small, beside each day — for readers
+who count in both. An event on 21 October stays on 21 October.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Africa/Algiers',
+  locale: 'fr-DZ',
+  initialView: 'dayGridMonth',
+  secondaryCalendar: 'islamic-umalqura', // the Hijri date under each day
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Africa/Algiers" locale="fr-DZ" view="dayGridMonth" secondaryCalendar="islamic-umalqura" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+</CodeTabs>
+
+<LiveDemo
+  label="A month with the Hijri date beside each day"
+  options={{
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    secondaryCalendar: 'islamic-umalqura',
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Day off', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+## Changing language while running
+
+`locale`, `messages`, `formats` and the calendars are all live: change them
+and the calendar redraws, its direction included. In the frameworks they are
+inputs, so a state of yours is enough; in plain JavaScript call `update()`.
+Import the bundles you may need first.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/dom/locales/es';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', locale: 'fr-FR' });
+
+document.querySelector('#lang')!.addEventListener('change', (event) => {
+  calendar.update({ locale: (event.target as HTMLSelectElement).value });
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/dom/locales/es';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <button (click)="locale.set('fr-FR')">Français</button>
+    <button (click)="locale.set('es-ES')">Español</button>
+    <dz-calendar timeZone="Europe/Paris" [locale]="locale()" />
+  `,
+})
+export class Agenda {
+  readonly locale = signal('fr-FR');
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/dom/locales/es';
+
+export function Agenda() {
+  const [locale, setLocale] = useState('fr-FR');
+  return (
+    <>
+      <button onClick={() => setLocale('fr-FR')}>Français</button>
+      <button onClick={() => setLocale('es-ES')}>Español</button>
+      <DzCalendar timeZone="Europe/Paris" locale={locale} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/dom/locales/es';
+
+const locale = ref('fr-FR');
+</script>
+
+<template>
+  <button @click="locale = 'fr-FR'">Français</button>
+  <button @click="locale = 'es-ES'">Español</button>
+  <DzCalendar time-zone="Europe/Paris" :locale="locale" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+## Problems, in which language
+
+The words people read and hear are translated: the buttons, the menus, the
+screen reader's announcements, a save refused, a source that could not be
+loaded, a place refused (`saveFailed`, `loadFailed`, `violation`…). So is
+the `detail` of a `CalendarProblem` given to
+[`onProblem`](../../options/on-problem/) or written on the console: it is in
+the calendar's language, through the message `messages.problem(p)`, which the
+English, French, Arabic, German and Spanish bundles define and a language of
+your own defines too. `p` is `{ code, … }`, with what each code carries:
+`host-no-height` `{ height }`, `zone-from-browser` `{ zone }`,
+`too-many-occurrences` `{ series, limit }`, and `events-not-drawn`
+`{ count, view, reason }` (`reason` is `'all-day'` or `'hours'`). A program
+should still read the stable `code`, not the sentence.
+
+What stays in English are the data problems the kernel finds in events
+(`calendar.kernel.getProblems()`: `invalid-start`, `offset-only`…). Their
+`detail` is a developer's note; if you show one to a person, choose the
+sentence from the `code`, in your own language.
+
+## See also
+
+- [`locale`](../../options/locale/), [`messages`](../../options/messages/) and [`firstDay`](../../options/first-day/).
+- [`formats`](../../options/formats/) and [`titleFormat`](../../options/title-format/).
+- [`displayCalendar`](../../options/display-calendar/) and [`secondaryCalendar`](../../options/secondary-calendar/).
+- [Views](../views/) — the views the words and formats apply to.
+- [Time zones](../time-zones/) — the other half of "the same moment, for another reader".

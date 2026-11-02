@@ -1,4 +1,17 @@
 /**
+ * What a `CalendarProblem` is about, for its `detail` in the calendar's
+ * language (its `code` stays for programs): `host-no-height` with the height
+ * drawn (0: none at all); `too-many-occurrences` with the series' id and how
+ * many are drawn; `events-not-drawn` with how many, the view, and why (no
+ * all-day row, or outside the hours shown).
+ */
+export type ProblemWords =
+  | { readonly code: 'host-no-height'; readonly height: number }
+  | { readonly code: 'zone-from-browser'; readonly zone: string }
+  | { readonly code: 'too-many-occurrences'; readonly series: string; readonly limit: number }
+  | { readonly code: 'events-not-drawn'; readonly count: number; readonly view: string; readonly reason: 'all-day' | 'hours' };
+
+/**
  * Every word the calendar adds. Month and weekday names are not here: `Intl`
  * knows them in every language through the `locale` option. One bundle,
  * handed over once, as in tzslot.
@@ -127,6 +140,8 @@ export interface DzMessages {
   /** Context menu: grab mode by another way in. */
   readonly moveEvent: string;
   readonly resizeEvent: string;
+  /** A `CalendarProblem`'s detail: for the developer reading `onProblem` or the console, in the calendar's language. */
+  problem(p: ProblemWords): string;
 }
 
 export const EN: DzMessages = {
@@ -205,6 +220,22 @@ export const EN: DzMessages = {
   redone: 'Redone',
   moveEvent: 'Move…',
   resizeEvent: 'Change duration…',
+  problem: (p) => {
+    switch (p.code) {
+      case 'host-no-height':
+        return p.height === 0
+          ? 'the calendar is 0 px tall: its host has no height (an inline element, such as a <dz-calendar> without display: block?)'
+          : `the calendar is ${p.height} px tall and nothing in it scrolls: its height comes from its content — give its host a height (--dz-height: 100% is 100% of the host's height, which needs one of its own)`;
+      case 'zone-from-browser':
+        return `no timeZone given: the browser's (${p.zone}) is used — pass timeZone (Temporal.Now.timeZoneId() for the browser's on purpose)`;
+      case 'too-many-occurrences':
+        return `series ${p.series}: more than ${p.limit} in the window — the first ones are drawn`;
+      case 'events-not-drawn':
+        return p.reason === 'all-day'
+          ? `${p.count} all-day event(s) in ${p.view}: allDaySlot is false, so they are not drawn (backgrounds still wash their columns)`
+          : `${p.count} event(s) in ${p.view} entirely outside the hours shown (slotMin–slotMax): not drawn`;
+    }
+  },
 };
 
 export const FR: DzMessages = {
@@ -283,6 +314,22 @@ export const FR: DzMessages = {
   redone: 'Rétabli',
   moveEvent: 'Déplacer…',
   resizeEvent: 'Changer la durée…',
+  problem: (p) => {
+    switch (p.code) {
+      case 'host-no-height':
+        return p.height === 0
+          ? 'le calendrier mesure 0 px de haut : son hôte n’a pas de hauteur (un élément en ligne, comme un <dz-calendar> sans display: block ?)'
+          : `le calendrier mesure ${p.height} px de haut et rien n’y défile : sa hauteur vient de son contenu — donnez une hauteur à son hôte (--dz-height: 100% vaut 100 % de la hauteur de l’hôte, qui doit en avoir une)`;
+      case 'zone-from-browser':
+        return `aucun timeZone donné : celui du navigateur (${p.zone}) est pris — passez timeZone (Temporal.Now.timeZoneId() pour celui du navigateur, sciemment)`;
+      case 'too-many-occurrences':
+        return `série ${p.series} : plus de ${p.limit} occurrences dans la période affichée — seules les premières sont dessinées`;
+      case 'events-not-drawn':
+        return p.reason === 'all-day'
+          ? `${p.count} événement(s) sur la journée dans ${p.view} : allDaySlot vaut false, ils ne sont pas dessinés (les fonds colorent toujours leurs colonnes)`
+          : `${p.count} événement(s) dans ${p.view} entièrement hors des heures affichées (slotMin–slotMax) : non dessinés`;
+    }
+  },
 };
 
 /**

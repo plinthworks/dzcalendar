@@ -952,11 +952,11 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       // Without the all-day row, its events have nowhere to be drawn (an all-day background still washes its columns): said.
       if (!ctx.allDaySlot && m.allDay.bars.length > 0) {
         const n = new Set(m.allDay.bars.map((b) => b.segment.instance.event.id)).size;
-        ctx.problem({ code: 'events-not-drawn', detail: `${n} all-day event(s) in ${viewType}: allDaySlot is false, so they are not drawn (backgrounds still wash their columns)`, element: root }, `${viewType}|all-day`);
+        ctx.problem({ code: 'events-not-drawn', detail: ctx.messages.problem({ code: 'events-not-drawn', count: n, view: viewType, reason: 'all-day' }), element: root }, `${viewType}|all-day`);
       } else ctx.problemGone('events-not-drawn', `${viewType}|all-day`);
       // Timed events entirely outside the hours shown (slotMin–slotMax) are not drawn either.
       const outside = new Set(m.columns.flatMap((c) => c.outside));
-      if (outside.size > 0) ctx.problem({ code: 'events-not-drawn', detail: `${outside.size} event(s) in ${viewType} entirely outside the hours shown (slotMin–slotMax): not drawn`, element: root }, `${viewType}|hours`);
+      if (outside.size > 0) ctx.problem({ code: 'events-not-drawn', detail: ctx.messages.problem({ code: 'events-not-drawn', count: outside.size, view: viewType, reason: 'hours' }), element: root }, `${viewType}|hours`);
       else ctx.problemGone('events-not-drawn', `${viewType}|hours`);
       bars.sync(!ctx.allDaySlot ? [] : [
         ...m.allDay.background.map((bar) => ({

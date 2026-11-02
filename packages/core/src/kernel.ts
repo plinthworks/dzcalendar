@@ -409,7 +409,8 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     } catch {
       /* said by assertViewSpec below */
     }
-    const spec: ViewSpec = { type, duration: { days: 1 }, alignment, fixedWeekCount: true, hiddenDays: [], showNonCurrentDates: true, ...given };
+    // The key names the view (a `defineView` definition given under another name is that name's).
+    const spec: ViewSpec = { duration: { days: 1 }, alignment, fixedWeekCount: true, hiddenDays: [], showNonCurrentDates: true, ...given, type };
     assertViewSpec(spec);
     views[type] = spec;
   }

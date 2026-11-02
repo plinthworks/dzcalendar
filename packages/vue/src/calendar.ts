@@ -225,7 +225,7 @@ export const DzCalendar = defineComponent({
     options: { type: Object as PropType<DzCalendarOptions>, default: () => ({}) },
     /** Read and driven from beside the calendar (`createCalendarController()`); otherwise its own. */
     controller: any<CalendarController | undefined>(),
-    /** Options read once, when the calendar is made (`firstDay`, `rules`, `now`…): over the plugin's defaults, under the props. */
+    /** Options read once, when the calendar is made (`now`, `kernel`, `store`…): over the plugin's defaults, under the props. */
     initial: any<DzCalendarDefaults | undefined>(),
     /** Made at creation, not changed after (the plugin's `motion` makes one per calendar). */
     motion: any<MotionAdapter | undefined>(),

@@ -84,6 +84,22 @@ return {
   redone: 'Rehecho',
   moveEvent: 'Mover…',
   resizeEvent: 'Cambiar duración…',
+  problem: (p) => {
+    switch (p.code) {
+      case 'host-no-height':
+        return p.height === 0
+          ? 'el calendario mide 0 px de alto: su anfitrión no tiene altura (¿un elemento en línea, como un <dz-calendar> sin display: block?)'
+          : `el calendario mide ${n(p.height)} px de alto y nada en él se desplaza: su altura viene de su contenido — dé una altura a su anfitrión (--dz-height: 100% es el 100 % de la altura del anfitrión, que necesita una propia)`;
+      case 'zone-from-browser':
+        return `no se indicó timeZone: se usa la del navegador (${p.zone}) — pase timeZone (Temporal.Now.timeZoneId() para la del navegador, a propósito)`;
+      case 'too-many-occurrences':
+        return `serie ${p.series}: más de ${n(p.limit)} repeticiones en el periodo mostrado — solo se dibujan las primeras`;
+      case 'events-not-drawn':
+        return p.reason === 'all-day'
+          ? `${n(p.count)} evento(s) de todo el día en ${p.view}: allDaySlot es false, no se dibujan (los fondos siguen coloreando sus columnas)`
+          : `${n(p.count)} evento(s) en ${p.view} completamente fuera de las horas mostradas (slotMin–slotMax): no se dibujan`;
+    }
+  },
 };
 }
 

@@ -84,6 +84,22 @@ return {
   redone: 'Wiederhergestellt',
   moveEvent: 'Verschieben…',
   resizeEvent: 'Dauer ändern…',
+  problem: (p) => {
+    switch (p.code) {
+      case 'host-no-height':
+        return p.height === 0
+          ? 'Der Kalender ist 0 px hoch: Sein Host hat keine Höhe (ein Inline-Element, etwa ein <dz-calendar> ohne display: block?)'
+          : `Der Kalender ist ${n(p.height)} px hoch und nichts darin scrollt: Seine Höhe kommt von seinem Inhalt — geben Sie dem Host eine Höhe (--dz-height: 100% sind 100 % der Höhe des Hosts, der selbst eine braucht)`;
+      case 'zone-from-browser':
+        return `Keine timeZone angegeben: Die des Browsers (${p.zone}) wird verwendet — geben Sie timeZone an (Temporal.Now.timeZoneId() für die des Browsers, wenn gewollt)`;
+      case 'too-many-occurrences':
+        return `Serie ${p.series}: mehr als ${n(p.limit)} Termine im angezeigten Zeitraum — nur die ersten werden gezeichnet`;
+      case 'events-not-drawn':
+        return p.reason === 'all-day'
+          ? `${n(p.count)} ganztägige(r) Termin(e) in ${p.view}: allDaySlot ist false, sie werden nicht gezeichnet (Hintergründe färben ihre Spalten weiterhin)`
+          : `${n(p.count)} Termin(e) in ${p.view} ganz außerhalb der angezeigten Stunden (slotMin–slotMax): nicht gezeichnet`;
+    }
+  },
 };
 }
 

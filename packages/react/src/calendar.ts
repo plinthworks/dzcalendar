@@ -40,7 +40,7 @@ export interface DzCalendarProps extends DzCalendarOptions, TemplateProps {
   readonly onSelectionChange?: (selection: Selection | null) => void;
   /** 'wall' (clock times, a 25-hour day has 25 rows… as the zone's day is) or 'elapsed'. */
   readonly axis?: 'wall' | 'elapsed';
-  /** Options read once, when the calendar is made (`firstDay`, `rules`, `now`…): over the provider's defaults, under the props. */
+  /** Options read once, when the calendar is made (`now`, `kernel`, `store`…): over the provider's defaults, under the props. */
   readonly initial?: DzCalendarDefaults;
   /** Made at creation, not changed after (`DzCalendarProvider`'s `motion` makes one per calendar). */
   readonly motion?: MotionAdapter;

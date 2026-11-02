@@ -1,0 +1,437 @@
+---
+title: "Time zones & clock changes"
+description: "Events in their own zones, the zone the calendar is drawn in, changing it while it runs, and the days of 23, 25 or 23.5 hours drawn as they are."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../components/CodeTabs.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+Two zones are always at work: the one **each event** was set in, and the one
+**the calendar** is drawn in. Neither is converted into the other. The event
+keeps its own, the calendar says where it falls on screen, and a day is
+whatever length that zone's clocks make it.
+
+## Every event keeps its zone
+
+A timed event names its zone in its `start`: `…[Europe/Paris]` is an ISO 8601
+string with the IANA name in brackets, the form Temporal writes. The same
+goes for a Temporal `ZonedDateTime`. The zone is part of the event, not
+a display choice:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'timeGridWeek',
+  events: [
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    // Ten o'clock in Chicago: drawn at 17:00 in Paris.
+    { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    // It leaves in one zone and lands in another.
+    { id: 'c', title: 'Flight to Tokyo', start: '2026-10-21T13:00[Europe/Paris]', end: '2026-10-22T08:00[Asia/Tokyo]' },
+  ],
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [events]="events" />`,
+})
+export class Agenda {
+  readonly events: EventInput[] = [
+    { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Flight to Tokyo', start: '2026-10-21T13:00[Europe/Paris]', end: '2026-10-22T08:00[Asia/Tokyo]' },
+  ];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const EVENTS: EventInput[] = [
+  { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Flight to Tokyo', start: '2026-10-21T13:00[Europe/Paris]', end: '2026-10-22T08:00[Asia/Tokyo]' },
+];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" events={EVENTS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const events: EventInput[] = [
+  { id: 'b', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Flight to Tokyo', start: '2026-10-21T13:00[Europe/Paris]', end: '2026-10-22T08:00[Asia/Tokyo]' },
+];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :events="events" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+An offset alone (`2026-10-22T10:00-05:00`) does not name a zone: Chicago in
+October is at -05:00 and in December at -06:00. Such an event is read in the
+calendar's zone and reported as a guess (`offset-only`), and so is a start
+written with no zone at all (`zone-defaulted`). The event is shown; the
+problem is in `calendar.kernel.getProblems()?.problems`, as
+[Events](../events/) explains. An instant ending in `Z` is exact but names no
+zone either, so it is still said as `offset-only`. To avoid the guess, give the
+zone in brackets (`…[Europe/Paris]`) or as the event's `timeZone` field.
+
+## The calendar's zone
+
+[`timeZone`](../../options/time-zone/) is the IANA zone the days and hours
+are drawn in. At 10:00 in Chicago the call above is at 17:00 on a calendar
+set to `'Europe/Paris'`, and at 10:00 on one set to `'America/Chicago'`. Today
+and "now" are that zone's too; the first day of the week comes from the
+locale (or `firstDay`).
+
+Left out, the calendar takes the browser's zone — and says it, once, as the
+problem `zone-from-browser` (through [`onProblem`](../../options/on-problem/),
+or on the console without it). A clinic's screen left on a laptop set to Tokyo
+would draw Algiers' 14:00 at 22:00. When the viewer's own zone is what you
+want, say so, and the problem does not come up:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+// Safari fetches its Temporal first; elsewhere this returns at once.
+await loadTemporal();
+
+createCalendar(element, {
+  timeZone: Temporal.Now.timeZoneId(),
+  onProblem: (problem) => console.warn(problem.code, problem.detail),
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+Browsers that have Temporal of their own use it; the others (Safari, and every
+browser on iOS) load a polyfill once, about 25 kB gzipped, through
+`@tzslot/core`, so an application using DzCalendar and
+tzslot has a single set of Temporal
+classes. Await `loadTemporal()` before your own first Temporal value; the
+calendar itself waits by itself, and `calendar.ready` resolves once it is
+drawn.
+
+## Changing the zone while it runs
+
+A person who travels, a dispatcher who looks at another city: the zone is
+changed live, and every event moves to its place in the new one. Nothing
+is reloaded unless a source depends on the zone (below), and no event changes — only where it is drawn.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  events: [{ id: 'call', title: 'Call Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } }],
+});
+
+// The same events, drawn in Chicago's hours.
+calendar.update({ timeZone: 'America/Chicago' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <select (change)="zone.set($any($event.target).value)">
+      <option value="Europe/Paris">Paris</option>
+      <option value="America/Chicago">Chicago</option>
+    </select>
+    <dz-calendar [timeZone]="zone()" />`,
+})
+export class Agenda {
+  readonly zone = signal('Europe/Paris');
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [zone, setZone] = useState('Europe/Paris');
+  return (
+    <>
+      <select value={zone} onChange={(e) => setZone(e.target.value)}>
+        <option value="Europe/Paris">Paris</option>
+        <option value="America/Chicago">Chicago</option>
+      </select>
+      <DzCalendar timeZone={zone} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const zone = ref('Europe/Paris');
+</script>
+
+<template>
+  <select v-model="zone">
+    <option value="Europe/Paris">Paris</option>
+    <option value="America/Chicago">Chicago</option>
+  </select>
+  <DzCalendar :time-zone="zone" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Two details. An event that only *guessed* its zone (see above) took the
+calendar's zone at the time it was read; a later zone change does not read it
+again, so name the zone to avoid it. And a name that is not a
+zone throws a `RangeError` and nothing changes (the frameworks pass it to
+`onError` instead of throwing), so check what a person typed before passing
+it on.
+
+### Sources and the new zone
+
+An event [source](../event-sources/) is asked again only when its answer
+depends on the zone. A `jsonSource` that sends the zone (the default) is
+asked again in the new one, its events staying on screen until the answer
+arrives. A source of your own is not: its chunks are dates, the same
+everywhere. If your function answers differently by zone, say so with
+`zoneDependent`:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { fnSource } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  sources: [
+    fnSource(
+      'shifts',
+      async ({ window, signal }) => {
+        const res = await fetch(`/api/shifts?from=${window!.startDate}&to=${window!.endDate}`, { signal });
+        return res.json();
+      },
+      { zoneDependent: true },
+    ),
+  ],
+});
+
+calendar.update({ timeZone: 'Asia/Tokyo' }); // "shifts" is fetched again
+```
+
+</Fragment>
+</CodeTabs>
+
+## All-day events have no zone
+
+`{ start: '2026-10-23', allDay: true }` is a date, not a moment: the 23rd for
+a viewer in Paris, in Tokyo or in Chicago, in whatever zone the calendar is
+shown. Changing `timeZone` does not move it, and it is never "the 22nd at
+18:00 somewhere". A congress from the 26th to the 29th (`end` is exclusive)
+covers the same three days everywhere.
+
+Use one for what belongs to a date — a holiday, a birthday, a day off — and a
+timed event for what belongs to a moment.
+
+## Days of 23 and 25 hours
+
+Twice a year, a zone's clocks jump. In Paris, on Sunday 29 March 2026 they go
+from 02:00 to 03:00: the day lasts 23 hours. On Sunday 25 October they go
+back from 03:00 to 02:00: the day lasts 25 hours. Chicago does the same on 8
+March and 1 November 2026; Lord Howe, off Australia, moves by half an hour.
+
+The time grid draws these days as they are, in the calendar's zone. The week
+below holds the 25 October: the Sunday has two 02:00–03:00 hours, and the
+band across the Sunday's column marks it. Several things on it deserve a look:
+
+- the event on Saturday night runs from 22:00 to 05:00 on the wall clock, and
+  lasts eight real hours, not seven;
+- "Reading from Chicago" is set at 10:00 in Chicago, whose clocks have not changed
+  yet: it is drawn at 17:00 on Saturday and at 16:00 on Sunday, once Paris's have;
+- the Monday consultation, before the change, in Paris, is at 09:00 as ever.
+
+<LiveDemo
+  label="The week of 25 October 2026 in Paris: a Sunday of 25 hours"
+  height={620}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-25',
+    locale: 'en-GB',
+    timeZone: 'Europe/Paris',
+    scrollTime: 'PT0H',
+    events: [
+      { id: 'night', title: 'Night shift', start: '2026-10-24T22:00[Europe/Paris]', duration: { hours: 8 }, tone: 'violet' },
+      { id: 'chi', title: 'Reading from Chicago', start: '2026-10-24T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'chi2', title: 'Reading from Chicago', start: '2026-10-25T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'mon', title: 'Consultation', start: '2026-10-19T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    ],
+  }}
+/>
+
+### The hour that does not exist, the hour that comes twice
+
+By default the grid's rows stay aligned from one day to the next: 09:00 is
+at the same height every day of the week. That is the wall clock's
+reading — the `'wall'` axis of [`timeGrid`](../../options/time-grid/). On a
+day with a change:
+
+- the hour that does not exist (02:00–03:00 on 29 March in Paris) is a hatched
+  band, so nobody looks for an event in it;
+- the hour that comes twice (02:00–03:00 on 25 October) is marked by a band
+  as well, and both of its readings share the same rows.
+
+An event keeps its true position in time: one that starts at the first 02:30 and
+one that starts at the second are drawn side by side, in the same
+rows, each with its offset (+02:00, +01:00) and the second one's time with the
+`*` mark, so they can be told apart.
+
+### Real time to scale
+
+When the grid should show how long things last rather than how the clock
+reads, switch the axis to `'elapsed'`: the repeated hour appears twice and
+the Sunday of 25 hours is an hour taller than the days around it.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'timeGridWeek' });
+
+calendar.update({ timeGrid: { axis: 'elapsed' } });
+```
+
+</Fragment>
+</CodeTabs>
+
+### Half an hour: Lord Howe
+
+Not every change is an hour. Lord Howe Island (`Australia/Lord_Howe`) moves
+its clocks by 30 minutes: on Sunday 4 October 2026 they go from 02:00 to
+02:30, and the day lasts 23 hours 30. The grid shows the skipped half hour as
+it shows Paris's skipped hour, only shorter.
+
+<LiveDemo
+  label="Lord Howe, Sunday 4 October 2026: a day of 23 h 30"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-04',
+    locale: 'en-GB',
+    timeZone: 'Australia/Lord_Howe',
+    scrollTime: 'PT0H',
+    timeGrid: { slotMinutes: 30 },
+    events: [
+      { id: 'a', title: 'Ferry', start: '2026-10-04T09:00[Australia/Lord_Howe]', duration: { hours: 1 } },
+      { id: 'b', title: 'Watch', start: '2026-10-03T23:00[Australia/Lord_Howe]', duration: { hours: 4 } },
+    ],
+  }}
+/>
+
+## Events and series across a change
+
+An event is a start and a length, and the two do not mean the same thing
+across a change. `duration: { hours: 8 }` is eight real hours; `{ days: 1 }`
+is a day of the wall clock, so 25 hours on 25 October. With `start` and `end`,
+the end is where it is. A night shift from 22:00 to 05:00 is eight hours long
+that night and seven in a week without a change.
+
+A **series** lives on the wall clock of its zone, as people mean it. "Every
+Monday at 08:00 in Paris" is at 08:00 the Monday after the clocks go back too
+— 06:00 UTC in summer, 07:00 in winter. Drawn in Chicago, it moves by an hour
+for the week when Europe has changed and America has not yet:
+
+```ts
+{ id: 'rounds', title: 'Rounds', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO' }
+// Monday 19 October: 08:00 in Paris, 01:00 in Chicago
+// Monday 26 October: 08:00 in Paris, 02:00 in Chicago (Europe has changed, America not yet)
+// Monday 2 November: 08:00 in Paris, 01:00 in Chicago again
+```
+
+An occurrence that would fall in an hour skipped in spring is moved forward,
+and one in the repeated hour in autumn takes the first. How the engine
+decides, and how an occurrence is told from its twin, is in
+[Recurrence](../recurrence/).
+
+## One store, several zones
+
+To compare zones, give each calendar the same
+[`store`](../../options/store/) and its own `timeZone`: four calendars show
+the same events in four sets of hours, and an event moved in one moves in all.
+The repository's `dst.html` playground does it with Paris, Chicago, Lord Howe
+and Sydney.
+
+[`secondaryCalendar`](../../options/secondary-calendar/) is another thing: it
+adds a second *calendar system* (the Hijri date under the Gregorian one), not
+a second zone.
+
+<Aside>
+The time grid has one axis, in the calendar's zone. There is no second column
+of hours in another zone.
+</Aside>
+
+## See also
+
+- [`timeZone`](../../options/time-zone/) — the zone, and what throws.
+- [`timeGrid`](../../options/time-grid/) — the axis, `'wall'` or `'elapsed'`.
+- [`nowIndicator`](../../options/now-indicator/) — the line at "now", in this zone.
+- [`scrollTime`](../../options/scroll-time/) — where the grid first opens.
+- [`onProblem`](../../options/on-problem/) — `zone-from-browser`.
+- [Events](../events/), [Event sources](../event-sources/) and [Recurrence](../recurrence/).

@@ -67,6 +67,7 @@ export interface CalendarProblem {
    * a year): the first 2 000 are drawn — said once a series, again if it comes back.
    */
   readonly code: 'events-not-drawn' | 'host-no-height' | 'zone-from-browser' | 'too-many-occurrences';
+  /** For the developer, in the calendar's language (`messages.problem`); programs read `code`. */
   readonly detail: string;
   readonly element?: HTMLElement;
 }

@@ -40,6 +40,20 @@
 
 ### Fixed
 
+- A view's days and fixed period (every day hidden, `hiddenDays` outside 1–7,
+  a `visibleRange` that ends before it starts or shows no day) are refused
+  when the calendar is made, for every view in `views` (18j-3, batch 2). A
+  view not shown first was accepted and threw when first shown — from a
+  header button's click.
+- A `defineView` definition given under another name in `views` is that
+  name's view (owner, 2026-11-01): its `type` replaced the key, so
+  `view.type` was not the name given and its header button never showed
+  pressed.
+- `TimedEvent.zoneGuessed`'s description: a guessed zone is the calendar's
+  when the event was read, kept after a zone change (it said the event
+  followed the calendar). React's and Vue's `initial` no longer name
+  `firstDay` and `rules` as read once: both are live.
+
 - A source's event made a series (`event.repeat`), or a source's series made
   a single event (`series.rule` null), stays the source's: undo then redo
   works (redo failed), the source withdrawing the id takes it away (the series
@@ -100,6 +114,14 @@
   `onResourceProblems`.
 
 ### Added
+
+- A `CalendarProblem`'s `detail` is in the calendar's language (owner,
+  2026-11-01): `DzMessages.problem(p)` (`ProblemWords`: `host-no-height`,
+  `zone-from-browser`, `too-many-occurrences`, `events-not-drawn`), in
+  English, French, Arabic, German and Spanish; a language of one's own
+  defines it too (a full `DzMessages` needs the new member). The kernel's
+  data problems keep an English `detail`. Budgets, owner: dom 59 224,
+  locales ar 3 111, es 2 440, de 2 508.
 
 - `icalSource` takes `staleAfter` and `retry`, as the other sources.
 - A change of the calendar's zone asks again the sources whose answer depends

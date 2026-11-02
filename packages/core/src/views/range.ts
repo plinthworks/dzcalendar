@@ -23,7 +23,8 @@ function datesBetween(start: PlainDate, end: PlainDate, spec: ViewSpec): PlainDa
  */
 /**
  * A view's settings readable before any range is made: a duration, a day
- * count, a step and a fixed period that make a period. A `RangeError` names
+ * count, a step, hidden days and a fixed period that make a period — checked
+ * when the calendar is made, for every view, not when one is first shown. A `RangeError` names
  * what is wrong (options are refused whole, as elsewhere).
  */
 export function assertViewSpec(spec: ViewSpec): void {
@@ -42,16 +43,25 @@ export function assertViewSpec(spec: ViewSpec): void {
   if (!Array.isArray(spec.hiddenDays)) throw new RangeError(`${spec.type}: hiddenDays is a list of ISO weekdays`);
   const r = spec.visibleRange;
   if (r !== undefined && !(r && r.start instanceof Temporal.PlainDate && r.end instanceof Temporal.PlainDate)) throw new RangeError(`${spec.type}: visibleRange is { start, end } as PlainDate`);
+  assertDays(spec);
+}
+
+/** Days that make a period: weekdays 1 to 7, not every one hidden, a fixed period that ends after it starts and shows a day. */
+function assertDays(spec: ViewSpec): void {
+  if (spec.hiddenDays.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw new RangeError(`${spec.type}: hiddenDays are ISO weekdays, 1 to 7`);
+  if (new Set(spec.hiddenDays).size >= 7) throw new RangeError(`${spec.type}: every day of the week is hidden`);
+  if (!spec.visibleRange) return;
+  const { start, end } = spec.visibleRange;
+  if (Temporal.PlainDate.compare(start, end) >= 0) throw new RangeError(`${spec.type}: visibleRange ends before it starts (its end is exclusive)`);
+  if (datesBetween(start, end, spec).length === 0) throw new RangeError(`${spec.type}: visibleRange shows no day (every one of its days is hidden)`);
 }
 
 export function computeViewRange(anchor: PlainDate, spec: ViewSpec, ctx: NavContext): ViewRange {
-  if (spec.hiddenDays.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw new RangeError(`${spec.type}: hiddenDays are ISO weekdays, 1 to 7`);
-  if (new Set(spec.hiddenDays).size >= 7) throw new RangeError(`${spec.type}: every day of the week is hidden`);
+  // Checked again here: the global hiddenDays may have joined the view's since it was made.
+  assertDays(spec);
   if (spec.visibleRange) {
     // A fixed period: the same whatever the anchor; a grid's rows run from the week's first day.
     const { start, end } = spec.visibleRange;
-    if (Temporal.PlainDate.compare(start, end) >= 0) throw new RangeError(`${spec.type}: visibleRange ends before it starts (its end is exclusive)`);
-    if (datesBetween(start, end, spec).length === 0) throw new RangeError(`${spec.type}: visibleRange shows no day (every one of its days is hidden)`);
     if (spec.family === 'dayGrid') {
       // A grid's rows are whole weeks (its columns line up under the weekdays): the days around the period pad them, as a month's do.
       const from = startOfWeek(start, ctx.firstDay);

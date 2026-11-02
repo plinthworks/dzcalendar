@@ -125,6 +125,22 @@ return {
   redone: 'تمت الإعادة',
   moveEvent: 'نقل…',
   resizeEvent: 'تغيير المدة…',
+  problem: (p) => {
+    switch (p.code) {
+      case 'host-no-height':
+        return p.height === 0
+          ? `ارتفاع التقويم ${iso('0 px')}: العنصر الحاضن بلا ارتفاع (عنصر سطري، مثل ${iso('<dz-calendar>')} دون ${iso('display: block')}؟)`
+          : `ارتفاع التقويم ${iso(`${p.height} px`)} ولا شيء فيه يُمرَّر: ارتفاعه يأتي من محتواه — أعطِ العنصر الحاضن ارتفاعًا (${iso('--dz-height: 100%')} تعني كامل ارتفاع الحاضن، ويلزمه ارتفاع خاص به)`;
+      case 'zone-from-browser':
+        return `لم يُحدَّد ${iso('timeZone')}: تُستعمل منطقة المتصفح (${iso(p.zone)}) — مرِّر ${iso('timeZone')} (أو ${iso('Temporal.Now.timeZoneId()')} لمنطقة المتصفح عن قصد)`;
+      case 'too-many-occurrences':
+        return `السلسلة ${iso(p.series)}: أكثر من ${n(p.limit)} تكرار في الفترة المعروضة — تُرسَم الأولى منها فقط`;
+      case 'events-not-drawn':
+        return p.reason === 'all-day'
+          ? `${events(p.count)} طوال اليوم في ${iso(p.view)}: ${iso('allDaySlot')} قيمته ${iso('false')}، فلا تُرسَم (تبقى الخلفيات ملوِّنةً أعمدتها)`
+          : `${events(p.count)} في ${iso(p.view)} خارج الساعات المعروضة كليًّا (${iso('slotMin–slotMax')}): لا تُرسَم`;
+    }
+  },
 };
 }
 

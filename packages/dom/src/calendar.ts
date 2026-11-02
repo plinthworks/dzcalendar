@@ -2,7 +2,7 @@ import { decorate, flushMounts, holder, undecorate } from './render/hooks.js';
 import type { ElementHooks, HeaderItemCtx } from './render/hooks.js';
 import { sameFormats } from './render/formats.js';
 import type { Formats } from './render/formats.js';
-import { actionsFor, assertBusinessHours, assertTimeGrid, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, loadTemporal, Temporal, temporalReady } from '@dzcalendar/core';
+import { actionsFor, assertBusinessHours, DEFAULT_OCCURRENCE_LIMIT, assertTimeGrid, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, loadTemporal, Temporal, temporalReady } from '@dzcalendar/core';
 import type { CalEvent, Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
 import { attachInteractions } from './interact/host.js';
@@ -898,7 +898,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   const checkBox = () => {
     if (!win || scope.isDisposed || !root.isConnected || root.getClientRects().length === 0) return;
     const h = root.getBoundingClientRect().height;
-    if (h === 0) return ctx.problem({ code: 'host-no-height', detail: 'the calendar is 0 px tall: its host has no height (an inline element, such as a <dz-calendar> without display: block?)', element: root });
+    if (h === 0) return ctx.problem({ code: 'host-no-height', detail: ctx.messages.problem({ code: 'host-no-height', height: 0 }), element: root });
     const scroller = root.querySelector('.dz-tg__body, .dz-dg__body, .dz-list, .dz-tl__scroller');
     // Nothing scrolls to speak of (a few pixels of a last row aside): the hours or the weeks are as tall as their content.
     // A height given in absolute terms (px, rem, vh — or the default 40rem) is the application's: tall on purpose.
@@ -906,7 +906,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
     const relative = given !== '' && /%|auto|fit-content|max-content|min-content/.test(given);
     if (!(relative && h > win.innerHeight * 1.5 && scroller && scroller.scrollHeight - scroller.clientHeight < scroller.scrollHeight * 0.1)) return ctx.problemGone('host-no-height');
     {
-      ctx.problem({ code: 'host-no-height', detail: `the calendar is ${Math.round(h)} px tall and nothing in it scrolls: its height comes from its content — give its host a height (--dz-height: 100% is 100% of the host's height, which needs one of its own)`, element: root });
+      ctx.problem({ code: 'host-no-height', detail: ctx.messages.problem({ code: 'host-no-height', height: Math.round(h) }), element: root });
     }
   };
   /** What was last drawn: the "from" of the next change. */
@@ -946,7 +946,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
     const vm = kernel.viewModel();
     // A series cut short in what is shown is said, once a series; one no longer cut may be said again.
     const cuts = kernel.viewProblems().filter((p) => p.code === 'too-many-occurrences');
-    for (const p of cuts) ctx.problem({ code: 'too-many-occurrences', detail: `${p.path.replace(/^series:/, 'series ')}: ${p.detail ?? ''} — the first ones are drawn`, element: root }, p.path);
+    for (const p of cuts) ctx.problem({ code: 'too-many-occurrences', detail: ctx.messages.problem({ code: 'too-many-occurrences', series: p.path.replace(/^series:/, ''), limit: DEFAULT_OCCURRENCE_LIMIT }), element: root }, p.path);
     for (const path of toldCuts) if (!cuts.some((p) => p.path === path)) ctx.problemGone('too-many-occurrences', path);
     toldCuts = cuts.map((p) => p.path);
     let v: ViewController;
@@ -984,7 +984,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       win?.requestAnimationFrame(() => win.requestAnimationFrame(checkBox));
       // No zone given: the device's is used — said once (Sehhaty, a patient's phone set to Tokyo: every slot outside the grid).
       if (!options.kernel && !options.timeZone) {
-        ctx.problem({ code: 'zone-from-browser', detail: `no timeZone given: the browser's (${kernel.getState().timeZone}) is used — pass timeZone (Temporal.Now.timeZoneId() for the browser's on purpose)`, element: root });
+        ctx.problem({ code: 'zone-from-browser', detail: ctx.messages.problem({ code: 'zone-from-browser', zone: kernel.getState().timeZone }), element: root });
       }
       if (vm.family === 'timeline' && v.scrollTo) {
         // A timeline scrolls along time: to that hour of today when shown, else of its first day.

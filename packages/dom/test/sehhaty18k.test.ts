@@ -80,6 +80,7 @@ describe('runtime problems: onProblem, else the console once per code', () => {
   it('all-day events in a time grid without its all-day row: events-not-drawn, told once', () => {
     const told: string[] = [];
     const { cal } = mount({
+      locale: 'en-GB',
       allDaySlot: false,
       onProblem: (p) => told.push(`${p.code}: ${p.detail}`),
       events: [
@@ -111,6 +112,7 @@ describe('after the 18k review', () => {
   it('a problem gone and back is told again; events outside the hours are told too', () => {
     const told: string[] = [];
     const { cal } = mount({
+      locale: 'en-GB',
       allDaySlot: false,
       timeGrid: { slotMin: { hours: 8 }, slotMax: { hours: 18 } },
       onProblem: (p) => told.push(p.detail.split(':')[0]!),
@@ -234,5 +236,31 @@ describe('deleting and Enter, after the 18j review', () => {
     const byId = (id: string) => [...cal.kernel.store.snapshot.allEvents()].find((e) => e.id === id)!;
     expect([mayDelete(byId('locked'), true), mayDelete(byId('free'), true), mayDelete(byId('free'), false)]).toEqual([false, true, false]);
     cal.destroy();
+  });
+});
+
+describe('the 18j-3 batch 2 review', () => {
+  it("a view's bad days or fixed period are refused when the calendar is made, not when the view is first shown", () => {
+    const d = (s: string) => Temporal.PlainDate.from(s);
+    for (const [bad, said] of [
+      [{ family: 'timeGrid', visibleRange: { start: d('2026-11-13'), end: d('2026-11-03') } }, 'visibleRange ends before it starts'],
+      [{ family: 'dayGrid', duration: { weeks: 1 }, hiddenDays: [1, 2, 3, 4, 5, 6, 7] }, 'every day of the week is hidden'],
+      [{ family: 'dayGrid', duration: { weeks: 1 }, hiddenDays: [0] }, 'ISO weekdays, 1 to 7'],
+    ] as const) {
+      const host = document.body.appendChild(document.createElement('div'));
+      expect(() => createCalendar(host, { timeZone: 'Europe/Paris', initialView: 'dayGridMonth', views: { other: bad } } as unknown as CalendarOptions)).toThrow(said);
+    }
+  });
+
+  it("a problem's detail is in the calendar's language; its code stays", () => {
+    const told: string[] = [];
+    const fr = mount({ allDaySlot: false, onProblem: (p) => told.push(`${p.code}: ${p.detail}`), events: [{ id: 'conf', start: '2026-10-20', allDay: true }] });
+    fr.cal.destroy();
+    const en = mount({ locale: 'en-GB', allDaySlot: false, onProblem: (p) => told.push(`${p.code}: ${p.detail}`), events: [{ id: 'conf', start: '2026-10-20', allDay: true }] });
+    en.cal.destroy();
+    expect(told).toEqual([
+      'events-not-drawn: 1 événement(s) sur la journée dans timeGridWeek : allDaySlot vaut false, ils ne sont pas dessinés (les fonds colorent toujours leurs colonnes)',
+      'events-not-drawn: 1 all-day event(s) in timeGridWeek: allDaySlot is false, so they are not drawn (backgrounds still wash their columns)',
+    ]);
   });
 });

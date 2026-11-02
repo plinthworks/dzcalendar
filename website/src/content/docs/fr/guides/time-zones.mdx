@@ -1,0 +1,445 @@
+---
+title: "Fuseaux horaires et changements d'heure"
+description: "Des événements dans leur propre fuseau, le fuseau dans lequel le calendrier est dessiné, le changer en cours de route, et les journées de 23, 25 ou 23,5 heures dessinées telles qu'elles sont."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Deux fuseaux sont toujours à l'œuvre : celui dans lequel **chaque événement**
+a été fixé, et celui dans lequel **le calendrier** est dessiné. Aucun n'est
+converti dans l'autre. L'événement garde le sien, le calendrier dit où il
+tombe à l'écran, et une journée dure ce que les horloges de ce fuseau en font.
+
+## Chaque événement garde son fuseau
+
+Un événement horaire nomme son fuseau dans son `start` : `…[Europe/Paris]`
+est une chaîne ISO 8601 suivie du nom IANA entre crochets, la forme qu'écrit
+Temporal. Un `ZonedDateTime` de Temporal fait de même. Le fuseau fait partie
+de l'événement ; ce n'est pas un choix d'affichage :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'timeGridWeek',
+  events: [
+    { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    // Dix heures à Chicago : dessiné à 17 h à Paris.
+    { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    // Il part d'un fuseau et atterrit dans un autre.
+    { id: 'c', title: 'Vol pour Tokyo', start: '2026-10-21T13:00[Europe/Paris]', end: '2026-10-22T08:00[Asia/Tokyo]' },
+  ],
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [events]="events" />`,
+})
+export class Agenda {
+  readonly events: EventInput[] = [
+    { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+    { id: 'c', title: 'Vol pour Tokyo', start: '2026-10-21T13:00[Europe/Paris]', end: '2026-10-22T08:00[Asia/Tokyo]' },
+  ];
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const EVENTS: EventInput[] = [
+  { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Vol pour Tokyo', start: '2026-10-21T13:00[Europe/Paris]', end: '2026-10-22T08:00[Asia/Tokyo]' },
+];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" events={EVENTS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const events: EventInput[] = [
+  { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } },
+  { id: 'c', title: 'Vol pour Tokyo', start: '2026-10-21T13:00[Europe/Paris]', end: '2026-10-22T08:00[Asia/Tokyo]' },
+];
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :events="events" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Un décalage seul (`2026-10-22T10:00-05:00`) ne nomme pas un fuseau : Chicago
+est à -05:00 en octobre et à -06:00 en décembre. Un tel événement est lu dans
+le fuseau du calendrier et signalé comme une supposition (`offset-only`) ; il
+en va de même d'un début écrit sans aucun fuseau (`zone-defaulted`).
+L'événement est affiché ; le problème se lit dans
+`calendar.kernel.getProblems()?.problems`, comme l'explique le guide
+[Événements](../events/). Un instant terminé par `Z` est exact mais ne nomme
+pas non plus de fuseau : il est donc signalé lui aussi comme `offset-only`.
+Pour éviter la supposition, donnez le fuseau entre crochets
+(`…[Europe/Paris]`) ou dans le champ `timeZone` de l'événement.
+
+## Le fuseau du calendrier
+
+[`timeZone`](../../options/time-zone/) est le fuseau IANA dans lequel les
+jours et les heures sont dessinés. L'appel ci-dessus, fixé à 10 h à Chicago,
+tombe à 17 h dans un calendrier réglé sur `'Europe/Paris'`, et à 10 h dans un
+calendrier réglé sur `'America/Chicago'`. Le jour courant et « maintenant »
+sont eux aussi ceux de ce fuseau ; le premier jour de la semaine vient des
+paramètres régionaux (ou de `firstDay`).
+
+Sans `timeZone`, le calendrier prend celui du navigateur — et le dit, une
+fois, par le problème `zone-from-browser` (via
+[`onProblem`](../../options/on-problem/), ou dans la console sans lui). Un
+écran de clinique resté sur un portable réglé sur Tokyo dessinerait à 22 h le
+14 h d'Alger. Quand c'est bien le fuseau du lecteur que vous voulez, dites-le,
+et le problème ne se pose plus :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal, loadTemporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+// Safari va chercher son Temporal d'abord ; ailleurs, cela rend la main aussitôt.
+await loadTemporal();
+
+createCalendar(element, {
+  timeZone: Temporal.Now.timeZoneId(),
+  onProblem: (problem) => console.warn(problem.code, problem.detail),
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+Les navigateurs qui ont leur propre Temporal l'utilisent ; les autres (Safari,
+et tous les navigateurs d'iOS) chargent une fois un polyfill, environ 25 ko
+compressés, par `@tzslot/core` : une application qui emploie DzCalendar et
+tzslot n'a ainsi qu'un seul jeu de classes Temporal. Attendez `loadTemporal()`
+avant votre première valeur Temporal ; le calendrier, lui, attend tout seul,
+et `calendar.ready` se résout une fois qu'il est dessiné.
+
+## Changer de fuseau en cours de route
+
+Une personne qui voyage, un régulateur qui regarde une autre ville : le
+fuseau se change à chaud, et chaque événement prend sa place dans le nouveau.
+Rien n'est rechargé, sauf si une source dépend du fuseau (plus bas), aucun événement ne change — seul change l'endroit où il
+est dessiné.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  events: [{ id: 'call', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 } }],
+});
+
+// Les mêmes événements, aux heures de Chicago.
+calendar.update({ timeZone: 'America/Chicago' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <select (change)="zone.set($any($event.target).value)">
+      <option value="Europe/Paris">Paris</option>
+      <option value="America/Chicago">Chicago</option>
+    </select>
+    <dz-calendar [timeZone]="zone()" />`,
+})
+export class Agenda {
+  readonly zone = signal('Europe/Paris');
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [zone, setZone] = useState('Europe/Paris');
+  return (
+    <>
+      <select value={zone} onChange={(e) => setZone(e.target.value)}>
+        <option value="Europe/Paris">Paris</option>
+        <option value="America/Chicago">Chicago</option>
+      </select>
+      <DzCalendar timeZone={zone} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const zone = ref('Europe/Paris');
+</script>
+
+<template>
+  <select v-model="zone">
+    <option value="Europe/Paris">Paris</option>
+    <option value="America/Chicago">Chicago</option>
+  </select>
+  <DzCalendar :time-zone="zone" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Deux précisions. Un événement qui a seulement *supposé* son fuseau (voir
+plus haut) a pris le fuseau du calendrier au moment où il a été lu ; un changement de
+fuseau ultérieur ne le relit pas, donc nommez le fuseau pour l'éviter. Et un
+nom qui n'est pas un fuseau lève une `RangeError` sans rien changer (les
+frameworks la passent à `onError` au lieu de la lever) : vérifiez ce qu'une
+personne a saisi avant de le transmettre.
+
+### Les sources et le nouveau fuseau
+
+Une [source](../event-sources/) d'événements n'est redemandée que si sa
+réponse dépend du fuseau. Une `jsonSource` qui envoie le fuseau (c'est son
+réglage par défaut) est redemandée dans le nouveau, ses événements restant à
+l'écran jusqu'à la réponse. Une source écrite par vos soins ne l'est pas :
+ses tranches sont des dates, les mêmes partout. Si votre fonction répond
+différemment selon le fuseau, dites-le avec `zoneDependent` :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { fnSource } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  sources: [
+    fnSource(
+      'shifts',
+      async ({ window, signal }) => {
+        const res = await fetch(`/api/shifts?from=${window!.startDate}&to=${window!.endDate}`, { signal });
+        return res.json();
+      },
+      { zoneDependent: true },
+    ),
+  ],
+});
+
+calendar.update({ timeZone: 'Asia/Tokyo' }); // « shifts » est redemandée
+```
+
+</Fragment>
+</CodeTabs>
+
+## Les événements sur la journée n'ont pas de fuseau
+
+`{ start: '2026-10-23', allDay: true }` est une date, non un instant : le 23
+pour un lecteur à Paris, à Tokyo ou à Chicago, quel que soit le fuseau dans
+lequel le calendrier est affiché. Changer `timeZone` ne la déplace pas, et ce
+n'est jamais « le 22 à 18 h quelque part ». Un congrès du 26 au 29 (`end` est
+exclusif) couvre partout les trois mêmes jours.
+
+Employez-les pour ce qui tient à une date — un jour férié, un anniversaire,
+un jour de congé — et un événement horaire pour ce qui tient à un instant.
+
+## Des journées de 23 et de 25 heures
+
+Deux fois par an, les horloges d'un fuseau sautent. À Paris, le dimanche 29
+mars 2026, elles passent de 2 h à 3 h : la journée dure 23 heures. Le dimanche
+25 octobre, elles reculent de 3 h à 2 h : la journée dure 25 heures. Chicago
+fait de même les 8 mars et 1<sup>er</sup> novembre 2026 ; Lord Howe, au large
+de l'Australie, décale d'une demi-heure.
+
+La grille horaire dessine ces journées telles qu'elles sont, dans le fuseau du
+calendrier. La semaine ci-dessous contient le 25 octobre : le dimanche compte
+deux fois l'heure de 2 h à 3 h, et une bande sur la colonne du dimanche la
+signale. Quelques points à regarder :
+
+- l'événement de la nuit de samedi va de 22 h à 5 h à l'heure affichée, et
+  dure huit heures réelles, non sept ;
+- « Lecture depuis Chicago » est fixée à 10 h à Chicago, dont les horloges n'ont
+  pas encore changé : elle est dessinée à 17 h le samedi et à 16 h le dimanche,
+  une fois celles de Paris passées à l'heure d'hiver ;
+- la consultation du lundi, avant le changement, à Paris, est à 9 h comme toujours.
+
+<LiveDemo
+  label="La semaine du 25 octobre 2026 à Paris : un dimanche de 25 heures"
+  height={620}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-25',
+    locale: 'fr-FR',
+    timeZone: 'Europe/Paris',
+    scrollTime: 'PT0H',
+    events: [
+      { id: 'night', title: 'Garde de nuit', start: '2026-10-24T22:00[Europe/Paris]', duration: { hours: 8 }, tone: 'violet' },
+      { id: 'chi', title: 'Lecture depuis Chicago', start: '2026-10-24T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'chi2', title: 'Lecture depuis Chicago', start: '2026-10-25T10:00[America/Chicago]', duration: { hours: 1 } },
+      { id: 'mon', title: 'Consultation', start: '2026-10-19T09:00[Europe/Paris]', duration: { minutes: 45 } },
+    ],
+  }}
+/>
+
+### L'heure qui n'existe pas, l'heure qui revient
+
+Par défaut, les rangées de la grille restent alignées d'un jour à l'autre :
+9 h est à la même hauteur tous les jours de la semaine. C'est la lecture de
+l'heure locale — l'axe `'wall'` de [`timeGrid`](../../options/time-grid/).
+Un jour de changement d'heure :
+
+- l'heure qui n'existe pas (de 2 h à 3 h le 29 mars à Paris) est une bande
+  hachurée, pour que personne n'y cherche un événement ;
+- l'heure qui revient (de 2 h à 3 h le 25 octobre) est elle aussi marquée par
+  une bande, et ses deux lectures partagent les mêmes rangées.
+
+Un événement garde sa vraie place dans le temps : celui qui commence au premier passage de 2 h 30 et celui qui commence au second
+sont dessinés côte à côte, dans les mêmes rangées, chacun avec son décalage
+(+02:00, +01:00), l'heure du second portant la marque `*`, pour qu'on les
+distingue.
+
+### Le temps réel, à l'échelle
+
+Quand la grille doit montrer combien dure une chose plutôt que ce que lit
+l'horloge, passez l'axe à `'elapsed'` : l'heure répétée apparaît deux fois et
+le dimanche de 25 heures est plus haut d'une heure que les jours voisins.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'timeGridWeek' });
+
+calendar.update({ timeGrid: { axis: 'elapsed' } });
+```
+
+</Fragment>
+</CodeTabs>
+
+### Une demi-heure : Lord Howe
+
+Tous les changements ne valent pas une heure. L'île Lord Howe
+(`Australia/Lord_Howe`) décale ses horloges de 30 minutes : le dimanche 4
+octobre 2026, elles passent de 2 h à 2 h 30, et la journée dure 23 heures 30.
+La grille montre la demi-heure sautée comme elle montre l'heure sautée de
+Paris, en plus courte.
+
+<LiveDemo
+  label="Lord Howe, dimanche 4 octobre 2026 : une journée de 23 h 30"
+  height={560}
+  options={{
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-04',
+    locale: 'fr-FR',
+    timeZone: 'Australia/Lord_Howe',
+    scrollTime: 'PT0H',
+    timeGrid: { slotMinutes: 30 },
+    events: [
+      { id: 'a', title: 'Navette', start: '2026-10-04T09:00[Australia/Lord_Howe]', duration: { hours: 1 } },
+      { id: 'b', title: 'Veille', start: '2026-10-03T23:00[Australia/Lord_Howe]', duration: { hours: 4 } },
+    ],
+  }}
+/>
+
+## Événements et séries à travers un changement
+
+Un événement est un début et une durée, et les deux ne veulent pas dire la
+même chose à travers un changement. `duration: { hours: 8 }` fait huit heures
+réelles ; `{ days: 1 }` est un jour à l'heure locale, donc 25 heures le 25
+octobre. Avec `start` et `end`, la fin est là où on l'a mise. Une garde de 22 h
+à 5 h dure huit heures cette nuit-là, et sept dans une semaine sans changement.
+
+Une **série** vit à l'heure locale de son fuseau, comme on l'entend. « Tous
+les lundis à 8 h à Paris » tombe à 8 h le lundi qui suit le retour à l'heure
+d'hiver — 6 h UTC en été, 7 h en hiver. Dessinée à Chicago, elle se décale
+d'une heure la semaine où l'Europe a changé d'heure et pas encore l'Amérique :
+
+```ts
+{ id: 'rounds', title: 'Visite des services', start: '2026-10-19T08:00[Europe/Paris]', duration: { hours: 2 }, rrule: 'FREQ=WEEKLY;BYDAY=MO' }
+// Lundi 19 octobre : 8 h à Paris, 1 h à Chicago
+// Lundi 26 octobre : 8 h à Paris, 2 h à Chicago (l'Europe a changé, pas encore l'Amérique)
+// Lundi 2 novembre : 8 h à Paris, de nouveau 1 h à Chicago
+```
+
+Une occurrence qui tomberait dans une heure sautée au printemps est avancée,
+et celle qui tombe dans l'heure répétée à l'automne prend la première. La
+façon dont le moteur tranche, et dont une occurrence se distingue de sa
+jumelle, est dans le guide [Récurrence](../recurrence/).
+
+## Un même magasin, plusieurs fuseaux
+
+Pour comparer des fuseaux, donnez le même [`store`](../../options/store/) à
+chaque calendrier et son propre `timeZone` : quatre calendriers montrent les
+mêmes événements à quatre jeux d'heures, et un événement déplacé dans l'un se
+déplace dans tous. La page de démonstration `dst.html` du dépôt le fait avec Paris,
+Chicago, Lord Howe et Sydney.
+
+[`secondaryCalendar`](../../options/secondary-calendar/) est autre chose : il
+ajoute un second *système de calendrier* (la date hégirienne sous la date
+grégorienne), non un second fuseau.
+
+<Aside>
+La grille horaire n'a qu'un axe, dans le fuseau du calendrier. Il n'y a pas
+de seconde colonne d'heures dans un autre fuseau.
+</Aside>
+
+## Voir aussi
+
+- [`timeZone`](../../options/time-zone/) — le fuseau, et ce qui lève une erreur.
+- [`timeGrid`](../../options/time-grid/) — l'axe, `'wall'` ou `'elapsed'`.
+- [`nowIndicator`](../../options/now-indicator/) — la ligne de « maintenant », dans ce fuseau.
+- [`scrollTime`](../../options/scroll-time/) — l'endroit où la grille s'ouvre.
+- [`onProblem`](../../options/on-problem/) — `zone-from-browser`.
+- [Événements](../events/), [Sources d'événements](../event-sources/) et [Récurrence](../recurrence/).

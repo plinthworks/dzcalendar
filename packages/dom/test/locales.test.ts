@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { Temporal } from '@dzcalendar/core';
 import { EN, FR, createCalendar, defineLocale, messagesForLocale } from '../src/index.js';
-import type { CalendarInstance, DzMessages } from '../src/index.js';
+import type { CalendarInstance, DzMessages, ProblemWords } from '../src/index.js';
 import { AR } from '../src/locales/ar.js';
 import { ES } from '../src/locales/es.js';
 import { DE } from '../src/locales/de.js';
@@ -35,6 +35,7 @@ const SAMPLES: Record<string, unknown> = {
   range: { from: 'A', to: 'B' },
   selected: { span: 'S' },
   violation: 'overlap',
+  problem: { code: 'events-not-drawn', count: 2, view: 'timeGridWeek', reason: 'hours' },
   grabbed: { title: 'T' },
   eventDeleted: { title: 'T', undo: 'Ctrl+Z' },
   saveFailed: { title: 'T', reverted: true },
@@ -60,6 +61,23 @@ describe('locales: every word, in every language', () => {
       }
     });
   }
+
+  it("every problem's detail, in every language: said, filled, and different from English", () => {
+    const all: ProblemWords[] = [
+      { code: 'host-no-height', height: 0 },
+      { code: 'host-no-height', height: 2400 },
+      { code: 'zone-from-browser', zone: 'Asia/Tokyo' },
+      { code: 'too-many-occurrences', series: 'tick', limit: 2000 },
+      { code: 'events-not-drawn', count: 1, view: 'timeGridWeek', reason: 'all-day' },
+      { code: 'events-not-drawn', count: 3, view: 'timeGridDay', reason: 'hours' },
+    ];
+    for (const m of [FR, AR, ES, DE]) for (const p of all) {
+      const out = m.problem(p);
+      expect(out, p.code).not.toMatch(/undefined|\$\{/);
+      expect(out, p.code).not.toBe(EN.problem(p));
+    }
+    expect(FR.problem({ code: 'zone-from-browser', zone: 'Asia/Tokyo' })).toContain('Asia/Tokyo');
+  });
 
   it('Arabic counts take their six plural forms; digits are the ones Intl gives for ar', () => {
     const forms = [0, 1, 2, 3, 11, 100].map((c) => AR.dayLabel({ date: 'D', count: c }));
