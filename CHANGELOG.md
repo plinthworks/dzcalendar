@@ -182,6 +182,14 @@
   Vue controllers and `<dz-calendar>`). `timeline.follow` keeps the present
   in view, paused by the person's own move along time, taken up by "Today".
   `playground/supervision.html` shows both.
+- `timeline.span` (owner, 2026-11-04): the time a timeline shows at once
+  (`{ hours: 4 }`), whatever the room — a slot's width computed from it and
+  measured again on a resize. Changed live by `update()`, it keeps the
+  minute at the centre in place, the present while following: four hours on
+  screen that slide with the clock. While following, the present's slot
+  now sits at the left edge (at 22:47 in quarters, 22:45), the view moving
+  on when the next slot begins. The supervision playground offers 1 h,
+  4 h, 12 h, 24 h or the whole period.
 - A timeline's background events take the event content hook's label, as a
   time grid's do (`background: true`): « Maintenance » written at the start
   of its window, kept in view while the row scrolls by, read by a screen

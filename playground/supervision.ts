@@ -82,6 +82,12 @@ const el = (tag: string, cls: string, text = '') => Object.assign(document.creat
 
 const log = document.querySelector<HTMLElement>('#log')!;
 const stepOf = () => document.querySelector<HTMLSelectElement>('#step')!.value || undefined;
+// `?span=` (the browser checks): another time shown at first, empty for the whole period.
+const spanAsked = new URLSearchParams(location.search).get('span');
+if (spanAsked !== null) document.querySelector<HTMLSelectElement>('#span')!.value = spanAsked;
+const spanOf = () => document.querySelector<HTMLSelectElement>('#span')!.value || undefined;
+// A slot that suits the time shown: its head says a time that fits (24 h in quarters of an hour would be 96 heads).
+const slotOf = (span: string | undefined) => (span === 'P1D' ? 60 : span === 'PT12H' ? 30 : 15);
 const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   motion: createGsapMotion(),
   timeZone: ZONE,
@@ -93,7 +99,7 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   headerViews: [],
   resources: processes,
   events: history,
-  timeline: { slot: 15, step: stepOf(), follow: true, maxLanes: 2 },
+  timeline: { slot: slotOf(spanOf()), span: spanOf(), step: stepOf(), follow: true, maxLanes: 2 },
   hooks: {
     event: {
       // The card, by kind: what happened, how it went, and when — to the second.
@@ -139,6 +145,7 @@ function feed(): void {
 }
 if (!fixed) setInterval(feed, 5000);
 
+document.querySelector<HTMLSelectElement>('#span')!.addEventListener('change', () => cal.update({ timeline: { span: spanOf(), slot: slotOf(spanOf()) } }));
 document.querySelector<HTMLSelectElement>('#step')!.addEventListener('change', () => cal.update({ timeline: { step: stepOf() } }));
 document.querySelector<HTMLInputElement>('#follow')!.addEventListener('change', (e) => cal.update({ timeline: { follow: (e.target as HTMLInputElement).checked } }));
 document.querySelector<HTMLButtonElement>('#back45')!.addEventListener('click', () => cal.shift({ minutes: -45 }));

@@ -70,6 +70,12 @@ export interface ModelOptions {
      * @default false
      */
     readonly follow?: boolean | undefined;
+    /**
+     * The time shown at once (`{ hours: 4 }`): a slot's width is the room shared by that many slots, measured again
+     * when the calendar's size changes. Days, hours and minutes; longer than the period, the period fits. A change keeps
+     * the moment at the centre in place (the present while following). Without it, the stylesheet's `--dz-tl-slot`.
+     */
+    readonly span?: DurationLike | undefined;
   };
   /** How sibling resources are ordered after their `order`: field names (`'-title'` descending) or a comparison. */
   readonly resourceOrder?: ResourceOrder | undefined;
@@ -369,12 +375,17 @@ export function assertTimeline(t: NonNullable<ModelOptions['timeline']>): void {
     if (v !== undefined && !(Number.isInteger(v) && v >= 1)) throw new RangeError(`timeline.${k} must be a whole number ≥ 1: ${String(v)}`);
   }
   if (t.step !== undefined) timeStep(t.step);
+  if (t.span !== undefined) timeSpan(t.span);
   if (t.follow !== undefined && typeof t.follow !== 'boolean') throw new RangeError(`timeline.follow is true or false: ${String(t.follow)}`);
 }
 
 /** The step kept as its ISO text: the same step given again (a framework's new object each render) changes nothing. */
-const stepAsText = <T extends NonNullable<ModelOptions['timeline']>>(t: T): T =>
-  t.step === undefined ? t : { ...t, step: Temporal.Duration.from(t.step).toString() };
+// A duration given again as a new object (a framework's next render) is the same option: compared as text.
+const stepAsText = <T extends NonNullable<ModelOptions['timeline']>>(t: T): T => ({
+  ...t,
+  ...(t.step !== undefined && { step: Temporal.Duration.from(t.step).toString() }),
+  ...(t.span !== undefined && { span: Temporal.Duration.from(t.span).toString() }),
+});
 
 /** A timeline's step in milliseconds: hours, minutes, seconds, longer than nothing (a day or more is a view's `dateIncrement`). */
 export function timeStep(d: DurationLike): number {
@@ -387,6 +398,20 @@ export function timeStep(d: DurationLike): number {
   if (dur.years || dur.months || dur.weeks || dur.days) throw new RangeError(`timeline.step is hours and minutes (a day or more is a view's dateIncrement): ${dur.toString()}`);
   const ms = dur.total({ unit: 'milliseconds' });
   if (!(ms > 0)) throw new RangeError(`timeline.step must be longer than nothing: ${dur.toString()}`);
+  return ms;
+}
+
+/** A timeline's span in milliseconds: days (of 24 hours), hours, minutes, longer than nothing. */
+export function timeSpan(d: DurationLike): number {
+  let dur: Duration;
+  try {
+    dur = Temporal.Duration.from(d);
+  } catch {
+    throw new RangeError(`timeline.span is not a duration: ${String(d)}`);
+  }
+  if (dur.years || dur.months || dur.weeks) throw new RangeError(`timeline.span is days, hours and minutes: ${dur.toString()}`);
+  const ms = dur.total({ unit: 'milliseconds' });
+  if (!(ms > 0)) throw new RangeError(`timeline.span must be longer than nothing: ${dur.toString()}`);
   return ms;
 }
 

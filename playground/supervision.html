@@ -32,8 +32,15 @@
   <body>
     <main>
       <h1>Supervision des traitements</h1>
-      <p>Une ligne par processus, sur trois jours. Les exécutions arrivent en direct (un flux simulé, comme un SSE) et s'inscrivent sur leur ligne : en cours, réussie, en échec ; des alertes (ambre) et des fenêtres de maintenance (en fond, violet) sur les mêmes lignes. ◀ ▶ glissent du pas choisi ; « Aujourd'hui » reprend le suivi de l'heure actuelle, mis en pause dès qu'on part dans le passé ou le futur.</p>
+      <p>Une ligne par processus, sur trois jours. Les exécutions arrivent en direct (un flux simulé, comme un SSE) et s'inscrivent sur leur ligne : en cours, réussie, en échec ; des alertes (ambre) et des fenêtres de maintenance (en fond, violet) sur les mêmes lignes. ◀ ▶ glissent du pas choisi ; « Aujourd'hui » reprend le suivi de l'heure actuelle, mis en pause dès qu'on part dans le passé ou le futur. « Afficher » règle le temps visible d'un coup (<code>timeline.span</code>) : 4 h à l'écran, qui glissent avec l'heure.</p>
       <div class="controls">
+        <label>Afficher <select id="span">
+          <option value="PT1H">1 h</option>
+          <option value="PT4H" selected>4 h</option>
+          <option value="PT12H">12 h</option>
+          <option value="P1D">24 h</option>
+          <option value="">tout (3 jours)</option>
+        </select></label>
         <label>Pas <select id="step">
           <option value="PT15M">15 min</option>
           <option value="PT1H">1 h</option>

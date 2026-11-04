@@ -1,4 +1,4 @@
-import { PrefixSums, Temporal, UNASSIGNED, fieldOf, formatTemporal } from '@dzcalendar/core';
+import { PrefixSums, Temporal, UNASSIGNED, fieldOf, formatTemporal, timeSpan } from '@dzcalendar/core';
 import type { Hit, Instant, PlainDate, Resource, ZonedDateTime } from '@dzcalendar/core';
 import {
   KeyedList,
@@ -35,8 +35,6 @@ export interface AreaColumn {
   readonly width?: number;
 }
 
-/** Where the present sits while followed: three quarters along the time shown, what just happened in view, a little of what comes. */
-const NOW_AT = 0.75;
 
 /** `viewOptions.timeline` (createCalendar / update). */
 export interface TimelineViewOptions {
@@ -182,6 +180,26 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   /** How far along time the scroller is, whatever the direction. */
   const scrolledAlong = () => Math.abs(scroller.scrollLeft);
   const scrollAlong = (v: number) => (scroller.scrollLeft = rtl() ? -v : v);
+  /** `timeline.span` as last drawn (text): another one keeps the centre (the present while following) in place. */
+  let spanSeen: string | undefined;
+  /** The axis the scale was last measured on: a scale changed on it is a resize (the place kept), not another period. */
+  let measuredAxis: TimelineModel['axis'] | null = null;
+  /** The room for time at that measure: the old centre is half of it along, whatever the room is now. */
+  let measuredShown = 0;
+  /**
+   * A slot's width (px per unit of the axis): with `timeline.span`, the room shared by that many slots (at most the
+   * period, at least one slot); else the stylesheet's, measured on the sheet. Read in any order, it gives the same:
+   * the room does not depend on the width written.
+   */
+  function scaleOf(m: TimelineModel, area: number): number {
+    if (m.axis.length === 0) return 0;
+    const span = ctx.kernel.getOptions().timeline?.span;
+    if (span === undefined) return (sheet.getBoundingClientRect().width - area) / m.axis.length;
+    const shown = scroller.clientWidth - area;
+    // No room for time (a resource area as wide as the calendar): the stylesheet's width, never a negative one.
+    if (!(shown > 0)) return (sheet.getBoundingClientRect().width - area) / m.axis.length;
+    return shown / Math.min(m.axis.length, Math.max(1, timeSpan(span) / (m.axis.slotMinutes * 60_000)));
+  }
 
   const opts = (): TimelineViewOptions => (ctx.viewOptions['timeline'] as TimelineViewOptions | undefined) ?? {};
   const columnsOf = (): readonly AreaColumn[] => {
@@ -1242,6 +1260,10 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       },
     });
   }
+  // The room for time changes without the calendar's box (a scrollbar come or gone as rows grow): a span measured again.
+  const RO = (doc.defaultView as (Window & { ResizeObserver?: typeof ResizeObserver }) | null)?.ResizeObserver;
+  const roomWatch = RO ? new RO(() => void (ctx.kernel.getOptions().timeline?.span !== undefined && measure(() => undefined))) : null;
+  roomWatch?.observe(scroller);
   /** One lane's height, from a bar-sized probe. */
   const probe = h(doc, 'div', 'dz-tl__probe');
   probe.setAttribute('aria-hidden', 'true');
@@ -1254,11 +1276,15 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       read: () => {
         const m = model;
         const area = corner.getBoundingClientRect().width;
-        const scale = m && m.axis.length > 0 ? (sheet.getBoundingClientRect().width - area) / m.axis.length : 0;
+        const scale = m ? scaleOf(m, area) : 0;
         const lane = lanePx();
-        return { scale, lane, state: scrollState(), area, top: head.getBoundingClientRect().height };
+        // A span's scale changed on the same axis (a resize, a scrollbar come or gone): the minute at the centre, read at
+        // the old scale, to keep in place (the present while following).
+        const shown = scroller.clientWidth - area;
+        const anchor = m && m.axis === measuredAxis && px > 0 && scale > 0 && scale !== px && ctx.kernel.getOptions().timeline?.span !== undefined ? m.axis.fromPosition((scrolledAlong() + measuredShown / 2) / px).epochMilliseconds : null;
+        return { scale, lane, state: scrollState(), area, top: head.getBoundingClientRect().height, anchor, shown };
       },
-      write: ({ scale, lane, state, area, top }) => {
+      write: ({ scale, lane, state, area, top, anchor, shown }) => {
         const m = model;
         if (!m) return;
         insetStart = area;
@@ -1267,6 +1293,16 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         const nextRow = lane > 0 ? m.maxLanes * lane + 8 : 0;
         const changed = scale !== px || nextRow !== rowPx;
         px = scale;
+        // A span sets the width the stylesheet would (the sheet drawn at the scale computed).
+        root.style.setProperty('--dz-tl-slot', ctx.kernel.getOptions().timeline?.span !== undefined && scale > 0 ? `${scale}px` : '');
+        measuredAxis = m.axis;
+        measuredShown = shown;
+        if (anchor !== null) {
+          const [at, frac] = following ? [nowSlot(m, ctx.kernel.now()), 0] : [anchor, 0.5];
+          scrollAlong(Math.max(0, m.axis.toPosition(at) * scale - frac * shown));
+          lastAlong = scrolledAlong();
+          lastRoom = room();
+        }
         rowPx = nextRow;
         groupPx = lane > 0 ? lane + 8 : 0;
         root.style.setProperty('--dz-tl-row', rowPx > 0 ? `${rowPx}px` : '');
@@ -1338,6 +1374,15 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         [...rowsHost.querySelectorAll<HTMLElement>('.dz-tl__row')].find((x) => x.dataset['key'] === headFocus)?.querySelector<HTMLElement>('.dz-tl__cell[role="rowheader"]')?.focus();
       }
       if (!cursorHits.has(cursorNode)) cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
+      // Another span: the moment at the centre of what is shown, read at the old scale, stays there.
+      const spanText = ctx.kernel.getOptions().timeline?.span;
+      const span = spanText === undefined ? undefined : Temporal.Duration.from(spanText).toString();
+      // (read on the old axis: the old scale is its; a slot changed with it is another axis)
+      const centre = prev && span !== spanSeen && px > 0 ? prev.axis.fromPosition((scrolledAlong() + (scroller.clientWidth - insetStart) / 2) / px).epochMilliseconds : null;
+      const centreHere = centre !== null && centre >= m.axis.start.epochMilliseconds && centre <= m.axis.end.epochMilliseconds;
+      spanSeen = span;
+      // No span: the stylesheet's width again before anything measures it.
+      if (span === undefined) root.style.removeProperty('--dz-tl-slot');
       measure(() => {
         if (!m.options.rows) fillLanes();
       });
@@ -1350,9 +1395,11 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       }
       // Another period without the present in it (the person went elsewhere, or started elsewhere): following pauses.
       if ((rescroll || !prev) && following && timelineNow(m, now) === null) following = false;
+      if (centre !== null && !rescroll) scrollAt(following ? nowSlot(m, now) : centre, following ? 0 : 0.5);
       if (rescroll) {
         if (landAt !== null) scrollAt(landAt, 0, () => (landAt = null));
-        else if (following) scrollAt(now.epochMilliseconds, NOW_AT);
+        else if (following) scrollAt(nowSlot(m, now), 0);
+        else if (centreHere) scrollAt(centre, 0.5);
         else scrollToMinutes(scrollMinutes);
       }
       return created;
@@ -1375,7 +1422,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       scrollMinutes = minutes;
       // A slide's landing, or the present followed, wins over the hour asked.
       if (landAt !== null) return;
-      if (following) return scrollAt(ctx.kernel.now().epochMilliseconds, NOW_AT);
+      if (following && model) return scrollAt(nowSlot(model, ctx.kernel.now()), 0);
       scrollToMinutes(minutes);
     },
 
@@ -1424,6 +1471,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     },
 
     destroy() {
+      roomWatch?.disconnect();
       undecorateAll(root);
       for (const p of parts.values()) {
         p.bars.clear();
@@ -1441,7 +1489,15 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     const m = model;
     if (!following || !m) return;
     if (timelineNow(m, now) === null) return ctx.kernel.navigate({ to: now.toZonedDateTimeISO(ctx.zone).toPlainDate() });
-    scrollAt(now.epochMilliseconds, NOW_AT);
+    scrollAt(nowSlot(m, now), 0);
+  }
+
+  /**
+   * Where the timeline stands while it follows the present (owner, 2026-11-04): the slot holding it at the left edge —
+   * at 22:47 in quarters of an hour, 22:45 — what comes after it in view; a step on when the next slot begins.
+   */
+  function nowSlot(m: TimelineModel, now: Instant): number {
+    return m.axis.fromPosition(Math.floor(m.axis.toPosition(now))).epochMilliseconds;
   }
 
   /** Scrolls so an instant (epoch ms) sits at `frac` of the time shown (0: the left edge), once the scale is read. */
@@ -1451,7 +1507,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     ctx.scheduler.schedule({
       read: () => {
         const area = corner.getBoundingClientRect().width;
-        return { scale: m.axis.length > 0 ? (sheet.getBoundingClientRect().width - area) / m.axis.length : 0, shown: scroller.clientWidth - area };
+        return { scale: scaleOf(m, area), shown: scroller.clientWidth - area };
       },
       write: ({ scale, shown }) => {
         then?.();
@@ -1473,8 +1529,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     {
       ctx.scheduler.schedule({
         read: () => {
-          const area = corner.getBoundingClientRect().width;
-          return m.axis.length > 0 ? (sheet.getBoundingClientRect().width - area) / m.axis.length : 0;
+          return scaleOf(m, corner.getBoundingClientRect().width);
         },
         write: (scale) => {
           if (!(scale > 0) || !Number.isFinite(scale)) return;

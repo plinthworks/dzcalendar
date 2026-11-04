@@ -316,6 +316,28 @@ describe('the timeline’s step and following the present', () => {
     expect(() => cal!.shift({ days: 1 })).toThrow('a day or more');
   });
 
+  it('a span is days, hours and minutes, longer than nothing — refused otherwise at creation and by update(); the same one again changes nothing', () => {
+    for (const [bad, said] of [
+      [{ span: { weeks: 1 } }, 'days, hours and minutes'],
+      [{ span: { months: 1 } }, 'days, hours and minutes'],
+      [{ span: { hours: 0 } }, 'longer than nothing'],
+      [{ span: 'wide' }, 'not a duration'],
+    ] as const) {
+      expect(() => mount([], { timeline: bad })).toThrow(said);
+      document.body.innerHTML = '';
+    }
+    mount([], { timeline: { span: { hours: 4 } } });
+    expect(() => cal!.update({ timeline: { span: { minutes: -30 } } })).toThrow('longer than nothing');
+    let states = 0;
+    const off = cal!.kernel.subscribe((e) => void (e.type === 'state' && states++));
+    cal!.update({ timeline: { span: { hours: 4 } } });
+    cal!.update({ timeline: { span: 'PT4H' } });
+    const same = states;
+    cal!.update({ timeline: { span: { days: 1 } } });
+    off();
+    expect([same, states, String(cal!.kernel.getOptions().timeline?.span)]).toEqual([0, 1, 'P1D']);
+  });
+
   it('the same step given again (a new object, a framework’s next render) changes nothing; another one does', () => {
     mount([], { timeline: { step: { minutes: 15 } } });
     let states = 0;

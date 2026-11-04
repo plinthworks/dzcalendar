@@ -961,7 +961,7 @@
     },
     {
       "name": "timeline",
-      "type": "{ readonly slot?: number | 'day'; readonly maxLanes?: number; readonly fillLanes?: number; readonly step?: DurationLike | undefined; readonly follow?: boolean | undefined }",
+      "type": "{ readonly slot?: number | 'day'; readonly maxLanes?: number; readonly fillLanes?: number; readonly step?: DurationLike | undefined; readonly follow?: boolean | undefined; readonly span?: DurationLike | undefined }",
       "resolved": null,
       "doc": "A timeline's scale and rows (the Pro's family reads them).",
       "default": null,
@@ -1006,6 +1006,14 @@
           "default": {
             "token": "slotPerSpan"
           },
+          "source": "packages/core/src/kernel.ts"
+        },
+        {
+          "name": "span",
+          "type": "DurationLike | undefined",
+          "resolved": null,
+          "doc": "The time shown at once (`{ hours: 4 }`): a slot's width is the room shared by that many slots, measured again when the calendar's size changes. Days, hours and minutes; longer than the period, the period fits. A change keeps the moment at the centre in place (the present while following). Without it, the stylesheet's `--dz-tl-slot`.",
+          "default": null,
           "source": "packages/core/src/kernel.ts"
         },
         {

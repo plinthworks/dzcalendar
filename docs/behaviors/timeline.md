@@ -26,12 +26,18 @@ keeps the area and the heads in place.
   where it was going. A one-day view stops at midnight on the way, a view of
   several days slides across it. `calendar.shift(by)` slides by any hours and minutes (a day or more throws, as the option).
   The keyboard's period keys still change period.
-- `timeline.follow` keeps the present three quarters along the time shown,
-  moved each minute, the period after it brought in past midnight. The
+- `timeline.follow` keeps the present's slot at the left edge (owner,
+  2026-11-04: at 22:47 in quarters of an hour, 22:45 — what comes is what a
+  supervisor watches), a step on when the next slot begins, the period after it brought in past midnight. The
   person's own move along time — a scroll (the bar, a finger, a wheel, the
   keyboard's cursor), a slide, a period without the present — pauses it;
   "Today" takes it up. Made for supervision, where a timeline shows what is
   running now and runs arrive by SSE (`run({ type: 'event.create' })`).
+- `timeline.span` (days, hours and minutes) is the time shown at once: a
+  slot's width is the room shared by that many slots (measured again on a
+  resize; the period at most, one slot at least), written as `--dz-tl-slot`.
+  A change by `update()` keeps the minute at the centre in place, the
+  present while following. Without it, the stylesheet's width.
 - A background event (a maintenance window) is a tint behind the row's
   events; the event content hook gives it a label (`background: true`),
   drawn at its start and kept in view while the row scrolls by.

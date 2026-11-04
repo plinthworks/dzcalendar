@@ -1712,7 +1712,7 @@ try {
     }
     // ── The timeline's step and following the present (supervision: three days of processes, 15-minute slots) ──
     {
-      const { p, errors } = await page('/supervision.html?now=2026-10-21T09:30:00Z');
+      const { p, errors } = await page('/supervision.html?now=2026-10-21T09:30:00Z&span=');
       await p.waitForSelector('.dz-tl__now');
       await p.waitForTimeout(300);
       // Where the scroller's left edge is (minutes from the axis start) and where the now line sits in the time shown (0 to 1).
@@ -1729,7 +1729,7 @@ try {
       const settle = () => p.waitForTimeout(150);
       const first = await at();
       // 09:30Z is 11:30 in Paris: 690 minutes into the 21st.
-      check('step: following, the present sits three quarters along the time shown', Math.abs(first.now - 0.75) < 0.01, JSON.stringify(first));
+      check('step: following, the present’s quarter at the left edge (11:30)', first.left === 690 && Math.abs(first.now) < 0.01, JSON.stringify(first));
       await p.click('.dz-toolbar__next');
       await settle();
       const next = await at();
@@ -1753,7 +1753,7 @@ try {
       const scrolled = await at();
       await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
       await settle();
-      check('step: "Today" takes following up again; the person’s own scroll pauses it', Math.abs(today.now - 0.75) < 0.01 && (await at()).left === scrolled.left, JSON.stringify({ today, scrolled, after: await at() }));
+      check('step: "Today" takes following up again; the person’s own scroll pauses it', Math.abs(today.now) < 0.01 && (await at()).left === scrolled.left, JSON.stringify({ today, scrolled, after: await at() }));
       // Six hours a press across the three days' end: up to the edge, then the next period where the slide was going.
       await p.selectOption('#step', 'PT6H');
       await p.click('.dz-toolbar__today');
@@ -1764,8 +1764,9 @@ try {
         await settle();
         walk.push(await at());
       }
-      const edge = walk[9];
-      const over = walk[10];
+      const turn = walk.findIndex((w) => w.from !== '2026-10-21');
+      const edge = walk[turn - 1] ?? walk[0];
+      const over = walk[turn] ?? walk[0];
       // The last edge holds the time shown before the 24th: 3 × 1440 minutes less what is shown; the next press is 6 hours on, in the period from the 23rd.
       const went = 2 * 1440 + over.left - edge.left;
       check('step: at the end of the axis the next period comes in, 6 hours on from the edge (no jump)', edge.from === '2026-10-21' && over.from === '2026-10-23' && went === 360, JSON.stringify(walk.map((w) => `${w.from} ${w.left}`)));
@@ -1778,7 +1779,7 @@ try {
       check('step: no console error', errors.length === 0, errors.join('\n'));
       await p.close();
       // With the motion on (GSAP's eased scroll): "Today" from another period lands on the present and keeps following.
-      const moving = await page('/supervision.html?now=2026-10-21T09:30:00Z', { reducedMotion: 'no-preference' });
+      const moving = await page('/supervision.html?now=2026-10-21T09:30:00Z&span=', { reducedMotion: 'no-preference' });
       await moving.p.waitForSelector('.dz-tl__now');
       await moving.p.selectOption('#step', '');
       await moving.p.click('.dz-toolbar__next');
@@ -1794,9 +1795,72 @@ try {
         const now = document.querySelector('.dz-tl__now')?.getBoundingClientRect();
         return now ? (now.left - box.left - area) / (box.width - area) : null;
       });
-      check('step: with motion, "Today" from another period still follows (the present three quarters along)', landed !== null && Math.abs(landed - 0.75) < 0.01, String(landed));
+      check('step: with motion, "Today" from another period still follows (the present’s quarter at the left edge)', landed !== null && Math.abs(landed) < 0.01, String(landed));
       check('step: with motion, no console error', moving.errors.length === 0, moving.errors.join('\n'));
       await moving.p.close();
+    }
+
+    // ── timeline.span: the time shown at once, whatever the room; a change keeps the centre (the present while following) ──
+    {
+      const { p, errors } = await page('/supervision.html?now=2026-10-21T09:37:00Z&span=PT4H');
+      await p.waitForSelector('.dz-tl__now');
+      await p.waitForTimeout(300);
+      // The time shown (minutes), the minute at its centre, where the now line sits in it (0 to 1).
+      const at = () =>
+        p.evaluate(() => {
+          const sc = document.querySelector('.dz-tl__scroller');
+          const area = document.querySelector('.dz-tl__corner').getBoundingClientRect().width;
+          const len = Number(getComputedStyle(document.querySelector('.dz-tl')).getPropertyValue('--dz-tl-len'));
+          const slot = (document.querySelector('.dz-tl__sheet').getBoundingClientRect().width - area) / len;
+          const per = window.__cal.kernel.getOptions().timeline.slot;
+          const box = sc.getBoundingClientRect();
+          const now = document.querySelector('.dz-tl__now')?.getBoundingClientRect();
+          const shown = ((box.width - area) / slot) * per;
+          // past: the minutes of the present past the left edge (its slot's start).
+          return { shown: Math.round(shown), centre: Math.round(((Math.abs(sc.scrollLeft) + (sc.clientWidth - area) / 2) / slot) * per), past: now ? Math.round(((now.left - box.left - area) / (box.width - area)) * shown * 10) / 10 : null };
+        });
+      const settle = () => p.waitForTimeout(250);
+      const four = await at();
+      // 09:37Z is 11:37 in Paris: its quarter, 11:30, at the left edge — the present 7 minutes in.
+      check('span: 4 hours shown, the present’s quarter at the left edge', four.shown === 240 && Math.abs(four.past - 7) < 0.5, JSON.stringify(four));
+      await p.selectOption('#span', 'PT1H');
+      await settle();
+      const one = await at();
+      check('span: another span, live — 1 hour shown, the present’s quarter still at the left edge', one.shown === 60 && Math.abs(one.past - 7) < 0.5, JSON.stringify(one));
+      await p.selectOption('#span', '');
+      await settle();
+      const all = await at();
+      await p.selectOption('#span', 'PT4H');
+      await settle();
+      check('span: none — the stylesheet’s width again (more than 4 hours here), the present still placed', all.shown > 300 && Math.abs(all.past - 7) < 0.5, JSON.stringify(all));
+      // A resize while following: the slot narrows, the present’s quarter stays at the left edge.
+      await p.setViewportSize({ width: 1000, height: 950 });
+      await settle();
+      const narrow = await at();
+      await p.setViewportSize({ width: 1400, height: 950 });
+      await settle();
+      check('span: a resize while following keeps the present’s quarter at the left edge', narrow.shown === 240 && Math.abs(narrow.past - 7) < 0.5, JSON.stringify(narrow));
+      // Following paused (the person scrolled back): a change keeps the minute at the centre.
+      await p.evaluate(() => (document.querySelector('.dz-tl__scroller').scrollLeft -= 400));
+      await settle();
+      const before = await at();
+      await p.selectOption('#span', 'PT1H');
+      await settle();
+      const after = await at();
+      await p.selectOption('#span', 'PT12H');
+      await settle();
+      const twelve = await at();
+      check('span: not following — the minute at the centre stays there (4 h → 1 h, then 12 h with another slot)', after.shown === 60 && Math.abs(after.centre - before.centre) <= 1 && twelve.shown === 720 && Math.abs(twelve.centre - before.centre) <= 1, JSON.stringify({ before, after, twelve }));
+      await p.selectOption('#span', 'PT1H');
+      await settle();
+      const wide = await at();
+      await p.setViewportSize({ width: 900, height: 800 });
+      await settle();
+      const thin = await at();
+      check('span: a resize, not following, keeps the minute at the centre', thin.shown === 60 && Math.abs(thin.centre - wide.centre) <= 1, JSON.stringify({ wide, thin }));
+      check('span: a narrower window still shows the hour asked', thin.shown === 60, JSON.stringify(thin));
+      check('span: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
     }
 
     // ── Phase 16a: the editor (resources page) and seats (slots page, ?seats=2) ──

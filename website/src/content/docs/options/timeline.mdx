@@ -14,7 +14,7 @@ The scale and the lanes of the Pro's timeline views (`import '@dzcalendar/pro'`)
 ## What it does
 
 The timeline draws time across, a row per resource (`resourceTimelineDay`,
-`…Week`, `…Month`, `…Year`) or one row for all (`timelineDay`…). Five
+`…Week`, `…Month`, `…Year`) or one row for all (`timelineDay`…). Six
 settings, merged key by key with `update({ timeline })` — `slot: undefined`
 goes back to the default:
 
@@ -26,13 +26,14 @@ goes back to the default:
 - `step`: what ◀ ▶ slide the timeline by (`{ minutes: 15 }`, `{ hours: 1 }`)
   instead of changing period.
 - `follow`: the timeline keeps the present in view as time passes.
+- `span`: the time shown at once (`{ hours: 4 }`), whatever the room.
 
 A slot that is a whole number of minutes must divide a day, and the lanes
 are whole numbers of 1 or more; a step is hours and minutes, longer than
-nothing; anything else throws a `RangeError` at
+nothing, a span days, hours and minutes; anything else throws a `RangeError` at
 creation or `update()`. A wall-clock slot crossing a
 clock change keeps its true width. The width on screen is the stylesheet's
-(`--dz-tl-slot`); the resource area's columns are
+(`--dz-tl-slot`) unless a `span` sets it; the resource area's columns are
 `viewOptions.timeline.areaColumns`.
 
 ## Its members
@@ -47,7 +48,7 @@ Lanes of a timeline without resources, before it is measured: in a browser its o
 
 <OptionFacts name="timeline.follow" />
 
-The present stays in view, three quarters along the time shown, moved every minute; past the end of the period (midnight on a day's timeline) the next one comes in. It pauses as soon as the person moves along time — a scroll, a slide, another period — and "Today" (`navigate('today')`) takes it up again. Made for supervision: a timeline that shows what is running now.
+The present stays in view, its slot at the left edge (at 22:47 in quarters of an hour, 22:45), what comes after it shown; the timeline moves on when the next slot begins; past the end of the period (midnight on a day's timeline) the next one comes in. It pauses as soon as the person moves along time — a scroll, a slide, another period — and "Today" (`navigate('today')`) takes it up again. Made for supervision: a timeline that shows what is running now.
 
 ### `maxLanes`
 
@@ -66,6 +67,12 @@ Minutes per slot (a divisor of a day: 15, 30, 60, 120…) or `'day'`. By default
 <OptionFacts name="timeline.step" />
 
 Hours and minutes (`{ minutes: 15 }`, `{ hours: 1 }`, `'PT30M'`). With it, ◀ ▶ and `navigate('prev' | 'next')` scroll the timeline by that much; at the end of the axis the next or previous period comes in, where the slide was going. A view of one day stops at midnight on the way; a view of several days (`views: { supervision: { family: 'timeline', duration: { days: 3 } } }`) slides across it. `calendar.shift({ minutes: -45 })` slides by any other number of hours and minutes (a day or more, or nothing, throws a `RangeError`, as the option does). A day or more is a view's `dateIncrement`, not a step.
+
+### `span`
+
+<OptionFacts name="timeline.span" />
+
+Days, hours and minutes (`{ hours: 4 }`, `'PT1H'`, `{ days: 1 }`): the time on screen at once. A slot's width is the room shared by that many slots, measured again when the calendar's size changes — four hours fill a phone as they fill a wide screen. Longer than the period, the period fits; shorter than a slot, one slot fills it. Changed by `update()`, the moment at the centre of what is shown stays there, and the present keeps its place while `follow` is on: a window of four hours that slides with the clock. Pick a `slot` that suits it (24 hours in quarters of an hour are 96 narrow heads). Without it, the width is the stylesheet's `--dz-tl-slot`.
 
 ## Example
 
