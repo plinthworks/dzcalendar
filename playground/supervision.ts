@@ -29,8 +29,30 @@ const run = (id: string, process: string, start: Instant, minutes: number, statu
   duration: { minutes },
   resourceId: process,
   tone: TONE[status],
-  extendedProps: { status, detail },
+  extendedProps: { kind: 'run', status, detail },
 });
+// Two other kinds on the same rows: an alert (a short red mark) and a maintenance window (behind the runs, the row's whole height).
+const alert = (id: string, process: string, at: Instant, detail: string): EventInput => ({
+  id,
+  title: 'Alerte',
+  start: at.toZonedDateTimeISO(ZONE).toString(),
+  duration: { minutes: 10 },
+  resourceId: process,
+  tone: 'amber',
+  classNames: ['kind-alert'],
+  extendedProps: { kind: 'alert', detail },
+});
+const maintenance = (id: string, process: string, from: Instant, hours: number): EventInput => ({
+  id,
+  title: 'Maintenance',
+  start: from.toZonedDateTimeISO(ZONE).toString(),
+  duration: { hours },
+  resourceId: process,
+  display: 'background',
+  tone: 'violet',
+  extendedProps: { kind: 'maintenance', detail: 'fenêtre prévue' },
+});
+type Props = { kind: 'run'; status: Status; detail: string } | { kind: 'alert' | 'maintenance'; detail: string };
 
 // What already ran: the last ten hours, every process.
 const t0 = now().round({ smallestUnit: 'minute', roundingMode: 'floor' });
@@ -41,6 +63,12 @@ processes.forEach((p, i) => {
     history.push(run(`${p.id}-${h}`, p.id as string, t0.subtract({ hours: h, minutes: 10 * i }), 20 + 10 * i, failed ? 'failed' : 'ok', failed ? 'code 2, 3 lignes rejetées' : `${120 * (i + 1)} éléments`));
   }
 });
+history.push(
+  maintenance('maint-backup', 'backup', t0.subtract({ hours: 3 }), 2),
+  maintenance('maint-billing', 'billing', t0.add({ hours: 1 }), 3),
+  alert('alert-import', 'import', t0.subtract({ hours: 2, minutes: 20 }), 'disque à 95 %'),
+  alert('alert-reports', 'reports', t0.subtract({ minutes: 50 }), 'file d’attente lente'),
+);
 
 const log = document.querySelector<HTMLElement>('#log')!;
 const stepOf = () => document.querySelector<HTMLSelectElement>('#step')!.value || undefined;
@@ -58,12 +86,16 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   timeline: { slot: 15, step: stepOf(), follow: true },
   hooks: {
     event: {
-      // The card: what happened, said in full on the event.
+      // The card, by kind: a run says how it went, an alert what it is about, a maintenance window its name.
       content: ({ instance }) => {
-        const x = instance.event.props as { status: Status; detail: string } | undefined;
+        const x = instance.event.props as Props;
         const el = document.createElement('div');
         el.className = 'run';
-        el.append(Object.assign(document.createElement('b'), { textContent: instance.event.title }), Object.assign(document.createElement('small'), { textContent: x ? `${SAID[x.status]} — ${x.detail}` : '' }));
+        // An alert is a moment, too narrow for words: its sign, and the detail on hover (and on click).
+        if (x.kind === 'alert') return Object.assign(el, { textContent: '⚠', title: `${instance.event.title} : ${x.detail}` });
+        const head = instance.event.title;
+        const line = x.kind === 'run' ? `${SAID[x.status]} — ${x.detail}` : x.detail;
+        el.append(Object.assign(document.createElement('b'), { textContent: head }), Object.assign(document.createElement('small'), { textContent: line }));
         return el;
       },
     },
@@ -77,10 +109,12 @@ function feed(): void {
   const p = processes[n % processes.length]!;
   const id = `live-${n++}`;
   const start = now().round({ smallestUnit: 'second', roundingMode: 'floor' });
+  // Now and then an alert instead of a run: another kind on the same row, from the same feed.
+  if (n % 5 === 0) return void cal.run({ type: 'event.create', event: alert(id, p.id as string, start, 'mémoire à 90 %') });
   cal.run({ type: 'event.create', event: run(id, p.id as string, start, 20, 'running', 'démarré') });
   setTimeout(() => {
     const failed = Math.random() < 0.25;
-    cal.run({ type: 'event.update', id, patch: { tone: TONE[failed ? 'failed' : 'ok'], extendedProps: { status: failed ? 'failed' : 'ok', detail: failed ? 'délai dépassé' : `${Math.round(Math.random() * 900)} éléments` } } });
+    cal.run({ type: 'event.update', id, patch: { tone: TONE[failed ? 'failed' : 'ok'], extendedProps: { kind: 'run', status: failed ? 'failed' : 'ok', detail: failed ? 'délai dépassé' : `${Math.round(Math.random() * 900)} éléments` } } });
   }, 4000);
 }
 if (!fixed) setInterval(feed, 6000);

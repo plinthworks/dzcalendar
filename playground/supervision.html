@@ -15,12 +15,14 @@
       .run { display: flex; flex-direction: column; line-height: 1.2; overflow: hidden; }
       .run b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .run small { opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      /* An alert: a mark that stands out among the runs. */
+      .kind-alert .run { align-items: center; justify-content: center; font-size: 15px; }
     </style>
   </head>
   <body>
     <main>
       <h1>Supervision des traitements</h1>
-      <p>Une ligne par processus, sur trois jours. Les exécutions arrivent en direct (un flux simulé, comme un SSE) et s'inscrivent sur leur ligne : en cours, réussie, en échec. ◀ ▶ glissent du pas choisi ; « Aujourd'hui » reprend le suivi de l'heure actuelle, mis en pause dès qu'on part dans le passé ou le futur.</p>
+      <p>Une ligne par processus, sur trois jours. Les exécutions arrivent en direct (un flux simulé, comme un SSE) et s'inscrivent sur leur ligne : en cours, réussie, en échec ; des alertes (ambre) et des fenêtres de maintenance (en fond, violet) sur les mêmes lignes. ◀ ▶ glissent du pas choisi ; « Aujourd'hui » reprend le suivi de l'heure actuelle, mis en pause dès qu'on part dans le passé ou le futur.</p>
       <div class="controls">
         <label>Pas <select id="step">
           <option value="PT15M">15 min</option>
