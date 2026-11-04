@@ -272,6 +272,33 @@ describe('after the reviews', () => {
   });
 });
 
+describe('a background event on a timeline row', () => {
+  it('carries the content hook’s label (said then); null leaves it mute, a calendar without the hook too', () => {
+    const events: EventInput[] = [
+      { id: 'm', title: 'Maintenance', start: '2026-10-21T10:00[Europe/Paris]', duration: { hours: 2 }, resourceId: 'irm', display: 'background' },
+      { id: 'p', title: 'Pause', start: '2026-10-21T12:00[Europe/Paris]', duration: { hours: 1 }, resourceId: 'irm', display: 'background' },
+    ];
+    const bgs = (host: HTMLElement) => [...host.querySelectorAll<HTMLElement>('.dz-tl__ev--bg')].map((el) => `${el.textContent}|${el.getAttribute('aria-hidden')}|${el.classList.contains('dz-tl__ev--labelled')}`).sort();
+    const host = mount(events, { hooks: { event: { content: (c: { background?: boolean; instance: { event: { id: string; title: string } } }) => (c.background && c.instance.event.id === 'm' ? c.instance.event.title : null) } } });
+    const labelled = bgs(host);
+    cal!.destroy();
+    document.body.innerHTML = '';
+    expect([labelled, bgs(mount(events))]).toEqual([
+      ['Maintenance|null|true', '|true|false'].sort(),
+      ['|true|false', '|true|false'],
+    ]);
+  });
+
+  it('a background leaving a row that stays is let go (willUnmount), as an event is', () => {
+    const gone: string[] = [];
+    mount([{ id: 'm', title: 'Maintenance', start: '2026-10-21T10:00[Europe/Paris]', duration: { hours: 2 }, resourceId: 'irm', display: 'background' }], {
+      hooks: { event: { content: () => 'Maintenance', willUnmount: ({ ctx }: { ctx: { instance: { event: { id: string } } } }) => void gone.push(ctx.instance.event.id) } },
+    });
+    cal!.run({ type: 'event.delete', id: 'm' });
+    expect(gone).toEqual(['m']);
+  });
+});
+
 describe('the timeline’s step and following the present', () => {
   it('a step is hours and minutes, longer than nothing; follow is true or false — anything else refused at creation and by update()', () => {
     for (const [bad, said] of [

@@ -182,6 +182,11 @@
   Vue controllers and `<dz-calendar>`). `timeline.follow` keeps the present
   in view, paused by the person's own move along time, taken up by "Today".
   `playground/supervision.html` shows both.
+- A timeline's background events take the event content hook's label, as a
+  time grid's do (`background: true`): « Maintenance » written at the start
+  of its window, kept in view while the row scrolls by, read by a screen
+  reader. Without content they stay mute tints. The supervision playground
+  shows runs, alerts and maintenance windows as cards timed to the second.
 - Guides: theming and CSS, Tailwind, unstyled mode, in English and French
   (18j-3, batch 4).
 

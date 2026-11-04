@@ -32,6 +32,9 @@ keeps the area and the heads in place.
   keyboard's cursor), a slide, a period without the present — pauses it;
   "Today" takes it up. Made for supervision, where a timeline shows what is
   running now and runs arrive by SSE (`run({ type: 'event.create' })`).
+- A background event (a maintenance window) is a tint behind the row's
+  events; the event content hook gives it a label (`background: true`),
+  drawn at its start and kept in view while the row scrolls by.
 - A view's `duration` and `dateIncrement` are whole days or more: a date
   plus minutes is the same date, a step that never moved (refused with a
   `RangeError`).

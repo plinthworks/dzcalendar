@@ -64,9 +64,10 @@ for a day that did not exist). `text` is what the calendar would write.
   "+N" panel — take classes and mounts, never content: their content is the
   events. A day's cell's content goes in place of its number, a timeline
   resource's in place of its title, a group's in place of its name.
-- The event hooks reach background events in a time grid's columns (with
-  `background`); the all-day row's, the month's and the timeline's
-  backgrounds stay plain tints.
+- The event hooks reach background events in a time grid's columns and a
+  timeline's rows (with `background`): a content given is drawn at its start
+  (kept in view while the row scrolls by) and read; the all-day row's and
+  the month's backgrounds stay plain tints.
 - `didMount` runs once the drawing is in the page (`el.isConnected`); an
   element drawn and removed in the same drawing is never mounted nor let go.
   New `didMount` / `willUnmount` functions given by `update()`: each element

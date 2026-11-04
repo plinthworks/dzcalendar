@@ -40,7 +40,7 @@ export interface EventContentCtx {
   readonly timeText: string;
   readonly displayZone: ZoneId;
   readonly family: string;
-  /** A background event (a closed day, leave) in a time grid's column: its content, if the hook gives one, is drawn at its top; null leaves it mute. */
+  /** A background event (a closed day, leave, maintenance) in a time grid's column or a timeline's row: its content, if the hook gives one, is drawn at its start; null leaves it mute. */
   readonly background?: boolean;
 }
 

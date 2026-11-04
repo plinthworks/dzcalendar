@@ -409,6 +409,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
           bgHost,
           () => h(doc, 'div', 'dz-tl__ev dz-tl__ev--bg'),
           (n, b, c) => drawBar(n, b, c),
+          // A background the hooks decorated (its label, its didMount): let go when it leaves a row that stays.
+          (n) => unmountEvent(ctx, n),
         ),
         mores: new KeyedList<MoreItem>(
           moreHost,
@@ -624,8 +626,13 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     applyEventLook(el, ev, drawNow(ctx));
     handles(el, seg, it.bg);
     if (it.bg) {
-      el.replaceChildren();
-      el.setAttribute('aria-hidden', 'true');
+      // A background's own content (« Maintenance »), if the hook gives one: drawn, read; none: mute.
+      if (ctx.hooks.event) fillEvent(ctx, el, { instance: seg.instance, segment: seg, timeText: '', displayZone: ctx.zone, family: 'timeline', background: true }, () => [], changed.created);
+      else el.replaceChildren();
+      const labelled = el.childNodes.length > 0;
+      el.classList.toggle('dz-tl__ev--labelled', labelled);
+      if (labelled) el.removeAttribute('aria-hidden');
+      else el.setAttribute('aria-hidden', 'true');
       return;
     }
     const labels = timeLabels(ctx, ev, {});

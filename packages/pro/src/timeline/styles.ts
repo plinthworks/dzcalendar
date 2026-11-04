@@ -89,6 +89,9 @@ export const TIMELINE_CSS = `
 .dz-tl__ev--cont-start { border-start-start-radius: 0; border-end-start-radius: 0; }
 .dz-tl__ev--cont-end { border-start-end-radius: 0; border-end-end-radius: 0; }
 .dz-tl__ev--bg { top: 0; height: 100%; opacity: 0.35; border: 0; z-index: 0; border-radius: 0; }
+/* A background with its own content: the tint mixed in, the label at full strength, kept in view while the row scrolls by. */
+.dz-tl__ev--bg.dz-tl__ev--labelled { opacity: 1; background: color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 22%, transparent); color: var(--dz-fg, var(--dzc-fg)); pointer-events: none; }
+.dz-tl__ev--bg.dz-tl__ev--labelled > * { position: sticky; inset-inline-start: calc(var(--dz-tl-area, 0px) + 0.25rem); }
 .dz-tl__ev:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: 1px; }
 .dz-more--tl { z-index: 2; margin: 0; padding: 0 0.375rem; text-align: start; }
 .dz-tl__now { position: absolute; top: 0; bottom: 0; inset-inline-start: calc(var(--dz-tl-area, 0px) + var(--x) * var(--dz-tl-slot)); border-inline-start: 2px solid var(--dz-now, var(--dzc-danger)); z-index: 2; pointer-events: none; }
