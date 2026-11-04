@@ -1,0 +1,317 @@
+---
+title: "Tailwind"
+description: "DzCalendar à côté de Tailwind CSS 3 et 4, et des utilitaires Tailwind tirés des jetons du calendrier."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+
+DzCalendar est du CSS ordinaire et n'a besoin d'aucun framework. À côté de
+Tailwind, ce qui compte est la **remise à zéro** de la page : le preflight de
+Tailwind touche tous les éléments, bordures, marges et remplissages compris.
+Ce guide installe le calendrier et la remise à zéro pour qu'aucun ne défasse
+l'autre, puis va plus loin : des utilitaires Tailwind qui lisent le thème du
+calendrier, les couleurs de Tailwind qui l'alimentent, et des classes
+Tailwind sur les parties du calendrier.
+
+## Quelle installation
+
+Tout dépend de la place de votre remise à zéro par rapport aux
+[couches de cascade](../../options/css-layers/) :
+
+| Votre page | Remise à zéro | Que faire |
+|---|---|---|
+| Tailwind CSS 4 | dans `@layer base` | importer `@dzcalendar/theme/tailwind.css` avant `tailwindcss` |
+| Tailwind CSS 3 | preflight hors de toute couche | `cssLayers: false`, et `@dzcalendar/theme/tailwind3.css` importé après `tailwindcss/base` |
+| Bootstrap 5, normalize.css, CSS plus ancien | hors de toute couche | `cssLayers: false`, et `@dzcalendar/theme/unlayered.css` |
+| CSS moderne simple | aucune | rien |
+
+Par défaut, le CSS du calendrier est dans des couches (`dzcalendar.base` et
+`dzcalendar.theme`) : une règle de votre page hors couche l'emporte donc sur
+lui, quel que soit son poids. Rhabiller le calendrier, c'est écrire du CSS
+ordinaire ; c'est ce qu'une remise à zéro hors couche détournerait.
+
+## Tailwind 4
+
+Tailwind 4 range son preflight dans `@layer base`. Importez le thème du
+calendrier **avant** Tailwind, pour que les couches se suivent dans le bon
+ordre :
+
+```css
+@import '@dzcalendar/theme/tailwind.css';
+@import 'tailwindcss';
+```
+
+`tailwind.css` déclare l'ordre `theme, base, dzcalendar, components,
+utilities` : le calendrier vient après le preflight, qui ne réinitialise donc
+plus ses bordures, ses marges ni ses remplissages, et avant vos composants et
+vos utilitaires. Un utilitaire sur votre propre balisage dans le calendrier,
+dans le gabarit d'un événement par exemple, l'emporte toujours. Le code qui
+crée le calendrier ne change pas.
+
+L'ordre des couches doit parvenir à la page avant la création du premier
+calendrier : la feuille en couches que le calendrier ajoute à ce moment
+s'ouvre par `@layer dzcalendar.base, dzcalendar.theme;`, et un CSS Tailwind
+chargé plus tard (paresseusement, route par route) trouverait `dzcalendar`
+ordonné avant `base` : le preflight l'emporterait de nouveau. Chargez le CSS de
+l'application avant de créer un calendrier.
+
+## Tailwind 3
+
+Le preflight de Tailwind 3 n'est dans aucune couche : il l'emporterait sur un
+calendrier en couches. Coupez les couches et prenez la version sans couches du
+thème. L'option est lue à la création du calendrier, et **le premier
+calendrier d'un document (ou d'une racine shadow) décide, feuille par feuille** :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', cssLayers: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { ApplicationConfig } from '@angular/core';
+import { provideDzCalendar } from '@dzcalendar/angular';
+
+export const appConfig: ApplicationConfig = {
+  providers: [provideDzCalendar({ cssLayers: false })],
+};
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" initial={{ cssLayers: false }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :initial="{ cssLayers: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Importez ensuite le thème après la base de Tailwind, en écrivant les quatre
+lignes comme des `@import` : un `@import` placé après une règle `@tailwind`
+n'est pas suivi (le CSS n'accepte les imports qu'en tête de feuille), et le CSS
+du calendrier manquerait au build, sans le moindre avertissement. La CLI de Tailwind 3 suit ces
+imports d'elle-même ; une configuration PostCSS demande `postcss-import`
+avant `tailwindcss`.
+
+```css
+@import 'tailwindcss/base';
+@import '@dzcalendar/theme/tailwind3.css';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+```
+
+Les sélecteurs de classe du calendrier pèsent plus que les règles d'élément
+et de `*` du preflight, quel que soit l'ordre (la feuille de base du calendrier
+est injectée en premier dans le `<head>`). L'ordre garantit le thème avant
+`components` et `utilities` : vos composants et vos utilitaires, qui viennent
+après avec le même poids, l'emportent.
+
+## Autres remises à zéro
+
+Le reboot de Bootstrap, normalize.css et les feuilles plus anciennes sont
+eux aussi hors couche. La recette est celle de Tailwind 3 : `cssLayers: false`
+comme ci-dessus, et le thème en `unlayered.css`, après la remise à zéro :
+
+```css
+@import 'bootstrap/dist/css/bootstrap.css';
+@import '@dzcalendar/theme/unlayered.css';
+```
+
+`tailwind3.css` importe ce même fichier, sous un nom qui dit à quoi il sert.
+
+Si une Content-Security-Policy interdit les styles en ligne, c'est à vous
+d'inclure le CSS du calendrier : voir
+[`injectStyles`](../../options/inject-styles/).
+
+## Utilitaires tirés des jetons du calendrier
+
+Pour écrire votre propre balisage avec Tailwind (une barre d'outils à vous,
+le gabarit d'un événement) en suivant le thème du calendrier et son schéma
+clair ou sombre, importez `tailwind-theme.css` après Tailwind (v4). Avec l'ordre de couches de la section Tailwind 4, les
+trois lignes sont :
+
+```css
+@import '@dzcalendar/theme/tailwind.css';
+@import 'tailwindcss';
+@import '@dzcalendar/theme/tailwind-theme.css';
+```
+
+Il ajoute les jetons du calendrier au thème de Tailwind : des couleurs, un
+rayon et une police :
+
+| Utilitaire | Ce qu'il lit |
+|---|---|
+| `bg-dz-bg`, `bg-dz-raised` | le fond du calendrier, et le fond surélevé (survols des boutons de la barre d'outils, de « +N » et des entrées de menu, titres de jour de la vue liste) |
+| `text-dz-fg`, `text-dz-muted` | le texte, et le texte secondaire |
+| `border-dz-border`, `border-dz-line` | les bordures, et les lignes de la grille (la bordure à 70 % sauf si `--dz-line` est posé) |
+| `bg-dz-accent`, `text-dz-accent-fg` | l'accent (aujourd'hui, la vue choisie) et le texte posé dessus |
+| `text-dz-danger`, `text-dz-warning` | les refus, et les marques de changement d'heure |
+| `bg-dz-event`, `text-dz-on-tone` | la couleur d'un événement, et le texte sur un événement plein |
+| `rounded-dz`, `rounded-dz-event` | les coins du calendrier, et ceux d'un événement |
+| `font-dz` | la police du calendrier |
+
+```html
+<span class="rounded-dz bg-dz-accent px-2 py-1 text-xs text-dz-accent-fg">
+  on call
+</span>
+```
+
+Les utilitaires lisent les propriétés personnalisées du calendrier là où ils
+sont employés (`@theme inline`) : dans un calendrier, ils prennent son thème,
+`contrast` ou un schéma sombre forcé compris. Hors d'un calendrier, ils
+retombent sur la palette `--tz-*` partagée de la page, puis sur les couleurs
+de la plateforme (rouges et ambres fixes pour le danger et l'avertissement,
+rayon de 0,375rem), sauf si vous posez vous-même les jetons : `:root { --dz-accent: #0b7285; }`. Les jetons sont listés dans
+[Thèmes et CSS](../theming/).
+
+## Les couleurs de Tailwind dans le calendrier
+
+Dans l'autre sens, aucun import : Tailwind 4 expose sa palette en propriétés
+personnalisées, et les jetons du calendrier en sont aussi. Une de vos règles,
+hors couche, suffit. Écrivez-la dans la feuille que Tailwind compile, pour que
+Tailwind émette la variable de palette qu'il voit employée :
+
+```css
+.dz-cal {
+  --dz-accent: var(--color-emerald-600);
+  --dz-radius: 0.75rem;
+}
+```
+
+Le repère d'aujourd'hui, la vue choisie, l'anneau de focus et les événements
+dérivés de l'accent suivent. Pour ne changer qu'un schéma, ajoutez un
+sélecteur pour un schéma forcé avec `scheme: 'dark'` : `.dz-cal[data-dz-scheme='dark'] { … }`. [Thèmes et CSS](../theming/)
+donne tous les jetons, et les thèmes.
+
+## Des classes sur les parties du calendrier
+
+Les éléments du calendrier reçoivent vos classes par
+[`hooks`](../../options/hooks/) : `hooks.<élément>.class` est une chaîne, une
+liste ou une fonction du contexte de l'élément. Tailwind trouve les classes
+dans vos sources comme partout ailleurs. Avec Tailwind 4, elles l'emportent sur les classes
+du calendrier, rangées dans une couche sous vos utilitaires. Avec la recette
+Tailwind 3 (`cssLayers: false`), elles l'emportent par l'ordre à poids égal,
+mais une règle du calendrier plus spécifique gagne encore (celle du style
+d'événement plein, par exemple) : utilisez le modificateur `!` (important) ou
+une règle plus spécifique dans ce cas.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  hooks: {
+    event: { class: 'rounded-none shadow-md' },
+    dayLane: { class: 'data-[past]:bg-slate-50' },
+    dayHeader: { class: ({ date }) => (date.dayOfWeek === 7 ? 'text-rose-600' : null) },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [hooks]="hooks" />`,
+})
+export class Agenda {
+  readonly hooks: CalendarHooks = {
+    event: { class: 'rounded-none shadow-md' },
+    dayLane: { class: 'data-[past]:bg-slate-50' },
+    dayHeader: { class: ({ date }) => (date.dayOfWeek === 7 ? 'text-rose-600' : null) },
+  };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const HOOKS: CalendarHooks = {
+  event: { class: 'rounded-none shadow-md' },
+  dayLane: { class: 'data-[past]:bg-slate-50' },
+  dayHeader: { class: ({ date }) => (date.dayOfWeek === 7 ? 'text-rose-600' : null) },
+};
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" hooks={HOOKS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const hooks: CalendarHooks = {
+  event: { class: 'rounded-none shadow-md' },
+  dayLane: { class: 'data-[past]:bg-slate-50' },
+  dayHeader: { class: ({ date }) => (date.dayOfWeek === 7 ? 'text-rose-600' : null) },
+};
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :hooks="hooks" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Les variantes de Tailwind atteignent l'état que le calendrier écrit en
+attributs : `data-[today]:` et `data-[past]:` sur la colonne d'un jour, par
+exemple. La liste des éléments et de leurs contextes est sur la page
+[`hooks`](../../options/hooks/).
+
+## Un look entièrement Tailwind
+
+Quand les couleurs, bordures, rayons, polices et ombres du calendrier gênent
+plus qu'elles n'aident, [`look`](../../options/look/) à `'none'` garde la
+structure (la grille, les positions, les tailles) et retire le reste. Les
+classes de vos hooks font alors tout l'aspect, et [Mode sans style](../unstyled/)
+explique comment s'y prendre. La structure conservée (marges, remplissages,
+hauteur de ligne, affichage) reste en couches par défaut : une remise à zéro
+hors couche (Tailwind 3, Bootstrap) l'emporte donc encore et `cssLayers: false`
+y reste nécessaire ; avec le preflight en couches de Tailwind 4, tout tient tel
+quel. Pour une simple teinte, [Thèmes et CSS](../theming/)
+et les jetons ci-dessus sont plus légers.

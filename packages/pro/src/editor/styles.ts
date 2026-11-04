@@ -1,5 +1,7 @@
 /** The editor's look, from the calendar's tokens. `EDITOR_CSS`: include it yourself under `injectStyles: false`. */
 export const EDITOR_CSS = `
+@layer dzcalendar.base, dzcalendar.theme;
+@layer dzcalendar.base {
 .dz-editor-backdrop[hidden] { display: none; }
 .dz-editor-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 1rem; background-color: color-mix(in srgb, CanvasText 35%, transparent); background: color-mix(in srgb, var(--dz-fg, var(--dzc-fg, #000)) 35%, transparent); }
 .dz-editor-backdrop {
@@ -54,4 +56,5 @@ export const EDITOR_CSS = `
 .dz-editor__btn--danger { margin-inline-end: auto; color: var(--dz-danger, var(--dzc-danger, LinkText)); }
 .dz-editor :focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent, Highlight)); outline-offset: 2px; }
 .dz-editor [hidden] { display: none !important; }
+}
 `;

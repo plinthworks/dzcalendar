@@ -63,7 +63,10 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
   const cm = messagesForLocale(locale);
   const host = o.container ?? cal.element;
   const doc = host.ownerDocument;
-  if (o.injectStyles !== false) ensureStyles(host, 'editor', EDITOR_CSS);
+  // Layered or not as the calendar's own sheets are (its `cssLayers`: the first calendar of the root decided).
+  const calRoot = cal.element.getRootNode();
+  const layers = !(calRoot instanceof ShadowRoot ? calRoot : doc.head).querySelector('style[data-dzcalendar="core"][data-dz-layers="off"]');
+  if (o.injectStyles !== false) ensureStyles(host, 'editor', EDITOR_CSS, layers);
   const id = `dz-editor-${++uid}`;
   let fieldN = 0;
   /** tzslot's range, made below: read by the helpers before (only once it exists). */

@@ -1,0 +1,308 @@
+---
+title: "Tailwind"
+description: "DzCalendar beside Tailwind CSS 3 and 4, and Tailwind utilities from the calendar's tokens."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+
+DzCalendar is plain CSS and needs no framework. What matters beside Tailwind
+is the page's **reset**: Tailwind's preflight touches every element, borders,
+margins and paddings included. This guide sets the calendar and the reset up
+so neither undoes the other, then goes further: Tailwind utilities that read
+the calendar's theme, Tailwind's colours that feed it, and Tailwind classes
+on the calendar's own parts.
+
+## Which setup
+
+The setup depends on whether your reset sits in a
+[cascade layer](../../options/css-layers/):
+
+| Your page | Reset | What to do |
+|---|---|---|
+| Tailwind CSS 4 | in `@layer base` | import `@dzcalendar/theme/tailwind.css` before `tailwindcss` |
+| Tailwind CSS 3 | preflight outside any layer | `cssLayers: false`, and `@dzcalendar/theme/tailwind3.css` imported after `tailwindcss/base` |
+| Bootstrap 5, normalize.css, older CSS | outside any layer | `cssLayers: false`, and `@dzcalendar/theme/unlayered.css` |
+| Plain modern CSS | none | nothing |
+
+By default the calendar's CSS is in layers (`dzcalendar.base` and
+`dzcalendar.theme`), so a rule of yours outside a layer wins over it whatever
+its weight. That is what makes restyling plain CSS, and what a reset outside
+any layer would abuse.
+
+## Tailwind 4
+
+Tailwind 4 puts its preflight in `@layer base`. Import the calendar's theme
+**before** Tailwind, so that the layers come in the right order:
+
+```css
+@import '@dzcalendar/theme/tailwind.css';
+@import 'tailwindcss';
+```
+
+`tailwind.css` declares the order `theme, base, dzcalendar, components,
+utilities`: the calendar comes after the preflight, which therefore no longer
+resets its borders, margins and paddings, and before your components and
+utilities. A utility on your own markup inside the calendar, in an event's
+template for example, still wins. Nothing changes in the code that makes the
+calendar.
+
+The order of layers must reach the page before the first calendar is made: the
+layered sheet the calendar appends at that moment opens with
+`@layer dzcalendar.base, dzcalendar.theme;`, and a Tailwind CSS loaded later
+(lazily, per route) would find `dzcalendar` ordered before `base`, so the
+preflight would win again. Load the app's CSS before creating a calendar.
+
+## Tailwind 3
+
+Tailwind 3's preflight is not in a layer, so it would beat a layered
+calendar. Turn the layers off and use the plain version of the theme. The
+option is read when the calendar is made, and **the first calendar of a
+document (or shadow root) decides, sheet by sheet**:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', cssLayers: false });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { ApplicationConfig } from '@angular/core';
+import { provideDzCalendar } from '@dzcalendar/angular';
+
+export const appConfig: ApplicationConfig = {
+  providers: [provideDzCalendar({ cssLayers: false })],
+};
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" initial={{ cssLayers: false }} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :initial="{ cssLayers: false }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Then import the theme after Tailwind's base. Write the four lines as `@import`s:
+an `@import` that comes after a `@tailwind` rule is not followed (CSS takes
+imports only at the top of a sheet), and the calendar's CSS would be left out
+of the build without a word. Tailwind 3's CLI follows these imports itself; a
+PostCSS setup needs `postcss-import` before `tailwindcss`.
+
+```css
+@import 'tailwindcss/base';
+@import '@dzcalendar/theme/tailwind3.css';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+```
+
+The calendar's class selectors outweigh preflight's element and `*` rules
+whatever the order (the calendar's core sheet is injected first in the
+`<head>`). What the order secures is the theme before `components` and
+`utilities`: your components and utilities, coming later at equal weight, win.
+
+## Other resets
+
+Bootstrap's reboot, normalize.css and any older stylesheet are outside a
+layer too. The recipe is Tailwind 3's: `cssLayers: false` as above, and the
+theme as `unlayered.css`, after the reset:
+
+```css
+@import 'bootstrap/dist/css/bootstrap.css';
+@import '@dzcalendar/theme/unlayered.css';
+```
+
+`tailwind3.css` imports this same file, under a name that says what it is for.
+
+If a Content-Security-Policy forbids inline styles, the calendar's CSS is
+yours to include: see [`injectStyles`](../../options/inject-styles/).
+
+## Utilities from the calendar's tokens
+
+To write your own markup with Tailwind (a toolbar of yours, an event's
+template) and have it follow the calendar's theme and its light or dark
+scheme, import `tailwind-theme.css` after Tailwind (v4). With the layer order of the
+Tailwind 4 section, the three lines are:
+
+```css
+@import '@dzcalendar/theme/tailwind.css';
+@import 'tailwindcss';
+@import '@dzcalendar/theme/tailwind-theme.css';
+```
+
+It adds the calendar's tokens to Tailwind's theme as colours, a radius and a
+font:
+
+| Utility | What it reads |
+|---|---|
+| `bg-dz-bg`, `bg-dz-raised` | the calendar's background, and the raised surface (hovers on toolbar buttons, "+N" and menu items, the list view's day headings) |
+| `text-dz-fg`, `text-dz-muted` | text, and secondary text |
+| `border-dz-border`, `border-dz-line` | borders, and the grid's lines (the border at 70 % unless `--dz-line` is set) |
+| `bg-dz-accent`, `text-dz-accent-fg` | the accent (today, the selected view) and the text on it |
+| `text-dz-danger`, `text-dz-warning` | refusals, and clock-change marks |
+| `bg-dz-event`, `text-dz-on-tone` | an event's colour, and the text on a solid event |
+| `rounded-dz`, `rounded-dz-event` | the calendar's corners, and an event's |
+| `font-dz` | the calendar's font |
+
+```html
+<span class="rounded-dz bg-dz-accent px-2 py-1 text-xs text-dz-accent-fg">
+  on call
+</span>
+```
+
+The utilities read the calendar's custom properties where they are used
+(`@theme inline`): inside a calendar they take its theme, `contrast` or a
+forced dark scheme included. Outside one they fall back on the page's shared
+`--tz-*` palette, then on the platform's colours (fixed reds and ambers for
+danger and warning, a radius of 0.375rem), unless you set the tokens yourself:
+`:root { --dz-accent: #0b7285; }`. The tokens are listed in
+[Theming & CSS](../theming/).
+
+## Tailwind's colours in the calendar
+
+The other way needs no import: Tailwind 4 exposes its palette as custom
+properties, and the calendar's tokens are custom properties too. A rule of
+yours, outside any layer, is enough. Write it in the stylesheet Tailwind
+compiles, so that Tailwind emits the palette variable it sees used:
+
+```css
+.dz-cal {
+  --dz-accent: var(--color-emerald-600);
+  --dz-radius: 0.75rem;
+}
+```
+
+Today's marker, the selected view, the focus ring and the events derived from
+the accent follow. To change a scheme only, add a selector for a scheme forced with `scheme: 'dark'`:
+`.dz-cal[data-dz-scheme='dark'] { … }`. [Theming & CSS](../theming/) lists every
+token, and the themes.
+
+## Classes on the calendar's parts
+
+The calendar's elements take your classes through
+[`hooks`](../../options/hooks/): `hooks.<element>.class` is a string, a list
+or a function of the element's context. Tailwind finds the classes in your
+sources, as it does anywhere else. With Tailwind 4 they win over the
+calendar's classes, which sit in a layer under your utilities. With the
+Tailwind 3 recipe (`cssLayers: false`) they win by order at equal weight, but a
+calendar rule of higher specificity still wins (the solid event style's, for
+example): use the `!` important modifier or a more specific rule there.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  hooks: {
+    event: { class: 'rounded-none shadow-md' },
+    dayLane: { class: 'data-[past]:bg-slate-50' },
+    dayHeader: { class: ({ date }) => (date.dayOfWeek === 7 ? 'text-rose-600' : null) },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [hooks]="hooks" />`,
+})
+export class Agenda {
+  readonly hooks: CalendarHooks = {
+    event: { class: 'rounded-none shadow-md' },
+    dayLane: { class: 'data-[past]:bg-slate-50' },
+    dayHeader: { class: ({ date }) => (date.dayOfWeek === 7 ? 'text-rose-600' : null) },
+  };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const HOOKS: CalendarHooks = {
+  event: { class: 'rounded-none shadow-md' },
+  dayLane: { class: 'data-[past]:bg-slate-50' },
+  dayHeader: { class: ({ date }) => (date.dayOfWeek === 7 ? 'text-rose-600' : null) },
+};
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" hooks={HOOKS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const hooks: CalendarHooks = {
+  event: { class: 'rounded-none shadow-md' },
+  dayLane: { class: 'data-[past]:bg-slate-50' },
+  dayHeader: { class: ({ date }) => (date.dayOfWeek === 7 ? 'text-rose-600' : null) },
+};
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :hooks="hooks" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Tailwind's variants reach the state the calendar writes as attributes:
+`data-[today]:` and `data-[past]:` on a day's column, for instance. The
+list of elements and of their contexts is on the
+[`hooks`](../../options/hooks/) page.
+
+## A look that is all Tailwind
+
+When the calendar's colours, borders, radii, fonts and shadows are in the
+way more than they help, [`look`](../../options/look/) set to `'none'` keeps
+the structure (the grid, the positions, the sizes) and drops the rest. The
+classes of your hooks then do the whole look, and [Unstyled mode](../unstyled/) says how to go about it. The kept structure
+(margins, paddings, line height, display) is still layered by default, so an
+unlayered reset (Tailwind 3, Bootstrap) still beats it and `cssLayers: false`
+remains needed there; with Tailwind 4's layered preflight it holds as it is. For a tint
+only, [Theming & CSS](../theming/) and the tokens above are lighter.

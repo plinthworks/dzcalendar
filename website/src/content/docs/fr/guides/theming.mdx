@@ -1,0 +1,321 @@
+---
+title: "Thèmes et CSS"
+description: "Familles de thèmes, clair et sombre, jetons, couches de cascade, et vos propres thèmes."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Le calendrier est présentable avec une seule feuille de style, et une page
+peut tout changer sans lutter contre lui : des jetons pour les couleurs et
+les tailles, des règles CSS ordinaires qui l'emportent toujours, et des
+thèmes à vous. La mise en place de Tailwind est dans
+[son propre guide](../tailwind/), et un calendrier entièrement dessiné par
+vos soins dans [le mode sans style](../unstyled/).
+
+## Choisir une famille
+
+Importez la feuille de style une fois. Sept familles y sont livrées, chacune
+avec une palette claire et une sombre : `'standard'` (par défaut), `'slate'`,
+`'night'`, `'pastel'`, `'frost'`, `'solar'` et `'contrast'` (fort contraste).
+Toutes sont vérifiées au niveau AA du WCAG. [`theme`](../../options/theme/)
+nomme la famille, [`scheme`](../../options/scheme/) le mode clair ou sombre et
+[`density`](../../options/density/) l'échelle :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import '@dzcalendar/theme/dzcalendar.css';
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { theme: 'slate', scheme: 'auto', density: 'comfortable' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+// angular.json : "styles": ["node_modules/@dzcalendar/theme/dzcalendar.css"]
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar theme="slate" scheme="auto" density="comfortable" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import '@dzcalendar/theme/dzcalendar.css';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar theme="slate" scheme="auto" density="comfortable" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import '@dzcalendar/theme/dzcalendar.css';
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar theme="slate" scheme="auto" density="comfortable" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Sans la feuille de style, le calendrier fonctionne et se lit en couleurs
+système, mais les familles toutes faites vivent dans ce CSS : sans lui, elles
+ne changent rien. Les trois options se changent à chaud
+(`update({ theme: 'night' })`), et une valeur inconnue est refusée par une
+`RangeError` (par `createCalendar` et `update` ; avec React, Vue et Angular,
+elle va au chemin d'erreur de l'enveloppe). `THEME_NAMES`, exporté par
+`@dzcalendar/dom`, liste les familles.
+
+<LiveDemo
+  label="La famille night, en sombre"
+  height={460}
+  options={{
+    theme: 'night',
+    scheme: 'dark',
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Revue', start: '2026-10-22T14:00[Europe/Paris]', duration: { hours: 1 }, tone: 'green' },
+      { id: 'c', title: 'Jour de congé', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>
+
+<LiveDemo
+  label="La famille solar autour du changement d'heure"
+  height={520}
+  options={{
+    theme: 'solar',
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    scrollTime: { hours: 0 },
+    headerViews: ['timeGridWeek', 'dayGridMonth'],
+    events: [
+      { id: 'a', title: 'Garde de nuit', start: '2026-10-24T22:00[Europe/Paris]', duration: { hours: 8 } },
+      { id: 'b', title: "Point d'équipe", start: '2026-10-22T09:30[Europe/Paris]', duration: { minutes: 30 } },
+    ],
+  }}
+/>
+
+## Clair et sombre
+
+`scheme: 'auto'` suit le `prefers-color-scheme` du système ; `'light'` et
+`'dark'` imposent le mode clair ou sombre. Un interrupteur de site qui écrit
+`data-theme="dark"` ou `"light"` sur un ancêtre (`<html>`, par exemple) n'exige
+aucun `update` avec `'auto'` : le calendrier le suit, comme il suit le
+système. Pour une bascule propre au calendrier, appelez `update({ scheme })`
+(voir [`scheme`](../../options/scheme/)) :
+
+```ts
+toggle.addEventListener('change', () => calendar.update({ scheme: toggle.checked ? 'dark' : 'light' }));
+```
+
+Les deux palettes de chaque famille sont des valeurs simples, choisies par
+`scheme`, par un attribut `data-theme` et par la media query : rien n'exige
+la prise en charge de `light-dark()`. Les démos de ce site suivent
+l'interrupteur du haut de page, sauf si elles fixent elles-mêmes `scheme`.
+
+## Densité et style des événements
+
+[`density`](../../options/density/) règle la hauteur d'une minute (0,8, 1,2 et
+1,6 px pour `'compact'`, `'comfortable'` et `'spacious'`, soit 48, 72 et 96 px
+l'heure), celle d'une barre et la taille du texte. Toute autre échelle tient
+en un jeton : `.dz-cal { --dz-minute: 2px; }` donne 120 px l'heure (sur `.dz-cal`
+lui-même ou une classe posée dessus : les densités y règlent le jeton).
+[`eventStyle`](../../options/event-style/) vaut `'tinted'` (par défaut : une
+teinte du ton de l'événement, son bord dans le ton) ou `'solid'` (un aplat du
+ton, son texte en `--dz-on-tone`, blanc en clair et presque noir en sombre, si
+bien que le contraste tient en clair comme en sombre ; un ton pâle de votre cru prend
+`--dz-tone-<nom>-on`). Avec Angular et Vue, `eventStyle` passe par `options` ;
+avec React, c'est une prop.
+
+<LiveDemo
+  label="Une semaine compacte, événements pleins"
+  height={560}
+  options={{
+    density: 'compact',
+    eventStyle: 'solid',
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-21',
+    headerViews: ['timeGridWeek', 'dayGridMonth'],
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Appel Chicago', start: '2026-10-22T10:00[America/Chicago]', duration: { hours: 1 }, tone: 'green' },
+      { id: 'c', title: 'Bloc opératoire', start: '2026-10-23T08:30[Europe/Paris]', duration: { hours: 2 }, tone: 'red' },
+    ],
+  }}
+/>
+
+## Changer une couleur
+
+La palette est celle de tzslot (`--tz-*`) : une page qui utilise les deux
+bibliothèques la règle une seule fois ; les jetons propres au calendrier sont
+des `--dz-*`. Ceux dont vous aurez besoin :
+
+| Jeton | Ce qu'il règle |
+|---|---|
+| `--tz-bg`, `--tz-bg-raised` | le fond de la page, et la surface en relief des survols (boutons de la barre, « +N », éléments de menu) et des titres de jour de la vue liste |
+| `--tz-fg`, `--tz-fg-muted` | le texte, le texte secondaire |
+| `--tz-border` | les traits |
+| `--tz-accent`, `--tz-accent-fg` | l'accent (aujourd'hui, vue choisie, focus) et le texte posé dessus |
+| `--tz-danger`, `--tz-warning` | les refus et le trait de l'heure courante (valeur par défaut de `--dz-now`) ; les marques de changement d'heure |
+| `--tz-radius`, `--tz-font` | le rayon des coins, la police |
+| `--dz-today-bg`, `--dz-now` | la case ou la colonne du jour, le trait de l'heure courante |
+| `--dz-event-bg`, `--dz-event-fg`, `--dz-event-accent`, `--dz-event-radius` | les événements |
+| `--dz-tone-<nom>` | un ton d'événement nommé (`tone: 'green'` sur un événement) |
+| `--dz-on-tone`, `--dz-tone-<nom>-on` | le texte d'un événement plein, pour tous les tons ou pour un seul |
+| `--dz-height`, `--dz-minute`, `--dz-bar-height`, `--dz-gutter-width` | les tailles |
+
+Chaque `--tz-x` a un `--dz-x` qui le remplace sur le calendrier. Les jetons
+et tons de la famille (`--dz-*`) sont déclarés sur le calendrier lui-même :
+réglez-les sur `.dz-cal` ou sur une classe posée dessus ; sur `:root` ou un
+ancêtre, ils n'atteignent jamais les événements. Les `--tz-*` de la page font
+exception, plus bas.
+
+```css
+:root { --tz-accent: #0a7d5a; }              /* toutes les familles suivent */
+.dz-cal.agenda { --dz-radius: 2px; --dz-tone-green: #0a7d5a; }  /* ce calendrier seulement */
+```
+
+**La page passe en premier.** Une famille donne des valeurs par défaut : le
+calendrier lit `--dz-x`, sinon le `--tz-x` de la page (sur `:root` ou un
+ancêtre), sinon celui de la famille, sinon une couleur système. Un
+`--tz-accent` sur `:root` recolore donc aussi un calendrier `'slate'`. Revers
+de la médaille : une page qui charge le thème de tzslot montre la palette de
+tzslot quelle que soit la famille choisie. Réglez `--tz-*` sur le calendrier
+ou un ancêtre, pas sur un événement : lui a ses `--dz-event-*` et son ton.
+Une valeur peut être une paire `light-dark(clair, sombre)` là où le
+navigateur la connaît.
+
+## Vos règles l'emportent
+
+Tout le CSS du calendrier est rangé dans deux couches de cascade,
+`dzcalendar.base` puis `dzcalendar.theme`, feuilles de la timeline et de
+l'éditeur Pro comprises. Toute règle à vous, hors couche,
+l'emporte sur les deux, quelle que soit sa spécificité : pas de `!important`,
+pas besoin de recopier nos sélecteurs.
+[Chaque partie, état et jeton sur lesquels vous pouvez compter](https://github.com/plinthworks/dzcalendar/blob/main/docs/styling.md)
+est listé (en anglais), et un renommage y exige une version majeure.
+
+```css
+.dz-ev { border-radius: 0; }        /* événements carrés */
+.dz-toolbar { display: none; }      /* votre propre en-tête */
+.dz-cal [data-today] { outline: 2px solid var(--tz-accent); }
+```
+
+Seule exception : le curseur main fermée (*grabbing*) pendant le glisser d'un événement, qui
+est `!important` dans la couche de base. Les couches demandent Chrome 99,
+Safari 15.4 ou Firefox 97. Une page dont la feuille de réinitialisation (reset) n'est pas en couche
+(Bootstrap, Tailwind 3) met [`cssLayers`](../../options/css-layers/) à
+`false` et importe le thème sans couche (`@dzcalendar/theme/unlayered.css`,
+ou `tailwind3.css`) : voyez le [guide Tailwind](../tailwind/). Pour garder la structure
+et tout dessiner vous-même, [`look: 'none'`](../../options/look/) et les
+[`hooks`](../../options/hooks/) de rendu sont dans
+[le mode sans style](../unstyled/).
+
+## Un thème à vous
+
+`defineTheme(nom, jetons)` enregistre une famille qui s'appuie sur la
+famille standard : ce qu'elle donne l'emporte, ce qu'elle omet (la palette,
+les tons nommés `green`, `red`…, `--dz-on-tone`) est celui de standard, à
+condition que le CSS du thème soit chargé ; sans lui, ce qui manque retombe
+sur les couleurs système. Elle part de la palette, des
+jetons propres au calendrier (`todayBg`, `now`, `eventBg`, `eventFg`,
+`eventAccent`) et de `tones` d'événements nommés. Une couleur est une valeur
+ou une paire `[clair, sombre]` ; `radius` et `font` n'ont qu'une valeur.
+Appelez-la avant de créer le calendrier :
+
+```ts
+import { createCalendar, defineTheme } from '@dzcalendar/dom';
+
+defineTheme('clinic', {
+  accent: ['#0a7d5a', '#3ddc97'],
+  bg: ['#ffffff', '#0f1915'],
+  radius: '4px',
+  tones: { urgent: ['#b91c1c', '#f87171'] },
+});
+
+createCalendar(element, { theme: 'clinic' });
+// un événement avec tone: 'urgent' prend le rouge de la clinique
+```
+
+Votre thème est injecté dans la couche `dzcalendar.theme` : votre CSS
+ordinaire et les `--tz-*` de la page l'emportent donc toujours. Seuls les
+jetons ci-dessus sont acceptés ; un jeton inconnu, le nom d'une famille livrée, un nom qui n'est pas fait de
+minuscules, de chiffres et de tirets, un nom de ton à d'autres caractères ou
+une valeur dangereuse (`;`, `{`, `url(`) est refusé par une `RangeError`.
+Redéfini, il est suivi aussitôt par les calendriers qui l'utilisent.
+
+Si vous construisez vous-même la feuille de style, les variables SCSS sont en
+`!default`. Elles ne changent que la famille standard, donc aussi toute
+famille `defineTheme` qui s'appuie dessus ; les six autres viennent de
+`$themes` :
+
+```scss
+@use '@dzcalendar/theme/dzcalendar' with (
+  $accent: (#0a7d5a, #3ddc97),
+  $bg: (#ffffff, #0f1915)
+);
+```
+
+## Shadow roots et CSP stricte
+
+Les feuilles de la page ne traversent pas un shadow root. Avec l'élément
+`<dz-calendar>` de `@dzcalendar/element` (`import '@dzcalendar/element/define'`)
+et son attribut `shadow`, le calendrier y injecte son propre CSS, et la
+palette (`--tz-*`, `--dz-*`) s'hérite à travers la racine. Liez le thème
+(`stylesheet="/chemin/dzcalendar.css"`) ou chargez-le dans la racine quand
+vous y montez `createCalendar` ; les thèmes `defineTheme` y sont posés par le
+calendrier lui-même. Stylez l'élément de l'extérieur avec `::part(calendar)`
+et `::part(toolbar)`. Le `<dz-calendar>` d'Angular est un autre composant, sans
+ces attributs. Une limite : dans un shadow root, le `data-theme` d'un
+ancêtre de la page ne bascule pas la palette (les sélecteurs ne franchissent
+pas la frontière, et `:host-context` manque dans Safari et Firefox), et un
+attribut sur l'élément hôte n'y change rien. Passez `scheme` au calendrier ;
+`'auto'` suit toujours le système.
+
+Une Content-Security-Policy sans styles en ligne refuse le `<style>` que le
+calendrier ajoute. Mettez [`injectStyles`](../../options/inject-styles/) à
+`false` et placez le CSS dans une feuille que votre politique autorise :
+
+```ts
+import { DZ_CSS, themeCss, createCalendar } from '@dzcalendar/dom';
+import { LIST_CSS } from '@dzcalendar/dom/list';
+import { MULTIMONTH_CSS } from '@dzcalendar/dom/multimonth';
+import { TIMELINE_CSS } from '@dzcalendar/pro';
+import { EDITOR_CSS } from '@dzcalendar/pro/editor';
+
+// À écrire dans votre propre feuille de style, à la construction, après le
+// dzcalendar.css du thème ; defineTheme('clinic', …) s'exécute toujours dans l'app, avant createCalendar :
+const sheet = [DZ_CSS, LIST_CSS, MULTIMONTH_CSS, TIMELINE_CSS, EDITOR_CSS, themeCss('clinic')].join('\n');
+
+createCalendar(element, { injectStyles: false, theme: 'clinic' });
+```
+
+N'ajoutez chaque feuille que pour les vues importées, avec la feuille du
+thème lui-même (`@dzcalendar/theme/dzcalendar.css`) et `themeCss(…)` pour une
+famille `defineTheme`. Un thème inconnu est refusé par `createCalendar` : la
+famille doit être définie avant. Avec `look: 'none'`, passez chaque feuille
+par `lookGuardedCss(…)`, de `@dzcalendar/dom/toolkit`. Les titres et numéros
+de jour dans un autre calendrier (hégirien, persan) relèvent de
+[`displayCalendar`](../../options/display-calendar/).

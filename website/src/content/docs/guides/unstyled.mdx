@@ -1,0 +1,397 @@
+---
+title: "Unstyled mode"
+description: "look: 'none' keeps the structure only: every colour, border and font is yours."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import LiveDemo from '../../../components/LiveDemo.astro';
+
+`look: 'none'` keeps what makes the calendar work — the grids, the
+positions, the time axis, a day that is 23 or 25 hours long — and draws no
+colour, border, shadow or font of its own. The look is then your
+application's or your design system's. If you would rather start from a
+family of colours, see [Theming](../theming/); for utility classes, see
+[Tailwind](../tailwind/).
+
+## Turn the look off
+
+[`look`](../../options/look/) is `'styled'` by default. It is an option of
+the calendar, so it affects that calendar only; another one on the same page
+keeps its theme.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', look: 'none' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ look: 'none' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" look="none" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ look: 'none' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+The week below is the one where the clocks go back in Paris: Sunday is 25
+hours long, and still drawn so, with no colour at all.
+
+<LiveDemo
+  label="A time grid week with a 25-hour day, unstyled"
+  height={560}
+  options={{
+    look: 'none',
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-25',
+    locale: 'en-GB',
+    timeZone: 'Europe/Paris',
+    scrollTime: { hours: 1 },
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-23T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Night shift', start: '2026-10-25T01:00[Europe/Paris]', duration: { hours: 3 } },
+      { id: 'c', title: 'Day off', start: '2026-10-24', allDay: true },
+    ],
+  }}
+/>
+
+## What stays and what goes
+
+A rule of the calendar's CSS is split declaration by declaration: what a
+layout needs stays, what is only appearance goes.
+
+| Stays | Goes |
+|---|---|
+| `display`, grids, flex, positions, sizes, `overflow`, scrolling | colours (text, background), `box-shadow`, `filter`, `color-scheme` |
+| Margins and paddings, `z-index`, `cursor`, `touch-action`, `text-align` (slots, "+N" and menu entries keep their start alignment, the gutter's labels their end) | Borders and outlines (`outline-offset` too), radii, `text-decoration` |
+| `opacity` (a disabled entry, an event being moved) | Fonts, weights, letter forms, transitions, `scrollbar-width` |
+| Resets: a button as plain text, `transparent`, `inherit` | The theme's palette on the parts, `background-image` (the hatching of closed days) |
+| The page's own colours (`Canvas`) under what sticks or floats: the list's day head, the editor | |
+
+Three consequences are worth knowing before you start:
+
+- **What was drawn by colour alone is yours to draw**: today, the lines of
+  the grid, the now line, a ghost's place while dragging, the keyboard's
+  focus ring.
+- **A border is part of the look**: the room of a 1-px line goes back to the
+  content, so a border you draw takes room of its own.
+- **Type is the look**: heads and rows that size to their text follow your
+  font sizes, not ours.
+
+The theme's CSS can stay imported. It still applies to every calendar of the
+page that is not unstyled, and the unstyled one ignores the theme's look.
+
+## Style the parts
+
+Every part is a class named `dz-…`, every state a `data-*` attribute, and the
+calendar itself carries `data-dz-look="none"`. They are the contract of
+[`docs/styling.md`](https://github.com/plinthworks/dzcalendar/blob/main/docs/styling.md): a part renamed is a major version. Your rules win over the
+calendar's — whatever their specificity — as long as they are outside a
+cascade layer, with the calendar's layers on (the default; with
+[`cssLayers`](../../options/css-layers/) set to `false`, weight and order decide).
+
+```css
+/* Only the unstyled calendars. */
+[data-dz-look='none'] .dz-toolbar__btn {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: white;
+}
+[data-dz-look='none'] .dz-toolbar__btn[aria-pressed='true'] {
+  background: #0f172a;
+  color: white;
+}
+
+/* The grid's lines, today, an event. */
+[data-dz-look='none'] .dz-tg__col,
+[data-dz-look='none'] .dz-dg__cell {
+  border-inline-start: 1px solid #e2e8f0;
+}
+[data-dz-look='none'] [data-today] {
+  background: #fef9c3;
+}
+[data-dz-look='none'] .dz-ev,
+[data-dz-look='none'] .dz-bar {
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+[data-dz-look='none'] :is(.dz-ev, .dz-bar)[data-tone='green'] {
+  background: #dcfce7;
+}
+```
+
+Two things help here. A day carries `data-today`, `data-past`,
+`data-outside`, `data-closed` and `data-folded` (a day that did not exist in
+its zone); an event carries `data-tone`, `data-all-day`, `data-editable` and
+`data-moving`. And the tokens still work where a part reads them, so
+`--dz-minute` (a minute's height) or `--dz-gutter-width` change the
+structure without any colour. Unstyled, an
+event's `data-tone` is the hook to colour it from; the
+[`eventStyle`](../../options/event-style/) option belongs to the themed look.
+
+## Classes from hooks
+
+[`hooks`](../../options/hooks/) puts classes on the calendar's own elements,
+which is what a utility-class library or a design system needs. A class is a
+string, a list, or a function of the element's context, read again each time
+the element is drawn:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  look: 'none',
+  hooks: {
+    event: { class: 'appt' },
+    dayLane: { class: (ctx) => (ctx.today ? 'lane lane-today' : 'lane') },
+    nowIndicator: { class: 'now-line' },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ look: 'none' }" [hooks]="hooks" />`,
+})
+export class Agenda {
+  hooks: CalendarHooks = {
+    event: { class: 'appt' },
+    dayLane: { class: (ctx) => (ctx.today ? 'lane lane-today' : 'lane') },
+    nowIndicator: { class: 'now-line' },
+  };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const HOOKS: CalendarHooks = {
+  event: { class: 'appt' },
+  dayLane: { class: (ctx) => (ctx.today ? 'lane lane-today' : 'lane') },
+  nowIndicator: { class: 'now-line' },
+};
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" look="none" hooks={HOOKS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const hooks: CalendarHooks = {
+  event: { class: 'appt' },
+  dayLane: { class: (ctx) => (ctx.today ? 'lane lane-today' : 'lane') },
+  nowIndicator: { class: 'now-line' },
+};
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ look: 'none' }" :hooks="hooks" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+The names are those of the elements — `event`, `dayCell`, `dayHeader`,
+`nowIndicator`, `moreLink`… — each with the context it receives; the
+[`hooks`](../../options/hooks/) page lists them. `dayCell` is the month's
+and the day grid's cell; in a week of the time grid, a day's column is
+`dayLane`, as above. In the framework wrappers a new function at each render
+is fine: they read the latest. In plain JS, `update({ hooks })` with a new
+function redraws. In both, a function's result applies when the element is
+drawn again; a class given as a string or a list follows at once.
+
+Because an unstyled calendar draws nothing, the classes are all that styles
+it. A plain rule is enough, and so are Tailwind utilities, as the
+[Tailwind](../tailwind/) guide shows:
+
+```css
+.appt { border-radius: 4px; background: #dbeafe; color: #1e3a8a; }
+.lane-today { background: #fef9c3; }
+.now-line { border-top: 2px solid #dc2626; }
+```
+
+## Without injected styles
+
+By default the calendar puts its structural CSS in the page, and guards the
+calendar's own sheets, in its document or shadow root, the first time an unstyled calendar appears (a page without one
+pays nothing). Under a Content Security Policy that forbids inline styles you
+set [`injectStyles`](../../options/inject-styles/) to `false` and include the
+CSS yourself. The sheet then has to be guarded too, or the look of the theme
+stays in it: `lookGuardedCss` returns the same sheet with the appearance
+conditioned on "not an unstyled calendar".
+
+```ts
+import { DZ_CSS, lookGuardedCss } from '@dzcalendar/dom';
+import { writeFileSync } from 'node:fs';
+
+// A build step: write it to a stylesheet your policy allows.
+writeFileSync('public/dzcalendar.css', lookGuardedCss(DZ_CSS));
+```
+
+Do the same for the other sheets of the calendar you include: `LIST_CSS`
+(`@dzcalendar/dom/list`), `MULTIMONTH_CSS` (`@dzcalendar/dom/multimonth`) and,
+for the Pro's views, `TIMELINE_CSS` (`@dzcalendar/pro`) and `EDITOR_CSS`
+(`@dzcalendar/pro/editor`). The theme's sheet is already guarded. If no
+readable sheet of the document (or shadow root) holds the calendar's CSS
+guarded, the calendar says so once in the console, for each calendar
+(`dzcalendar: look 'none' with injectStyles: false — include lookGuardedCss(DZ_CSS)…`)
+and the look stays on. A sheet of another origin cannot be read, and a sheet
+still loading is not seen.
+
+## Back and forth
+
+`look` can change while the calendar is shown. `update({ look })` rebuilds
+nothing: the mark changes and the lanes and stacks are measured again. The
+date and the view are kept, and so is the scroll (the DOM is untouched); the frameworks
+pass the option as they do any other:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris' });
+
+calendar.update({ look: 'none' });
+calendar.update({ look: 'styled' }); // the theme again
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <button (click)="bare.set(!bare())">Toggle the look</button>
+    <dz-calendar timeZone="Europe/Paris" [options]="{ look: bare() ? 'none' : 'styled' }" />
+  `,
+})
+export class Agenda {
+  bare = signal(false);
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [bare, setBare] = useState(false);
+  return (
+    <>
+      <button onClick={() => setBare(!bare)}>Toggle the look</button>
+      <DzCalendar timeZone="Europe/Paris" look={bare ? 'none' : 'styled'} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const bare = ref(false);
+</script>
+
+<template>
+  <button @click="bare = !bare">Toggle the look</button>
+  <DzCalendar time-zone="Europe/Paris" :options="{ look: bare ? 'none' : 'styled' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+The month, unstyled, with nothing but its structure:
+
+<LiveDemo
+  label="A month, unstyled"
+  height={560}
+  options={{
+    look: 'none',
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    locale: 'en-GB',
+    timeZone: 'Europe/Paris',
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'c', title: 'Day off', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>

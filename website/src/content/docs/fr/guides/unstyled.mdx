@@ -1,0 +1,406 @@
+---
+title: "Mode sans style"
+description: "look: 'none' ne garde que la structure : chaque couleur, bordure et police est à vous."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+`look: 'none'` garde ce qui fait marcher le calendrier — les grilles, les
+positions, l'axe des heures, un jour de 23 ou de 25 heures — et ne dessine
+aucune couleur, bordure, ombre ni police. Le rendu devient celui de votre
+application ou de votre système de design. Si vous préférez partir d'une
+famille de couleurs, voyez [Thèmes](../theming/) ; pour des classes
+utilitaires, voyez [Tailwind](../tailwind/).
+
+## Couper l'habillage
+
+[`look`](../../options/look/) vaut `'styled'` par défaut. C'est une option du
+calendrier : elle ne touche que lui, et un autre calendrier de la même page
+garde son thème.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, { timeZone: 'Europe/Paris', look: 'none' });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ look: 'none' }" />`,
+})
+export class Agenda {}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" look="none" />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ look: 'none' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+La semaine ci-dessous est celle du passage à l'heure d'hiver à Paris : le
+dimanche dure 25 heures, et il est dessiné comme tel, sans aucune couleur.
+
+<LiveDemo
+  label="Une semaine en grille horaire avec un jour de 25 heures, sans style"
+  height={560}
+  options={{
+    look: 'none',
+    initialView: 'timeGridWeek',
+    initialDate: '2026-10-25',
+    locale: 'fr-FR',
+    timeZone: 'Europe/Paris',
+    scrollTime: { hours: 1 },
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-23T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'b', title: 'Garde de nuit', start: '2026-10-25T01:00[Europe/Paris]', duration: { hours: 3 } },
+      { id: 'c', title: 'Jour de congé', start: '2026-10-24', allDay: true },
+    ],
+  }}
+/>
+
+## Ce qui reste et ce qui part
+
+Chaque règle du CSS du calendrier est séparée déclaration par déclaration :
+ce dont une mise en page a besoin reste, ce qui n'est qu'apparence part.
+
+| Reste | Part |
+|---|---|
+| `display`, grilles, flex, positions, tailles, `overflow`, défilement | Les couleurs (texte, fond), `box-shadow`, `filter`, `color-scheme` |
+| Marges et remplissages, `z-index`, `cursor`, `touch-action`, `text-align` (les créneaux, « +N » et les entrées de menu gardent leur alignement de début, les étiquettes de la gouttière celui de fin) | Bordures et contours (`outline-offset` aussi), rayons, `text-decoration` |
+| `opacity` (une entrée désactivée, un événement en déplacement) | Polices, graisses, formes de lettres, transitions, `scrollbar-width` |
+| Les remises à zéro : un bouton en simple texte, `transparent`, `inherit` | La palette du thème sur les parties, `background-image` (les hachures des jours fermés) |
+| Les couleurs propres de la page (`Canvas`) sous ce qui reste collé ou flotte : l'en-tête de jour de la liste, l'éditeur | |
+
+Trois conséquences à connaître avant de commencer :
+
+- **Ce qui n'était dessiné que par la couleur est à vous** : aujourd'hui, les
+  lignes de la grille, le trait de l'heure courante, la place d'un fantôme
+  pendant un glisser-déposer, l'anneau de focus du clavier.
+- **Une bordure fait partie de l'habillage** : la place d'un trait de 1 px
+  retourne au contenu ; une bordure que vous dessinez prend donc sa propre
+  place.
+- **La typographie est l'habillage** : les en-têtes et les lignes qui
+  s'ajustent à leur texte suivent vos tailles de police, pas les nôtres.
+
+Le CSS du thème peut rester importé. Il s'applique toujours aux calendriers
+de la page qui ne sont pas sans style, et le calendrier sans style ignore l'habillage
+du thème.
+
+## Habiller les parties
+
+Chaque partie est une classe nommée `dz-…`, chaque état un attribut `data-*`,
+et le calendrier porte lui-même `data-dz-look="none"`. C'est le contrat de
+[`docs/styling.md`](https://github.com/plinthworks/dzcalendar/blob/main/docs/styling.md) :
+une partie renommée est une version majeure. Vos règles l'emportent sur
+celles du calendrier — quelle que soit leur spécificité — tant qu'elles sont
+hors d'une couche de cascade, les couches du calendrier étant actives (par
+défaut ; avec [`cssLayers`](../../options/css-layers/) à `false`, le poids et
+l'ordre décident).
+
+```css
+/* Seulement les calendriers sans style. */
+[data-dz-look='none'] .dz-toolbar__btn {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: white;
+}
+[data-dz-look='none'] .dz-toolbar__btn[aria-pressed='true'] {
+  background: #0f172a;
+  color: white;
+}
+
+/* Les lignes de la grille, aujourd'hui, un événement. */
+[data-dz-look='none'] .dz-tg__col,
+[data-dz-look='none'] .dz-dg__cell {
+  border-inline-start: 1px solid #e2e8f0;
+}
+[data-dz-look='none'] [data-today] {
+  background: #fef9c3;
+}
+[data-dz-look='none'] .dz-ev,
+[data-dz-look='none'] .dz-bar {
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+[data-dz-look='none'] :is(.dz-ev, .dz-bar)[data-tone='green'] {
+  background: #dcfce7;
+}
+```
+
+Deux aides. Un jour porte `data-today`, `data-past`, `data-outside`,
+`data-closed` et `data-folded` (un jour qui n'existait pas dans son fuseau) ;
+un événement porte `data-tone`, `data-all-day`, `data-editable` et
+`data-moving`. Et les jetons fonctionnent toujours là où une partie les lit :
+`--dz-minute` (la hauteur d'une minute) ou `--dz-gutter-width` changent la
+structure sans aucune couleur. Sans style, le `data-tone` d'un événement est
+le point d'accroche pour le colorer ; l'option
+[`eventStyle`](../../options/event-style/) relève de l'habillage du thème.
+
+## Des classes par `hooks`
+
+[`hooks`](../../options/hooks/) pose des classes sur les éléments mêmes du
+calendrier, ce dont une bibliothèque de classes utilitaires ou un système de
+design a besoin. Une classe est une chaîne, une liste, ou une fonction du
+contexte de l'élément, relue à chaque dessin :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  look: 'none',
+  hooks: {
+    event: { class: 'rdv' },
+    dayLane: { class: (ctx) => (ctx.today ? 'colonne colonne-jour' : 'colonne') },
+    nowIndicator: { class: 'trait-maintenant' },
+  },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" [options]="{ look: 'none' }" [hooks]="hooks" />`,
+})
+export class Agenda {
+  hooks: CalendarHooks = {
+    event: { class: 'rdv' },
+    dayLane: { class: (ctx) => (ctx.today ? 'colonne colonne-jour' : 'colonne') },
+    nowIndicator: { class: 'trait-maintenant' },
+  };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const HOOKS: CalendarHooks = {
+  event: { class: 'rdv' },
+  dayLane: { class: (ctx) => (ctx.today ? 'colonne colonne-jour' : 'colonne') },
+  nowIndicator: { class: 'trait-maintenant' },
+};
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" look="none" hooks={HOOKS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import type { CalendarHooks } from '@dzcalendar/dom';
+
+const hooks: CalendarHooks = {
+  event: { class: 'rdv' },
+  dayLane: { class: (ctx) => (ctx.today ? 'colonne colonne-jour' : 'colonne') },
+  nowIndicator: { class: 'trait-maintenant' },
+};
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :options="{ look: 'none' }" :hooks="hooks" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Les noms sont ceux des éléments — `event`, `dayCell`, `dayHeader`,
+`nowIndicator`, `moreLink`… — chacun avec le contexte qu'il reçoit ; la page
+[`hooks`](../../options/hooks/) les liste. `dayCell` est la cellule du mois et de
+la grille de jours ; dans une semaine de la grille horaire, la colonne d'un
+jour est `dayLane`, comme ci-dessus. Dans les wrappers de framework, une
+nouvelle fonction à chaque rendu ne pose pas de problème : ils lisent la
+dernière. En JS pur, `update({ hooks })` avec une nouvelle fonction
+redessine. Dans les deux cas, le résultat d'une fonction s'applique quand
+l'élément est dessiné de nouveau ; une classe donnée en chaîne (ou en liste)
+suit aussitôt.
+
+Un calendrier sans style ne dessine rien : ces classes sont tout ce qui
+l'habille. Une règle ordinaire suffit, et des utilitaires Tailwind aussi,
+comme le montre le guide [Tailwind](../tailwind/) :
+
+```css
+.rdv { border-radius: 4px; background: #dbeafe; color: #1e3a8a; }
+.colonne-jour { background: #fef9c3; }
+.trait-maintenant { border-top: 2px solid #dc2626; }
+```
+
+## Sans styles injectés
+
+Par défaut, le calendrier met son CSS de structure dans la page, et protège
+les feuilles du calendrier lui-même, dans son document ou sa racine shadow, la première fois qu'un calendrier sans style
+apparaît (une page qui n'en a pas ne paie rien). Sous une politique de
+sécurité du contenu qui interdit les styles en ligne, vous passez
+[`injectStyles`](../../options/inject-styles/) à `false` et incluez le CSS
+vous-même. La feuille doit alors être protégée aussi, sans quoi l'habillage du
+thème y reste : `lookGuardedCss` rend la même feuille avec l'apparence
+conditionnée à « pas un calendrier sans style ».
+
+```ts
+import { DZ_CSS, lookGuardedCss } from '@dzcalendar/dom';
+import { writeFileSync } from 'node:fs';
+
+// Une étape de build : l'écrire dans une feuille que votre politique autorise.
+writeFileSync('public/dzcalendar.css', lookGuardedCss(DZ_CSS));
+```
+
+Faites de même pour les autres feuilles du calendrier que vous incluez :
+`LIST_CSS` (`@dzcalendar/dom/list`), `MULTIMONTH_CSS`
+(`@dzcalendar/dom/multimonth`) et, pour les vues du Pro, `TIMELINE_CSS`
+(`@dzcalendar/pro`) et `EDITOR_CSS` (`@dzcalendar/pro/editor`). La feuille du
+thème est déjà protégée. Si aucune feuille lisible du document (ou de sa
+racine shadow) ne contient le CSS du calendrier protégé, le calendrier le dit
+une fois dans la console, pour chaque calendrier
+(`dzcalendar: look 'none' with injectStyles: false — include lookGuardedCss(DZ_CSS)…`)
+et l'habillage reste. Une feuille d'une autre origine ne peut pas être lue, et
+une feuille encore en chargement n'est pas vue.
+
+## Aller et retour
+
+`look` peut changer pendant que le calendrier est affiché.
+`update({ look })` ne reconstruit
+rien : la marque change et les voies et les piles sont mesurées de nouveau.
+La date et la vue sont gardées, le défilement aussi (le DOM n'est pas touché) ; les frameworks transmettent l'option comme
+n'importe quelle autre :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris' });
+
+calendar.update({ look: 'none' });
+calendar.update({ look: 'styled' }); // le thème revient
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <button (click)="nu.set(!nu())">Basculer l'habillage</button>
+    <dz-calendar timeZone="Europe/Paris" [options]="{ look: nu() ? 'none' : 'styled' }" />
+  `,
+})
+export class Agenda {
+  nu = signal(false);
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar } from '@dzcalendar/react';
+
+export function Agenda() {
+  const [nu, setNu] = useState(false);
+  return (
+    <>
+      <button onClick={() => setNu(!nu)}>Basculer l'habillage</button>
+      <DzCalendar timeZone="Europe/Paris" look={nu ? 'none' : 'styled'} />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const nu = ref(false);
+</script>
+
+<template>
+  <button @click="nu = !nu">Basculer l'habillage</button>
+  <DzCalendar time-zone="Europe/Paris" :options="{ look: nu ? 'none' : 'styled' }" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Le mois, sans style, avec sa seule structure :
+
+<LiveDemo
+  label="Un mois, sans style"
+  height={560}
+  options={{
+    look: 'none',
+    initialView: 'dayGridMonth',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    timeZone: 'Europe/Paris',
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } },
+      { id: 'c', title: 'Jour de congé', start: '2026-10-23', allDay: true },
+    ],
+  }}
+/>

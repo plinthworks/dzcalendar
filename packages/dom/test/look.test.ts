@@ -2,6 +2,8 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { Temporal } from '@dzcalendar/core';
 import { createCalendar } from '../src/index.js';
 import { withLookGuard } from '../src/render/look.js';
+import { DZ_CSS, lookGuardedCss } from '../src/index.js';
+import { vi } from 'vitest';
 import '../src/list.js';
 
 // The unstyled mode (look: 'none', docs/styling.md): the CSS split into its structure and its look.
@@ -15,6 +17,9 @@ describe('withLookGuard', () => {
     );
   });
 
+  it('alignment is structure: a slot or a "+N" button keeps its start alignment, a gutter label its end (owner, 2026-11-04)', () => {
+    expect(withLookGuard('.a { text-align: end; color: red; }').trim()).toBe(`.a { text-align: end; }\n.a${G} { color: red; }`);
+  });
   it('every selector of a list guarded; a pseudo-element kept last', () => {
     expect(withLookGuard('.a, .b:hover::before { color: red; }').trim()).toBe(`.a${G}, .b:hover${G}::before { color: red; }`);
   });
@@ -66,5 +71,34 @@ describe('the look option', () => {
     expect([before.length > 0, before.includes('[data-dz-look="none"]'), after.includes('[data-dz-look="none"]'), list === '' || list.includes('[data-dz-look="none"]')]).toEqual([true, false, true, true]);
     styled.destroy();
     bare.destroy();
+  });
+});
+
+describe("look: 'none' with injectStyles: false (owner, 2026-11-04: said only when the guarded CSS is missing)", () => {
+  const make = () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    return createCalendar(host, { timeZone: 'Europe/Paris', look: 'none', injectStyles: false, initialDate: Temporal.PlainDate.from('2026-10-21') });
+  };
+  it('without the guarded CSS the console says to include it; with it, nothing — the theme’s guarded sheet does not count', () => {
+    // A calendar of an earlier test left its sheets, guarded: a page with them has nothing to be told.
+    document.head.querySelectorAll('style[data-dzcalendar]').forEach((s) => s.remove());
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const theme = document.createElement('style');
+    theme.textContent = `.dz-tg__col:where(:not([data-dz-look="none"], [data-dz-look="none"] *)) { color: red; }`;
+    document.head.append(theme);
+    const a = make();
+    expect(warn.mock.calls.filter((c) => String(c[0]).includes('lookGuardedCss'))).toHaveLength(1);
+    warn.mockClear();
+    const ours = document.createElement('style');
+    ours.textContent = lookGuardedCss(DZ_CSS);
+    document.head.append(ours);
+    const b = make();
+    expect(warn.mock.calls.filter((c) => String(c[0]).includes('lookGuardedCss'))).toHaveLength(0);
+    a.destroy();
+    b.destroy();
+    theme.remove();
+    ours.remove();
+    warn.mockRestore();
   });
 });

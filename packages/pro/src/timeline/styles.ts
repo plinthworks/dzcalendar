@@ -5,6 +5,8 @@
  * `TIMELINE_CSS`: include it yourself under `injectStyles: false`.
  */
 export const TIMELINE_CSS = `
+@layer dzcalendar.base, dzcalendar.theme;
+@layer dzcalendar.base {
 .dz-tl {
   --dz-tl-slot: 2.75rem;
   /* A lane holds an event at least 24 px tall (WCAG 2.5.8, target size). */
@@ -104,4 +106,5 @@ export const TIMELINE_CSS = `
 .dz-tl__ev, .dz-tl__lane { touch-action: pan-x pan-y; }
 @media (forced-colors: active) { .dz-tl__ev { border: 1px solid CanvasText; } .dz-tl__now { border-inline-start-color: CanvasText; } .dz-tl__ev:focus-visible, .dz-tl__resizer:focus-visible, .dz-tl__expander:focus-visible, .dz-tl__cell:focus-visible { outline: 2px solid Highlight; } .dz-tl__resizer:focus-visible { background: Highlight; } }
 @media print { .dz-tl { height: auto; } .dz-tl__scroller { overflow: visible; } }
+}
 `;

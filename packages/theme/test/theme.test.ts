@@ -16,11 +16,12 @@ describe('@dzcalendar/theme', () => {
 
   // The family's values are defaults (--dzp-*): the calendar reads --tz-* first, so a page's own palette wins.
   const block = (selector: string) => {
-    const at = css.indexOf(`${selector} {`);
+    const at = css.indexOf(`${selector} { --dzp-bg`);
     return at < 0 ? '' : css.slice(at, css.indexOf('}', at));
   };
-  const light = block(".dz-cal[data-dz-theme=standard]");
-  const dark = block(".dz-cal[data-dz-theme=standard][data-dz-scheme=dark]");
+  // The standard family is on every calendar: the base the other families build on (owner, 2026-11-04).
+  const light = block('.dz-cal');
+  const dark = block('.dz-cal[data-dz-scheme=dark]');
 
   it('gives tzslot’s nine palette colours as defaults, light and dark, without light-dark() (Safari 15.4)', () => {
     for (const name of tzslotPalette) {
@@ -44,8 +45,8 @@ describe('@dzcalendar/theme', () => {
   });
 
   it('the system’s dark mode and [data-theme] switch the family, unless the calendar forces its scheme', () => {
-    expect(css).toMatch(/@media \(prefers-color-scheme: dark\)\s*\{\s*\.dz-cal\[data-dz-theme=standard\]:not\(\[data-dz-scheme=light\]\)/);
-    expect(css).toContain('[data-theme=dark] .dz-cal[data-dz-theme=standard]:not([data-dz-scheme=light])');
+    expect(css).toMatch(/@media \(prefers-color-scheme: dark\)\s*\{\s*\.dz-cal:not\(\[data-dz-scheme=light\]\)/);
+    expect(css).toContain('[data-theme=dark] .dz-cal:not([data-dz-scheme=light])');
   });
 
   it('unlayered.css is what unlayered.scss produces: the same rules, outside any layer', async () => {

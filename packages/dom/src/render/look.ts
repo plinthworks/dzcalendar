@@ -10,7 +10,7 @@
 
 /** Properties a layout needs: they stay in an unstyled calendar. Custom properties (`--…`) stay too. */
 const STRUCTURE =
-  /^(all|appearance|-webkit-appearance|forced-color-adjust|(-webkit-)?print-color-adjust|line-height|opacity|display|position|inset(-.*)?|top|right|bottom|left|(min-|max-)?(width|height|block-size|inline-size)|grid(-.*)?|flex(-.*)?|order|align-.*|justify-.*|place-.*|gap|row-gap|column-gap|overflow(-.*)?|overscroll-behavior(-.*)?|scrollbar-gutter|scroll-.*|z-index|box-sizing|margin(-.*)?|padding(-.*)?|contain(-.*)?|content-visibility|pointer-events|visibility|(-webkit-)?user-select|-webkit-touch-callout|touch-action|white-space|text-overflow|overflow-wrap|word-break|isolation|aspect-ratio|vertical-align|float|clear|writing-mode|direction|unicode-bidi|resize|will-change|transform|translate|clip|clip-path|content|cursor|container(-.*)?|table-layout|list-style(-.*)?)$/;
+  /^(all|appearance|-webkit-appearance|forced-color-adjust|(-webkit-)?print-color-adjust|line-height|opacity|display|position|inset(-.*)?|top|right|bottom|left|(min-|max-)?(width|height|block-size|inline-size)|grid(-.*)?|flex(-.*)?|order|align-.*|justify-.*|place-.*|gap|row-gap|column-gap|overflow(-.*)?|overscroll-behavior(-.*)?|scrollbar-gutter|scroll-.*|z-index|box-sizing|margin(-.*)?|padding(-.*)?|contain(-.*)?|content-visibility|pointer-events|visibility|(-webkit-)?user-select|-webkit-touch-callout|touch-action|white-space|text-align|text-overflow|overflow-wrap|word-break|isolation|aspect-ratio|vertical-align|float|clear|writing-mode|direction|unicode-bidi|resize|will-change|transform|translate|clip|clip-path|content|cursor|container(-.*)?|table-layout|list-style(-.*)?)$/;
 
 /**
  * A value of no colour of ours: a reset (0, none, transparent, inherit…) or

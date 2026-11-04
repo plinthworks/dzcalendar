@@ -7,7 +7,13 @@
  *
  *   1. createCalendar(host, { cssLayers: false })
  *      (Angular: provideDzCalendar({ cssLayers: false }))
- *   2. @import '@dzcalendar/theme/tailwind3.css';   after @tailwind base;
+ *   2. Tailwind's three parts as imports, this sheet after the base
+ *      (an @import after `@tailwind base;` is dropped: imports go first):
+ *        @import 'tailwindcss/base';
+ *        @import '@dzcalendar/theme/tailwind3.css';
+ *        @import 'tailwindcss/components';
+ *        @import 'tailwindcss/utilities';
+ *      (Tailwind 3's CLI follows them; with PostCSS, postcss-import first.)
  *
  * The calendar's class selectors outweigh preflight's element and * rules,
  * and a rule of yours of the same weight, written after, wins.

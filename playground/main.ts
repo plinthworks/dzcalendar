@@ -1,7 +1,7 @@
 import './prelude';
 import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
-import { createCalendar, NO_MOTION } from '@dzcalendar/dom';
+import { createCalendar, NO_MOTION, defineTheme } from '@dzcalendar/dom';
 import '@dzcalendar/dom/list';
 import '@dzcalendar/dom/multimonth';
 import { createGsapMotion } from '@dzcalendar/motion-gsap';
@@ -55,6 +55,8 @@ function make(axis: 'wall' | 'elapsed') {
 
 // For the browser checks (npm run test:browser): the live calendar.
 (window as unknown as { __dz: () => typeof cal }).__dz = () => cal;
+// For the browser checks: a family of one's own, built on the standard one (scripts/browser.mjs).
+(window as unknown as { __defineTheme: typeof defineTheme }).__defineTheme = defineTheme;
 
 zoneSelect.addEventListener('change', () => cal.update({ timeZone: zoneSelect.value }));
 document.querySelector<HTMLSelectElement>('#axis')!.addEventListener('change', (e) => {

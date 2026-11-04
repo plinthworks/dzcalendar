@@ -6,7 +6,10 @@ export type ThemeColor = string | readonly [light: string, dark: string];
 
 /**
  * A theme of one's own: tzslot's palette (shared with its pickers) and the
- * calendar's own tokens. Anything left out keeps the theme's value.
+ * calendar's own tokens. It builds on the standard family of the theme's CSS
+ * (`@dzcalendar/theme/dzcalendar.css`): anything left out — a colour, the named
+ * tones, the text on a solid event — keeps the standard family's value
+ * (without that CSS, the platform's colours).
  */
 export interface ThemeTokens {
   readonly bg?: ThemeColor;

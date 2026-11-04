@@ -40,6 +40,36 @@
 
 ### Fixed
 
+- Tailwind CSS 3: the recipe `@tailwind base;` then
+  `@import '@dzcalendar/theme/tailwind3.css';` left the calendar's CSS out of
+  the build without a word (an `@import` after another rule is dropped;
+  checked with Tailwind 3.4.17: 0 rules of the calendar). The recipe is the
+  three parts of Tailwind as imports, the theme after the base
+  (`tailwind3.css`'s header, docs, guide) (18j-3, batch 4).
+- `tailwind-theme.css`: outside a calendar the utilities skipped the page's
+  shared `--tz-*` palette; `bg-dz-raised` fell back to `Canvas` (the
+  calendar's `ButtonFace`) and `border-dz-line` to the full border colour
+  (the calendar's lines are at 70 %). They fall back as the calendar does.
+- The Pro's timeline and editor sheets were outside the cascade layers and
+  appended last: they beat a page's own rules of equal weight, against the
+  promise that a page's unlayered rule always wins. They are in
+  `dzcalendar.base`; the editor's follows the calendar's `cssLayers` (it was
+  always layered).
+- A `defineTheme` family had none of the standard family's values (owner,
+  2026-11-04: it builds on it): the named tones (`green`, `red`…) were gone,
+  the text on a solid event fell to the background colour, and what it left
+  out fell to system colours, while its JSDoc said "keeps the theme's value".
+  With the theme's CSS, the standard family is on every calendar and a
+  family's rules each have one attribute more: what a family gives wins, what
+  it leaves out is standard's (checked in Chrome: light, dark, a page's
+  `data-theme`, a light page over a dark system).
+- `look: 'none'` kept no alignment (owner): slots, "+N" and menu entries
+  (buttons) were centred, the gutter's labels lost their end alignment.
+  `text-align` is structure.
+- `look: 'none'` with `injectStyles: false` warned on the console even when
+  the page held `lookGuardedCss(DZ_CSS)` (owner): said only when no readable
+  sheet of the document (or shadow root) holds it.
+
 - A selection made with Shift+arrows is handed to `onSelect` once (18j-3,
   batch 3): Enter again gave it again (a double Enter booked twice), and once
   the application cleared it in `onSelect` the next Enter was a new tap (a
@@ -139,6 +169,9 @@
   `onResourceProblems`.
 
 ### Added
+
+- Guides: theming and CSS, Tailwind, unstyled mode, in English and French
+  (18j-3, batch 4).
 
 - Guides: drag and drop, selection, keyboard and accessibility, in English
   and French (18j-3, batch 3).

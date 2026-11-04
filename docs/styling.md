@@ -35,12 +35,16 @@ removed is a major version**; one added is a minor version.
    Kept (no colour of ours): resets (a button as plain text), the page's
    own colour (`Canvas`, the page's scheme) under what sticks or floats (a
    list's day head, the timeline's heads and resource column, the editor),
-   opacity (a disabled entry, an event being moved); the editor's buttons and
+   opacity (a disabled entry, an event being moved), alignment (`text-align`:
+   a slot or "+N" button keeps its start, a gutter label its end); the editor's buttons and
    fields are the browser's own. Type is the look: heads and rows that size
    to their text follow your font sizes.
    A page with no unstyled calendar pays nothing for this; the first one
    guards the sheets of its document (or shadow root). A page that includes
-   the CSS itself (`injectStyles: false`) uses `lookGuardedCss(DZ_CSS)`.
+   the CSS itself (`injectStyles: false`) uses `lookGuardedCss(DZ_CSS)` (and
+   the list's, the year's, the Pro's sheets it uses; the theme's sheet comes
+   guarded); the console says so once per calendar when no sheet of the
+   document holds it.
 
 Note: a timed event (`.dz-ev`) is a size container (`container: dz-ev / size`,
 for its one-line form when short): an element of yours inside it with

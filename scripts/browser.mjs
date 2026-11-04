@@ -446,7 +446,8 @@ try {
       const thu = await colCenter(p, 3);
       await cdp.send('Input.synthesizeScrollGesture', { x: Math.round(thu.x), y: 600, yDistance: -200, gestureSourceType: 'touch', speed: 1200 });
       const s1 = await p.$eval('.dz-tg__body', (e) => e.scrollTop);
-      check('touch: a finger on empty time scrolls the grid', s1 > s0 + 50, `${s0} → ${s1}`);
+      const room = await p.$eval('.dz-tg__body', (e) => e.scrollHeight - e.clientHeight);
+      check('touch: a finger on empty time scrolls the grid', s1 > s0 + 50, `${s0} → ${s1} (of ${room})`);
       check('touch: no console error', errors.length === 0, errors.join(' | '));
       await ctx.close();
     }
@@ -2198,6 +2199,29 @@ try {
         check(`page first (${layers ? 'layered' : 'cssLayers: false'}): the page's --tz-accent beats the slate family; its .dz-ev rule beats ours`, got.pressed === 'rgb(1, 2, 3)' && got.radius === '0px', JSON.stringify(got));
         await rp.close();
       }
+    }
+    // A family of one's own builds on the standard one (owner, 2026-11-04): what it gives wins, in every
+    // case of the scheme; what it leaves out (a tone, the text on a solid event, the background) is standard's.
+    {
+      const read = () => p.evaluate(() => {
+        const s = getComputedStyle(document.querySelector('.dz-cal'));
+        return ['--dzc-accent', '--dz-tone-green', '--dz-on-tone', '--dzc-bg'].map((k) => s.getPropertyValue(k).trim()).join(' ');
+      });
+      await p.evaluate(() => window.__defineTheme('clinic', { accent: ['#0a7d5a', '#3ddc97'] }));
+      const seen = {};
+      await p.evaluate(() => window.__dz().update({ theme: 'clinic', scheme: 'light' }));
+      seen.light = await read();
+      await p.evaluate(() => window.__dz().update({ scheme: 'dark' }));
+      seen.dark = await read();
+      await p.evaluate(() => { window.__dz().update({ scheme: 'auto' }); document.documentElement.dataset.theme = 'dark'; });
+      seen.page = await read();
+      await p.emulateMedia({ colorScheme: 'dark' });
+      await p.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
+      seen.pageLightSystemDark = await read();
+      await p.emulateMedia({ colorScheme: 'light' });
+      await p.evaluate(() => { delete document.documentElement.dataset.theme; window.__dz().update({ theme: 'standard' }); });
+      const want = { light: '#0a7d5a #15803d #ffffff #ffffff', dark: '#3ddc97 #4ade80 #111827 #18181b', page: '#3ddc97 #4ade80 #111827 #18181b', pageLightSystemDark: '#0a7d5a #15803d #ffffff #ffffff' };
+      check('defineTheme: a family of its own builds on standard (its accent; standard’s tones, on-tone, background) — light, dark, page [data-theme], page light over a dark system', JSON.stringify(seen) === JSON.stringify(want), JSON.stringify(seen));
     }
     const scale = async () => p.evaluate(() => document.querySelector('.dz-tg__col').getBoundingClientRect().height);
     const comfortable = await scale();

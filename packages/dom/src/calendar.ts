@@ -22,7 +22,7 @@ import { createPopover } from './popover.js';
 import { FrameScheduler } from './render/frame.js';
 import { h } from './render/reconcile.js';
 import { Scope } from './render/scope.js';
-import { DZ_CSS, ensureStyles, guardLook } from './styles.js';
+import { DZ_CSS, ensureStyles, guardLook, hasGuardedSheet } from './styles.js';
 import { THEME_NAMES, ensureTheme, isKnownTheme } from './themes.js';
 import { createToolbar, defaultLayout, sameLook } from './toolbar.js';
 import type { CustomButton, HeaderToolbar } from './toolbar.js';
@@ -602,7 +602,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       root.dataset['dzLook'] = look.look;
       // This page's sheets guarded from now on (a page without an unstyled calendar never pays for it).
       if (options.injectStyles !== false) guardLook(host);
-      else if (!saidUnguarded) {
+      else if (!saidUnguarded && !hasGuardedSheet(host)) {
         saidUnguarded = true;
         console.warn("dzcalendar: look 'none' with injectStyles: false — include lookGuardedCss(DZ_CSS) (and the other sheets) for the look to go");
       }

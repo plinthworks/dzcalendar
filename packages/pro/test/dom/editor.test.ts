@@ -4,6 +4,8 @@ import type { EventInput, EventInstance } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import type { CalendarInstance } from '@dzcalendar/dom';
 import { editorHandlers, openEventEditor } from '../../src/editor-entry.js';
+import { TIMELINE_CSS } from '../../src/timeline/styles.js';
+import { unlayered } from '../../../dom/src/styles.js';
 
 // The editor in jsdom: what it shows, what it saves through the calendar's history.
 const now = () => Temporal.Instant.from('2026-10-21T08:00:00Z');
@@ -226,5 +228,30 @@ describe('the editor', () => {
     cal!.destroy();
     cal = null;
     expect([await done, document.querySelector('.dz-editor')]).toEqual(['cancelled', null]);
+  });
+});
+
+describe('the editor’s sheet in the calendar’s cascade layers (18j-3, batch 4 review)', () => {
+  const sheet = () => document.head.querySelector<HTMLStyleElement>('style[data-dzcalendar="editor"]')!;
+  const fresh = () => document.head.querySelectorAll('style[data-dzcalendar]').forEach((s) => s.remove());
+  it('layered by default: in dzcalendar.base, so a page’s plain rule wins over it', () => {
+    fresh();
+    mount([]);
+    void openEventEditor(cal!, { create: { allDay: true, start: Temporal.PlainDate.from('2026-10-21') } });
+    expect(sheet().textContent).toContain('@layer dzcalendar.base {');
+    expect(sheet().dataset['dzLayers']).toBeUndefined();
+  });
+  it('cssLayers: false: outside any layer, as the calendar’s own sheets (before the page’s)', () => {
+    fresh();
+    mount([], { cssLayers: false });
+    void openEventEditor(cal!, { create: { allDay: true, start: Temporal.PlainDate.from('2026-10-21') } });
+    expect(sheet().textContent).not.toContain('@layer');
+    expect(sheet().dataset['dzLayers']).toBe('off');
+    expect(sheet().previousElementSibling?.getAttribute('data-dzcalendar')).not.toBeNull();
+  });
+  it('the timeline’s sheet is layered too, and comes out whole without its layer', () => {
+    expect(TIMELINE_CSS.trimStart().startsWith('@layer dzcalendar.base, dzcalendar.theme;\n@layer dzcalendar.base {')).toBe(true);
+    expect(unlayered(TIMELINE_CSS)).not.toContain('@layer');
+    expect(unlayered(TIMELINE_CSS)).toContain('.dz-tl {');
   });
 });

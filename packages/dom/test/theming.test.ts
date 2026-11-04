@@ -1,4 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Temporal } from '@dzcalendar/core';
 import { DZ_CSS, createCalendar, defineTheme } from '../src/index.js';
 import type { CalendarInstance } from '../src/index.js';
@@ -78,6 +80,23 @@ describe('cssLayers: false (pages whose reset is unlayered: Tailwind 3, Bootstra
     expect(theme.textContent).not.toContain('@layer');
     page.remove();
     for (const st of document.head.querySelectorAll('style[data-dzcalendar]')) st.remove();
+  });
+});
+
+describe('tailwind-theme.css: the utilities fall back as the calendar does (18j-3, batch 4 review)', () => {
+  const tw = readFileSync(join(process.cwd(), 'packages/theme/tailwind-theme.css'), 'utf8');
+  /** The calendar's own chain for a palette entry: --dzc-x: var(--tz-x, var(--dzp-x, <last>)). */
+  const calendar = new Map([...DZ_CSS.matchAll(/--dzc-([\w-]+): var\(--tz-\1, var\(--dzp-\1, ([^)]+)\)\)/g)].map((m) => [m[1]!, m[2]!]));
+  it('outside a calendar the page’s --tz-* palette is read, then the same system colour as the calendar’s', () => {
+    const wrong: string[] = [];
+    for (const m of tw.matchAll(/var\(--dzc-([\w-]+), var\(--tz-([\w-]+), ([^)]+)\)\)/g)) {
+      const [, dzc, tz, last] = m;
+      if (dzc !== tz || calendar.get(dzc!) !== last) wrong.push(`${dzc}: --tz-${tz}, ${last} (calendar: ${calendar.get(dzc!)})`);
+    }
+    expect(wrong).toEqual([]);
+    // Every --dzc-* the utilities read goes through --tz-* (none skips the shared palette).
+    expect(tw.match(/var\(--dzc-[\w-]+, (?!var\(--tz-)/g)).toBeNull();
+    expect(tw).toContain('--color-dz-line: var(--dz-line, color-mix(in srgb,');
   });
 });
 

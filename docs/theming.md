@@ -58,7 +58,7 @@ page's **global reset**, which touches every element:
 | Your page | Reset | Do |
 |---|---|---|
 | Tailwind CSS v4 | in `@layer base` | `@import '@dzcalendar/theme/tailwind.css';` before `@import 'tailwindcss';` |
-| Tailwind CSS v3 | unlayered preflight | `cssLayers: false` + `@import '@dzcalendar/theme/tailwind3.css';` after `@tailwind base;` |
+| Tailwind CSS v3 | unlayered preflight | `cssLayers: false` + `@import '@dzcalendar/theme/tailwind3.css';` between `@import 'tailwindcss/base';` and `@import 'tailwindcss/components';` (an `@import` after `@tailwind base;` is dropped) |
 | Bootstrap 5, normalize.css, older CSS | unlayered | `cssLayers: false` + `@dzcalendar/theme/unlayered.css` |
 | Plain modern CSS | none | nothing |
 
@@ -75,7 +75,8 @@ page's **global reset**, which touches every element:
   (`playground/tailwind.html` shows both, checked in Chrome).
 - Layered (the default), the calendar's sheet is appended, so its layers come
   after any the page declared first (Tailwind 4's `base`): the preflight does
-  not reset it. `tailwind.css` also puts it *before* Tailwind's utilities, so
+  not reset it. The page's CSS must be there before the first calendar is
+  made: a Tailwind sheet loaded later finds `dzcalendar` ordered first. `tailwind.css` also puts it *before* Tailwind's utilities, so
   utilities on your own markup inside the calendar win.
 - `cssLayers: false` (in Angular `provideDzCalendar({ cssLayers: false })`;
   the first calendar of a document decides): the same CSS outside any layer,
@@ -92,6 +93,9 @@ false`): include `DZ_CSS`, `LIST_CSS`, `MULTIMONTH_CSS` (from their entries)
 and, for a `defineTheme` theme, `themeCss('clinic')` in your own stylesheet. With an unstyled calendar (`look: 'none'`), give each of them through `lookGuardedCss(…)` (from `@dzcalendar/dom` or `@dzcalendar/dom/toolkit`).
 
 **In a shadow root**, load the theme CSS inside the root; its sizes are on `:root, :host`.
+A page ancestor's `data-theme` does not switch the palette there (selectors do
+not cross the boundary; `:host-context` is missing in Safari and Firefox):
+pass `scheme` to the calendar (owner, 2026-11-04: documented, not relayed).
 
 ## 3. Change the colours — tokens
 
@@ -144,7 +148,9 @@ defineTheme('clinic', {
 createCalendar(host, { theme: 'clinic' });
 ```
 
-It is injected in the `dzcalendar.theme` layer (outside any layer with
+It builds on the standard family (with the theme CSS loaded): what it leaves
+out — other colours, the named tones, the text on a solid event — is
+standard's (owner, 2026-11-04). It is injected in the `dzcalendar.theme` layer (outside any layer with
 `cssLayers: false`), so your plain CSS still wins, and so does a `--tz-*` of
 your page. Only the tokens listed above are accepted; values are checked (no
 `;`, `{`, `url(` …). Defined again, calendars using it follow at once, in

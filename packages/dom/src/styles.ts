@@ -668,6 +668,38 @@ export function guardLook(host: HTMLElement): void {
 }
 
 /**
+ * Whether a sheet of the page (or of the shadow root) holds the calendar's
+ * own CSS guarded for the unstyled mode — `lookGuardedCss(DZ_CSS)` included
+ * by the application under `injectStyles: false`. The mark: a guarded rule of
+ * `.dz-more`, which only DZ_CSS styles (the theme's sheet is guarded too).
+ * Sheets of another origin cannot be read and do not count; a sheet still
+ * loading is not seen yet.
+ */
+export function hasGuardedSheet(host: HTMLElement): boolean {
+  const root = host.getRootNode() as Document | ShadowRoot;
+  const sheets = [...(root.styleSheets ?? []), ...((root as { adoptedStyleSheets?: CSSStyleSheet[] }).adoptedStyleSheets ?? [])];
+  const guarded = (rules: CSSRuleList): boolean => {
+    for (const rule of rules) {
+      const text = rule.cssText;
+      if (text.includes('.dz-more') && text.includes('data-dz-look')) return true;
+      const inner = (rule as CSSGroupingRule).cssRules;
+      if (inner && guarded(inner)) return true;
+    }
+    return false;
+  };
+  for (const sheet of sheets) {
+    // A sheet whose element left the page is not the page's any more.
+    if (sheet.ownerNode && !sheet.ownerNode.isConnected) continue;
+    try {
+      if (guarded(sheet.cssRules)) return true;
+    } catch {
+      // Another origin's sheet: not ours to read.
+    }
+  }
+  return false;
+}
+
+/**
  * Inserts the stylesheet once per document or shadow root.
  * Layered (the default), it goes last: the page's own rules win by the
  * layers, and the calendar's layers come after any the page declared before

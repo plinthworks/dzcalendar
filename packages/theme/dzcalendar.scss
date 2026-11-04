@@ -141,9 +141,12 @@ $layer: true !default;
   [data-theme='light'] { --tz-color-scheme: light; }
   [data-theme='dark'] { --tz-color-scheme: dark; }
 
-  // The standard family (the attribute is always set by the calendar), then the others.
+  // The standard family, on every calendar: the base a family builds on. Each rule of another family
+  // (ready-made or `defineTheme`) has one attribute more than standard's of the same kind, so it wins in
+  // every case (light, the system's dark, the page's [data-theme], a forced scheme), whatever the order
+  // of the sheets; what a family leaves out (tones, the text on a solid event…) stays standard's.
   @include family(
-    ".dz-cal[data-dz-theme='standard']",
+    ".dz-cal",
     (bg: $bg, bg-raised: $bg-raised, fg: $fg, fg-muted: $fg-muted, border: $border, accent: $accent, accent-fg: $accent-fg, danger: $danger, warning: $warning)
   );
   @each $name, $palette in $themes {
