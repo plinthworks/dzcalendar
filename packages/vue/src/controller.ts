@@ -1,6 +1,6 @@
 import { computed, inject, shallowRef } from 'vue';
 import type { ComputedRef, InjectionKey, ShallowRef } from 'vue';
-import type { Command, CommandResult, CreateRequest, EventInstance, KernelState, NormalizationReport, PlainDate, ViewRange } from '@dzcalendar/core';
+import type { Command, CommandResult, CreateRequest, DurationLike, EventInstance, KernelState, NormalizationReport, PlainDate, ViewRange } from '@dzcalendar/core';
 import type { CalendarInstance } from '@dzcalendar/dom';
 
 /**
@@ -29,6 +29,8 @@ export interface CalendarController {
   prev(): void;
   next(): void;
   today(): void;
+  /** Slides a timeline by a duration in hours and minutes (`{ minutes: -15 }`: back); false when the view does not slide. */
+  shift(by: DurationLike): boolean;
   goTo(date: PlainDate): void;
   changeView(view: string): void;
   refetch(sourceId?: string): void;
@@ -105,6 +107,7 @@ export function createCalendarController(): CalendarController {
     prev: () => call((c) => c.navigate('prev'), undefined),
     next: () => call((c) => c.navigate('next'), undefined),
     today: () => call((c) => c.navigate('today'), undefined),
+    shift: (by) => call((c) => c.shift(by), false),
     goTo: (date) => call((c) => c.update({ date }), undefined),
     changeView: (view) => call((c) => c.update({ view }), undefined),
     refetch: (sourceId) => call((c) => c.refetch(sourceId), undefined),

@@ -212,6 +212,13 @@ export interface ViewController {
   /** First paint only: scroll to this many minutes from the start of the axis. */
   scrollTo?(minutes: number): void;
   /**
+   * Slides along time by `ms` (negative: back) — the timeline's `step`, `shift()`: the axis
+   * scrolls, and the period moves when it ends. False: this view does not slide.
+   */
+  slide?(ms: number): boolean;
+  /** Once a minute and at "Today": the timeline's `follow` keeps the present in view (`resume`: following again). */
+  follow?(now: Instant, resume: boolean): void;
+  /**
    * The calendar changed size (or appeared after being hidden): what is
    * mounted is decided again — a window, a month's height. Read and write go
    * through the frame scheduler.

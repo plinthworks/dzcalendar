@@ -2,7 +2,7 @@ import { decorate, flushMounts, holder, undecorate } from './render/hooks.js';
 import type { ElementHooks, HeaderItemCtx } from './render/hooks.js';
 import { sameFormats } from './render/formats.js';
 import type { Formats } from './render/formats.js';
-import { actionsFor, assertBusinessHours, DEFAULT_OCCURRENCE_LIMIT, assertTimeGrid, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, loadTemporal, Temporal, temporalReady } from '@dzcalendar/core';
+import { actionsFor, assertBusinessHours, DEFAULT_OCCURRENCE_LIMIT, assertTimeGrid, assertTimeline, createKernel, formatTemporal, intentFor, isValidZone, loadTemporal, Temporal, temporalReady, timeStep } from '@dzcalendar/core';
 import type { CalEvent, Command, CommandResult, EditScope, Instant, Proposal, Selection, ZonedDateTime } from '@dzcalendar/core';
 import { createSettings } from './settings.js';
 import { attachInteractions } from './interact/host.js';
@@ -267,7 +267,13 @@ export interface CalendarInstance {
    * position or the focused event.
    */
   update(changes: CalendarUpdate): void;
+  /** A timeline with `timeline.step` slides by it on `'prev'`/`'next'`; `'today'` also takes up following the present (`timeline.follow`). */
   navigate(dir: NavDirection): void;
+  /**
+   * Slides a timeline along time by any duration in hours and minutes (`{ minutes: -15 }`: back), the next or
+   * previous period brought in when it ends; pauses `timeline.follow`. False: the view does not slide (not a timeline).
+   */
+  shift(by: DurationLike): boolean;
   /** Runs a command through the calendar's history (undoable); `validate` checks it against the rules as a gesture would be. */
   run(cmd: Command, opts?: { readonly validate?: boolean }): CommandResult;
   undo(): boolean;
@@ -487,6 +493,7 @@ export function deferredCalendar(make: () => CalendarInstance, options: Calendar
       later((c) => c.update(changes));
     },
     navigate: (dir) => later((c) => c.navigate(dir)),
+    shift: (by) => real?.shift(by) ?? false,
     run: (cmd, opts) => (real ? real.run(cmd, opts) : refused),
     undo: () => real?.undo() ?? false,
     redo: () => real?.redo() ?? false,
@@ -864,7 +871,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   let itemsAsked = options.headerItems ?? {};
   // A header view this renderer cannot draw: said once, not at each new layout.
   const saidViews = new Set<string>();
-  const toolbar = createToolbar(doc, scope, kernel, (v) => drawable(v) || tabsOf([v]).length > 0, (dir) => kernel.navigate(dir), (v) => kernel.setView(v));
+  const toolbar = createToolbar(doc, scope, kernel, (v) => drawable(v) || tabsOf([v]).length > 0, (dir) => go(dir), (v) => kernel.setView(v));
   // Where the header goes: `headerToolbar: false` takes it out, a layout puts it back in the same place.
   const toolbarSpot = doc.createComment('dz-header');
   root.append(toolbarSpot);
@@ -882,6 +889,14 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   let viewScope: Scope | null = null;
   let mountedFamily: string | null = null;
   let firstPaint = true;
+  /** ◀ ▶ and `navigate()`: a timeline with a step slides by it; "Today" also takes up following the present. */
+  const go = (dir: NavDirection) => {
+    const step = kernel.getOptions().timeline?.step;
+    if ((dir === 'prev' || dir === 'next') && step !== undefined && view?.slide?.((dir === 'next' ? 1 : -1) * timeStep(step))) return;
+    // Following first: the period's drawing then lands on the present, not on an eased "an hour before now" it would pause on.
+    if (dir === 'today') view?.follow?.(kernel.now(), true);
+    kernel.navigate(dir);
+  };
   /** The line at the current time, and where a time grid first scrolls: both changeable by `update`. */
   let nowOn = options.nowIndicator !== false;
   let scrollTime = options.scrollTime;
@@ -1309,6 +1324,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       view?.tick(kernel.now(), kernel.getState());
       ctx.motion.nowTick?.([...root.querySelectorAll<HTMLElement>('.dz-now')]);
     }
+    // A timeline following the present moves with it, the now line drawn or not.
+    if (root.isConnected) view?.follow?.(kernel.now(), false);
     timer = setTimeout(tick, untilNextMinute());
   };
   const startTicking = () => {
@@ -1318,6 +1335,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   scope.on(doc, 'visibilitychange', () => {
     if (doc.hidden) return clearTimeout(timer);
     if (!kernel.refreshToday() && nowOn) view?.tick(kernel.now(), kernel.getState());
+    view?.follow?.(kernel.now(), false);
     startTicking();
   });
   scope.add(() => clearTimeout(timer));
@@ -1596,7 +1614,11 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       const { view: _v, date: _d, ...rest } = given as CalendarOptions & CalendarUpdate;
       return { ...rest, initialView: st.view.type, initialDate: st.date, timeZone: st.timeZone };
     },
-    navigate: (dir) => kernel.navigate(dir),
+    navigate: (dir) => go(dir),
+    shift(by) {
+      const d = Temporal.Duration.from(by);
+      return view?.slide?.(d.sign < 0 ? -timeStep(d.negated()) : timeStep(d)) ?? false;
+    },
     run: (cmd, opts) => kernel.run(cmd, opts),
     undo: () => kernel.history.undo(),
     redo: () => kernel.history.redo(),

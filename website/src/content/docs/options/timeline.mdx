@@ -14,7 +14,7 @@ The scale and the lanes of the Pro's timeline views (`import '@dzcalendar/pro'`)
 ## What it does
 
 The timeline draws time across, a row per resource (`resourceTimelineDay`,
-`…Week`, `…Month`, `…Year`) or one row for all (`timelineDay`…). Three
+`…Week`, `…Month`, `…Year`) or one row for all (`timelineDay`…). Five
 settings, merged key by key with `update({ timeline })` — `slot: undefined`
 goes back to the default:
 
@@ -23,9 +23,13 @@ goes back to the default:
   more events overlap.
 - `fillLanes`: the lanes of a timeline without resources — a starting value:
   in a browser its one row fills the view and the lanes are measured.
+- `step`: what ◀ ▶ slide the timeline by (`{ minutes: 15 }`, `{ hours: 1 }`)
+  instead of changing period.
+- `follow`: the timeline keeps the present in view as time passes.
 
 A slot that is a whole number of minutes must divide a day, and the lanes
-are whole numbers of 1 or more; anything else throws a `RangeError` at
+are whole numbers of 1 or more; a step is hours and minutes, longer than
+nothing; anything else throws a `RangeError` at
 creation or `update()`. A wall-clock slot crossing a
 clock change keeps its true width. The width on screen is the stylesheet's
 (`--dz-tl-slot`); the resource area's columns are
@@ -39,6 +43,12 @@ clock change keeps its true width. The width on screen is the stylesheet's
 
 Lanes of a timeline without resources, before it is measured: in a browser its one row is as tall as the view and holds as many lanes as fit.
 
+### `follow`
+
+<OptionFacts name="timeline.follow" />
+
+The present stays in view, three quarters along the time shown, moved every minute; past the end of the period (midnight on a day's timeline) the next one comes in. It pauses as soon as the person moves along time — a scroll, a slide, another period — and "Today" (`navigate('today')`) takes it up again. Made for supervision: a timeline that shows what is running now.
+
 ### `maxLanes`
 
 <OptionFacts name="timeline.maxLanes" />
@@ -50,6 +60,12 @@ Overlapping events a resource's row stacks; past them its last lane holds "+N", 
 <OptionFacts name="timeline.slot" />
 
 Minutes per slot (a divisor of a day: 15, 30, 60, 120…) or `'day'`. By default 30 minutes for a day, an hour up to a week, a day beyond.
+
+### `step`
+
+<OptionFacts name="timeline.step" />
+
+Hours and minutes (`{ minutes: 15 }`, `{ hours: 1 }`, `'PT30M'`). With it, ◀ ▶ and `navigate('prev' | 'next')` scroll the timeline by that much; at the end of the axis the next or previous period comes in, where the slide was going. A view of one day stops at midnight on the way; a view of several days (`views: { supervision: { family: 'timeline', duration: { days: 3 } } }`) slides across it. `calendar.shift({ minutes: -45 })` slides by any other number of hours and minutes (a day or more, or nothing, throws a `RangeError`, as the option does). A day or more is a view's `dateIncrement`, not a step.
 
 ## Example
 

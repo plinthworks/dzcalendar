@@ -18,7 +18,7 @@ import type { RulesContext } from './rules/validate.js';
 import { createEventStore } from './store/store.js';
 import type { EventStore, QueryOptions, StoreSnapshot, ViewWindow } from './store/store.js';
 import { Temporal } from './temporal.js';
-import type { Instant, PlainDate, Weekday, ZoneId } from './temporal.js';
+import type { Duration, DurationLike, Instant, PlainDate, Weekday, ZoneId } from './temporal.js';
 import { BUILTIN_VIEWS, registeredViewSpecs } from './views/builtin.js';
 import { buildDayGridModel, updateDayGridModel } from './views/daygrid.js';
 import type { DayGridModel, DayGridOptions } from './views/daygrid.js';
@@ -59,6 +59,17 @@ export interface ModelOptions {
      * @default 12
      */
     readonly fillLanes?: number;
+    /**
+     * What ◀ ▶ and `navigate('prev' | 'next')` slide the timeline by, in hours and minutes (`{ minutes: 15 }`):
+     * the axis scrolls, the next or previous period comes in when it ends. Without it, they change period.
+     */
+    readonly step?: DurationLike | undefined;
+    /**
+     * Keeps the present in view as time passes (supervision): paused as soon as the person scrolls or
+     * slides into the past or future, resumed by "Today". Default false.
+     * @default false
+     */
+    readonly follow?: boolean | undefined;
   };
   /** How sibling resources are ordered after their `order`: field names (`'-title'` descending) or a comparison. */
   readonly resourceOrder?: ResourceOrder | undefined;
@@ -357,6 +368,26 @@ export function assertTimeline(t: NonNullable<ModelOptions['timeline']>): void {
     const v = t[k];
     if (v !== undefined && !(Number.isInteger(v) && v >= 1)) throw new RangeError(`timeline.${k} must be a whole number ≥ 1: ${String(v)}`);
   }
+  if (t.step !== undefined) timeStep(t.step);
+  if (t.follow !== undefined && typeof t.follow !== 'boolean') throw new RangeError(`timeline.follow is true or false: ${String(t.follow)}`);
+}
+
+/** The step kept as its ISO text: the same step given again (a framework's new object each render) changes nothing. */
+const stepAsText = <T extends NonNullable<ModelOptions['timeline']>>(t: T): T =>
+  t.step === undefined ? t : { ...t, step: Temporal.Duration.from(t.step).toString() };
+
+/** A timeline's step in milliseconds: hours, minutes, seconds, longer than nothing (a day or more is a view's `dateIncrement`). */
+export function timeStep(d: DurationLike): number {
+  let dur: Duration;
+  try {
+    dur = Temporal.Duration.from(d);
+  } catch {
+    throw new RangeError(`timeline.step is not a duration: ${String(d)}`);
+  }
+  if (dur.years || dur.months || dur.weeks || dur.days) throw new RangeError(`timeline.step is hours and minutes (a day or more is a view's dateIncrement): ${dur.toString()}`);
+  const ms = dur.total({ unit: 'milliseconds' });
+  if (!(ms > 0)) throw new RangeError(`timeline.step must be longer than nothing: ${dur.toString()}`);
+  return ms;
 }
 
 /** A time grid's ticks and labels that cannot be taken: said before anything changes, never thrown while drawing. */
@@ -429,7 +460,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   let options: ModelOptions = {
     ...(o.timeGrid && { timeGrid: o.timeGrid }),
     ...(o.dayGrid && { dayGrid: o.dayGrid }),
-    ...(o.timeline && { timeline: o.timeline }),
+    ...(o.timeline && { timeline: stepAsText(o.timeline) }),
     ...(o.businessHours !== undefined && { businessHours: o.businessHours }),
     ...(o.hiddenDays && { hiddenDays: o.hiddenDays }),
     ...(o.availableSlots && { availableSlots: o.availableSlots }),
@@ -762,7 +793,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       if (
         (!next.timeGrid || same(options.timeGrid, next.timeGrid)) &&
         (!next.dayGrid || same(options.dayGrid, next.dayGrid)) &&
-        (!next.timeline || same(options.timeline, next.timeline)) &&
+        (!next.timeline || same(options.timeline, stepAsText(next.timeline))) &&
         (!('businessHours' in next) || next.businessHours === options.businessHours) &&
         (!('availableSlots' in next) || next.availableSlots === options.availableSlots) &&
         (!('hiddenDays' in next) || [...(next.hiddenDays ?? [])].sort().join() === [...(options.hiddenDays ?? [])].sort().join()) &&
@@ -780,7 +811,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         ...options,
         ...(next.timeGrid && { timeGrid: { ...options.timeGrid, ...next.timeGrid } }),
         ...(next.dayGrid && { dayGrid: { ...options.dayGrid, ...next.dayGrid } }),
-        ...(next.timeline && { timeline: { ...options.timeline, ...next.timeline } }),
+        ...(next.timeline && { timeline: { ...options.timeline, ...stepAsText(next.timeline) } }),
         ...('businessHours' in next && { businessHours: next.businessHours }),
         ...('hiddenDays' in next && { hiddenDays: next.hiddenDays }),
         ...('availableSlots' in next && { availableSlots: next.availableSlots }),

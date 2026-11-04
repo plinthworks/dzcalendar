@@ -1710,6 +1710,94 @@ try {
       check('timeline: no console error', errors.length === 0, errors.join('\n'));
       await p.close();
     }
+    // ── The timeline's step and following the present (supervision: three days of processes, 15-minute slots) ──
+    {
+      const { p, errors } = await page('/supervision.html?now=2026-10-21T09:30:00Z');
+      await p.waitForSelector('.dz-tl__now');
+      await p.waitForTimeout(300);
+      // Where the scroller's left edge is (minutes from the axis start) and where the now line sits in the time shown (0 to 1).
+      const at = () =>
+        p.evaluate(() => {
+          const sc = document.querySelector('.dz-tl__scroller');
+          const area = document.querySelector('.dz-tl__corner').getBoundingClientRect().width;
+          const len = Number(getComputedStyle(document.querySelector('.dz-tl')).getPropertyValue('--dz-tl-len'));
+          const slot = (document.querySelector('.dz-tl__sheet').getBoundingClientRect().width - area) / len;
+          const box = sc.getBoundingClientRect();
+          const now = document.querySelector('.dz-tl__now')?.getBoundingClientRect();
+          return { from: window.__cal.kernel.getState().range.start.toString(), left: Math.round((Math.abs(sc.scrollLeft) / slot) * 15), now: now ? (now.left - box.left - area) / (box.width - area) : null };
+        });
+      const settle = () => p.waitForTimeout(150);
+      const first = await at();
+      // 09:30Z is 11:30 in Paris: 690 minutes into the 21st.
+      check('step: following, the present sits three quarters along the time shown', Math.abs(first.now - 0.75) < 0.01, JSON.stringify(first));
+      await p.click('.dz-toolbar__next');
+      await settle();
+      const next = await at();
+      await p.click('.dz-toolbar__prev');
+      await p.click('.dz-toolbar__prev');
+      await settle();
+      const prev = await at();
+      await p.click('#back45');
+      await settle();
+      const back = await at();
+      check('step: ▶ slides 15 minutes, ◀ ◀ 30 back, shift({ minutes: -45 }) 45 more', next.left - first.left === 15 && next.left - prev.left === 30 && prev.left - back.left === 45, JSON.stringify({ first, next, prev, back }));
+      // The minute's tick (here: the page shown again) leaves a timeline the person moved.
+      await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await settle();
+      check('step: a slide pauses following — the minute leaves it where it is', (await at()).left === back.left, JSON.stringify(await at()));
+      await p.click('.dz-toolbar__today');
+      await settle();
+      const today = await at();
+      await p.evaluate(() => (document.querySelector('.dz-tl__scroller').scrollLeft += 300));
+      await settle();
+      const scrolled = await at();
+      await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await settle();
+      check('step: "Today" takes following up again; the person’s own scroll pauses it', Math.abs(today.now - 0.75) < 0.01 && (await at()).left === scrolled.left, JSON.stringify({ today, scrolled, after: await at() }));
+      // Six hours a press across the three days' end: up to the edge, then the next period where the slide was going.
+      await p.selectOption('#step', 'PT6H');
+      await p.click('.dz-toolbar__today');
+      await settle();
+      const walk = [];
+      for (let i = 0; i < 11; i++) {
+        await p.click('.dz-toolbar__next');
+        await settle();
+        walk.push(await at());
+      }
+      const edge = walk[9];
+      const over = walk[10];
+      // The last edge holds the time shown before the 24th: 3 × 1440 minutes less what is shown; the next press is 6 hours on, in the period from the 23rd.
+      const went = 2 * 1440 + over.left - edge.left;
+      check('step: at the end of the axis the next period comes in, 6 hours on from the edge (no jump)', edge.from === '2026-10-21' && over.from === '2026-10-23' && went === 360, JSON.stringify(walk.map((w) => `${w.from} ${w.left}`)));
+      // Without a step, ▶ changes period as before.
+      await p.selectOption('#step', '');
+      await settle();
+      await p.click('.dz-toolbar__next');
+      await settle();
+      check('step: none — ▶ moves the three days', (await at()).from === '2026-10-26', JSON.stringify(await at()));
+      check('step: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+      // With the motion on (GSAP's eased scroll): "Today" from another period lands on the present and keeps following.
+      const moving = await page('/supervision.html?now=2026-10-21T09:30:00Z', { reducedMotion: 'no-preference' });
+      await moving.p.waitForSelector('.dz-tl__now');
+      await moving.p.selectOption('#step', '');
+      await moving.p.click('.dz-toolbar__next');
+      await moving.p.waitForTimeout(300);
+      await moving.p.click('.dz-toolbar__today');
+      await moving.p.waitForTimeout(1200);
+      await moving.p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await moving.p.waitForTimeout(300);
+      const landed = await moving.p.evaluate(() => {
+        const sc = document.querySelector('.dz-tl__scroller');
+        const area = document.querySelector('.dz-tl__corner').getBoundingClientRect().width;
+        const box = sc.getBoundingClientRect();
+        const now = document.querySelector('.dz-tl__now')?.getBoundingClientRect();
+        return now ? (now.left - box.left - area) / (box.width - area) : null;
+      });
+      check('step: with motion, "Today" from another period still follows (the present three quarters along)', landed !== null && Math.abs(landed - 0.75) < 0.01, String(landed));
+      check('step: with motion, no console error', moving.errors.length === 0, moving.errors.join('\n'));
+      await moving.p.close();
+    }
 
     // ── Phase 16a: the editor (resources page) and seats (slots page, ?seats=2) ──
     {

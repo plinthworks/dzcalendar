@@ -1,5 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
-import type { Command, CommandResult, KernelState, NormalizationReport, PlainDate, ViewRange } from '@dzcalendar/core';
+import type { Command, CommandResult, DurationLike, KernelState, NormalizationReport, PlainDate, ViewRange } from '@dzcalendar/core';
 import type { CalendarInstance } from '@dzcalendar/dom';
 
 /** What `dispatch` answers before the calendar is drawn: the refusal React's and Vue's controllers give. */
@@ -80,6 +80,10 @@ export class CalendarController {
   }
   today(): void {
     this.call((c) => c.navigate('today'), undefined);
+  }
+  /** Slides a timeline by a duration in hours and minutes (`{ minutes: -15 }`: back); false when the view does not slide. */
+  shift(by: DurationLike): boolean {
+    return this.call((c) => c.shift(by), false);
   }
   goTo(date: PlainDate): void {
     this.call((c) => c.update({ date }), undefined);

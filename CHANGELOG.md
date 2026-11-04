@@ -40,6 +40,10 @@
 
 ### Fixed
 
+- A view's `dateIncrement: { minutes: 15 }` (or a `duration` in hours) was
+  taken and did nothing: a date plus minutes is the same date. A view's
+  `duration` and `dateIncrement` are now whole days or more, anything else a
+  `RangeError` naming the timeline's `step`.
 - Tailwind CSS 3: the recipe `@tailwind base;` then
   `@import '@dzcalendar/theme/tailwind3.css';` left the calendar's CSS out of
   the build without a word (an `@import` after another rule is dropped;
@@ -170,6 +174,14 @@
 
 ### Added
 
+- The timeline slides along time and follows the present (supervision:
+  processes as rows, runs arriving by SSE as cards). `timeline.step` (hours
+  and minutes, `{ minutes: 15 }`) makes ◀ ▶ and `navigate('prev' | 'next')`
+  scroll by it, the next or previous period brought in at the axis' end;
+  `calendar.shift(by)` slides by any hours and minutes (also on the Angular, React and
+  Vue controllers and `<dz-calendar>`). `timeline.follow` keeps the present
+  in view, paused by the person's own move along time, taken up by "Today".
+  `playground/supervision.html` shows both.
 - Guides: theming and CSS, Tailwind, unstyled mode, in English and French
   (18j-3, batch 4).
 

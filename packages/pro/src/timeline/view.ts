@@ -35,6 +35,9 @@ export interface AreaColumn {
   readonly width?: number;
 }
 
+/** Where the present sits while followed: three quarters along the time shown, what just happened in view, a little of what comes. */
+const NOW_AT = 0.75;
+
 /** `viewOptions.timeline` (createCalendar / update). */
 export interface TimelineViewOptions {
   /** The resource area's columns. Default one: the resource's title. */
@@ -164,6 +167,16 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   let insetTop = 0;
   /** The hour the calendar asked to scroll to (scrollTime), again after a period or scale change. */
   let scrollMinutes = 480;
+  /** Following the present (`timeline.follow`): paused by the person's own move along time, taken up by "Today". */
+  let following = false;
+  /** The option as last read: turned on by `update()`, following starts. */
+  let followAsked: boolean | null = null;
+  /** Where a slide that brought in another period lands (epoch ms at the left edge), once it is drawn. */
+  let landAt: number | null = null;
+  /** The scroll along time as this view last put it, and the room it had: a scroll elsewhere in the same room is the person's. */
+  let lastAlong = 0;
+  let lastRoom = 0;
+  const room = () => scroller.scrollWidth - scroller.clientWidth;
   /** Right to left: positions run from the right edge, and the scroll offset is negative (Chrome). */
   const rtl = () => root.closest('[dir]')?.getAttribute('dir') === 'rtl';
   /** How far along time the scroller is, whatever the direction. */
@@ -751,6 +764,19 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     });
   }
   onScrollFrame(ctx.scope, scroller, () => windowed(model), measureWindow);
+  // The person's own move along time (the bar, a finger, a wheel, the keyboard's cursor) pauses following the present.
+  ctx.scope.on(scroller, 'scroll', () => {
+    const along = scrolledAlong();
+    // Another room (a resize, wider columns) clamps the scroll by itself: the present placed again, not a pause.
+    if (room() !== lastRoom) {
+      lastRoom = room();
+      lastAlong = along;
+      if (following) keepNow(ctx.kernel.now());
+      return;
+    }
+    if (following && Math.abs(along - lastAlong) > 1) following = false;
+    lastAlong = along;
+  });
 
   /** Mounts what the window covers. */
   function mount(next: typeof win, force = false): void {
@@ -1308,7 +1334,20 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       measure(() => {
         if (!m.options.rows) fillLanes();
       });
-      if (rescroll) scrollToMinutes(scrollMinutes);
+      const now = ctx.kernel.now();
+      const asked = ctx.kernel.getOptions().timeline?.follow === true;
+      // Turned on by `update()`: the present brought into view, once this drawing is done.
+      if (asked !== followAsked) {
+        if (asked && prev) queueMicrotask(() => keepNow(ctx.kernel.now()));
+        following = followAsked = asked;
+      }
+      // Another period without the present in it (the person went elsewhere, or started elsewhere): following pauses.
+      if ((rescroll || !prev) && following && timelineNow(m, now) === null) following = false;
+      if (rescroll) {
+        if (landAt !== null) scrollAt(landAt, 0, () => (landAt = null));
+        else if (following) scrollAt(now.epochMilliseconds, NOW_AT);
+        else scrollToMinutes(scrollMinutes);
+      }
       return created;
     },
 
@@ -1327,7 +1366,48 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
 
     scrollTo(minutes) {
       scrollMinutes = minutes;
+      // A slide's landing, or the present followed, wins over the hour asked.
+      if (landAt !== null) return;
+      if (following) return scrollAt(ctx.kernel.now().epochMilliseconds, NOW_AT);
       scrollToMinutes(minutes);
+    },
+
+    slide(ms) {
+      const m = model;
+      if (!m || !(px > 0) || m.axis.length === 0) return false;
+      following = false;
+      const unit = m.axis.slotMinutes * 60_000;
+      const start = m.axis.start.epochMilliseconds;
+      const end = m.axis.end.epochMilliseconds;
+      const shown = Math.min(((scroller.clientWidth - insetStart) / px) * unit, end - start);
+      const left = m.axis.fromPosition(scrolledAlong() / px).epochMilliseconds;
+      const last = end - shown;
+      const t = left + ms;
+      // A pixel's worth of time: positions are rounded.
+      const eps = unit / px;
+      if (t >= start - eps && t <= last + eps) return (scrollAt(t, 0), true);
+      // Short of the edge: up to it first, the next press brings in the next period.
+      if (ms > 0 && left < last - eps) return (scrollAt(last, 0), true);
+      if (ms < 0 && left > start + eps) return (scrollAt(start, 0), true);
+      // The period that holds where it goes; a period aligned (a week) that still holds it: the one after it.
+      const dateOf = (x: number) => Temporal.Instant.fromEpochMilliseconds(x).toZonedDateTimeISO(ctx.zone).toPlainDate();
+      const before = ctx.kernel.getState().range.start;
+      landAt = t;
+      ctx.kernel.navigate({ to: dateOf(t) });
+      if (ms > 0 && ctx.kernel.getState().range.start.equals(before)) {
+        landAt = end;
+        ctx.kernel.navigate({ to: dateOf(end) });
+      }
+      // A fixed period: nowhere further.
+      if (ctx.kernel.getState().range.start.equals(before)) landAt = null;
+      return true;
+    },
+
+    follow(now, resume) {
+      const asked = ctx.kernel.getOptions().timeline?.follow === true;
+      if (!asked) return void (following = false);
+      if (resume) following = true;
+      keepNow(now);
     },
 
     relayout() {
@@ -1348,6 +1428,34 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       root.remove();
     },
   };
+
+  /** The present in view while followed; past the period's end (midnight on a day's timeline), the period that holds it, placed when drawn. */
+  function keepNow(now: Instant): void {
+    const m = model;
+    if (!following || !m) return;
+    if (timelineNow(m, now) === null) return ctx.kernel.navigate({ to: now.toZonedDateTimeISO(ctx.zone).toPlainDate() });
+    scrollAt(now.epochMilliseconds, NOW_AT);
+  }
+
+  /** Scrolls so an instant (epoch ms) sits at `frac` of the time shown (0: the left edge), once the scale is read. */
+  function scrollAt(ms: number, frac: number, then?: () => void): void {
+    const m = model;
+    if (!m) return;
+    ctx.scheduler.schedule({
+      read: () => {
+        const area = corner.getBoundingClientRect().width;
+        return { scale: m.axis.length > 0 ? (sheet.getBoundingClientRect().width - area) / m.axis.length : 0, shown: scroller.clientWidth - area };
+      },
+      write: ({ scale, shown }) => {
+        then?.();
+        if (model !== m || !(scale > 0) || !Number.isFinite(scale)) return;
+        scrollAlong(Math.max(0, m.axis.toPosition(ms) * scale - frac * shown));
+        lastAlong = scrolledAlong();
+        lastRoom = room();
+        measureWindow();
+      },
+    });
+  }
 
   /** To that hour of today when the axis shows today, else of its first day; a day scale: today's column, two before it. */
   function scrollToMinutes(minutes: number): void {
@@ -1371,6 +1479,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
           const at = m.axis.unit === 'day' ? (todaySlot?.start ?? m.axis.start) : Temporal.Instant.fromEpochMilliseconds(Math.round(day.start.epochMilliseconds + minutes * 60_000));
           // (now's minutes carry its seconds: a whole number of milliseconds, or the instant is refused)
           scrollEased(eased, scroller, () => scrollAlong(Math.max(0, m.axis.toPosition(at) * scale - (m.axis.unit === 'day' ? scale * 2 : 0))));
+          lastAlong = scrolledAlong();
+          lastRoom = room();
           measureWindow();
         },
       });

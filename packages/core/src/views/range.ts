@@ -1,6 +1,6 @@
 import { getMonthGrid } from '@tzslot/core/lazy';
 import { Temporal } from '../temporal.js';
-import type { PlainDate } from '../temporal.js';
+import type { Duration, PlainDate } from '../temporal.js';
 import type { NavContext, ViewRange, ViewSpec } from './spec.js';
 
 const startOfWeek = (d: PlainDate, firstDay: number) => d.subtract({ days: (d.dayOfWeek - firstDay + 7) % 7 });
@@ -29,13 +29,17 @@ function datesBetween(start: PlainDate, end: PlainDate, spec: ViewSpec): PlainDa
  */
 export function assertViewSpec(spec: ViewSpec): void {
   const positive = (d: unknown, what: string) => {
-    let dur: { readonly sign: number };
+    let dur: Duration;
     try {
       dur = Temporal.Duration.from(d as never);
     } catch {
       throw new RangeError(`${spec.type}: ${what} is not a duration`);
     }
     if (dur.sign <= 0) throw new RangeError(`${spec.type}: ${what} must be longer than nothing`);
+    // A view is whole dates: a date plus minutes is the same date, a step that would never move.
+    if (dur.hours || dur.minutes || dur.seconds || dur.milliseconds || dur.microseconds || dur.nanoseconds) {
+      throw new RangeError(`${spec.type}: ${what} is days, weeks, months or years (a timeline slides by hours with timeline.step)`);
+    }
   };
   positive(spec.duration, 'duration');
   if (spec.dateIncrement !== undefined) positive(spec.dateIncrement, 'dateIncrement');

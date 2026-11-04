@@ -15,7 +15,7 @@ L'échelle et les couloirs des vues timeline du Pro (`import '@dzcalendar/pro'`)
 
 La timeline dessine le temps en travers, une ligne par ressource
 (`resourceTimelineDay`, `…Week`, `…Month`, `…Year`) ou une seule ligne pour
-tout (`timelineDay`…). Trois réglages, fusionnés clé par clé avec
+tout (`timelineDay`…). Cinq réglages, fusionnés clé par clé avec
 `update({ timeline })` — `slot: undefined` revient à la valeur par défaut :
 
 - `slot` : la largeur d'un créneau en temps.
@@ -24,9 +24,14 @@ tout (`timelineDay`…). Trois réglages, fusionnés clé par clé avec
 - `fillLanes` : les couloirs d'une timeline sans ressources — une valeur de
   départ : dans un navigateur, sa ligne unique remplit la vue et les couloirs
   sont mesurés.
+- `step` : ce dont ◀ ▶ font glisser la timeline (`{ minutes: 15 }`,
+  `{ hours: 1 }`) au lieu de changer de période.
+- `follow` : la timeline garde l'instant présent à l'écran à mesure que le
+  temps passe.
 
 Un créneau en minutes doit diviser un jour, et les couloirs sont des entiers
-de 1 ou plus ; toute autre valeur lève une `RangeError` à la création ou à
+de 1 ou plus ; un pas s'écrit en heures et en minutes, plus long que rien ;
+toute autre valeur lève une `RangeError` à la création ou à
 `update()`. Un créneau d'horloge qui traverse
 un changement d'heure garde sa vraie largeur. La largeur à l'écran est celle
 de la feuille de style (`--dz-tl-slot`) ; les colonnes de la zone des
@@ -40,6 +45,12 @@ ressources sont `viewOptions.timeline.areaColumns`.
 
 Les couloirs d'une timeline sans ressources, avant la mesure : dans un navigateur, sa ligne unique a la hauteur de la vue et tient autant de couloirs que la place le permet.
 
+### `follow`
+
+<OptionFacts name="timeline.follow" />
+
+L'instant présent reste à l'écran, aux trois quarts du temps montré, déplacé chaque minute ; passé la fin de la période (minuit sur une timeline d'un jour), la suivante arrive. Le suivi se met en pause dès que la personne se déplace dans le temps — un défilement, un glissement, une autre période — et « Aujourd'hui » (`navigate('today')`) le reprend. Pensé pour la supervision : une timeline qui montre ce qui tourne maintenant.
+
 ### `maxLanes`
 
 <OptionFacts name="timeline.maxLanes" />
@@ -51,6 +62,12 @@ Les événements qui se chevauchent que la ligne d'une ressource empile ; au-del
 <OptionFacts name="timeline.slot" />
 
 Des minutes par créneau (un diviseur du jour : 15, 30, 60, 120…) ou `'day'`. Par défaut 30 minutes pour un jour, une heure jusqu'à une semaine, un jour au-delà.
+
+### `step`
+
+<OptionFacts name="timeline.step" />
+
+Des heures et des minutes (`{ minutes: 15 }`, `{ hours: 1 }`, `'PT30M'`). Avec lui, ◀ ▶ et `navigate('prev' | 'next')` font défiler la timeline d'autant ; au bout de l'axe, la période suivante ou précédente arrive, là où allait le glissement. Une vue d'un jour s'arrête à minuit en chemin ; une vue de plusieurs jours (`views: { supervision: { family: 'timeline', duration: { days: 3 } } }`) le traverse. `calendar.shift({ minutes: -45 })` fait glisser de n'importe quel autre nombre d'heures et de minutes (un jour ou plus, ou rien, lève une `RangeError`, comme l'option). Un jour ou plus, c'est le `dateIncrement` d'une vue, pas un pas.
 
 ## Exemple
 

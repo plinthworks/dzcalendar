@@ -15,7 +15,7 @@
  * throws: it is a `dz-problem` event.
  */
 import { Temporal, isValidZone, loadTemporal, temporalReady } from '@dzcalendar/core';
-import type { EventInput, EventSourceSpec, PlainDate, Problem, ResourceInput } from '@dzcalendar/core';
+import type { DurationLike, EventInput, EventSourceSpec, PlainDate, Problem, ResourceInput } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import type { CalendarInstance, CalendarOptions, CalendarUpdate } from '@dzcalendar/dom';
 
@@ -282,6 +282,10 @@ export class DzCalendarElement extends Base {
   navigate(dir: 'prev' | 'next' | 'today'): void {
     if (!this.#cal && this.#waiting) return void this.#waiting.push((c) => c.navigate(dir));
     this.#cal?.navigate(dir);
+  }
+  /** Slides a timeline by a duration in hours and minutes (`{ minutes: -15 }`: back); false when the view does not slide. */
+  shift(by: DurationLike): boolean {
+    return this.#cal?.shift(by) ?? false;
   }
   update(changes: CalendarUpdate): void {
     if (!this.#cal && this.#waiting) return void this.#waiting.push(() => this.update(changes));

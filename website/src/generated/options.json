@@ -961,7 +961,7 @@
     },
     {
       "name": "timeline",
-      "type": "{ readonly slot?: number | 'day'; readonly maxLanes?: number; readonly fillLanes?: number }",
+      "type": "{ readonly slot?: number | 'day'; readonly maxLanes?: number; readonly fillLanes?: number; readonly step?: DurationLike | undefined; readonly follow?: boolean | undefined }",
       "resolved": null,
       "doc": "A timeline's scale and rows (the Pro's family reads them).",
       "default": null,
@@ -975,6 +975,16 @@
           "doc": "Lanes of a timeline without resources (its one row fills the view: the DOM measures it). Default 12.",
           "default": {
             "code": "12"
+          },
+          "source": "packages/core/src/kernel.ts"
+        },
+        {
+          "name": "follow",
+          "type": "boolean | undefined",
+          "resolved": null,
+          "doc": "Keeps the present in view as time passes (supervision): paused as soon as the person scrolls or slides into the past or future, resumed by \"Today\". Default false.",
+          "default": {
+            "code": "false"
           },
           "source": "packages/core/src/kernel.ts"
         },
@@ -996,6 +1006,14 @@
           "default": {
             "token": "slotPerSpan"
           },
+          "source": "packages/core/src/kernel.ts"
+        },
+        {
+          "name": "step",
+          "type": "DurationLike | undefined",
+          "resolved": null,
+          "doc": "What ◀ ▶ and `navigate('prev' | 'next')` slide the timeline by, in hours and minutes (`{ minutes: 15 }`): the axis scrolls, the next or previous period comes in when it ends. Without it, they change period.",
+          "default": null,
           "source": "packages/core/src/kernel.ts"
         }
       ]

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DzCalendar — supervision</title>
+    <style>
+      body { margin: 0; padding: 1.5rem; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f5; color: #18181b; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.25rem; }
+      p { margin: 0 0 1rem; color: #52525b; max-width: 80ch; }
+      .controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+      #log { min-height: 1.4em; font-weight: 600; }
+      #cal { height: 520px; }
+      .run { display: flex; flex-direction: column; line-height: 1.2; overflow: hidden; }
+      .run b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .run small { opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Supervision des traitements</h1>
+      <p>Une ligne par processus, sur trois jours. Les exécutions arrivent en direct (un flux simulé, comme un SSE) et s'inscrivent sur leur ligne : en cours, réussie, en échec. ◀ ▶ glissent du pas choisi ; « Aujourd'hui » reprend le suivi de l'heure actuelle, mis en pause dès qu'on part dans le passé ou le futur.</p>
+      <div class="controls">
+        <label>Pas <select id="step">
+          <option value="PT15M">15 min</option>
+          <option value="PT1H">1 h</option>
+          <option value="PT6H">6 h</option>
+          <option value="">aucun (jour par jour)</option>
+        </select></label>
+        <label><input type="checkbox" id="follow" checked /> Suivre l'heure actuelle</label>
+        <button type="button" id="back45">− 45 min</button>
+        <span id="log" role="status"></span>
+      </div>
+      <div id="cal"></div>
+    </main>
+    <script type="module" src="./supervision.ts"></script>
+  </body>
+</html>

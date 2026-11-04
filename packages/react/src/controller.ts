@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useSyncExternalStore } from 'react';
-import type { Command, CommandResult, CreateRequest, EventInstance, KernelState, NormalizationReport, PlainDate, ViewRange } from '@dzcalendar/core';
+import type { Command, CommandResult, CreateRequest, DurationLike, EventInstance, KernelState, NormalizationReport, PlainDate, ViewRange } from '@dzcalendar/core';
 import type { CalendarInstance } from '@dzcalendar/dom';
 
 /** What the calendar is now, as one immutable value (a new one on every change). */
@@ -119,6 +119,8 @@ export class CalendarController {
   readonly prev = (): void => this.call((c) => c.navigate('prev'), undefined);
   readonly next = (): void => this.call((c) => c.navigate('next'), undefined);
   readonly today = (): void => this.call((c) => c.navigate('today'), undefined);
+  /** Slides a timeline by a duration in hours and minutes (`{ minutes: -15 }`: back); false when the view does not slide. */
+  readonly shift = (by: DurationLike): boolean => this.call((c) => c.shift(by), false);
   readonly goTo = (date: PlainDate): void => this.call((c) => c.update({ date }), undefined);
   readonly changeView = (view: string): void => this.call((c) => c.update({ view }), undefined);
   readonly refetch = (sourceId?: string): void => this.call((c) => c.refetch(sourceId), undefined);

@@ -271,3 +271,50 @@ describe('after the reviews', () => {
     expect(() => cal!.update({ timeline: { slot: 7 } })).toThrow(RangeError);
   });
 });
+
+describe('the timeline’s step and following the present', () => {
+  it('a step is hours and minutes, longer than nothing; follow is true or false — anything else refused at creation and by update()', () => {
+    for (const [bad, said] of [
+      [{ step: { days: 1 } }, 'a day or more'],
+      [{ step: { hours: 1, days: 1 } }, 'a day or more'],
+      [{ step: { minutes: 0 } }, 'longer than nothing'],
+      [{ step: 'soon' }, 'not a duration'],
+      [{ follow: 'yes' }, 'true or false'],
+    ] as const) {
+      expect(() => mount([], { timeline: bad })).toThrow(said);
+      document.body.innerHTML = '';
+    }
+    mount([], { timeline: { step: { minutes: 15 }, follow: true } });
+    expect(() => cal!.update({ timeline: { step: { minutes: -15 } } })).toThrow('longer than nothing');
+    expect(() => cal!.shift({ days: 1 })).toThrow('a day or more');
+  });
+
+  it('the same step given again (a new object, a framework’s next render) changes nothing; another one does', () => {
+    mount([], { timeline: { step: { minutes: 15 } } });
+    let states = 0;
+    const off = cal!.kernel.subscribe((e) => void (e.type === 'state' && states++));
+    cal!.update({ timeline: { step: { minutes: 15 } } });
+    cal!.update({ timeline: { step: 'PT15M' } });
+    expect(states).toBe(0);
+    cal!.update({ timeline: { step: { hours: 1 } } });
+    expect(states).toBe(1);
+    off();
+  });
+
+  it('a view that is not a timeline does not slide: shift() says so, ◀ ▶ change period', () => {
+    mount([], { initialView: 'timeGridWeek', timeline: { step: { minutes: 15 } } });
+    expect(cal!.shift({ minutes: 15 })).toBe(false);
+    cal!.navigate('next');
+    expect(cal!.kernel.getState().date.toString()).toBe('2026-10-28');
+  });
+
+  it('a view of hours is refused: a date plus minutes is the same date, a step that never moved', () => {
+    for (const [bad, said] of [
+      [{ family: 'timeline', duration: { days: 3 }, dateIncrement: { minutes: 15 } }, 'dateIncrement is days, weeks, months or years'],
+      [{ family: 'timeline', duration: { hours: 6 } }, 'duration is days, weeks, months or years'],
+    ] as const) {
+      expect(() => mount([], { views: { supervision: bad } })).toThrow(said);
+      document.body.innerHTML = '';
+    }
+  });
+});

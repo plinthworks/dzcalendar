@@ -82,6 +82,7 @@ export default defineConfig({
         vue: fileURLToPath(new URL('./playground/vue.html', import.meta.url)),
         sehhaty: fileURLToPath(new URL('./playground/sehhaty.html', import.meta.url)),
         timeline: fileURLToPath(new URL('./playground/timeline.html', import.meta.url)),
+        supervision: fileURLToPath(new URL('./playground/supervision.html', import.meta.url)),
         dragdrop: fileURLToPath(new URL('./playground/dragdrop.html', import.meta.url)),
         tailwind: fileURLToPath(new URL('./playground/tailwind.html', import.meta.url)),
         unstyled: fileURLToPath(new URL('./playground/unstyled.html', import.meta.url)),
