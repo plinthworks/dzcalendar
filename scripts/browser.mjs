@@ -1946,6 +1946,20 @@ try {
       check('follow before: no console error', errors.length === 0, errors.join('\n'));
       await p.close();
     }
+    // nowRefresh: the line (and the axis following it) every second — on the real clock, it moves within two seconds.
+    {
+      const { p, errors } = await page('/supervision.html?span=PT1H');
+      await p.waitForSelector('.dz-tl__now');
+      await p.selectOption('#refresh', 'PT1S');
+      const x = () => p.evaluate(() => getComputedStyle(document.querySelector('.dz-tl__now')).getPropertyValue('--x'));
+      const before = await x();
+      await p.waitForTimeout(2200);
+      const after = await x();
+      const paused = await p.evaluate(() => !document.querySelector('#paused').hidden);
+      check('nowRefresh: every second, the now line moves within two seconds — following not paused', before !== after && !paused, JSON.stringify({ before, after, paused }));
+      check('nowRefresh: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
 
     // ── Phase 16a: the editor (resources page) and seats (slots page, ?seats=2) ──
     {

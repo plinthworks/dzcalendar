@@ -115,6 +115,8 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   events: history,
   // The present 5 minutes from the left edge, the axis gliding each minute; a ruler: a mark each minute, the time every 5.
   timeline: { slot: slotOf(spanOf()), span: spanOf(), step: stepOf(), follow: FOLLOW, ticks: { every: 1, label: 5 }, maxLanes: 2 },
+  // The now line, and the axis following it, as often as chosen (`nowRefresh`; a minute by default).
+  nowRefresh: document.querySelector<HTMLSelectElement>('#refresh')!.value,
   // A screen left open: what ended more than two days ago is forgotten.
   forget: { olderThan: { days: 2 } },
   hooks: {
@@ -249,6 +251,7 @@ summarize();
 // Light, dark, or the system's: the calendar's `scheme`; the page around it follows (its own colours by data-scheme).
 const schemeOf = () => document.querySelector<HTMLSelectElement>('#scheme')!.value as 'auto' | 'light' | 'dark';
 const paintPage = () => (document.documentElement.dataset['scheme'] = schemeOf());
+document.querySelector<HTMLSelectElement>('#refresh')!.addEventListener('change', (e) => cal.update({ nowRefresh: (e.target as HTMLSelectElement).value }));
 document.querySelector<HTMLSelectElement>('#scheme')!.addEventListener('change', () => (cal.update({ scheme: schemeOf() }), paintPage()));
 paintPage();
 document.querySelector<HTMLSelectElement>('#span')!.addEventListener('change', () => cal.update({ timeline: { span: spanOf(), slot: slotOf(spanOf()) } }));

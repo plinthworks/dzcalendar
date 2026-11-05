@@ -42,6 +42,10 @@ keeps the area and the heads in place.
   browser's smooth one, at once under reduced motion; the glide's scroll
   events are the view's own (not a pause). `true` keeps the present's slot
   at the edge.
+- `nowRefresh` (a calendar option, owner 2026-11-05): how often the now
+  line moves and a followed timeline glides — a minute by default, from a
+  second to an hour, aligned on the clock; ageing (ongoing, forget) stays
+  once a minute.
 - `timeline.ticks` (minutes): a small tick, its time written smaller
   (`--dz-tl-tick-font`), and a dotted line, inside each slot it divides.
   `{ every: 1, label: 5 }` is a ruler: a short mark each minute

@@ -1,0 +1,101 @@
+---
+title: nowRefresh
+description: "How often the now line moves — and a followed timeline with it."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Sets how often the line at the present moves, in every view — and, on a timeline that follows the present, how often the axis glides with it.
+
+<OptionFacts name="nowRefresh" />
+
+## What it does
+
+By default the line moves once a minute, on the minute: between two, it
+stands where the present was. `{ seconds: 5 }` moves it every five seconds,
+aligned on the clock (12:00:05, 12:00:10…) — with `timeline.follow`, the axis
+glides each time, which reads as continuous. From a second to an hour;
+anything else throws a `RangeError`. Live by `update()`. What ages — the
+events still running, `forget` — stays once a minute, however often the line
+moves.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineDay',
+  resources: [{ id: 'import', title: 'Import' }],
+  timeline: { span: { hours: 1 }, follow: { before: { minutes: 5 } } },
+  // The line, and the axis following it, every five seconds.
+  nowRefresh: { seconds: 5 },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-supervision',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineDay" [resources]="processes" [options]="options" />`,
+})
+export class Supervision {
+  readonly processes = [{ id: 'import', title: 'Import' }];
+  readonly options = { timeline: { span: { hours: 1 }, follow: { before: { minutes: 5 } } }, nowRefresh: { seconds: 5 } };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const PROCESSES = [{ id: 'import', title: 'Import' }];
+const FIVE_SECONDS = { seconds: 5 };
+
+export function Supervision() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimelineDay" resources={PROCESSES} nowRefresh={FIVE_SECONDS} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const processes = [{ id: 'import', title: 'Import' }];
+const options = { timeline: { span: { hours: 1 }, follow: { before: { minutes: 5 } } }, nowRefresh: { seconds: 5 } };
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineDay" :resources="processes" :options="options" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`nowIndicator`](../now-indicator/) — the line itself.
+- [`timeline`](../timeline/) — `follow`, for a screen that watches the present.

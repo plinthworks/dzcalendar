@@ -1329,7 +1329,11 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   // always runs — past midnight the kernel moves "today" (a state event, so a
   // paint) — and the now line is just what it also redraws when wanted.
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const untilNextMinute = () => 60000 - (kernel.now().epochMilliseconds % 60000);
+  // `nowRefresh` (a minute by default), aligned on its multiples of the clock: 12:00:05, 12:00:10…
+  const every = () => (settings.current.nowRefresh ? Temporal.Duration.from(settings.current.nowRefresh).total({ unit: 'milliseconds' }) : 60000);
+  const untilNextMinute = () => every() - (kernel.now().epochMilliseconds % every());
+  // What ages (forget, events still running) once a minute, however often the line moves.
+  let agedAt = Math.floor(kernel.now().epochMilliseconds / 60000);
   // What is old leaves (`forget`), what still runs grows to now: store changes, the views redraw only those.
   const ageing = () => {
     const f = settings.current.forget;
@@ -1337,7 +1341,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
     kernel.refreshOngoing();
   };
   const tick = () => {
-    if (root.isConnected) ageing();
+    const minute = Math.floor(kernel.now().epochMilliseconds / 60000);
+    if (root.isConnected && minute !== agedAt) ((agedAt = minute), ageing());
     if (root.isConnected && !kernel.refreshToday() && nowOn) {
       view?.tick(kernel.now(), kernel.getState());
       ctx.motion.nowTick?.([...root.querySelectorAll<HTMLElement>('.dz-now')]);
@@ -1449,6 +1454,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       }
       // Live settings check themselves and apply at once (nothing to redraw): a bad one throws here, before any change.
       if (settings.apply(changes)) {
+        if ('nowRefresh' in changes) startTicking();
         ctx.snapMinutes = settings.current.snapMinutes ?? 15;
         root.classList.toggle('dz-editable', settings.current.editable === true);
         root.toggleAttribute('data-editable', settings.current.editable === true);

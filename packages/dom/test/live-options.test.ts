@@ -140,6 +140,20 @@ describe('from the owner’s side-by-side screenshots', () => {
     expect([capped, [ids.size, cal.element.querySelector('.dz-dg__week .dz-more') !== null, cal.element.querySelector('.dz-dg--grow') !== null]]).toEqual([[true, false], [9, false, true]]);
   });
 
+  it('nowRefresh: from a second to an hour, live; anything else refused', () => {
+    const cal = make({ nowRefresh: { seconds: 5 } });
+    const refused = [{ milliseconds: 500 }, { hours: 2 }, { days: 1 }, 'soon'].map((v) => {
+      try {
+        cal.update({ nowRefresh: v as never });
+        return 'taken';
+      } catch (e) {
+        return (e as Error).name;
+      }
+    });
+    cal.update({ nowRefresh: 'PT10S' });
+    expect(refused).toEqual(['RangeError', 'RangeError', 'RangeError', 'RangeError']);
+  });
+
   it('forget: made with old events, those ended more than olderThan ago go at once; a bad olderThan refused', () => {
     // Now is 10:00 in Paris on the 21st: a day before is 10:00 on the 20th.
     const cal = make({

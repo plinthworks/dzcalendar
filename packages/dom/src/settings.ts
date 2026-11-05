@@ -165,6 +165,12 @@ export interface LiveSettings {
    * Days, hours and minutes (`{ days: 7 }`). Null: keep everything.
    */
   readonly forget?: { readonly olderThan: DurationLike } | null;
+  /**
+   * How often the now line moves, and a timeline following the present with it (`{ seconds: 5 }`: a glide every
+   * five seconds — continuous). From a second to an hour. Default a minute.
+   * @default { minutes: 1 }
+   */
+  readonly nowRefresh?: DurationLike;
 }
 
 type Handler<K extends keyof LiveSettings> = {
@@ -189,6 +195,18 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   onResourceProblems: {},
   onResourceToggle: {},
   onFollowChange: {},
+  nowRefresh: {
+    check: (v) => {
+      let ms = NaN;
+      try {
+        const d = Temporal.Duration.from(v);
+        if (!d.years && !d.months && !d.weeks && !d.days) ms = d.total({ unit: 'milliseconds' });
+      } catch {
+        // said below
+      }
+      if (!(ms >= 1000 && ms <= 3_600_000)) throw new RangeError(`nowRefresh is from a second to an hour: ${JSON.stringify(v)}`);
+    },
+  },
   forget: {
     check: (v) => {
       let ms = NaN;

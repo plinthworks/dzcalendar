@@ -603,6 +603,17 @@
       "live": "yes"
     },
     {
+      "name": "nowRefresh",
+      "type": "DurationLike",
+      "resolved": null,
+      "doc": "How often the now line moves, and a timeline following the present with it (`{ seconds: 5 }`: a glide every five seconds — continuous). From a second to an hour. Default a minute.",
+      "default": {
+        "code": "{ minutes: 1 }"
+      },
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
       "name": "onCommandRefused",
       "type": "(result: CommandResult, command: Command) => void",
       "resolved": null,

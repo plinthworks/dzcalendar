@@ -188,6 +188,13 @@
 
 ### Added
 
+- `nowRefresh` (owner, 2026-11-05: "au client de décider"): how often the
+  now line moves, in every view, and a timeline following the present with
+  it — `{ seconds: 5 }` glides every five seconds, aligned on the clock;
+  from a second to an hour, live. A minute by default; what ages (events
+  still running, `forget`) stays once a minute. The supervision playground
+  offers a minute, 10 s, 5 s or a second.
+
 - `timeline.follow: { before: { minutes: 5 } }` (owner, 2026-11-05): the
   present stays that far from the left edge, the axis gliding each minute
   (GSAP's eased scroll with `@dzcalendar/motion-gsap`, else the browser's
