@@ -90,14 +90,20 @@ describe('list views', () => {
     expect(host.textContent).toContain('Revue finale');
   });
 
-  it('the context menu opens on an event and on a day heading', () => {
-    const host = mount({ editable: true });
+  it('the context menu opens on an event and on a day heading (its "go to this day" when the header has a way back)', () => {
+    const host = mount({ editable: true, headerViews: ['listWeek', 'timeGridDay'] });
     items(host)[1]!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     const menu = host.querySelector<HTMLElement>('.dz-menu')!;
     expect(menu.hidden).toBe(false);
     key(menu, 'Escape');
     host.querySelector('.dz-list__head')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     expect(menu.hidden).toBe(false);
+  });
+
+  it('no way back to this view in the header: "go to this day" is not offered (a day heading has nothing else)', () => {
+    const host = mount({ headerViews: [] });
+    host.querySelector('.dz-list__head')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    expect(host.querySelector<HTMLElement>('.dz-menu')?.hidden ?? true).toBe(true);
   });
 
   it('the date in a heading goes to that day', () => {

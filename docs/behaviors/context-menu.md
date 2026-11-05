@@ -44,6 +44,10 @@ occurrence / This and following / All" before an edit applies.
   hour — or a date in a month), "Go to this day", "Open" (`onEventOpen`), the
   `contextMenu(ctx, defaults)` hook, disabled entries with a reason, typed
   type-ahead, closing on any change of the calendar.
+- "Go to this day" (the day's time grid) is offered only with a way back:
+  the header has a button for the view shown now (2026-11-05: a
+  supervision timeline without view buttons left a person in a day's grid
+  with nothing to return by).
 - **Phases 6–7**: editing entries as commands (Duplicate, Change duration…,
   Delete, Paste), sub-menus (rendered `children`) and the recurrence scope.
 - **Phase 8**: "Move…" into the keyboard grab mode; the menu anchored on the

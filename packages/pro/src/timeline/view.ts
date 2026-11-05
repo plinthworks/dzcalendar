@@ -189,6 +189,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   const scrollAlong = (v: number) => (scroller.scrollLeft = rtl() ? -v : v);
   /** `timeline.span` as last drawn (text): another one keeps the centre (the present while following) in place. */
   let spanSeen: string | undefined;
+  /** The minute at the centre when the span changed, kept until a scroll puts it back (a slot changed in the next drawing too). */
+  let keepCentre: number | null = null;
   /** The axis the scale was last measured on: a scale changed on it is a resize (the place kept), not another period. */
   let measuredAxis: TimelineModel['axis'] | null = null;
   /** The room for time at that measure: the old centre is half of it along, whatever the room is now. */
@@ -1331,6 +1333,13 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       const m = next as TimelineModel;
       created = [];
       const prev = model;
+      // Another span: the moment at the centre of what is shown, read at the old scale, stays there.
+      const spanText = ctx.kernel.getOptions().timeline?.span;
+      const span = spanText === undefined ? undefined : Temporal.Duration.from(spanText).toString();
+      // (read on the old axis: the old scale is its; a slot changed with it is another axis)
+      // Read before anything is written: a new axis length shrinks the sheet, and the browser clamps the scroll.
+      if (prev && span !== spanSeen && px > 0 && keepCentre === null) keepCentre = prev.axis.fromPosition((scrolledAlong() + (scroller.clientWidth - insetStart) / 2) / px).epochMilliseconds;
+
       model = m;
       // Another period or scale: the scroll offset means another moment now — back to the hour asked, today if shown.
       const rescroll = prev !== null && (!prev.axis.start.equals(m.axis.start) || prev.axis.slotMinutes !== m.axis.slotMinutes);
@@ -1381,12 +1390,9 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         [...rowsHost.querySelectorAll<HTMLElement>('.dz-tl__row')].find((x) => x.dataset['key'] === headFocus)?.querySelector<HTMLElement>('.dz-tl__cell[role="rowheader"]')?.focus();
       }
       if (!cursorHits.has(cursorNode)) cursorNode.setAttribute('aria-label', ctx.messages.timeSlots);
-      // Another span: the moment at the centre of what is shown, read at the old scale, stays there.
-      const spanText = ctx.kernel.getOptions().timeline?.span;
-      const span = spanText === undefined ? undefined : Temporal.Duration.from(spanText).toString();
-      // (read on the old axis: the old scale is its; a slot changed with it is another axis)
-      const centre = prev && span !== spanSeen && px > 0 ? prev.axis.fromPosition((scrolledAlong() + (scroller.clientWidth - insetStart) / 2) / px).epochMilliseconds : null;
+      const centre = keepCentre;
       const centreHere = centre !== null && centre >= m.axis.start.epochMilliseconds && centre <= m.axis.end.epochMilliseconds;
+      if (centre !== null && !centreHere) keepCentre = null;
       spanSeen = span;
       // No span: the stylesheet's width again before anything measures it.
       if (span === undefined) root.style.removeProperty('--dz-tl-slot');
@@ -1405,11 +1411,12 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       }
       // Another period without the present in it (the person went elsewhere, or started elsewhere): following pauses.
       if ((rescroll || !prev) && following && timelineNow(m, now) === null) follows(false);
-      if (centre !== null && !rescroll) scrollAt(following ? nowSlot(m, now) : centre, following ? 0 : 0.5);
+      const placed = () => (keepCentre = null);
+      if (centreHere && !rescroll) scrollAt(following ? nowSlot(m, now) : centre, following ? 0 : 0.5, placed);
       if (rescroll) {
         if (landAt !== null) scrollAt(landAt, 0, () => (landAt = null));
         else if (following) scrollAt(nowSlot(m, now), 0);
-        else if (centreHere) scrollAt(centre, 0.5);
+        else if (centreHere) scrollAt(centre, 0.5, placed);
         else scrollToMinutes(scrollMinutes);
       }
       return created;
@@ -1525,10 +1532,11 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         return { scale: scaleOf(m, area), shown: scroller.clientWidth - area };
       },
       write: ({ scale, shown }) => {
-        then?.();
-        // Another period or scale since: this place means another moment there. Another model on the same axis (the
-        // resources or the events given anew before the frame): still the place asked.
+        // Another period or scale since: this place means another moment there (the next drawing asks again; `then`
+        // waits for it). Another model on the same axis (the resources or the events given anew before the frame):
+        // still the place asked.
         if (!model || !sameAxis(model, m) || !(scale > 0) || !Number.isFinite(scale)) return;
+        then?.();
         scrollAlong(Math.max(0, m.axis.toPosition(ms) * scale - frac * shown));
         lastAlong = scrolledAlong();
         lastRoom = room();

@@ -774,7 +774,12 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
           // A month draws a timed event's day, not its hours: it only moves there, as under the pointer.
           canResize: (inst: EventInstance) => mayResize(inst.event, live.editable) && ((mountedFamily !== 'dayGrid' && mountedFamily !== 'multiMonth') || inst.event.allDay),
         }),
-        ...(drawable('timeGridDay') && { onGoToDay: (d: PlainDate) => kernel.setView('timeGridDay', d) }),
+        // Only with a way back: the header offers the view shown now (a supervision timeline without view buttons
+        // would be left for a day's grid with nothing to return by).
+        ...(drawable('timeGridDay') &&
+          (kernel.getState().view.type === 'timeGridDay' || [...root.querySelectorAll<HTMLElement>('.dz-toolbar__view')].some((b) => b.dataset['view'] === kernel.getState().view.type)) && {
+            onGoToDay: (d: PlainDate) => kernel.setView('timeGridDay', d),
+          }),
       });
       const items: readonly ActionItem[] | null = live.contextMenu ? live.contextMenu({ target, state }, defaults) : defaults;
       if (!items || items.length === 0) return false;

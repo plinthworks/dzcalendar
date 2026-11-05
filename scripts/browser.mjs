@@ -445,7 +445,14 @@ try {
       const s0 = await p.$eval('.dz-tg__body', (e) => e.scrollTop);
       const thu = await colCenter(p, 3);
       await cdp.send('Input.synthesizeScrollGesture', { x: Math.round(thu.x), y: 600, yDistance: -200, gestureSourceType: 'touch', speed: 1200 });
-      const s1 = await p.$eval('.dz-tg__body', (e) => e.scrollTop);
+      // The gesture's scroll may still be going when the command returns: read once it has settled (up to a second).
+      let s1 = await p.$eval('.dz-tg__body', (e) => e.scrollTop);
+      for (let i = 0; i < 20; i++) {
+        await p.waitForTimeout(50);
+        const s = await p.$eval('.dz-tg__body', (e) => e.scrollTop);
+        if (s === s1 && s > s0 + 50) break;
+        s1 = s;
+      }
       const room = await p.$eval('.dz-tg__body', (e) => e.scrollHeight - e.clientHeight);
       check('touch: a finger on empty time scrolls the grid', s1 > s0 + 50, `${s0} → ${s1} (of ${room})`);
       check('touch: no console error', errors.length === 0, errors.join(' | '));
@@ -1836,7 +1843,8 @@ try {
       await p.selectOption('#span', 'PT1H');
       await settle();
       const one = await at();
-      check('span: another span, live — 1 hour shown, the present’s quarter still at the left edge', one.shown === 60 && Math.abs(one.past - 7) < 0.5, JSON.stringify(one));
+      // The page shows an hour in slots of 5 minutes: 11:35 at the edge, the present 2 minutes in.
+      check('span: another span, live — 1 hour shown, the present’s slot still at the left edge', one.shown === 60 && Math.abs(one.past - 2) < 0.5, JSON.stringify(one));
       await p.selectOption('#span', '');
       await settle();
       const all = await at();
@@ -1869,7 +1877,12 @@ try {
       const thin = await at();
       check('span: a resize, not following, keeps the minute at the centre', thin.shown === 60 && Math.abs(thin.centre - wide.centre) <= 1, JSON.stringify({ wide, thin }));
       check('span: a narrower window still shows the hour asked', thin.shown === 60, JSON.stringify(thin));
-      // A marker (the alerts): a line across its whole row, its flag in a lane beside it.
+      // A marker (the alerts, at 09:17 and 09:47 in Paris): a line across its whole row, its flag in a lane beside it.
+      await p.selectOption('#span', 'PT4H');
+      await p.click('.dz-toolbar__today');
+      await settle();
+      await p.evaluate(() => window.__cal.shift({ hours: -3 }));
+      await settle();
       const marker = await p.evaluate(() => {
         const m = document.querySelector('.dz-tl__ev[data-marker]');
         if (!m) return null;

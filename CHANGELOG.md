@@ -40,6 +40,15 @@
 
 ### Fixed
 
+- "Go to this day" in the context menu was offered with no way back: a
+  timeline without view buttons (`headerViews: []`) left a person in a
+  day's time grid. It is offered now only when the header has a button for
+  the view shown.
+- A timeline's span changed together with its slot (1 h in 5-minute slots
+  to 12 h in half hours) lost the minute at the centre: the new axis length
+  shrank the sheet and the browser clamped the scroll before it was read —
+  it is read first now, and kept until a scroll puts it back.
+
 - A timeline whose resources or events were given anew right after it was
   made (before the next frame) lost the scroll it had asked for — the
   present followed, the hour shown first: a scroll is now kept when the new
@@ -218,7 +227,8 @@
 - `display: 'marker'` (owner, 2026-11-05): a moment without length — an
   alert, a deployment. In a timeline, a line across its row where it
   happened and a flag with its title in a lane beside it; in a time grid, a
-  line across the column. A start only: an end or a duration is ignored
+  line across the column. Its flag is drawn at most 16rem wide
+  (`--dz-marker-flag`), however wide its slots. A start only: an end or a duration is ignored
   (`marker-length-ignored`, a warning), a date alone is refused
   (`marker-all-day`). A moment's time is written once ("14:32", not
   "14:32 – 14:32"). The supervision playground's alerts are markers.

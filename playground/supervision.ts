@@ -99,7 +99,7 @@ const spanAsked = new URLSearchParams(location.search).get('span');
 if (spanAsked !== null) document.querySelector<HTMLSelectElement>('#span')!.value = spanAsked;
 const spanOf = () => document.querySelector<HTMLSelectElement>('#span')!.value || undefined;
 // A slot that suits the time shown: its head says a time that fits (24 h in quarters of an hour would be 96 heads).
-const slotOf = (span: string | undefined) => (span === 'P1D' ? 60 : span === 'PT12H' ? 30 : 15);
+const slotOf = (span: string | undefined) => (span === 'P1D' ? 60 : span === 'PT12H' ? 30 : span === 'PT1H' ? 5 : 15);
 const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   motion: createGsapMotion(),
   timeZone: ZONE,
@@ -160,27 +160,49 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
 // run ends then (`ongoing: false`). Now and then, an alert (a marker).
 const feed = liveSource('feed', {
   connect(emit) {
+    // As a server would see it, in real time: a run lasts minutes (here 4 to 12, to see some end), the next one starts a
+    // little after; an alert now and then, not two on one process within a quarter of an hour.
+    const finishAt = new Map<string, number>();
+    const nextStart = new Map<string, number>();
+    const lastAlert = new Map<string, number>();
     let n = 0;
+    const minutes = (a: number, b: number) => 60_000 * (a + Math.random() * (b - a));
     const timer = setInterval(() => {
       const t = now().round({ smallestUnit: 'second', roundingMode: 'floor' });
-      const p = processes[n++ % processes.length]!;
-      const pid = p.id as string;
-      if (n % 7 === 0) return emit({ create: alert(`alert-${n}`, pid, t, 'Mémoire à 90 %') });
-      // One run at a time per process: the one running now (the feed's, or one the page started with), if any.
-      const mine = [...cal.kernel.store.snapshot.allEvents()].filter((e) => e.resourceIds[0] === pid && (e.props as Partial<Props>).kind === 'run');
-      const cur = mine.find((e) => !e.allDay && e.ongoing);
-      if (cur) {
-        const failed = Math.random() < 0.25;
-        const props = { kind: 'run', status: failed ? 'failed' : 'ok', detail: failed ? 'Délai dépassé' : `${Math.round(Math.random() * 900)} éléments traités`, ended: t.toString() };
-        const patch = { ongoing: false, end: t.toString(), tone: TONE[failed ? 'failed' : 'ok'], extendedProps: props };
-        // The feed's own run through the feed; one the page was given, by a command (the feed does not own it).
-        if (cur.sourceId === 'feed') return emit({ update: cur.id, patch });
-        return void cal.run({ type: 'event.update', id: cur.id, patch });
+      const ms = t.epochMilliseconds;
+      for (const p of processes) {
+        const pid = p.id as string;
+        const mine = [...cal.kernel.store.snapshot.allEvents()].filter((e) => e.resourceIds[0] === pid && (e.props as Partial<Props>).kind === 'run');
+        const cur = mine.find((e) => !e.allDay && e.ongoing);
+        if (cur && !cur.allDay) {
+          // One the page started with: it ends around its expected end.
+          if (!finishAt.has(cur.id)) finishAt.set(cur.id, Math.max(ms + minutes(1, 4), (cur.expectedEnd?.epochMilliseconds ?? ms) + minutes(0, 3)));
+          if (ms < finishAt.get(cur.id)!) continue;
+          finishAt.delete(cur.id);
+          nextStart.set(pid, ms + minutes(1, 4));
+          const failed = Math.random() < 0.25;
+          const props = { kind: 'run', status: failed ? 'failed' : 'ok', detail: failed ? 'Délai dépassé' : `${Math.round(Math.random() * 900)} éléments traités`, ended: t.toString() };
+          const patch = { ongoing: false, end: t.toString(), tone: TONE[failed ? 'failed' : 'ok'], extendedProps: props };
+          // The feed's own run through the feed; one the page was given, by a command (the feed does not own it).
+          if (cur.sourceId === 'feed') emit({ update: cur.id, patch });
+          else cal.run({ type: 'event.update', id: cur.id, patch });
+          continue;
+        }
+        if (ms < (nextStart.get(pid) ?? 0)) continue;
+        const id = `live-${++n}`;
+        const expected = 4 + Math.round(Math.random() * 8);
+        finishAt.set(id, ms + minutes(expected * 0.8, expected * 1.2));
+        emit({ create: { ...run(id, pid, t, expected, 'running', 'En cours'), ongoing: true } });
       }
-      // Heard of while running: started after the process's last run ended (the feed tells when), expected to take an hour or so.
-      const lastEnd = Math.max(...mine.map((e) => (e.allDay ? 0 : e.end.epochMilliseconds)), t.epochMilliseconds - 3_600_000);
-      const started = Temporal.Instant.fromEpochMilliseconds(Math.min(t.epochMilliseconds, lastEnd + 60_000 * (2 + Math.round(Math.random() * 8)))).round({ smallestUnit: 'second', roundingMode: 'floor' });
-      emit({ create: { ...run(`live-${n}`, pid, started, 60 + Math.round(Math.random() * 30), 'running', 'En cours'), ongoing: true } });
+      // About one alert every three minutes, on a process that had none for a quarter of an hour.
+      if (Math.random() < 5 / 180) {
+        const p = processes[Math.floor(Math.random() * processes.length)]!;
+        const pid = p.id as string;
+        if (ms - (lastAlert.get(pid) ?? 0) > 15 * 60_000) {
+          lastAlert.set(pid, ms);
+          emit({ create: alert(`alert-${++n}`, pid, t, 'Mémoire à 90 %') });
+        }
+      }
     }, 5000);
     return () => clearInterval(timer);
   },
