@@ -1,6 +1,13 @@
 # Changes
 
-## Unreleased
+## 1.0.0 — 2026-11-05
+
+The first release on npm: every package at 1.0.0 (`@dzcalendar/core`, `dom`,
+`theme`, `rrule`, `ical`, `slots`, `pro`, `motion-gsap`, `element`, `react`,
+`vue`, `angular`, `pro-react`, `pro-vue`, `pro-angular`, `compat-fullcalendar`,
+`migrate`). What follows is what changed along the way to it — "Breaking"
+names what an application written against the repository's earlier states
+must change.
 
 ### Breaking
 

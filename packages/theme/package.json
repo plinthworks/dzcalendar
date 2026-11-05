@@ -1,6 +1,6 @@
 {
   "name": "@dzcalendar/theme",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "An optional stylesheet for DzCalendar, of one family with @tzslot/theme. Plain CSS, no framework.",
   "license": "MIT",
   "main": "./dzcalendar.css",

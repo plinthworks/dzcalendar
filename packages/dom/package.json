@@ -1,11 +1,11 @@
 {
   "name": "@dzcalendar/dom",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "DzCalendar in plain DOM: views, rendering, interactions. No framework; wrappers sit on top.",
   "type": "module",
   "license": "MIT",
   "dependencies": {
-    "@dzcalendar/core": "0.0.0"
+    "@dzcalendar/core": "1.0.0"
   },
   "exports": {
     ".": {

@@ -1,15 +1,21 @@
 {
   "name": "@dzcalendar/element",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "DzCalendar as a Web Component: <dz-calendar> for any page or framework — in the page (its CSS applies) or isolated in a shadow root; attributes, properties and dz-* DOM events.",
   "type": "module",
   "license": "MIT",
   "dependencies": {
-    "@dzcalendar/core": "0.0.0",
-    "@dzcalendar/dom": "0.0.0"
+    "@dzcalendar/core": "1.0.0",
+    "@dzcalendar/dom": "1.0.0"
   },
   "exports": {
-    ".": { "types": "./src/index.ts", "default": "./src/index.ts" },
-    "./define": { "types": "./src/define.ts", "default": "./src/define.ts" }
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./define": {
+      "types": "./src/define.ts",
+      "default": "./src/define.ts"
+    }
   }
 }
