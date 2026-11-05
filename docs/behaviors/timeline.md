@@ -32,7 +32,9 @@ keeps the area and the heads in place.
   2026-11-04: at 22:47 in quarters of an hour, 22:45 — what comes is what a
   supervisor watches), a step on when the next slot begins, the period after it brought in past midnight. The
   person's own move along time — a scroll (the bar, a finger, a wheel, the
-  keyboard's cursor), a slide, a period without the present — pauses it;
+  keyboard's cursor) of more than 24 px from where the view put it (a
+  vertical scroll's sideways slip is not one), a slide, a period without the
+  present — pauses it;
   "Today" takes it up. Each change is said by `onFollowChange(following)`
   (not the option as first read): a "Back to live" button. Made for supervision, where a timeline shows what is
   running now and runs arrive by SSE (`run({ type: 'event.create' })`).

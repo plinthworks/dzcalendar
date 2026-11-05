@@ -88,6 +88,11 @@ export interface MotionAdapter {
    */
   scroll?(el: HTMLElement, to: { readonly top: number; readonly left: number }): boolean;
   /**
+   * The view places the element itself, at once: an eased scroll still under way (one asleep in a hidden tab)
+   * stops, or it would take the element back where it was going.
+   */
+  stopScroll?(el: HTMLElement): void;
+  /**
    * A drag began: the ghosts that follow the pointer (lift them). The array
    * is the live one (ghosts come and go as the drag crosses weeks); their
    * place is in `--gx` / `--gy`. `kind`: a move or a resize.

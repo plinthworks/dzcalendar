@@ -1957,6 +1957,14 @@ try {
       const after = await x();
       const paused = await p.evaluate(() => !document.querySelector('#paused').hidden);
       check('nowRefresh: every second, the now line moves within two seconds — following not paused', before !== after && !paused, JSON.stringify({ before, after, paused }));
+      // A vertical scroll's sideways slip (a few pixels): following goes on; a real move along time pauses it.
+      await p.evaluate(() => (document.querySelector('.dz-tl__scroller').scrollLeft += 8));
+      await p.waitForTimeout(300);
+      const slipped = await p.evaluate(() => !document.querySelector('#paused').hidden);
+      await p.evaluate(() => (document.querySelector('.dz-tl__scroller').scrollLeft += 120));
+      await p.waitForTimeout(300);
+      const moved = await p.evaluate(() => !document.querySelector('#paused').hidden);
+      check('follow: a slip of 8 px does not pause it, a move of 120 px does', !slipped && moved, JSON.stringify({ slipped, moved }));
       check('nowRefresh: no console error', errors.length === 0, errors.join('\n'));
       await p.close();
     }

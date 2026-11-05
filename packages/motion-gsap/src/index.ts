@@ -587,6 +587,10 @@ export function createGsapMotion(o: GsapMotionOptions = {}): MotionAdapter {
       return true;
     },
 
+    stopScroll(el) {
+      for (const t of gsap.getTweensOf(el)) t.kill();
+    },
+
     destroy() {
       // Finished, not left running on nodes that are gone; the media watched again by the next calendar.
       rolling?.progress(1);

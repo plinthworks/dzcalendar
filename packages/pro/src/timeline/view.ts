@@ -98,6 +98,9 @@ const EMPTY_WINDOW = { from: 0, to: 0, x0: 0, x1: -1 } as const;
 const ownerOf = (row: TimelineRow): string | undefined => (row.kind === 'resource' ? row.resource.id : undefined);
 const isDrawnRow = (row: TimelineRow) => row.kind !== 'group';
 
+/** Pixels along time a person's scroll may stray from where the view put it before following pauses (a slip). */
+const FOLLOW_SLIP = 24;
+
 /**
  * A timeline: rows of resources (or one row of every event) along an elapsed
  * time axis, the resource area on the left. One scroller for both ways: the
@@ -191,6 +194,12 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   /** How far along time the scroller is, whatever the direction. */
   const scrolledAlong = () => Math.abs(scroller.scrollLeft);
   const scrollAlong = (v: number) => (scroller.scrollLeft = rtl() ? -v : v);
+  /** The view's own instant placement: an eased scroll under way (asleep in a hidden tab, say) stops first. */
+  const placeAlong = (v: number) => {
+    glide = null;
+    ctx.motion.stopScroll?.(scroller);
+    scrollAlong(v);
+  };
   /** `timeline.span` as last drawn (text): another one keeps the centre (the present while following) in place. */
   let spanSeen: string | undefined;
   /** The minute at the centre when the span changed, kept until a scroll puts it back (a slot changed in the next drawing too). */
@@ -849,7 +858,15 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       if (following) keepNow(ctx.kernel.now());
       return;
     }
-    if (following && Math.abs(along - lastAlong) > 1) follows(false);
+    // While following, a move along time of the person's pauses it — a real one: a vertical scroll's sideways slip (a
+    // trackpad, a wheel) of a few pixels from where the view put it is not one.
+    if (following) {
+      if (Math.abs(along - lastAlong) > FOLLOW_SLIP) {
+        follows(false);
+        lastAlong = along;
+      }
+      return;
+    }
     lastAlong = along;
   });
 
@@ -1360,7 +1377,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         measuredShown = shown;
         if (anchor !== null) {
           const [at, frac] = following ? [nowSlot(m, ctx.kernel.now()), 0] : [anchor, 0.5];
-          scrollAlong(Math.max(0, m.axis.toPosition(at) * scale - frac * shown));
+          placeAlong(Math.max(0, m.axis.toPosition(at) * scale - frac * shown));
           lastAlong = scrolledAlong();
           lastRoom = room();
         }
@@ -1591,7 +1608,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         lastRoom = room();
         const reduce = doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? true;
         // A long way (a tab shown again after hours): there at once — a glide is for a minute's step.
-        if (reduce || Math.abs(to - from) > scroller.clientWidth / 2) return void ((glide = null), scrollAlong(to));
+        if (reduce || Math.abs(to - from) > scroller.clientWidth / 2) return placeAlong(to);
         glide = { from, to, until: performance.now() + 2000 };
         const left = rtl() ? -to : to;
         if (ctx.motion.scroll?.(scroller, { top: scroller.scrollTop, left })) return;
@@ -1633,8 +1650,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         // still the place asked.
         if (!model || !sameAxis(model, m) || !(scale > 0) || !Number.isFinite(scale)) return;
         then?.();
-        glide = null;
-        scrollAlong(Math.max(0, m.axis.toPosition(ms) * scale - frac * shown));
+        placeAlong(Math.max(0, m.axis.toPosition(ms) * scale - frac * shown));
         lastAlong = scrolledAlong();
         lastRoom = room();
         measureWindow();
@@ -1663,6 +1679,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
           const at = m.axis.unit === 'day' ? (todaySlot?.start ?? m.axis.start) : Temporal.Instant.fromEpochMilliseconds(Math.round(day.start.epochMilliseconds + minutes * 60_000));
           // (now's minutes carry its seconds: a whole number of milliseconds, or the instant is refused)
           glide = null;
+          ctx.motion.stopScroll?.(scroller);
           scrollEased(eased, scroller, () => scrollAlong(Math.max(0, m.axis.toPosition(at) * scale - (m.axis.unit === 'day' ? scale * 2 : 0))));
           lastAlong = scrolledAlong();
           lastRoom = room();

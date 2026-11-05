@@ -40,6 +40,13 @@
 
 ### Fixed
 
+- A timeline following the present paused on a vertical scroll's sideways
+  slip (a trackpad, a wheel: from one pixel): following now pauses only on a
+  real move along time (24 px from where the view put it). An eased scroll
+  still under way (one asleep in a hidden tab) is stopped before the view
+  places the timeline itself (`MotionAdapter.stopScroll`, GSAP's adapter
+  kills its tween), so it cannot take the timeline back and pause following.
+
 - "Go to this day" in the context menu was offered with no way back: a
   timeline without view buttons (`headerViews: []`) left a person in a
   day's time grid. It is offered now only when the header has a button for
