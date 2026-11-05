@@ -350,6 +350,16 @@ describe('the timeline’s step and following the present', () => {
     off();
   });
 
+  it('onFollowChange says each change of following — not the option as first read', () => {
+    const said: boolean[] = [];
+    mount([], { timeline: { follow: true }, onFollowChange: (f: boolean) => void said.push(f) });
+    const first = [...said];
+    cal!.update({ timeline: { follow: false } });
+    cal!.update({ timeline: { follow: true } });
+    cal!.update({ timeline: { follow: true } });
+    expect([first, said]).toEqual([[], [false, true]]);
+  });
+
   it('a view that is not a timeline does not slide: shift() says so, ◀ ▶ change period', () => {
     mount([], { initialView: 'timeGridWeek', timeline: { step: { minutes: 15 } } });
     expect(cal!.shift({ minutes: 15 })).toBe(false);

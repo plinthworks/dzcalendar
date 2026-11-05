@@ -803,6 +803,12 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
     problemGone(code, key = '') {
       toldProblems.delete(`${code}|${key}`);
     },
+    slideStep(dir) {
+      const step = kernel.getOptions().timeline?.step;
+      if (step === undefined) return null;
+      const ms = (dir === 'next' ? 1 : -1) * timeStep(step);
+      return view?.slide?.(ms) ? ms : null;
+    },
     announce(text) {
       // Emptied first, so the same words twice are said twice.
       liveRegion.textContent = '';

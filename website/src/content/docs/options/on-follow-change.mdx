@@ -1,0 +1,128 @@
+---
+title: onFollowChange
+description: "A timeline following the present paused, or took it up again."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+import OptionFacts from '../../../components/OptionFacts.astro';
+
+Hears a timeline that follows the present (`timeline.follow`) pause or take it up again.
+
+<OptionFacts name="onFollowChange" />
+
+## What it does
+
+It receives `false` when following pauses — the person scrolled, slid or
+went to another period — and `true` when it is taken up again: "Today"
+(`navigate('today')`) or `update({ timeline: { follow: true } })`. Turning
+`follow` off by `update()` is said too; the option as the calendar first reads
+it is not. Made for a supervision screen: a "Back to live" button shown while
+paused.
+
+## Example
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const live = document.querySelector<HTMLButtonElement>('#live')!;
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineDay',
+  resources: [{ id: 'import', title: 'Import' }, { id: 'billing', title: 'Billing' }],
+  timeline: { slot: 15, span: { hours: 4 }, follow: true },
+  // Paused: the button appears; back to live, it goes.
+  onFollowChange: (following) => (live.hidden = following),
+});
+live.addEventListener('click', () => calendar.navigate('today'));
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal, viewChild } from '@angular/core';
+import { DZ_CALENDAR, DzCalendar } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-supervision',
+  imports: [DZ_CALENDAR],
+  template: `
+    @if (!following()) { <button (click)="cal().controller.today()">Back to live</button> }
+    <dz-calendar #calendar timeZone="Europe/Paris" view="resourceTimelineDay" [resources]="processes" [options]="options" />`,
+})
+export class Supervision {
+  readonly cal = viewChild.required<DzCalendar>('calendar');
+  readonly following = signal(true);
+  readonly processes = [{ id: 'import', title: 'Import' }, { id: 'billing', title: 'Billing' }];
+  readonly options = {
+    timeline: { slot: 15, span: { hours: 4 }, follow: true },
+    onFollowChange: (f: boolean) => this.following.set(f),
+  };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const PROCESSES = [{ id: 'import', title: 'Import' }, { id: 'billing', title: 'Billing' }];
+
+export function Supervision() {
+  const [following, setFollowing] = useState(true);
+  const controller = useCalendarController();
+  return (
+    <>
+      {!following && <button onClick={() => controller.today()}>Back to live</button>}
+      <DzCalendar
+        controller={controller}
+        timeZone="Europe/Paris"
+        defaultView="resourceTimelineDay"
+        resources={PROCESSES}
+        timeline={{ slot: 15, span: { hours: 4 }, follow: true }}
+        onFollowChange={setFollowing}
+      />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const processes = [{ id: 'import', title: 'Import' }, { id: 'billing', title: 'Billing' }];
+const following = ref(true);
+const controller = createCalendarController();
+const options = { timeline: { slot: 15, span: { hours: 4 }, follow: true }, onFollowChange: (f: boolean) => (following.value = f) };
+</script>
+
+<template>
+  <button v-if="!following" @click="controller.today()">Back to live</button>
+  <DzCalendar :controller="controller" time-zone="Europe/Paris" view="resourceTimelineDay" :resources="processes" :options="options" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+In Angular and Vue it goes in `options`; in React it is a prop.
+
+## See also
+
+- [`timeline`](../timeline/) — `follow`, `step` and `span`.
+- [Resources & timeline](../../guides/resources-timeline/).

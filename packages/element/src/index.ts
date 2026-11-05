@@ -48,6 +48,7 @@ const EVENTS = {
   onCommandRefused: 'dz-command-refused',
   onProposalRefused: 'dz-proposal-refused',
   onResourceProblems: 'dz-resource-problems',
+  onFollowChange: 'dz-follow-change',
   onProblem: 'dz-calendar-problem',
 } as const;
 

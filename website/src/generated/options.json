@@ -675,6 +675,15 @@
       "live": "yes"
     },
     {
+      "name": "onFollowChange",
+      "type": "(following: boolean) => void",
+      "resolved": null,
+      "doc": "A timeline following the present (`timeline.follow`) paused (the person moved along time) or took it up again (\"Today\"): to show \"paused — back to live\", say.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
       "name": "onProblem",
       "type": "(problem: CalendarProblem) => void",
       "resolved": null,

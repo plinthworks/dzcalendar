@@ -181,6 +181,8 @@ export interface ViewCtx {
   rules(): RulesContext | null;
   /** Said by screen readers (a polite live region). */
   announce(text: string): void;
+  /** A timeline with `timeline.step` slid by it (the keyboard's period keys, as ◀ ▶): the milliseconds slid, null when it did not. */
+  slideStep(dir: 'prev' | 'next'): number | null;
   /**
    * Something it could not do as asked (`onProblem`, else the console once per code). Told once per `code` and
    * `key` (a view, a kind) until `problemGone` says the condition went away: then told again if it comes back.

@@ -37,7 +37,8 @@ deletes, undoes — without a mouse, or with a screen reader.
   (and, holding an event, move it there). Everything the cursor says starts
   with the resource ("Dr Haddad, Wednesday 21 October, 09:00").
 - **Timeline**: ←/→ along time, ↑/↓ from resource to resource (cursor and
-  grab); on an event ↑/↓ the previous or next one.
+  grab); on an event ↑/↓ the previous or next one. With `timeline.step`,
+  PageUp/PageDown slide by it (as ◀ ▶), the cursor going on by as much.
 - **Slots step in elapsed time**: on the 25-hour Sunday the cursor visits
   02:00 (+02:00) … then 02:00 (+01:00) — both passes, told apart by offset;
   on the 23-hour Sunday, 01:45 goes to 03:00.

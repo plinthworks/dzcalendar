@@ -182,6 +182,9 @@
   Vue controllers and `<dz-calendar>`). `timeline.follow` keeps the present
   in view, paused by the person's own move along time, taken up by "Today".
   `playground/supervision.html` shows both.
+- `onFollowChange(following)` (owner, 2026-11-05): a timeline following the
+  present paused or took it up again — for a "Back to live" button. With
+  `timeline.step`, PageUp/PageDown slide the timeline by it, as ◀ ▶ do.
 - `timeline.span` (owner, 2026-11-04): the time a timeline shows at once
   (`{ hours: 4 }`), whatever the room — a slot's width computed from it and
   measured again on a resize. Changed live by `update()`, it keeps the

@@ -167,6 +167,12 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   let scrollMinutes = 480;
   /** Following the present (`timeline.follow`): paused by the person's own move along time, taken up by "Today". */
   let following = false;
+  /** Following set; a change said to the application (`onFollowChange`). */
+  const follows = (v: boolean) => {
+    if (v === following) return;
+    following = v;
+    ctx.live().onFollowChange?.(v);
+  };
   /** The option as last read: turned on by `update()`, following starts. */
   let followAsked: boolean | null = null;
   /** Where a slide that brought in another period lands (epoch ms at the left edge), once it is drawn. */
@@ -799,7 +805,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       if (following) keepNow(ctx.kernel.now());
       return;
     }
-    if (following && Math.abs(along - lastAlong) > 1) following = false;
+    if (following && Math.abs(along - lastAlong) > 1) follows(false);
     lastAlong = along;
   });
 
@@ -1391,10 +1397,13 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       // Turned on by `update()`: the present brought into view, once this drawing is done.
       if (asked !== followAsked) {
         if (asked && prev) queueMicrotask(() => keepNow(ctx.kernel.now()));
-        following = followAsked = asked;
+        // The option as first read is not a change; turned on or off by `update()`, it is.
+        if (followAsked === null) following = asked;
+        else follows(asked);
+        followAsked = asked;
       }
       // Another period without the present in it (the person went elsewhere, or started elsewhere): following pauses.
-      if ((rescroll || !prev) && following && timelineNow(m, now) === null) following = false;
+      if ((rescroll || !prev) && following && timelineNow(m, now) === null) follows(false);
       if (centre !== null && !rescroll) scrollAt(following ? nowSlot(m, now) : centre, following ? 0 : 0.5);
       if (rescroll) {
         if (landAt !== null) scrollAt(landAt, 0, () => (landAt = null));
@@ -1429,7 +1438,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     slide(ms) {
       const m = model;
       if (!m || !(px > 0) || m.axis.length === 0) return false;
-      following = false;
+      follows(false);
       const unit = m.axis.slotMinutes * 60_000;
       const start = m.axis.start.epochMilliseconds;
       const end = m.axis.end.epochMilliseconds;
@@ -1459,8 +1468,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
 
     follow(now, resume) {
       const asked = ctx.kernel.getOptions().timeline?.follow === true;
-      if (!asked) return void (following = false);
-      if (resume) following = true;
+      if (!asked) return void follows(false);
+      if (resume) follows(true);
       keepNow(now);
     },
 

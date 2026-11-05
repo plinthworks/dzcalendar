@@ -1,0 +1,128 @@
+---
+title: onFollowChange
+description: "Une timeline qui suit le présent s’est mise en pause, ou a repris."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Écoute une timeline qui suit le présent (`timeline.follow`) se mettre en pause ou reprendre.
+
+<OptionFacts name="onFollowChange" />
+
+## Ce qu'elle fait
+
+Elle reçoit `false` quand le suivi se met en pause — la personne a fait
+défiler, glisser ou changé de période — et `true` quand il reprend :
+« Aujourd'hui » (`navigate('today')`) ou `update({ timeline: { follow: true } })`.
+Couper `follow` par `update()` est signalé aussi ; l'option telle que le
+calendrier la lit à sa création ne l'est pas. Faite pour un écran de
+supervision : un bouton « Revenir au direct » montré pendant la pause.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const live = document.querySelector<HTMLButtonElement>('#live')!;
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineDay',
+  resources: [{ id: 'import', title: 'Import' }, { id: 'billing', title: 'Billing' }],
+  timeline: { slot: 15, span: { hours: 4 }, follow: true },
+  // En pause : le bouton apparaît ; revenu au direct, il part.
+  onFollowChange: (following) => (live.hidden = following),
+});
+live.addEventListener('click', () => calendar.navigate('today'));
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, signal, viewChild } from '@angular/core';
+import { DZ_CALENDAR, DzCalendar } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-supervision',
+  imports: [DZ_CALENDAR],
+  template: `
+    @if (!following()) { <button (click)="cal().controller.today()">Revenir au direct</button> }
+    <dz-calendar #calendar timeZone="Europe/Paris" view="resourceTimelineDay" [resources]="processes" [options]="options" />`,
+})
+export class Supervision {
+  readonly cal = viewChild.required<DzCalendar>('calendar');
+  readonly following = signal(true);
+  readonly processes = [{ id: 'import', title: 'Import' }, { id: 'billing', title: 'Billing' }];
+  readonly options = {
+    timeline: { slot: 15, span: { hours: 4 }, follow: true },
+    onFollowChange: (f: boolean) => this.following.set(f),
+  };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { useState } from 'react';
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const PROCESSES = [{ id: 'import', title: 'Import' }, { id: 'billing', title: 'Billing' }];
+
+export function Supervision() {
+  const [following, setFollowing] = useState(true);
+  const controller = useCalendarController();
+  return (
+    <>
+      {!following && <button onClick={() => controller.today()}>Revenir au direct</button>}
+      <DzCalendar
+        controller={controller}
+        timeZone="Europe/Paris"
+        defaultView="resourceTimelineDay"
+        resources={PROCESSES}
+        timeline={{ slot: 15, span: { hours: 4 }, follow: true }}
+        onFollowChange={setFollowing}
+      />
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue';
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const processes = [{ id: 'import', title: 'Import' }, { id: 'billing', title: 'Billing' }];
+const following = ref(true);
+const controller = createCalendarController();
+const options = { timeline: { slot: 15, span: { hours: 4 }, follow: true }, onFollowChange: (f: boolean) => (following.value = f) };
+</script>
+
+<template>
+  <button v-if="!following" @click="controller.today()">Revenir au direct</button>
+  <DzCalendar :controller="controller" time-zone="Europe/Paris" view="resourceTimelineDay" :resources="processes" :options="options" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Voir aussi
+
+- [`timeline`](../timeline/) — `follow`, `step` et `span`.
+- [Ressources et timeline](../../guides/resources-timeline/).

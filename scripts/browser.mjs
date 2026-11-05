@@ -1741,6 +1741,16 @@ try {
       await settle();
       const back = await at();
       check('step: ▶ slides 15 minutes, ◀ ◀ 30 back, shift({ minutes: -45 }) 45 more', next.left - first.left === 15 && next.left - prev.left === 30 && prev.left - back.left === 45, JSON.stringify({ first, next, prev, back }));
+      // The keyboard's period keys slide by the step too (the cursor on, the timeline 15 minutes further).
+      await p.focus('.dz-tl__cursor');
+      await settle();
+      const keyed = await at();
+      await p.keyboard.press('PageDown');
+      await settle();
+      const paged = await at();
+      await p.keyboard.press('PageUp');
+      await settle();
+      check('step: PageDown slides 15 minutes, PageUp back, as ◀ ▶ (the period kept)', paged.left - keyed.left === 15 && (await at()).left === keyed.left && paged.from === keyed.from, JSON.stringify({ keyed, paged, back: await at() }));
       // The minute's tick (here: the page shown again) leaves a timeline the person moved.
       await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
       await settle();

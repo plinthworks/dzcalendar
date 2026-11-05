@@ -153,6 +153,11 @@ export interface LiveSettings {
   readonly onResourceToggle?: (state: { readonly collapsedResources: readonly string[]; readonly collapsedGroups: readonly string[] }) => void;
   /** What the resources given (option or `update`) could not be read as: refused entries, dropped fields. Called only when there are some. */
   readonly onResourceProblems?: (problems: readonly Problem[]) => void;
+  /**
+   * A timeline following the present (`timeline.follow`) paused (the person moved along time) or took it up again
+   * ("Today"): to show "paused — back to live", say.
+   */
+  readonly onFollowChange?: (following: boolean) => void;
 }
 
 type Handler<K extends keyof LiveSettings> = {
@@ -176,6 +181,7 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   onSlotClick: {},
   onResourceProblems: {},
   onResourceToggle: {},
+  onFollowChange: {},
   chooseScope: {},
   dragEdgeNavigate: {},
   eventResizableFromStart: {},
