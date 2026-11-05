@@ -1,5 +1,6 @@
 import type { DropInfo } from './interact/drop.js';
-import type { AvailableSlot, CalEvent, Problem, Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection, Series } from '@dzcalendar/core';
+import { Temporal } from '@dzcalendar/core';
+import type { AvailableSlot, CalEvent, DurationLike, Problem, Command, CommandResult, CreateRequest, EditScope, EventInstance, Instant, PlainDate, Proposal, Selection, Series } from '@dzcalendar/core';
 import type { MenuHook, ScopeRequest } from './host.js';
 
 /** A click on an empty day or moment. */
@@ -158,6 +159,12 @@ export interface LiveSettings {
    * ("Today"): to show "paused — back to live", say.
    */
   readonly onFollowChange?: (following: boolean) => void;
+  /**
+   * Forget what is old (a screen left open for weeks): each minute, the events that ended more than `olderThan`
+   * ago leave the calendar — not its undo, not `onEventChange`; a series, and an event still running, stay.
+   * Days, hours and minutes (`{ days: 7 }`). Null: keep everything.
+   */
+  readonly forget?: { readonly olderThan: DurationLike } | null;
 }
 
 type Handler<K extends keyof LiveSettings> = {
@@ -182,6 +189,18 @@ const HANDLERS: { readonly [K in keyof LiveSettings]-?: Handler<K> } = {
   onResourceProblems: {},
   onResourceToggle: {},
   onFollowChange: {},
+  forget: {
+    check: (v) => {
+      let ms = NaN;
+      try {
+        const d = Temporal.Duration.from(v.olderThan);
+        if (!d.years && !d.months && !d.weeks) ms = d.total({ unit: 'milliseconds' });
+      } catch {
+        // said below
+      }
+      if (!(ms > 0)) throw new RangeError(`forget.olderThan is days, hours and minutes, longer than nothing: ${JSON.stringify(v.olderThan)}`);
+    },
+  },
   chooseScope: {},
   dragEdgeNavigate: {},
   eventResizableFromStart: {},

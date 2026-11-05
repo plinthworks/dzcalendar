@@ -104,6 +104,8 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   resources: processes,
   events: history,
   timeline: { slot: slotOf(spanOf()), span: spanOf(), step: stepOf(), follow: true, maxLanes: 2 },
+  // A screen left open: what ended more than two days ago is forgotten.
+  forget: { olderThan: { days: 2 } },
   hooks: {
     event: {
       // The card, by kind: what happened, how it went, and when — to the second.

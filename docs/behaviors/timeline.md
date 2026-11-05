@@ -47,6 +47,10 @@ keeps the area and the heads in place.
   going by (still under reduced motion); its time reads "11:02 – running".
   `event.update({ ongoing: false })` finishes it: at its `end` if given,
   else now. A date alone or a series cannot run (`ongoing-not-timed`).
+- `forget: { olderThan }` (owner 2026-11-05, a calendar option, live):
+  each minute, and when the calendar is made, the events that ended more
+  than that long ago leave the store (`kernel.forgetBefore`, cause 'api': no
+  undo, no `onEventChange`); a series and an event still running stay.
 - A marker (`display: 'marker'`, owner 2026-11-05) is a moment: a line
   across its row where it happened, its flag (the title, or the content
   hook's) in a lane beside it, three slots wide — the room its lane keeps.

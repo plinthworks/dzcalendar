@@ -320,6 +320,12 @@ export interface CalendarKernel {
    * person's: no undo, no `onEventChange`). True when one moved. The DOM calls it each minute.
    */
   refreshOngoing(): boolean;
+  /**
+   * The events that ended before `at` leave the store (a store change, cause 'api': no undo entry, no
+   * `onEventChange`) — single events and a series' changed occurrences; a series itself, and an event still
+   * running, stay. How many went. The DOM calls it each minute with `forget.olderThan`.
+   */
+  forgetBefore(at: Instant): number;
   /** Memoized; after a store change only what changed is rebuilt (where the family can). */
   viewModel(): ViewModel;
   /** What building the shown model had to say: a series cut short there (`too-many-occurrences`, its path `series:<id>`). */
@@ -878,6 +884,17 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         held--;
         flush();
       }
+    },
+    forgetBefore(at) {
+      const ms = at.epochMilliseconds;
+      const gone: Mutation[] = [];
+      for (const e of store.snapshot.allEvents()) {
+        if (!e.allDay && e.ongoing) continue;
+        const end = e.allDay ? e.end.toZonedDateTime({ timeZone }).epochMilliseconds : e.end.epochMilliseconds;
+        if (end <= ms) gone.push({ kind: 'event', before: e });
+      }
+      if (gone.length > 0) store.apply(gone, 'api');
+      return gone.length;
     },
     refreshOngoing() {
       const at = now();

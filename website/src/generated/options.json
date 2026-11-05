@@ -238,6 +238,15 @@
       "live": "yes"
     },
     {
+      "name": "forget",
+      "type": "{ readonly olderThan: DurationLike } | null",
+      "resolved": null,
+      "doc": "Forget what is old (a screen left open for weeks): each minute, the events that ended more than `olderThan` ago leave the calendar — not its undo, not `onEventChange`; a series, and an event still running, stay. Days, hours and minutes (`{ days: 7 }`). Null: keep everything.",
+      "default": null,
+      "source": "packages/dom/src/settings.ts",
+      "live": "yes"
+    },
+    {
       "name": "formats",
       "type": "Formats",
       "resolved": null,

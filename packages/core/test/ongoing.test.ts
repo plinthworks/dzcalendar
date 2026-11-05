@@ -70,3 +70,26 @@ describe('an event still running (ongoing)', () => {
     ]);
   });
 });
+
+describe('forgetting what is old (forgetBefore)', () => {
+  it('the events ended before the moment go (an all-day one by its end in the calendar’s zone); a running one and a series stay; no undo entry', () => {
+    clock = Temporal.Instant.from('2026-10-21T09:37:00Z');
+    const k = createKernel({
+      timeZone: 'Europe/Paris',
+      locale: 'fr-FR',
+      now,
+      events: [
+        { id: 'old', start: '2026-10-13T10:00[Europe/Paris]', duration: { hours: 1 } },
+        { id: 'edge', start: '2026-10-14T10:00[Europe/Paris]', end: '2026-10-14T11:37[Europe/Paris]' },
+        { id: 'recent', start: '2026-10-14T11:00[Europe/Paris]', end: '2026-10-14T11:38[Europe/Paris]' },
+        { id: 'day', start: '2026-10-13', end: '2026-10-14' },
+        { id: 'running', start: '2026-10-10T10:00[Europe/Paris]', ongoing: true },
+        { id: 'weekly', start: '2026-10-01T10:00[Europe/Paris]', duration: { hours: 1 }, rrule: 'FREQ=WEEKLY;COUNT=2' },
+      ],
+    });
+    // Seven days before 11:37 on the 21st, in Paris: 11:37 on the 14th. 'edge' ends exactly then: it goes.
+    const went = k.forgetBefore(Temporal.Instant.from('2026-10-14T09:37:00Z'));
+    const left = ['old', 'edge', 'recent', 'day', 'running'].filter((id) => k.store.snapshot.getEvent(id) !== undefined);
+    expect([went, left, k.store.snapshot.getSeries('weekly') !== undefined, k.history.canUndo]).toEqual([3, ['recent', 'running'], true, false]);
+  });
+});

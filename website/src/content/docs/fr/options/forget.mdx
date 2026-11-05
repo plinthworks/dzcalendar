@@ -1,0 +1,103 @@
+---
+title: forget
+description: "Oublier les événements finis depuis longtemps : un écran ouvert des semaines."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import OptionFacts from '../../../../components/OptionFacts.astro';
+
+Laisse le calendrier oublier ce qui est vieux, pour qu'un écran laissé ouvert — une supervision, un écran mural — ne grossisse pas sans fin.
+
+<OptionFacts name="forget" />
+
+## Ce qu'elle fait
+
+Chaque minute, les événements finis depuis plus de `olderThan` quittent le
+calendrier — quelle que soit leur source, l'option `events` comprise. Ce n'est
+pas un changement fait par une personne : rien à annuler, pas
+d'`onEventChange`. Un événement encore en cours (`ongoing`) reste, de même
+qu'une série (ses occurrences viennent de sa règle). `olderThan` s'écrit en
+jours, heures et minutes (`{ days: 7 }`, `'PT12H'`) ; des mois, des semaines,
+ou rien, lèvent une `RangeError`. `null` garde tout. Une source qui livre à
+nouveau un événement oublié le fait revenir, comme tout événement qu'elle
+envoie.
+
+## Exemple
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineDay',
+  resources: [{ id: 'import', title: 'Import' }],
+  timeline: { span: { hours: 4 }, follow: true },
+  // A week of history on screen, no more.
+  forget: { olderThan: { days: 7 } },
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-supervision',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineDay" [resources]="processes" [options]="options" />`,
+})
+export class Supervision {
+  readonly processes = [{ id: 'import', title: 'Import' }];
+  readonly options = { timeline: { span: { hours: 4 }, follow: true }, forget: { olderThan: { days: 7 } } };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const PROCESSES = [{ id: 'import', title: 'Import' }];
+const WEEK = { olderThan: { days: 7 } };
+
+export function Supervision() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimelineDay" resources={PROCESSES} forget={WEEK} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const processes = [{ id: 'import', title: 'Import' }];
+const options = { timeline: { span: { hours: 4 }, follow: true }, forget: { olderThan: { days: 7 } } };
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineDay" :resources="processes" :options="options" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular et en Vue elle va dans `options` ; en React c'est une prop.
+
+## Voir aussi
+
+- [`events`](../events/) — `ongoing` : un événement encore en cours reste.
+- [`timeline`](../timeline/) — `follow` et `span`, pour un écran qui suit le présent.

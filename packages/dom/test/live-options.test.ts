@@ -140,6 +140,27 @@ describe('from the owner’s side-by-side screenshots', () => {
     expect([capped, [ids.size, cal.element.querySelector('.dz-dg__week .dz-more') !== null, cal.element.querySelector('.dz-dg--grow') !== null]]).toEqual([[true, false], [9, false, true]]);
   });
 
+  it('forget: made with old events, those ended more than olderThan ago go at once; a bad olderThan refused', () => {
+    // Now is 10:00 in Paris on the 21st: a day before is 10:00 on the 20th.
+    const cal = make({
+      forget: { olderThan: { days: 1 } },
+      events: [
+        { id: 'gone', start: '2026-10-20T08:00[Europe/Paris]', end: '2026-10-20T09:59[Europe/Paris]' },
+        { id: 'kept', start: '2026-10-20T08:00[Europe/Paris]', end: '2026-10-20T10:01[Europe/Paris]' },
+      ],
+    });
+    const left = ['gone', 'kept'].filter((id) => cal.kernel.store.snapshot.getEvent(id) !== undefined);
+    const refused = ['P1M', { hours: 0 }, 'soon'].map((olderThan) => {
+      try {
+        cal.update({ forget: { olderThan } as never });
+        return 'taken';
+      } catch (e) {
+        return (e as Error).name;
+      }
+    });
+    expect([left, refused]).toEqual([['kept'], ['RangeError', 'RangeError', 'RangeError']]);
+  });
+
   it('eventStyle solid on the calendar’s element, live; a bad one refused', () => {
     const cal = make({ eventStyle: 'solid' });
     const a = cal.element.dataset['dzEventStyle'];

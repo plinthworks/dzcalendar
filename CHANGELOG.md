@@ -182,6 +182,10 @@
   Vue controllers and `<dz-calendar>`). `timeline.follow` keeps the present
   in view, paused by the person's own move along time, taken up by "Today".
   `playground/supervision.html` shows both.
+- `forget: { olderThan: { days: 7 } }` (owner, 2026-11-05): each minute,
+  the events that ended more than that long ago leave the calendar, whatever
+  their source (`kernel.forgetBefore(at)`, no undo entry); a series and an
+  event still running stay. For a screen left open for weeks.
 - `ongoing: true` on an event (owner, 2026-11-05): still running, drawn from
   its start to now and growing each minute in every view (the kernel moves
   its end: `refreshOngoing()`, no undo entry). Its `end` or `duration` is

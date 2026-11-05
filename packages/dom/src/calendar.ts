@@ -1325,9 +1325,14 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   // paint) — and the now line is just what it also redraws when wanted.
   let timer: ReturnType<typeof setTimeout> | undefined;
   const untilNextMinute = () => 60000 - (kernel.now().epochMilliseconds % 60000);
+  // What is old leaves (`forget`), what still runs grows to now: store changes, the views redraw only those.
+  const ageing = () => {
+    const f = settings.current.forget;
+    if (f) kernel.forgetBefore(kernel.now().subtract(Temporal.Duration.from(f.olderThan).round({ largestUnit: 'hours' })));
+    kernel.refreshOngoing();
+  };
   const tick = () => {
-    // The events still running grow to now (a store change: the views redraw them, nothing else).
-    if (root.isConnected) kernel.refreshOngoing();
+    if (root.isConnected) ageing();
     if (root.isConnected && !kernel.refreshToday() && nowOn) {
       view?.tick(kernel.now(), kernel.getState());
       ctx.motion.nowTick?.([...root.querySelectorAll<HTMLElement>('.dz-now')]);
@@ -1342,12 +1347,14 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   };
   scope.on(doc, 'visibilitychange', () => {
     if (doc.hidden) return clearTimeout(timer);
-    kernel.refreshOngoing();
+    ageing();
     if (!kernel.refreshToday() && nowOn) view?.tick(kernel.now(), kernel.getState());
     view?.follow?.(kernel.now(), false);
     startTicking();
   });
   scope.add(() => clearTimeout(timer));
+  // Made with old events and `forget`, or events already running: aged at once, not a minute later.
+  ageing();
   startTicking();
 
   /** Everything mounted, synchronously; the returned function restores the windowing. */
