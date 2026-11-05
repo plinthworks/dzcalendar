@@ -48,7 +48,7 @@ write('package.json', JSON.stringify({
   dependencies: {
     '@angular/common': angular, '@angular/compiler': angular, '@angular/core': angular, '@angular/platform-browser': angular,
     '@dzcalendar/angular': tgz('angular'), '@dzcalendar/core': tgz('core'), '@dzcalendar/dom': tgz('dom'), '@dzcalendar/rrule': tgz('rrule'),
-    '@dzcalendar/ical': tgz('ical'), '@dzcalendar/slots': tgz('slots'), '@dzcalendar/pro': tgz('pro'), '@dzcalendar/pro-angular': tgz('pro-angular'), '@tzslot/dom': '^2.2.0', '@dzcalendar/theme': tgz('theme'), rxjs: '~7.8.0', tslib: '^2.6.0',
+    '@dzcalendar/ical': tgz('ical'), '@dzcalendar/slots': tgz('slots'), '@dzcalendar/pro': tgz('pro'), '@dzcalendar/pro-angular': tgz('pro-angular'), '@tzslot/dom': '^2.2.0', '@dzcalendar/theme': tgz('theme'), '@dzcalendar/motion-gsap': tgz('motion-gsap'), gsap: '^3.13.0', rxjs: '~7.8.0', tslib: '^2.6.0',
   },
   devDependencies: { '@angular/build': angular, '@angular/cli': angular, '@angular/compiler-cli': angular, typescript },
 }, null, 2));
@@ -61,7 +61,7 @@ write('tsconfig.json', JSON.stringify({
   compilerOptions: { target: 'ES2022', module: 'ES2022', moduleResolution: 'bundler', lib: ['ES2022', 'DOM'], strict: true, skipLibCheck: false, useDefineForClassFields: false },
   angularCompilerOptions: { strictTemplates: true }, files: ['src/main.ts'],
 }, null, 2));
-write('src/index.html', '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>smoke</title></head><body><app-root></app-root></body></html>\n');
+write('src/index.html', '<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>smoke</title></head><body><app-root></app-root><app-supervision></app-supervision></body></html>\n');
 // Every entry a consumer imports, used in a template with strict checking.
 write('src/main.ts', `import * as ng from '@angular/core';
 import { Component, signal } from '@angular/core';
@@ -81,6 +81,10 @@ import { findSlots as findSeats } from '@dzcalendar/pro/slots';
 import { exportXLSX } from '@dzcalendar/pro/export';
 import { printPages } from '@dzcalendar/pro/print';
 import { DzEventEditor } from '@dzcalendar/pro-angular';
+import { liveSource, sseSource } from '@dzcalendar/core/live';
+import type { LiveMessage } from '@dzcalendar/core/live';
+import { createGsapMotion } from '@dzcalendar/motion-gsap';
+import { provideDzMotion, DZ_CALENDAR_DEFAULTS } from '@dzcalendar/angular';
 import { Temporal } from '@dzcalendar/core';
 import type { EventInput, PlainDate, Selection } from '@dzcalendar/core';
 
@@ -107,9 +111,49 @@ class App {
   readonly options: DzCalendarOptions = { headerToolbar: { start: 'prev,next today', center: 'title', end: 'filter reload listWeek,agenda,multiMonthYear,resourceTimelineDay' }, customButtons: { reload: { text: 'Recharger', click: () => undefined } }, weekNumbers: true, resources: [{ id: 'r', title: 'Salle' }], viewOptions: { timeline: { areaColumns: [{ field: 'title' }] } } };
 }
 
+// Supervision (owner, 2026-11-05): every option of the batch through Angular — the view in the component's defaults,
+// the timeline's span/step/follow/ticks, nowRefresh, forget and onFollowChange in [options], running events and
+// markers in [events], a live source in [sources], shift on the controller, the GSAP motion provided once.
+@Component({
+  selector: 'app-supervision',
+  standalone: true,
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { timeZone: 'Europe/Paris', views: { supervision: { family: 'timeline', resources: true, duration: { days: 3 } } } } }, provideDzMotion(() => createGsapMotion())],
+  template: \`
+    @if (!following()) { <button (click)="cal.controller.today()">Back to live</button> }
+    <button (click)="cal.controller.shift({ minutes: -45 })">−45 min</button>
+    <dz-calendar #cal view="supervision" scheme="light" [resources]="processes" [events]="events" [sources]="sources" [options]="options">
+      <ng-template dzEventContent let-event let-ctx="ctx">
+        @if (ctx.background) { <span>{{ event.title }}</span> } @else { <b>{{ event.title }}</b> {{ ctx.timeText }} }
+      </ng-template>
+      <ng-template dzResource let-ctx><b>{{ ctx.resource.title }}</b> {{ ctx.resource.extendedProps['last'] }}</ng-template>
+    </dz-calendar>\`,
+})
+class Supervision {
+  readonly following = signal(true);
+  readonly processes = [{ id: 'import', title: 'Import', extendedProps: { last: 'ok' } }];
+  readonly events: readonly EventInput[] = [
+    { id: 'run', title: 'Import', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 40 }, resourceId: 'import', ongoing: true, tone: 'blue' },
+    { id: 'alert', title: 'Disk 95 %', start: '2026-10-21T09:20:41[Europe/Paris]', resourceId: 'import', display: 'marker', tone: 'amber' },
+    { id: 'maint', title: 'Maintenance', start: '2026-10-21T10:00[Europe/Paris]', duration: { hours: 2 }, resourceId: 'import', display: 'background' },
+  ];
+  readonly sources = [
+    sseSource('runs', '/api/runs/stream', { map: (m) => ({ create: m as EventInput }) as LiveMessage }),
+    liveSource('ws', { connect: () => () => undefined }),
+  ];
+  readonly options: DzCalendarOptions = {
+    timeline: { slot: 15, span: { hours: 1 }, step: { minutes: 15 }, follow: { before: { minutes: 5 } }, ticks: { every: 1, label: 5 }, maxLanes: 2 },
+    nowRefresh: { seconds: 5 },
+    forget: { olderThan: { days: 7 } },
+    onFollowChange: (f: boolean) => this.following.set(f),
+  };
+}
+void Supervision;
+
 // Angular 19 names it experimental; 20.2 and later, stable.
 const zoneless = ((ng as Record<string, unknown>)['provideZonelessChangeDetection'] ?? (ng as Record<string, unknown>)['provideExperimentalZonelessChangeDetection']) as () => ng.EnvironmentProviders;
 bootstrapApplication(App, { providers: [zoneless(), provideDzCalendar({ timeZone: 'Europe/Paris', locale: 'fr-FR', views: { agenda } })] });
+bootstrapApplication(Supervision, { providers: [zoneless(), provideDzCalendar({ locale: 'fr-FR' })] });
 `);
 
 const run = (cmd, args) => execFileSync(cmd, args, { cwd: app, stdio: 'inherit' });

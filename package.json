@@ -23,7 +23,11 @@
     "check:entries": "node scripts/check-entries.mjs",
     "gen:options": "node scripts/gen-options.mjs",
     "docs:examples": "node scripts/docs-examples.mjs",
-    "docs:check": "node scripts/gen-options.mjs --check && node scripts/docs-examples.mjs"
+    "docs:check": "node scripts/gen-options.mjs --check && node scripts/docs-examples.mjs",
+    "version:set": "node scripts/set-version.mjs",
+    "publish:dry": "node scripts/publish.mjs --dry-run",
+    "publish:latest": "node scripts/publish.mjs",
+    "publish:verify": "node scripts/publish.mjs --verify-only"
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^2.8.1",

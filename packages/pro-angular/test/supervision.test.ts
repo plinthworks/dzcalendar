@@ -5,6 +5,8 @@ import type { EventInput, ResourceInput } from '@dzcalendar/core';
 import { CalendarController, DZ_CALENDAR, DZ_CALENDAR_DEFAULTS, provideDzCalendar } from '@dzcalendar/angular';
 import type { DzCalendarOptions } from '@dzcalendar/angular';
 import '@dzcalendar/pro';
+import { liveSource } from '@dzcalendar/core/live';
+import type { LiveMessage } from '@dzcalendar/core/live';
 
 // Supervision in Angular (owner, 2026-11-04): the timeline's settings through [options], live; the cards by kind through
 // dzEventContent — a run says how it went, a maintenance window (a background) its name.
@@ -66,5 +68,61 @@ describe('@dzcalendar/pro-angular: a supervision timeline', () => {
       (() => { try { return ctl.shift({ days: 1 }); } catch (e) { return (e as Error).name; } })(),
       typeof ctl.shift({ minutes: 15 }),
     ]).toEqual(['Import des commandes | failed', true, 'Maintenance', null, 'PT4H', 'PT1H', 'RangeError', 'boolean']);
+  });
+});
+
+// Every option of the supervision batch through Angular, read back from the calendar it made (owner, 2026-11-05:
+// "tout est accessible via des options Angular" — checked before the first release).
+@Component({
+  standalone: true,
+  imports: [DZ_CALENDAR],
+  providers: [{ provide: DZ_CALENDAR_DEFAULTS, useValue: { now, views: { supervision: { family: 'timeline', resources: true, duration: { days: 3 } } } } }],
+  template: `<dz-calendar view="supervision" [date]="date" timeZone="Europe/Paris" scheme="light" [resources]="processes" [events]="events" [sources]="sources" [options]="options" />`,
+})
+class Everything {
+  readonly date = Temporal.PlainDate.from('2026-10-21');
+  readonly processes: ResourceInput[] = [{ id: 'import', title: 'Import' }];
+  readonly said: boolean[] = [];
+  emit: (m: LiveMessage) => void = () => undefined;
+  readonly events: EventInput[] = [
+    { id: 'run', title: 'Import', start: '2026-10-21T11:00[Europe/Paris]', duration: { minutes: 20 }, resourceId: 'import', ongoing: true },
+    { id: 'alert', title: 'Disque', start: '2026-10-21T11:20:41[Europe/Paris]', resourceId: 'import', display: 'marker' },
+  ];
+  readonly sources = [liveSource('feed', { connect: (e) => ((this.emit = e), () => undefined) })];
+  readonly options: DzCalendarOptions = {
+    timeline: { slot: 15, span: { hours: 1 }, step: { minutes: 15 }, follow: { before: { minutes: 5 } }, ticks: { every: 1, label: 5 }, maxLanes: 4 },
+    nowRefresh: { seconds: 5 },
+    forget: { olderThan: { days: 7 } },
+    onFollowChange: (f: boolean) => void this.said.push(f),
+  };
+}
+
+describe('@dzcalendar/pro-angular: every supervision option through Angular', () => {
+  it('timeline span/step/follow before/ticks, nowRefresh, forget, onFollowChange, scheme, running events, markers, a live source', async () => {
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideDzCalendar({ now })] });
+    const f = TestBed.createComponent(Everything);
+    await f.whenStable();
+    const el = f.nativeElement as HTMLElement;
+    const ctl = f.debugElement.children[0]!.injector.get(CalendarController);
+    const k = ctl.instance()!.kernel;
+    f.componentInstance.emit({ create: { id: 'live-1', title: 'Billing', start: '2026-10-21T11:30[Europe/Paris]', resourceId: 'import', ongoing: true } });
+    await k.sources.idle();
+    await f.whenStable();
+    const t = k.getOptions().timeline!;
+    expect([
+      String(t.span),
+      String(t.step),
+      JSON.stringify(t.follow),
+      JSON.stringify(t.ticks),
+      el.querySelector('.dz-cal')?.getAttribute('data-dz-scheme'),
+      k.store.snapshot.getEvent('run')?.allDay === false && (k.store.snapshot.getEvent('run') as { ongoing?: boolean }).ongoing,
+      el.querySelector('.dz-tl__ev[data-marker]') !== null,
+      el.querySelector('.dz-tl__ev[data-ongoing]') !== null,
+      k.store.snapshot.getEvent('live-1')?.sourceId,
+      el.querySelectorAll('.dz-tl__tick').length > 0,
+    ]).toEqual(['PT1H', 'PT15M', '{"before":"PT5M"}', '{"every":1,"label":5}', 'light', true, true, true, 'feed', true]);
+    // nowRefresh and forget are live settings: refused through [options] when wrong, as anywhere.
+    expect(() => ctl.instance()!.update({ nowRefresh: { hours: 2 } })).toThrow('nowRefresh');
+    expect(() => ctl.instance()!.update({ forget: { olderThan: 'P1M' } })).toThrow('forget');
   });
 });
