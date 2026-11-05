@@ -66,10 +66,17 @@ export interface ModelOptions {
     readonly step?: DurationLike | undefined;
     /**
      * Keeps the present in view as time passes (supervision): paused as soon as the person scrolls or
-     * slides into the past or future, resumed by "Today". Default false.
+     * slides into the past or future, resumed by "Today". `true`: the present's slot at the left edge, a step on
+     * at each new slot. `{ before: { minutes: 5 } }`: the present that far from the left edge, the axis gliding
+     * each minute. Default false.
      * @default false
      */
-    readonly follow?: boolean | undefined;
+    readonly follow?: boolean | { readonly before?: DurationLike } | undefined;
+    /**
+     * Minutes between small ticks inside each slot (`5` in quarters of an hour: 10:05, 10:10), their time
+     * written smaller (`--dz-tl-tick-font`). Drawn when they divide the slot.
+     */
+    readonly ticks?: number | undefined;
     /**
      * The time shown at once (`{ hours: 4 }`): a slot's width is the room shared by that many slots, measured again
      * when the calendar's size changes. Days, hours and minutes; longer than the period, the period fits. A change keeps
@@ -387,7 +394,11 @@ export function assertTimeline(t: NonNullable<ModelOptions['timeline']>): void {
   }
   if (t.step !== undefined) timeStep(t.step);
   if (t.span !== undefined) timeSpan(t.span);
-  if (t.follow !== undefined && typeof t.follow !== 'boolean') throw new RangeError(`timeline.follow is true or false: ${String(t.follow)}`);
+  if (t.follow !== undefined && typeof t.follow !== 'boolean') {
+    if (typeof t.follow !== 'object' || t.follow === null) throw new RangeError(`timeline.follow is true, false or { before }: ${String(t.follow)}`);
+    followBefore(t.follow);
+  }
+  if (t.ticks !== undefined && !(Number.isInteger(t.ticks) && t.ticks >= 1 && 1440 % t.ticks === 0)) throw new RangeError(`timeline.ticks must be whole minutes dividing a day (1, 5, 10…): ${String(t.ticks)}`);
 }
 
 /** The step kept as its ISO text: the same step given again (a framework's new object each render) changes nothing. */
@@ -396,6 +407,7 @@ const stepAsText = <T extends NonNullable<ModelOptions['timeline']>>(t: T): T =>
   ...t,
   ...(t.step !== undefined && { step: Temporal.Duration.from(t.step).toString() }),
   ...(t.span !== undefined && { span: Temporal.Duration.from(t.span).toString() }),
+  ...(t.follow !== undefined && typeof t.follow === 'object' && t.follow !== null && { follow: { before: Temporal.Duration.from(t.follow.before ?? { minutes: 0 }).toString() } }),
 });
 
 /** A timeline's step in milliseconds: hours, minutes, seconds, longer than nothing (a day or more is a view's `dateIncrement`). */
@@ -410,6 +422,19 @@ export function timeStep(d: DurationLike): number {
   const ms = dur.total({ unit: 'milliseconds' });
   if (!(ms > 0)) throw new RangeError(`timeline.step must be longer than nothing: ${dur.toString()}`);
   return ms;
+}
+
+/** How far from the left edge a followed present stands (`follow: { before }`), in milliseconds; null: its slot at the edge. */
+export function followBefore(f: NonNullable<NonNullable<ModelOptions['timeline']>['follow']>): number | null {
+  if (typeof f !== 'object') return null;
+  let d: Duration;
+  try {
+    d = Temporal.Duration.from(f.before ?? { minutes: 0 });
+  } catch {
+    throw new RangeError(`timeline.follow.before is not a duration: ${String(f.before)}`);
+  }
+  if (d.sign < 0 || d.years || d.months || d.weeks || d.days) throw new RangeError(`timeline.follow.before is hours and minutes, not negative: ${d.toString()}`);
+  return d.total({ unit: 'milliseconds' });
 }
 
 /** A timeline's span in milliseconds: days (of 24 hours), hours, minutes, longer than nothing. */
@@ -827,8 +852,10 @@ export function createKernel(o: KernelOptions): CalendarKernel {
       if (next.timeGrid) assertTimeGrid({ ...options.timeGrid, ...next.timeGrid });
       if (next.timeline) assertTimeline(next.timeline);
       // Equal values (per key, one level deep) change nothing and say nothing.
+      // A member that is itself an object made as text (`timeline.follow: { before: 'PT5M' }`): compared by its text.
+      const sameMember = (x: unknown, y: unknown) => x === y || (typeof x === 'object' && typeof y === 'object' && x !== null && y !== null && !Array.isArray(y) && JSON.stringify(x) === JSON.stringify(y));
       const same = (a: object | undefined, b: object | undefined) =>
-        a === b || (a !== undefined && b !== undefined && Object.entries(b).every(([k, v]) => (a as Record<string, unknown>)[k] === v));
+        a === b || (a !== undefined && b !== undefined && Object.entries(b).every(([k, v]) => sameMember((a as Record<string, unknown>)[k], v)));
       if (
         (!next.timeGrid || same(options.timeGrid, next.timeGrid)) &&
         (!next.dayGrid || same(options.dayGrid, next.dayGrid)) &&

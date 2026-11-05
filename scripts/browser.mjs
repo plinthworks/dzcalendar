@@ -1719,7 +1719,7 @@ try {
     }
     // ── The timeline's step and following the present (supervision: three days of processes, 15-minute slots) ──
     {
-      const { p, errors } = await page('/supervision.html?now=2026-10-21T09:30:00Z&span=');
+      const { p, errors } = await page('/supervision.html?now=2026-10-21T09:30:00Z&span=&follow=slot');
       await p.waitForSelector('.dz-tl__now');
       await p.waitForTimeout(300);
       // Where the scroller's left edge is (minutes from the axis start) and where the now line sits in the time shown (0 to 1).
@@ -1796,7 +1796,7 @@ try {
       check('step: no console error', errors.length === 0, errors.join('\n'));
       await p.close();
       // With the motion on (GSAP's eased scroll): "Today" from another period lands on the present and keeps following.
-      const moving = await page('/supervision.html?now=2026-10-21T09:30:00Z&span=', { reducedMotion: 'no-preference' });
+      const moving = await page('/supervision.html?now=2026-10-21T09:30:00Z&span=&follow=slot', { reducedMotion: 'no-preference' });
       await moving.p.waitForSelector('.dz-tl__now');
       await moving.p.selectOption('#step', '');
       await moving.p.click('.dz-toolbar__next');
@@ -1819,7 +1819,7 @@ try {
 
     // ── timeline.span: the time shown at once, whatever the room; a change keeps the centre (the present while following) ──
     {
-      const { p, errors } = await page('/supervision.html?now=2026-10-21T09:37:00Z&span=PT4H');
+      const { p, errors } = await page('/supervision.html?now=2026-10-21T09:37:00Z&span=PT4H&follow=slot');
       await p.waitForSelector('.dz-tl__now');
       await p.waitForTimeout(300);
       // The time shown (minutes), the minute at its centre, where the now line sits in it (0 to 1).
@@ -1899,6 +1899,37 @@ try {
       check('ongoing: a run with no expected end reaches the now line, its end open (dashed)', running !== null && Math.abs(running.end - running.now) <= 3 && running.dashed === 'dashed', JSON.stringify(running));
       check('marker: a line across its row, a flag with its title beside it', marker !== null && Math.abs(marker.line - marker.row) <= 2 && marker.flag > 40 && marker.text.includes('⚠'), JSON.stringify(marker));
       check('span: no console error', errors.length === 0, errors.join('\n'));
+      await p.close();
+    }
+
+    // ── follow: { before } and ticks: the present 5 minutes from the left edge; a small tick every 5 minutes ──
+    {
+      const { p, errors } = await page('/supervision.html?now=2026-10-21T09:37:30Z&span=PT1H');
+      await p.waitForSelector('.dz-tl__now');
+      await p.waitForTimeout(400);
+      const seen = await p.evaluate(() => {
+        const sc = document.querySelector('.dz-tl__scroller');
+        const area = document.querySelector('.dz-tl__corner').getBoundingClientRect().width;
+        const box = sc.getBoundingClientRect();
+        const now = document.querySelector('.dz-tl__now').getBoundingClientRect();
+        const ticks = [...document.querySelectorAll('.dz-tl__tick')].filter((t) => { const r = t.getBoundingClientRect(); return r.left >= box.left + area && r.right <= box.right; });
+        return { past: Math.round(((now.left - box.left - area) / (box.width - area)) * 60 * 10) / 10, ticks: ticks.map((t) => t.textContent), font: ticks[0] ? getComputedStyle(ticks[0]).fontFamily : '', slot: getComputedStyle(document.querySelector('.dz-tl__slot span')).fontFamily };
+      });
+      // 09:37:30Z is 11:37:30 in Paris: the left edge at 11:32:30, an hour shown — ticks at 11:35, 11:40, 11:50, 11:55, 12:05… (not the quarters).
+      check('follow before: the present 5 minutes from the left edge', Math.abs(seen.past - 5) < 0.3, JSON.stringify(seen));
+      check('ticks: every 5 minutes between the quarters, in a font of their own', seen.ticks.slice(0, 4).join() === '11:35,11:40,11:50,11:55' && seen.font !== seen.slot, JSON.stringify(seen));
+      // Another margin, live: placed at once (not at the next minute).
+      await p.evaluate(() => window.__cal.update({ timeline: { follow: { before: { minutes: 10 } } } }));
+      await p.waitForTimeout(400);
+      const ten = await p.evaluate(() => {
+        const sc = document.querySelector('.dz-tl__scroller');
+        const area = document.querySelector('.dz-tl__corner').getBoundingClientRect().width;
+        const box = sc.getBoundingClientRect();
+        const now = document.querySelector('.dz-tl__now').getBoundingClientRect();
+        return Math.round(((now.left - box.left - area) / (box.width - area)) * 60 * 10) / 10;
+      });
+      check('follow before: 10 minutes asked by update(), the present placed there at once', Math.abs(ten - 10) < 0.3, String(ten));
+      check('follow before: no console error', errors.length === 0, errors.join('\n'));
       await p.close();
     }
 

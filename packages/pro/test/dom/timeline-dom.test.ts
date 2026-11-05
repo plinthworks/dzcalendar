@@ -314,7 +314,11 @@ describe('the timeline’s step and following the present', () => {
       [{ step: { hours: 1, days: 1 } }, 'a day or more'],
       [{ step: { minutes: 0 } }, 'longer than nothing'],
       [{ step: 'soon' }, 'not a duration'],
-      [{ follow: 'yes' }, 'true or false'],
+      [{ follow: 'yes' }, 'true, false or { before }'],
+      [{ follow: { before: { minutes: -5 } } }, 'not negative'],
+      [{ follow: { before: { days: 1 } } }, 'hours and minutes'],
+      [{ ticks: 7 }, 'dividing a day'],
+      [{ ticks: 0 }, 'dividing a day'],
     ] as const) {
       expect(() => mount([], { timeline: bad })).toThrow(said);
       document.body.innerHTML = '';
@@ -356,6 +360,25 @@ describe('the timeline’s step and following the present', () => {
     cal!.update({ timeline: { step: { hours: 1 } } });
     expect(states).toBe(1);
     off();
+  });
+
+  it('follow { before } given again (a new object, a framework’s next render) changes nothing; ticks are drawn in the head when they divide the slot', () => {
+    const host = mount([], { timeline: { follow: { before: { minutes: 5 } }, slot: 15, ticks: 5 } });
+    let states = 0;
+    const off = cal!.kernel.subscribe((e) => void (e.type === 'state' && states++));
+    cal!.update({ timeline: { follow: { before: { minutes: 5 } } } });
+    cal!.update({ timeline: { follow: { before: 'PT5M' } } });
+    off();
+    const ticks = [...host.querySelectorAll('.dz-tl__slot')].find((x) => x.textContent?.startsWith('10:00'))?.querySelectorAll('.dz-tl__tick');
+    expect([states, [...(ticks ?? [])].map((t) => t.textContent), host.querySelectorAll('.dz-tl__line--minor').length > 0]).toEqual([0, ['10:05', '10:10'], true]);
+  });
+
+  it('ticks across a clock change: at Lord Howe on 4 October 2026 (02:00 → 02:30), the 01:00 slot lasts 90 minutes — its half-hour ticks at 01:30 and 02:30', () => {
+    const host = mount([], { timeZone: 'Australia/Lord_Howe', initialView: 'timelineDay', initialDate: Temporal.PlainDate.from('2026-10-04'), timeline: { slot: 60, ticks: 30 } });
+    const slot = [...host.querySelectorAll('.dz-tl__slot')].find((x) => x.firstElementChild?.textContent === '01:00');
+    const ticks = [...(slot?.querySelectorAll<HTMLElement>('.dz-tl__tick') ?? [])].map((t) => `${t.textContent}@${t.style.getPropertyValue('--t').slice(0, 5)}`);
+    // 30 and 60 real minutes into a slot of 90: a third and two thirds along it.
+    expect(ticks).toEqual(['01:30@0.333', '02:30@0.666']);
   });
 
   it('onFollowChange says each change of following, once the drawing is done — not the option as first read', async () => {

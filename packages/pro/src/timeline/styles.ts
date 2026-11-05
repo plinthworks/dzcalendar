@@ -40,6 +40,14 @@ export const TIMELINE_CSS = `
 .dz-tl__lines { position: absolute; top: 0; bottom: 0; inset-inline-start: var(--dz-tl-area, 0px); width: calc(var(--dz-tl-len, 0) * var(--dz-tl-slot)); pointer-events: none; }
 .dz-tl__line { position: absolute; top: 0; bottom: 0; inset-inline-start: calc(var(--x) * var(--dz-tl-slot)); border-inline-start: 1px solid var(--dz-tl-line); }
 .dz-tl__line--major { border-inline-start-color: var(--dz-border, var(--dzc-border)); }
+/* timeline.ticks: a fine line every 5 minutes in the grid, a short mark and its time in the head — smaller, lighter. */
+.dz-tl__line--minor { border-inline-start-style: dotted; opacity: 0.55; }
+.dz-tl__tick {
+  position: absolute; bottom: 0; inset-inline-start: calc(var(--t) * 100%); padding-inline-start: 0.1875rem; height: 0.875rem;
+  border-inline-start: 1px solid var(--dz-tl-line); white-space: nowrap; line-height: 1;
+  font: var(--dz-tl-tick-font, 400 0.5625rem/1 ui-monospace, SFMono-Regular, Menlo, monospace); font-variant-numeric: tabular-nums;
+  color: var(--dz-fg-muted, var(--dzc-fg-muted)); opacity: 0.8;
+}
 .dz-tl__row {
   position: absolute; inset-inline-start: 0; top: calc(var(--y, 0) * 1px); width: 100%; display: flex; box-sizing: border-box;
   height: var(--dz-tl-row, calc(var(--dz-tl-lanes, 3) * var(--dz-tl-lane) + 8px));

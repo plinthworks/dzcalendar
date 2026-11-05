@@ -14,7 +14,7 @@ The scale and the lanes of the Pro's timeline views (`import '@dzcalendar/pro'`)
 ## What it does
 
 The timeline draws time across, a row per resource (`resourceTimelineDay`,
-`…Week`, `…Month`, `…Year`) or one row for all (`timelineDay`…). Six
+`…Week`, `…Month`, `…Year`) or one row for all (`timelineDay`…). Seven
 settings, merged key by key with `update({ timeline })` — `slot: undefined`
 goes back to the default:
 
@@ -27,6 +27,7 @@ goes back to the default:
   instead of changing period.
 - `follow`: the timeline keeps the present in view as time passes.
 - `span`: the time shown at once (`{ hours: 4 }`), whatever the room.
+- `ticks`: a small tick every so many minutes inside each slot.
 
 A slot that is a whole number of minutes must divide a day, and the lanes
 are whole numbers of 1 or more; a step is hours and minutes, longer than
@@ -50,6 +51,8 @@ Lanes of a timeline without resources, before it is measured: in a browser its o
 
 The present stays in view, its slot at the left edge (at 22:47 in quarters of an hour, 22:45), what comes after it shown; the timeline moves on when the next slot begins; past the end of the period (midnight on a day's timeline) the next one comes in. It pauses as soon as the person moves along time — a scroll, a slide, another period — and "Today" (`navigate('today')`) takes it up again. Made for supervision: a timeline that shows what is running now.
 
+Give it `{ before: { minutes: 5 } }` and the present stays that far from the left edge instead — a little of what just happened in view — the axis gliding each minute: the motion adapter's eased scroll (GSAP with `@dzcalendar/motion-gsap`), else the browser's smooth one, at once under reduced motion. The glide is the view's own: it does not pause following.
+
 ### `maxLanes`
 
 <OptionFacts name="timeline.maxLanes" />
@@ -67,6 +70,12 @@ Minutes per slot (a divisor of a day: 15, 30, 60, 120…) or `'day'`. By default
 <OptionFacts name="timeline.step" />
 
 Hours and minutes (`{ minutes: 15 }`, `{ hours: 1 }`, `'PT30M'`). With it, ◀ ▶ and `navigate('prev' | 'next')` scroll the timeline by that much; at the end of the axis the next or previous period comes in, where the slide was going. A view of one day stops at midnight on the way; a view of several days (`views: { supervision: { family: 'timeline', duration: { days: 3 } } }`) slides across it. `calendar.shift({ minutes: -45 })` slides by any other number of hours and minutes (a day or more, or nothing, throws a `RangeError`, as the option does). A day or more is a view's `dateIncrement`, not a step.
+
+### `ticks`
+
+<OptionFacts name="timeline.ticks" />
+
+Minutes between small ticks inside each slot: `5` in quarters of an hour draws 10:05 and 10:10 between 10:00 and 10:15 — a short mark and its time in the head, written smaller in a monospace font (`--dz-tl-tick-font`), and a fine dotted line through the rows. Drawn when it divides the slot and is shorter than it; whole minutes dividing a day, else a `RangeError`.
 
 ### `span`
 

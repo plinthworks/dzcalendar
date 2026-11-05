@@ -93,6 +93,8 @@ interface Summary {
   readonly failures: number;
   readonly running: boolean;
 }
+// `?follow=slot` (the browser checks): the present's slot at the left edge; else the present 5 minutes in, gliding.
+const FOLLOW = new URLSearchParams(location.search).get('follow') === 'slot' ? true : { before: { minutes: 5 } };
 const stepOf = () => document.querySelector<HTMLSelectElement>('#step')!.value || undefined;
 // `?span=` (the browser checks): another time shown at first, empty for the whole period.
 const spanAsked = new URLSearchParams(location.search).get('span');
@@ -111,7 +113,8 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   headerViews: [],
   resources: processes,
   events: history,
-  timeline: { slot: slotOf(spanOf()), span: spanOf(), step: stepOf(), follow: true, maxLanes: 2 },
+  // The present 5 minutes from the left edge, the axis gliding each minute; a small tick every 5 minutes.
+  timeline: { slot: slotOf(spanOf()), span: spanOf(), step: stepOf(), follow: FOLLOW, ticks: 5, maxLanes: 2 },
   // A screen left open: what ended more than two days ago is forgotten.
   forget: { olderThan: { days: 2 } },
   hooks: {
@@ -245,6 +248,6 @@ summarize();
 
 document.querySelector<HTMLSelectElement>('#span')!.addEventListener('change', () => cal.update({ timeline: { span: spanOf(), slot: slotOf(spanOf()) } }));
 document.querySelector<HTMLSelectElement>('#step')!.addEventListener('change', () => cal.update({ timeline: { step: stepOf() } }));
-document.querySelector<HTMLInputElement>('#follow')!.addEventListener('change', (e) => cal.update({ timeline: { follow: (e.target as HTMLInputElement).checked } }));
+document.querySelector<HTMLInputElement>('#follow')!.addEventListener('change', (e) => cal.update({ timeline: { follow: (e.target as HTMLInputElement).checked ? FOLLOW : false } }));
 document.querySelector<HTMLButtonElement>('#back45')!.addEventListener('click', () => cal.shift({ minutes: -45 }));
 (window as unknown as { __cal: typeof cal }).__cal = cal;

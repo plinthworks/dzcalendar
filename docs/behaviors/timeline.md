@@ -36,6 +36,14 @@ keeps the area and the heads in place.
   "Today" takes it up. Each change is said by `onFollowChange(following)`
   (not the option as first read): a "Back to live" button. Made for supervision, where a timeline shows what is
   running now and runs arrive by SSE (`run({ type: 'event.create' })`).
+- `timeline.follow: { before }` (owner 2026-11-05): the present that far
+  from the left edge (5 minutes: a little of what just happened), the axis
+  gliding each minute — the motion adapter's eased scroll, else the
+  browser's smooth one, at once under reduced motion; the glide's scroll
+  events are the view's own (not a pause). `true` keeps the present's slot
+  at the edge.
+- `timeline.ticks` (minutes): a small tick, its time written smaller
+  (`--dz-tl-tick-font`), and a dotted line, inside each slot it divides.
 - `timeline.span` (days, hours and minutes) is the time shown at once: a
   slot's width is the room shared by that many slots (measured again on a
   resize; the period at most, one slot at least), written as `--dz-tl-slot`.

@@ -15,7 +15,7 @@ L'échelle et les couloirs des vues timeline du Pro (`import '@dzcalendar/pro'`)
 
 La timeline dessine le temps en travers, une ligne par ressource
 (`resourceTimelineDay`, `…Week`, `…Month`, `…Year`) ou une seule ligne pour
-tout (`timelineDay`…). Six réglages, fusionnés clé par clé avec
+tout (`timelineDay`…). Sept réglages, fusionnés clé par clé avec
 `update({ timeline })` — `slot: undefined` revient à la valeur par défaut :
 
 - `slot` : la largeur d'un créneau en temps.
@@ -30,6 +30,7 @@ tout (`timelineDay`…). Six réglages, fusionnés clé par clé avec
   temps passe.
 - `span` : le temps visible d'un coup (`{ hours: 4 }`), quelle que soit la
   place.
+- `ticks` : un petit repère toutes les tant de minutes dans chaque créneau.
 
 Un créneau en minutes doit diviser un jour, et les couloirs sont des entiers
 de 1 ou plus ; un pas s'écrit en heures et en minutes, plus long que rien, une étendue en
@@ -54,6 +55,8 @@ Les couloirs d'une timeline sans ressources, avant la mesure : dans un navigateu
 
 L'instant présent reste à l'écran, son créneau au bord gauche (à 22:47 en quarts d'heure, 22:45), ce qui vient ensuite montré ; la timeline avance quand le créneau suivant commence ; passé la fin de la période (minuit sur une timeline d'un jour), la suivante arrive. Le suivi se met en pause dès que la personne se déplace dans le temps — un défilement, un glissement, une autre période — et « Aujourd'hui » (`navigate('today')`) le reprend. Pensé pour la supervision : une timeline qui montre ce qui tourne maintenant.
 
+Avec `{ before: { minutes: 5 } }`, le présent reste plutôt à cette distance du bord gauche — un peu de ce qui vient de se passer à l'écran — et l'axe glisse chaque minute : le défilement adouci de l'adaptateur d'animation (GSAP avec `@dzcalendar/motion-gsap`), sinon celui du navigateur, d'un coup quand les animations sont réduites. Ce glissement est celui de la vue : il ne met pas le suivi en pause.
+
 ### `maxLanes`
 
 <OptionFacts name="timeline.maxLanes" />
@@ -71,6 +74,12 @@ Des minutes par créneau (un diviseur du jour : 15, 30, 60, 120…) ou `'day'`. 
 <OptionFacts name="timeline.step" />
 
 Des heures et des minutes (`{ minutes: 15 }`, `{ hours: 1 }`, `'PT30M'`). Avec lui, ◀ ▶ et `navigate('prev' | 'next')` font défiler la timeline d'autant ; au bout de l'axe, la période suivante ou précédente arrive, là où allait le glissement. Une vue d'un jour s'arrête à minuit en chemin ; une vue de plusieurs jours (`views: { supervision: { family: 'timeline', duration: { days: 3 } } }`) le traverse. `calendar.shift({ minutes: -45 })` fait glisser de n'importe quel autre nombre d'heures et de minutes (un jour ou plus, ou rien, lève une `RangeError`, comme l'option). Un jour ou plus, c'est le `dateIncrement` d'une vue, pas un pas.
+
+### `ticks`
+
+<OptionFacts name="timeline.ticks" />
+
+Des minutes entre de petits repères dans chaque créneau : `5` en quarts d'heure dessine 10:05 et 10:10 entre 10:00 et 10:15 — un court trait et son heure dans l'en-tête, écrite plus petite dans une police à chasse fixe (`--dz-tl-tick-font`), et une fine ligne pointillée à travers les lignes. Dessinés quand ils divisent le créneau et sont plus courts que lui ; des minutes entières qui divisent un jour, sinon une `RangeError`.
 
 ### `span`
 

@@ -1,4 +1,4 @@
-import { PrefixSums, Temporal, UNASSIGNED, fieldOf, formatTemporal, timeSpan } from '@dzcalendar/core';
+import { PrefixSums, Temporal, UNASSIGNED, fieldOf, followBefore, formatTemporal, timeSpan } from '@dzcalendar/core';
 import type { Hit, Instant, PlainDate, Resource, ZonedDateTime } from '@dzcalendar/core';
 import {
   KeyedList,
@@ -176,11 +176,15 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   };
   /** The option as last read: turned on by `update()`, following starts. */
   let followAsked: boolean | null = null;
+  /** The `follow` option as text, as last drawn. */
+  let followHow = '';
   /** Where a slide that brought in another period lands (epoch ms at the left edge), once it is drawn. */
   let landAt: number | null = null;
   /** The scroll along time as this view last put it, and the room it had: a scroll elsewhere in the same room is the person's. */
   let lastAlong = 0;
   let lastRoom = 0;
+  /** The view's own glide under way (from, to: scroll offsets; until: when it is no longer believed ours). */
+  let glide: { readonly from: number; readonly to: number; readonly until: number } | null = null;
   const room = () => scroller.scrollWidth - scroller.clientWidth;
   /** Right to left: positions run from the right edge, and the scroll offset is negative (Chrome). */
   const rtl = () => root.closest('[dir]')?.getAttribute('dir') === 'rtl';
@@ -298,6 +302,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     readonly to: number;
     readonly text: string;
     readonly label: string;
+    /** `timeline.ticks` inside the slot: where (0 to 1 along it) and the time written there. */
+    readonly ticks?: readonly { readonly at: number; readonly text: string }[];
   }
   const place = (el: HTMLElement, from: number, to: number) => {
     el.style.setProperty('--x', String(from));
@@ -322,7 +328,14 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       // Seen: "02:00*"; said (and on hover): "02:00 (+01:00)" — the offset, not the mark (D.6).
       const seen = h(doc, 'span', '', it.text);
       if (it.label !== it.text) seen.setAttribute('aria-hidden', 'true');
-      el.replaceChildren(seen, ...(it.label !== it.text ? [h(doc, 'span', 'dz-tl__sr', it.label)] : []));
+      // The small ticks (every 5 minutes): seen, not said — the slot's own label says where one is.
+      const ticks = (it.ticks ?? []).map((t) => {
+        const n = h(doc, 'span', 'dz-tl__tick', t.text);
+        n.style.setProperty('--t', String(t.at));
+        n.setAttribute('aria-hidden', 'true');
+        return n;
+      });
+      el.replaceChildren(seen, ...(it.label !== it.text ? [h(doc, 'span', 'dz-tl__sr', it.label)] : []), ...ticks);
       el.title = it.label;
     },
   );
@@ -331,12 +344,14 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     sig: string;
     x: number;
     major: boolean;
+    minor?: boolean;
   }>(
     linesHost,
     () => h(doc, 'div', 'dz-tl__line'),
     (el, it) => {
       el.style.setProperty('--x', String(it.x));
       el.classList.toggle('dz-tl__line--major', it.major);
+      el.classList.toggle('dz-tl__line--minor', it.minor === true);
     },
   );
   /** What a slot is called: its wall time (with `*` and the offset on a repeated one), or its day. */
@@ -389,14 +404,29 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     );
     const dayStarts = new Set(a.groups.map((g) => g.start.epochMilliseconds));
     const items: HeadItem[] = [];
-    const ls: { key: string; sig: string; x: number; major: boolean }[] = [];
+    const ls: { key: string; sig: string; x: number; major: boolean; minor?: boolean }[] = [];
+    // Small ticks: minutes that divide the slot, fewer than it (5 in quarters of an hour).
+    const every = ctx.kernel.getOptions().timeline?.ticks;
+    const per = every !== undefined && a.unit !== 'day' && a.slotMinutes % every === 0 && every < a.slotMinutes ? a.slotMinutes / every : 0;
     a.slots.forEach((s, i) => {
       const from = a.toPosition(s.start);
       const to = a.toPosition(s.end);
       if (to <= x0 || from >= x1) return;
       const t = slotText(m, i);
       const key = String(s.start.epochMilliseconds);
-      items.push({ key, sig: `${from}|${to}|${ctx.epoch}`, from, to, ...t });
+      const ticks: { at: number; text: string }[] = [];
+      // In real time from the slot's start, up to its end: a slot across a clock change (90 minutes at Lord Howe) gets
+      // its ticks where those moments are, each with its wall time.
+      const s0 = s.start.epochMilliseconds;
+      const s1 = s.end.epochMilliseconds;
+      for (let k = 1; per > 0 && s0 + k * every! * 60_000 < s1; k++) {
+        const ms = s0 + k * every! * 60_000;
+        const at = Temporal.Instant.fromEpochMilliseconds(ms);
+        const x = a.toPosition(at);
+        ticks.push({ at: (ms - s0) / (s1 - s0), text: formatTemporal(at.toZonedDateTimeISO(ctx.zone).toPlainTime(), HM, ctx.locale) });
+        ls.push({ key: `${key}+${k}`, sig: `${x}|minor`, x, major: false, minor: true });
+      }
+      items.push({ key, sig: `${from}|${to}|${ctx.epoch}|${per}`, from, to, ...t, ...(ticks.length > 0 && { ticks }) });
       const major = a.unit === 'day' ? s.date.day === 1 : dayStarts.has(s.start.epochMilliseconds);
       ls.push({ key, sig: `${from}|${major}`, x: from, major });
     });
@@ -801,6 +831,12 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   // The person's own move along time (the bar, a finger, a wheel, the keyboard's cursor) pauses following the present.
   ctx.scope.on(scroller, 'scroll', () => {
     const along = scrolledAlong();
+    // The view's own glide going by (following the present): not the person's move.
+    if (glide && along >= Math.min(glide.from, glide.to) - 2 && along <= Math.max(glide.from, glide.to) + 2 && performance.now() < glide.until) {
+      if (Math.abs(along - glide.to) <= 1) glide = null;
+      return;
+    }
+    glide = null;
     // Another room (a resize, wider columns) clamps the scroll by itself: the present placed again, not a pause.
     if (room() !== lastRoom) {
       lastRoom = room();
@@ -1400,7 +1436,11 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         if (!m.options.rows) fillLanes();
       });
       const now = ctx.kernel.now();
-      const asked = ctx.kernel.getOptions().timeline?.follow === true;
+      const asked = followAsks();
+      // Another way of following (`before` 5 → 10 minutes, or `true` ↔ `{ before }`): placed again at once.
+      const how = JSON.stringify(ctx.kernel.getOptions().timeline?.follow ?? false);
+      if (asked && followAsked === true && how !== followHow && following) queueMicrotask(() => keepNow(ctx.kernel.now()));
+      followHow = how;
       // Turned on by `update()`: the present brought into view, once this drawing is done.
       if (asked !== followAsked) {
         if (asked && prev) queueMicrotask(() => keepNow(ctx.kernel.now()));
@@ -1475,10 +1515,11 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     },
 
     follow(now, resume) {
-      const asked = ctx.kernel.getOptions().timeline?.follow === true;
+      const asked = followAsks();
       if (!asked) return void follows(false);
       if (resume) follows(true);
-      keepNow(now);
+      // Each minute: a glide to the next place; taken up again ("Today"): there at once.
+      keepNow(now, !resume);
     },
 
     relayout() {
@@ -1502,11 +1543,46 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   };
 
   /** The present in view while followed; past the period's end (midnight on a day's timeline), the period that holds it, placed when drawn. */
-  function keepNow(now: Instant): void {
+  function keepNow(now: Instant, smooth = false): void {
     const m = model;
     if (!following || !m) return;
     if (timelineNow(m, now) === null) return ctx.kernel.navigate({ to: now.toZonedDateTimeISO(ctx.zone).toPlainDate() });
-    scrollAt(nowSlot(m, now), 0);
+    if (smooth) glideAt(nowSlot(m, now));
+    else scrollAt(nowSlot(m, now), 0);
+  }
+
+  /** `timeline.follow` asks for the present (true, or `{ before }`). */
+  function followAsks(): boolean {
+    const f = ctx.kernel.getOptions().timeline?.follow;
+    return f !== undefined && f !== false;
+  }
+
+  /**
+   * To an instant at the left edge, gliding (the present followed, minute by minute): the motion adapter's eased
+   * scroll (GSAP), else the browser's smooth one; at once under reduced motion. Its scroll events are the view's own.
+   */
+  function glideAt(ms: number): void {
+    const m = model;
+    if (!m) return;
+    ctx.scheduler.schedule({
+      read: () => scaleOf(m, corner.getBoundingClientRect().width),
+      write: (scale) => {
+        if (!model || !sameAxis(model, m) || !(scale > 0) || !Number.isFinite(scale)) return;
+        const to = Math.max(0, Math.min(room(), m.axis.toPosition(ms) * scale));
+        const from = scrolledAlong();
+        if (Math.abs(to - from) < 1) return;
+        lastAlong = to;
+        lastRoom = room();
+        const reduce = doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? true;
+        // A long way (a tab shown again after hours): there at once — a glide is for a minute's step.
+        if (reduce || Math.abs(to - from) > scroller.clientWidth / 2) return void ((glide = null), scrollAlong(to));
+        glide = { from, to, until: performance.now() + 2000 };
+        const left = rtl() ? -to : to;
+        if (ctx.motion.scroll?.(scroller, { top: scroller.scrollTop, left })) return;
+        if (typeof scroller.scrollTo === 'function') scroller.scrollTo({ left, behavior: 'smooth' });
+        else scrollAlong(to);
+      },
+    });
   }
 
   /**
@@ -1514,6 +1590,10 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
    * at 22:47 in quarters of an hour, 22:45 — what comes after it in view; a step on when the next slot begins.
    */
   function nowSlot(m: TimelineModel, now: Instant): number {
+    // `follow: { before }`: the present that far from the left edge, whatever the slot (it glides each minute).
+    const f = ctx.kernel.getOptions().timeline?.follow;
+    const before = f !== undefined && f !== false ? followBefore(f) : null;
+    if (before !== null) return now.epochMilliseconds - before;
     return m.axis.fromPosition(Math.floor(m.axis.toPosition(now))).epochMilliseconds;
   }
 
@@ -1537,6 +1617,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         // still the place asked.
         if (!model || !sameAxis(model, m) || !(scale > 0) || !Number.isFinite(scale)) return;
         then?.();
+        glide = null;
         scrollAlong(Math.max(0, m.axis.toPosition(ms) * scale - frac * shown));
         lastAlong = scrolledAlong();
         lastRoom = room();
@@ -1565,6 +1646,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
           if (!day) return;
           const at = m.axis.unit === 'day' ? (todaySlot?.start ?? m.axis.start) : Temporal.Instant.fromEpochMilliseconds(Math.round(day.start.epochMilliseconds + minutes * 60_000));
           // (now's minutes carry its seconds: a whole number of milliseconds, or the instant is refused)
+          glide = null;
           scrollEased(eased, scroller, () => scrollAlong(Math.max(0, m.axis.toPosition(at) * scale - (m.axis.unit === 'day' ? scale * 2 : 0))));
           lastAlong = scrolledAlong();
           lastRoom = room();

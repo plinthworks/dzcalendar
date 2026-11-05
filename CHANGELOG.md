@@ -188,6 +188,14 @@
 
 ### Added
 
+- `timeline.follow: { before: { minutes: 5 } }` (owner, 2026-11-05): the
+  present stays that far from the left edge, the axis gliding each minute
+  (GSAP's eased scroll with `@dzcalendar/motion-gsap`, else the browser's
+  smooth one; at once under reduced motion) — a glide that does not pause
+  following. `timeline.ticks: 5`: a small tick every 5 minutes inside each
+  slot, its time written smaller in a font of its own (`--dz-tl-tick-font`),
+  a dotted line through the rows. The supervision playground uses both.
+
 - The timeline slides along time and follows the present (supervision:
   processes as rows, runs arriving by SSE as cards). `timeline.step` (hours
   and minutes, `{ minutes: 15 }`) makes ◀ ▶ and `navigate('prev' | 'next')`
