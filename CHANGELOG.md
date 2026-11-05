@@ -195,8 +195,10 @@
   following. `timeline.ticks: 5`: a small tick every 5 minutes inside each
   slot, its time written smaller in a font of its own (`--dz-tl-tick-font`),
   a dotted line through the rows; `{ every: 1, label: 5 }` is a ruler — a
-  mark each minute, the time every fifth. The supervision playground uses
-  both, and picks its scheme (auto, light, dark).
+  mark each minute, the time every fifth, each time centred above its mark
+  (the slot's in bold), the marks in `--dz-tl-tick-color`; as dense as the
+  room allows (at 4 hours shown, the marks alone). The supervision
+  playground uses both, and picks its scheme (auto, light, dark).
 
 - The timeline slides along time and follows the present (supervision:
   processes as rows, runs arriving by SSE as cards). `timeline.step` (hours
