@@ -786,7 +786,11 @@ one). `calendar` is the DOM calendar (`run`, `undo`, `kernel`…);
 `dz-dates-set` (`{ view, date, range, title, timeZone }`, drawn and on every
 move), `dz-select`, `dz-unselect`, `dz-date-click`, `dz-event-click`,
 `dz-event-open`, `dz-create-request`, `dz-slot-click`, `dz-command-refused`,
-`dz-proposal-refused`, `dz-resource-problems`, `dz-problem`, `dz-remade`.
+`dz-proposal-refused`, `dz-resource-problems`, `dz-follow-change` (a
+timeline following the present paused or took it up: `detail` true or
+false), `dz-calendar-problem` (the calendar's own `onProblem`: something it
+could not do as asked), `dz-problem` (the element's: an attribute or a
+property it could not read), `dz-remade`.
 They bubble and are composed (they cross a shadow root).
 `dz-command-refused`'s detail is `{ result, command }`. Bad input never
 throws: an attribute or a property that cannot be read is a `dz-problem`

@@ -1,8 +1,6 @@
 ---
 title: JavaScript sans framework
 description: createCalendar dans une page simple — options, mises à jour à chaud, commandes et annulation, et le Web Component.
-banner:
-  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -167,9 +165,10 @@ Pour une page sans framework — un CMS, du HTML simple, Svelte —
 - **Propriétés** : `events`, `resources`, `sources`, et `options` pour tout le
   reste. `calendar` est le calendrier sous-jacent (`run`, `undo`, `kernel`…).
 - **Événements** : `dz-dates-set`, `dz-select`, `dz-date-click`,
-  `dz-event-click`, `dz-problem`… Ils remontent et traversent les shadow roots.
-  Une valeur illisible devient un événement `dz-problem`, jamais une
-  exception.
+  `dz-event-click`, `dz-follow-change`, `dz-calendar-problem`, `dz-problem`…
+  Ils remontent et traversent les shadow roots. Une valeur illisible devient
+  un événement `dz-problem`, jamais une exception ; ce que le calendrier
+  lui-même n'a pas pu faire comme demandé est un `dz-calendar-problem`.
 - `shadow` l'isole dans un shadow root, stylé par les propriétés `--tz-*` et
   `--dz-*`, `stylesheet="…"` et `::part(calendar)`, `::part(toolbar)`.
 

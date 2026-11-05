@@ -78,6 +78,8 @@ function example(path: string, pro: boolean): Rule {
       `import { Component, signal } from '@angular/core';
 import { DZ_CALENDAR } from '@dzcalendar/angular';
 ${pro ? "import { DzEventEditor } from '@dzcalendar/pro-angular';\n" : ''}import { Temporal } from '@dzcalendar/core';
+// Repeating events (the stand-up below): the recurrence engine, loaded once.
+import '@dzcalendar/core/recurrence';
 import type { EventInput } from '@dzcalendar/core';
 
 /** DzCalendar, added by \`ng add\`: a week, each event in its own time zone. */

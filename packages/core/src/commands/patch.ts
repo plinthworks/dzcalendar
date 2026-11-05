@@ -83,8 +83,8 @@ export function patchedBase(before: CalEvent, p: EventPatch): EventInput {
 
   // A new start (or a new duration) without a new end keeps the event's
   // length rather than its old end — elapsed time for a timed event, whole
-  // days for an all-day one. This is not yet a "move" (Phase 6), but it never
-  // turns an edit into end-before-start.
+  // days for an all-day one (an `event.move` gives both edges): it never turns
+  // an edit into end-before-start.
   if ((has('start') || has('duration')) && !has('end') && !toTimed && !toAllDay) {
     delete base.end;
     // A running event moved keeps the length it was expected to have (none: still from its start to now).

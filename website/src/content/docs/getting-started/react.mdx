@@ -1,8 +1,6 @@
 ---
 title: React
 description: The <DzCalendar> component for React 18 and 19 — options as props, controlled view and date, render props and the controller.
-banner:
-  content: 'Not on npm yet: until the first release, install the packages from tarballs built with <code>npm run pack:local</code> — <a href="/dzcalendar/getting-started/installation/">how</a>.'
 ---
 
 `@dzcalendar/react` gives a `<DzCalendar>` component for React 18 and 19.
@@ -85,8 +83,8 @@ export function Agenda() {
   calendar, nothing else. Arrays and objects are compared by their contents:
   a literal written again at each render (`resources={[…]}`) changes nothing.
   Sources are compared by identity — keep them stable with `useMemo`.
-- **`initial`**: options read once, when the calendar is made (`firstDay`,
-  `rules`, `now`…). Later changes to it are not read.
+- **`initial`**: options read once, when the calendar is made (`views`,
+  `now`, `historyLimit`…). Later changes to it are not read.
 - **A prop that goes back to `undefined`** leaves the calendar's value as it
   was: pass the default to restore it.
 - **`view`, `date`, `selection`** are controlled, like an input's `value`:

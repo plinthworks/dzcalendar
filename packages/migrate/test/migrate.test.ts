@@ -33,10 +33,10 @@ const calendar = createFromFullCalendar(document.getElementById('cal')!, {
 }).calendar;
 document.getElementById('next')!.onclick = () => calendar.navigate('next');
 calendar.update({ view: 'listWeek' });
-// dz-migrate: gotoDate() — see docs/migrating-from-fullcalendar.md
+// dz-migrate: gotoDate() — see https://plinthworks.github.io/dzcalendar/getting-started/migrating-from-fullcalendar/
 calendar.gotoDate('2026-10-21');
 `);
-    expect(r.notes).toEqual(['gotoDate() — see docs/migrating-from-fullcalendar.md']);
+    expect(r.notes).toEqual(['gotoDate() — see https://plinthworks.github.io/dzcalendar/getting-started/migrating-from-fullcalendar/']);
   });
 
   it('a file without FullCalendar is left as it is', async () => {
@@ -101,7 +101,7 @@ export class Agenda {
   start(el: HTMLElement) {
     this.calendar = createFromFullCalendar(el, { initialView: 'dayGridMonth' }).calendar;
     this.calendar.navigate('next');
-    // dz-migrate: select() — see docs/migrating-from-fullcalendar.md
+    // dz-migrate: select() — see https://plinthworks.github.io/dzcalendar/getting-started/migrating-from-fullcalendar/
     this.calendar.select('2026-10-21');
   }
 }

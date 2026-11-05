@@ -42,9 +42,9 @@ public documentation (option names and what they do), in our own words.
   to the console (`{ warn: false }` to stop it).
 - **On a calendar that exists** (`applyFullCalendar`, the Angular directive):
   `initialView` / `initialDate` only the first time; events and sources are
-  the options' (those no longer given go); `firstDay`, `rules`,
-  `nowIndicator`, `scrollTime`, `dayMaxLanes`, `eventMaxStack` are made with
-  the calendar and said (`at-creation`).
+  the options' (those no longer given go); the others are updated live, but
+  `virtualizeAbove` and `autoPrint`, read when the calendar is made: said
+  (`at-creation`).
 
 ## The options
 

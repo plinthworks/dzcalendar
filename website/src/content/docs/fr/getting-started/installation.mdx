@@ -1,8 +1,6 @@
 ---
 title: Installation
 description: Les paquets, la feuille de style, et le même premier calendrier en JavaScript, Angular, React et Vue.
-banner:
-  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -52,14 +50,6 @@ npm install @dzcalendar/core @dzcalendar/dom @dzcalendar/theme @dzcalendar/vue
 </Fragment>
 </CodeTabs>
 
-<Aside type="caution" title="Avant la première publication sur npm">
-Tant que les paquets ne sont pas publiés sur npm, ils sont construits en
-archives : `npm run pack:local` dans le dépôt DzCalendar les écrit dans
-`packed/`. Installez tout l'ensemble dont votre application a besoin, pas
-seulement ce que vous importez — `core`, `rrule`, `dom`, `theme` (et `ical`,
-`compat-fullcalendar` avec le traducteur FullCalendar) : npm ne peut pas aller
-chercher une dépendance interne qu'il ne trouve pas à côté des autres.
-</Aside>
 
 ## Les paquets
 

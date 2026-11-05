@@ -1,8 +1,6 @@
 ---
 title: Vue
 description: Le composant <DzCalendar> pour Vue 3.4 et 3.5 — props, v-model sur la vue, la date et la sélection, slots et contrôleur.
-banner:
-  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -96,7 +94,7 @@ const events = shallowRef<EventInput[]>([
   `theme`, `scheme`, `density`, `displayCalendar`, `secondaryCalendar`,
   `availableSlots`) ; **`options`** pour tout le reste de ce que prend
   `update()` (`headerToolbar`, `nowIndicator`, `dayMaxLanes`…) ;
-  **`initial`** pour ce qui est lu une fois (`firstDay`, `rules`, `now`…).
+  **`initial`** pour ce qui est lu une fois (`views`, `now`, `historyLimit`…).
 - Les tableaux et les objets sont comparés par leur contenu ; les sources par
   identité (gardez leurs spécifications stables).
 - **Donnez un nouveau tableau pour changer les événements**

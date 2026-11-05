@@ -1,8 +1,6 @@
 ---
 title: React
 description: Le composant <DzCalendar> pour React 18 et 19 — options en props, vue et date contrôlées, render props et contrôleur.
-banner:
-  content: 'Pas encore sur npm : jusqu''à la première version, installez les paquets depuis les tarballs construits par <code>npm run pack:local</code> — <a href="/dzcalendar/fr/getting-started/installation/">comment</a>.'
 ---
 
 `@dzcalendar/react` fournit un composant `<DzCalendar>` pour React 18 et 19.
@@ -88,7 +86,7 @@ export function Agenda() {
   change rien. Les sources sont comparées par identité — gardez-les stables
   avec `useMemo`.
 - **`initial`** : les options lues une fois, à la création du calendrier
-  (`firstDay`, `rules`, `now`…). Leurs changements ultérieurs ne sont pas lus.
+  (`views`, `now`, `historyLimit`…). Leurs changements ultérieurs ne sont pas lus.
 - **Une prop qui revient à `undefined`** laisse la valeur du calendrier telle
   quelle : passez la valeur par défaut pour la rétablir.
 - **`view`, `date`, `selection`** sont contrôlées, comme la `value` d'un

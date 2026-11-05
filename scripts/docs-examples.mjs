@@ -6,6 +6,11 @@
  * vue-tsc, Angular's templates by ngc with strictTemplates. A shell block
  * (an install line) is not code. Exits 1 on any error, naming the page,
  * the language and the tab.
+ *
+ * The READMEs too (owner, 2026-11-05: what npm shows is checked as the site
+ * is): every ```ts, ```tsx and ```vue block of the repository's README and of
+ * each package's, compiled whole — Angular's (an `@angular/core` import) by
+ * ngc. Other fences (bash, html, css, text) are not code.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -53,7 +58,28 @@ export function extract() {
       if (compiled === 0 && !blocks.some((b) => SHELL.has(b[1]))) problems.push(`${page} ${slot}: a tab with no code to compile`);
     }
   }
+  for (const { page, file } of readmes()) {
+    const text = readFileSync(file, 'utf8');
+    [...text.matchAll(/```(\w*)[^\n]*\n([\s\S]*?)```/g)].forEach((b, i) => {
+      if (!EXT[b[1]]) return;
+      const slot = b[1] === 'vue' ? 'vue' : /from '@angular\/core'/.test(b[2]) ? 'angular' : b[1] === 'tsx' ? 'react' : 'js';
+      found.push({ page, slot, lang: b[1], code: b[2], index: `${i}` });
+    });
+  }
   return { found, problems };
+}
+
+/** The repository's README and each package's. */
+function readmes() {
+  const out = [{ page: 'readme/root', file: join(root, 'README.md') }];
+  for (const d of readdirSync(join(root, 'packages'))) out.push({ page: `readme/${d}`, file: join(root, 'packages', d, 'README.md') });
+  return out.filter((r) => {
+    try {
+      return statSync(r.file).isFile();
+    } catch {
+      return false;
+    }
+  });
 }
 
 /** The packages as an application imports them: the playground's aliases (vite.config.ts). */

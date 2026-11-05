@@ -77,7 +77,7 @@ export interface EventInstance {
   /** The event id (escaped), or `seriesId@recurrenceKey` for an occurrence. */
   readonly key: string;
   readonly event: CalEvent;
-  /** `override` arrives with Phase 6 editing. */
+  /** `single` an event, `occurrence` one of a series' occurrences, `override` an occurrence changed on its own. */
   readonly origin: 'single' | 'occurrence' | 'override';
 }
 

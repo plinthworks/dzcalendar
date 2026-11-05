@@ -408,9 +408,10 @@ function directionOf(locale: string): 'ltr' | 'rtl' {
 }
 
 /**
- * A calendar in `host`: the time grid (week, day) and the day grid (month,
- * week, day), with "+N" panels, business hours, a context menu on cells and
- * events, navigation and a view switcher. Read-only until Phase 7.
+ * A calendar in `host`: the views of the families imported (time grid, day
+ * grid, list, year, the Pro's timeline), with "+N" panels, business hours, a
+ * context menu, navigation, a view switcher, and — with `editable` and
+ * `selectable` — drag and drop, resizing, selection and the keyboard's.
  */
 /** The view drawn when none is asked: the week where the time grid is imported, else the first family that is. */
 function defaultView(): string {

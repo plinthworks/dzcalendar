@@ -1,8 +1,6 @@
 ---
 title: Vanilla JavaScript
 description: createCalendar in a plain page — options, live updates, commands and undo, and the Web Component.
-banner:
-  content: 'Not on npm yet: until the first release, install the packages from tarballs built with <code>npm run pack:local</code> — <a href="/dzcalendar/getting-started/installation/">how</a>.'
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -168,8 +166,10 @@ For a page without a build step's framework — a CMS, plain HTML, Svelte —
   everything else. `calendar` is the underlying calendar (`run`, `undo`,
   `kernel`…).
 - **Events**: `dz-dates-set`, `dz-select`, `dz-date-click`,
-  `dz-event-click`, `dz-problem`… They bubble and cross shadow roots. A value
-  that cannot be read is a `dz-problem` event, never an exception.
+  `dz-event-click`, `dz-follow-change`, `dz-calendar-problem`, `dz-problem`…
+  They bubble and cross shadow roots. A value that cannot be read is a
+  `dz-problem` event, never an exception; what the calendar itself could not
+  do as asked is a `dz-calendar-problem`.
 - `shadow` isolates it in a shadow root, styled through the `--tz-*` and
   `--dz-*` properties, `stylesheet="…"` and `::part(calendar)`,
   `::part(toolbar)`.

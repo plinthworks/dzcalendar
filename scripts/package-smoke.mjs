@@ -212,6 +212,8 @@ bootstrapApplication(App, appConfig);
     !config.includes('provideDzMotion(') && 'provideDzMotion in app.config.ts',
     !styles.includes('node_modules/@dzcalendar/theme/dzcalendar.css') && 'the theme in angular.json',
     !deps['@dzcalendar/pro-angular'] && 'the Pro in package.json',
+    // Its stand-up repeats: without the recurrence engine it would be left out (said in the console).
+    !read('src/app/agenda.ts').includes("import '@dzcalendar/core/recurrence'") && 'the recurrence engine in the example',
   ].filter(Boolean);
   if (missing.length > 0) throw new Error(`ng add left out: ${missing.join(', ')}`);
   // Run again: nothing added twice.

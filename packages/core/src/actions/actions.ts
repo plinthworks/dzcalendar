@@ -93,9 +93,9 @@ export interface ActionContext {
 }
 
 /**
- * The built-in entries for a target. Phase 4: read actions and the requests
- * an application handles itself; Phases 6–8 add editing (move, resize,
- * delete, series scope) as commands.
+ * The built-in entries for a target: what reads (open, go to the day), the
+ * requests an application handles itself (new event here), and editing as
+ * commands (duplicate, move, change duration, delete, paste, a series' scope).
  */
 export function actionsFor(target: ActionTarget, ctx: ActionContext): ActionItem[] {
   const out: ActionItem[] = [];

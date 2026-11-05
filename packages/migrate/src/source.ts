@@ -2,6 +2,9 @@ import { Node, Project, SyntaxKind } from 'ts-morph';
 import { migrateTemplate } from './template.js';
 import type { Edited } from './template.js';
 
+/** The migration guide, named in the notes a person reads. */
+const GUIDE = 'https://plinthworks.github.io/dzcalendar/getting-started/migrating-from-fullcalendar/';
+
 /** The other library's type names this one exports under the same names (the import's source changes, nothing else). */
 const TYPES = new Set(['CalendarOptions', 'EventInput', 'EventSourceInput', 'EventApi', 'ViewApi', 'EventClickArg', 'DateClickArg', 'DateSelectArg', 'EventChangeArg', 'EventDropArg', 'EventResizeDoneArg', 'EventAddArg', 'EventRemoveArg', 'DatesSetArg', 'EventContentArg', 'EventMountArg']);
 /** Plugins: built in (nothing to import), or an import of their own here. */
@@ -146,7 +149,7 @@ export async function migrateSource(text: string, fileName = 'file.ts'): Promise
       imp.remove();
       continue;
     }
-    notes.push(`${from}: not migrated (React and Vue arrive with Phase 18c)`);
+    notes.push(`${from}: not migrated — by hand, with @dzcalendar/react or @dzcalendar/vue (${GUIDE})`);
   }
 
   // The plugins and the locales arrays: their entries are gone (built in), the property too when empty.
@@ -204,7 +207,7 @@ export async function migrateSource(text: string, fileName = 'file.ts'): Promise
     const to = CALLS[method]?.(call.getArguments().map((a) => a.getText()));
     if (to) call.replaceWithText(`${callee.getExpression().getText()}.${to}`);
     // Names only this calendar has pass; the other library's (`select(start, end)` too) are marked.
-    else if (!['run', 'undo', 'redo', 'update', 'navigate', 'refetch'].includes(method)) mark(call, `${method}() — see docs/migrating-from-fullcalendar.md`);
+    else if (!['run', 'undo', 'redo', 'update', 'navigate', 'refetch'].includes(method)) mark(call, `${method}() — see ${GUIDE}`);
   }
   // Inline Angular templates.
   for (const prop of file.getDescendantsOfKind(SyntaxKind.PropertyAssignment)) {
