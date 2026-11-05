@@ -21,6 +21,28 @@ Each source is a spec made by a helper:
   stretch to fetch (`window.startDate`, `window.endDate`, exclusive) and an
   abort signal — returning the events, or a promise of them.
 - `icalSource(id, { url })` (`@dzcalendar/ical`): an iCalendar feed.
+- `sseSource(id, url, { map })` and `liveSource(id, { connect })`
+  (`@dzcalendar/core/live`): a feed that tells rather than being asked —
+  Server-Sent Events, or any transport (a WebSocket…). `map` turns each
+  message into `{ create }`, `{ update, patch }` (fields laid over, `extendedProps`
+  merged), `{ remove }` or `{ reset }`; the browser reconnects a dropped
+  stream with `Last-Event-ID`, and a stream the server closed for good is
+  opened again (`reopenAfterMs`, the last id as `?lastEventId=`). The
+  connection opens when the source is added and closes when it is removed
+  or the calendar destroyed.
+
+```ts
+import { sseSource } from '@dzcalendar/core/live';
+
+const runs = sseSource('runs', '/api/runs/stream', {
+  map: (msg) => {
+    const m = msg as { kind: 'start' | 'end'; id: string; process: string; at: string; failed?: boolean };
+    return m.kind === 'start'
+      ? { create: { id: m.id, title: 'Import', start: m.at, resourceId: m.process, ongoing: true } }
+      : { update: m.id, patch: { ongoing: false, end: m.at, tone: m.failed ? 'red' : 'green' } };
+  },
+});
+```
 
 A source fetches the pieces of time it is asked for (`chunk`: a month at a
 time by default, `prefetch` more on each side), keeps them, and fetches again

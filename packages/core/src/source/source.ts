@@ -78,4 +78,10 @@ export interface EventSourceSpec {
    * overwrite them. Without it, an edit lasts until the source is fetched again.
    */
   readonly save?: (req: SaveRequest) => Promise<unknown> | unknown;
+  /**
+   * A source that is told rather than asked (`liveSource`, `sseSource`): called once when it is added, with what
+   * makes the calendar fetch it again (its events changed); it answers how to stop — called when the source is
+   * removed or replaced, or the calendar destroyed.
+   */
+  readonly live?: (changed: () => void) => () => void;
 }

@@ -81,7 +81,7 @@ function typescript(name) {
       }),
       // The commands as JSON Schema, for an assistant in the host application (npm run gen:schema).
       // Repeating events paid for only when imported (owner, 18i): `import '@dzcalendar/core/recurrence'`.
-      ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' }, './recurrence': { types: './recurrence-entry.d.ts', default: './recurrence-entry.js' }, './commands.schema.json': './commands.schema.json' }),
+      ...(name === 'core' && { './views': { types: './views.d.ts', default: './views.js' }, './recurrence': { types: './recurrence-entry.d.ts', default: './recurrence-entry.js' }, './live': { types: './live.d.ts', default: './live.js' }, './commands.schema.json': './commands.schema.json' }),
       // The timeline without a screen (a server, a worker): `@dzcalendar/pro/model`.
       ...(name === 'pro' && {
         './model': { types: './model-entry.d.ts', default: './model-entry.js' },

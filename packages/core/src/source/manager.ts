@@ -123,6 +123,8 @@ interface SourceState {
   readonly shielded: Set<string>;
   saving: Promise<void>;
   saves: number;
+  /** A live source's connection: how to close it. */
+  stop?: () => void;
 }
 
 const WHOLE: Chunk[] = [{ key: '*', start: null as unknown as PlainDate, end: null as unknown as PlainDate }];
@@ -498,6 +500,22 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
     }
   }
 
+  /** A live source connected (its own spec's `live`), what it was before closed. */
+  const connect = (src: SourceState) => {
+    src.stop?.();
+    delete src.stop;
+    const live = src.spec.live;
+    if (!live) return;
+    const spec = src.spec;
+    try {
+      src.stop = live(() => {
+        if (!destroyed && sources.get(spec.id) === src && src.spec === spec) refetch(spec.id);
+      });
+    } catch (e) {
+      notify({ type: 'problems', sourceId: spec.id, report: { accepted: 0, rejected: 0, problems: [{ ...problem('invalid-event', 'error', `sources.${spec.id}`, `live: ${(e as Error)?.message ?? String(e)}`), sourceId: spec.id }] } });
+    }
+  };
+
   return {
     add(spec) {
       if (o.reserved?.includes(spec.id)) {
@@ -509,6 +527,7 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
         if (prev.spec === spec) return;
         const recut = prev.spec.chunk.unit !== spec.chunk.unit;
         prev.spec = spec;
+        connect(prev);
         if (recut) {
           // Other chunk keys: what the old ones hold would never be replaced.
           prev.gen++;
@@ -525,12 +544,14 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
       }
       const src: SourceState = { spec, gen: 0, cache: new Map(), requests: new Set(), pending: new Map(), shielded: new Set(), saving: Promise.resolve(), saves: 0 };
       sources.set(spec.id, src);
+      connect(src);
       sync(src);
     },
     remove(id) {
       const src = sources.get(id);
       if (!src) return;
       src.gen++;
+      src.stop?.();
       for (const req of [...src.requests]) abort(req);
       sources.delete(id);
       const keys = [...src.cache.keys()];
@@ -592,7 +613,10 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
     },
     destroy() {
       destroyed = true;
-      for (const src of sources.values()) for (const req of [...src.requests]) abort(req);
+      for (const src of sources.values()) {
+        src.stop?.();
+        for (const req of [...src.requests]) abort(req);
+      }
       unsubscribe();
       settle();
       sources.clear();

@@ -20,6 +20,10 @@
     "./recurrence": {
       "types": "./src/recurrence-entry.ts",
       "default": "./src/recurrence-entry.ts"
+    },
+    "./live": {
+      "types": "./src/live.ts",
+      "default": "./src/live.ts"
     }
   },
   "sideEffects": [

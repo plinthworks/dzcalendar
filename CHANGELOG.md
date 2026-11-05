@@ -182,6 +182,14 @@
   Vue controllers and `<dz-calendar>`). `timeline.follow` keeps the present
   in view, paused by the person's own move along time, taken up by "Today".
   `playground/supervision.html` shows both.
+- `@dzcalendar/core/live` (owner, 2026-11-05), an entry apart: `liveSource(id,
+  { connect(emit) })` for any feed (a WebSocket, MQTT…) and `sseSource(id,
+  url, { map })` for Server-Sent Events. Each message is `{ create }`,
+  `{ update, patch }`, `{ remove }` or `{ reset }`; the connection opens when
+  the source is added and closes when it is removed or the calendar
+  destroyed (an `EventSourceSpec`'s new `live` member). A stream the server
+  closed for good is opened again with the last id. The supervision
+  playground's feed is a `liveSource`.
 - `forget: { olderThan: { days: 7 } }` (owner, 2026-11-05): each minute,
   the events that ended more than that long ago leave the calendar, whatever
   their source (`kernel.forgetBefore(at)`, no undo entry); a series and an

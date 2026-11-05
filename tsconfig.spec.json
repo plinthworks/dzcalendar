@@ -36,6 +36,9 @@
       "@dzcalendar/core/views": [
         "./packages/core/src/views.ts"
       ],
+      "@dzcalendar/core/live": [
+        "./packages/core/src/live.ts"
+      ],
       "@dzcalendar/dom/list": [
         "./packages/dom/src/list.ts"
       ],

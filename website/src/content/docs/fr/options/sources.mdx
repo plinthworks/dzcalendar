@@ -21,6 +21,28 @@ Chaque source est une spécification faite par une fonction :
   la tranche à récupérer (`window.startDate`, `window.endDate`, exclue) et un
   signal d'annulation — et rend les événements, ou une promesse.
 - `icalSource(id, { url })` (`@dzcalendar/ical`) : un flux iCalendar.
+- `sseSource(id, url, { map })` et `liveSource(id, { connect })`
+  (`@dzcalendar/core/live`) : un flux qui prévient au lieu d'être interrogé —
+  Server-Sent Events, ou tout autre transport (un WebSocket…). `map`
+  transforme chaque message en `{ create }`, `{ update, patch }` (champs
+  posés par-dessus, `extendedProps` fusionnés), `{ remove }` ou `{ reset }` ;
+  le navigateur reconnecte un flux coupé avec `Last-Event-ID`, et un flux que
+  le serveur a fermé pour de bon est rouvert (`reopenAfterMs`, le dernier
+  identifiant en `?lastEventId=`). La connexion s'ouvre quand la source est
+  ajoutée et se ferme quand elle est retirée ou le calendrier détruit.
+
+```ts
+import { sseSource } from '@dzcalendar/core/live';
+
+const runs = sseSource('runs', '/api/runs/stream', {
+  map: (msg) => {
+    const m = msg as { kind: 'start' | 'end'; id: string; process: string; at: string; failed?: boolean };
+    return m.kind === 'start'
+      ? { create: { id: m.id, title: 'Import', start: m.at, resourceId: m.process, ongoing: true } }
+      : { update: m.id, patch: { ongoing: false, end: m.at, tone: m.failed ? 'red' : 'green' } };
+  },
+});
+```
 
 Une source récupère les morceaux de temps qu'on lui demande (`chunk` : un mois
 à la fois par défaut, `prefetch` de plus de chaque côté), les garde, et

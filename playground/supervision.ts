@@ -3,6 +3,7 @@ import '../packages/theme/dzcalendar.css';
 import { Temporal } from '@dzcalendar/core';
 import type { Instant } from '@dzcalendar/core';
 import type { EventInput, ResourceInput } from '@dzcalendar/core';
+import { liveSource } from '@dzcalendar/core/live';
 import { createCalendar } from '@dzcalendar/dom';
 import { createGsapMotion } from '@dzcalendar/motion-gsap';
 import '@dzcalendar/pro';
@@ -128,30 +129,36 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   onEventClick: (i) => (log.textContent = `${i.event.title} : ${String((i.event.props as { detail?: string } | undefined)?.detail ?? '')}`),
 });
 
-// The live feed (an EventSource in a real application). A process runs one thing at a time: the feed says a run is
+// The live feed: in a real application `sseSource('runs', '/api/runs/stream', { map })` (@dzcalendar/core/live);
+// here `liveSource` with a timer standing for the server. A process runs one thing at a time: the feed says a run is
 // going (`ongoing`: drawn up to now, growing; its expected length dashed), then how it ended, to the second — the
-// run ends then (`ongoing: false`, its end now). Now and then, an alert (a marker).
-const live = new Map<string, string>();
-let n = 0;
-function feed(): void {
-  const t = now().round({ smallestUnit: 'second', roundingMode: 'floor' });
-  const p = processes[n++ % processes.length]!;
-  const pid = p.id as string;
-  const cur = live.get(pid);
-  if (n % 7 === 0) return void cal.run({ type: 'event.create', event: alert(`alert-${n}`, pid, t, 'Mémoire à 90 %') });
-  if (cur) {
-    live.delete(pid);
-    const failed = Math.random() < 0.25;
-    const detail = failed ? 'Délai dépassé' : `${Math.round(Math.random() * 900)} éléments traités`;
-    return void cal.run({ type: 'event.update', id: cur, patch: { ongoing: false, tone: TONE[failed ? 'failed' : 'ok'], extendedProps: { kind: 'run', status: failed ? 'failed' : 'ok', detail, ended: t.toString() } } });
-  }
-  // Heard of while running: started a while ago (the feed tells when), expected to take an hour or so.
-  const id = `live-${n}`;
-  live.set(pid, id);
-  const started = t.subtract({ minutes: 20 + Math.round(Math.random() * 40), seconds: Math.round(Math.random() * 59) });
-  cal.run({ type: 'event.create', event: { ...run(id, pid, started, 60 + Math.round(Math.random() * 30), 'running', 'En cours'), ongoing: true } });
-}
-if (!fixed) setInterval(feed, 5000);
+// run ends then (`ongoing: false`). Now and then, an alert (a marker).
+const feed = liveSource('feed', {
+  connect(emit) {
+    const live = new Map<string, string>();
+    let n = 0;
+    const timer = setInterval(() => {
+      const t = now().round({ smallestUnit: 'second', roundingMode: 'floor' });
+      const p = processes[n++ % processes.length]!;
+      const pid = p.id as string;
+      const cur = live.get(pid);
+      if (n % 7 === 0) return emit({ create: alert(`alert-${n}`, pid, t, 'Mémoire à 90 %') });
+      if (cur) {
+        live.delete(pid);
+        const failed = Math.random() < 0.25;
+        const detail = failed ? 'Délai dépassé' : `${Math.round(Math.random() * 900)} éléments traités`;
+        return emit({ update: cur, patch: { ongoing: false, end: t.toString(), tone: TONE[failed ? 'failed' : 'ok'], extendedProps: { status: failed ? 'failed' : 'ok', detail, ended: t.toString() } } });
+      }
+      // Heard of while running: started a while ago (the feed tells when), expected to take an hour or so.
+      const id = `live-${n}`;
+      live.set(pid, id);
+      const started = t.subtract({ minutes: 20 + Math.round(Math.random() * 40), seconds: Math.round(Math.random() * 59) });
+      emit({ create: { ...run(id, pid, started, 60 + Math.round(Math.random() * 30), 'running', 'En cours'), ongoing: true } });
+    }, 5000);
+    return () => clearInterval(timer);
+  },
+});
+if (!fixed) cal.update({ sources: [feed] });
 
 document.querySelector<HTMLSelectElement>('#span')!.addEventListener('change', () => cal.update({ timeline: { span: spanOf(), slot: slotOf(spanOf()) } }));
 document.querySelector<HTMLSelectElement>('#step')!.addEventListener('change', () => cal.update({ timeline: { step: stepOf() } }));

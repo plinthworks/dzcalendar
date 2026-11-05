@@ -40,6 +40,7 @@ export default defineConfig({
       '@dzcalendar/dom/drag': fileURLToPath(new URL('./packages/dom/src/drag.ts', import.meta.url)),
       '@dzcalendar/core/views': fileURLToPath(new URL('./packages/core/src/views.ts', import.meta.url)),
       '@dzcalendar/core/recurrence': fileURLToPath(new URL('./packages/core/src/recurrence-entry.ts', import.meta.url)),
+      '@dzcalendar/core/live': fileURLToPath(new URL('./packages/core/src/live.ts', import.meta.url)),
       '@dzcalendar/angular': fileURLToPath(new URL('./packages/angular/src/index.ts', import.meta.url)),
       '@dzcalendar/core': fileURLToPath(new URL('./packages/core/src/index.ts', import.meta.url)),
       '@dzcalendar/dom': fileURLToPath(new URL('./packages/dom/src/index.ts', import.meta.url)),

@@ -21,6 +21,7 @@ whose `@tzslot/core` we depend on and whose conventions we follow.
   everyone). One polyfill, one set of classes for apps using both libraries.
   No module reads Temporal as it is imported (Safari loads it after):
   `npm run check:entries` checks it — the suites preload it (`test/temporal-setup.ts`).
+  `@dzcalendar/core/live` (`liveSource`, `sseSource`) is an entry apart, like `core/views`.
 - `packages/dom` — `createCalendar`; views render from the kernel's model,
   keyed by date and segment key. `packages/theme` — one family with
   `@tzslot/theme` (same `--tz-*` palette). `packages/motion-gsap` — optional.

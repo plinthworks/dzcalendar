@@ -42,6 +42,7 @@ const results = {
   // Without views (owner, 18i): what an application that imports only some of them starts from.
   'dom/base (without core)': await bundle(join(root, 'packages/dom/src/base.ts'), ['@dzcalendar/core', ...poly]),
   'core/recurrence (with rrule, without the rest of core)': await bundle(join(root, 'packages/core/src/recurrence-entry.ts'), ['@dzcalendar/core', ...poly]),
+  'core/live (without core)': await bundle(join(root, 'packages/core/src/live.ts'), ['@dzcalendar/core', ...poly]),
   'pro (without core, dom)': await bundle(src('pro'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', ...poly]),
   'pro/editor (without core, dom, tzslot dom)': await bundle(join(root, 'packages/pro/src/editor-entry.ts'), ['@dzcalendar/core', '@dzcalendar/dom', '@dzcalendar/dom/toolkit', '@tzslot/dom', '@tzslot/core', ...poly]),
   'pro/export (without core, dom, ical)': await bundle(join(root, 'packages/pro/src/export-entry.ts'), ['@dzcalendar/core', '@dzcalendar/core/views', '@dzcalendar/dom', '@dzcalendar/ical', ...poly]),

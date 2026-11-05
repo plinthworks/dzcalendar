@@ -2,6 +2,7 @@
   "_comment": "gzip bytes of a minified bundle per entry (ARCHITECTURE.md G.1). The Temporal polyfill is counted apart.",
   "core (without polyfill)": 45741,
   "core/views (beyond core)": 1500,
+  "core/live (without core)": 1184,
   "rrule (without polyfill)": 7000,
   "ical (without core)": 8100,
   "slots (without core)": 5000,
