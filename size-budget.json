@@ -6,7 +6,7 @@
   "ical (without core)": 8100,
   "slots (without core)": 5000,
   "dom (without core)": 59224,
-  "pro (without core, dom)": 15506,
+  "pro (without core, dom)": 16781,
   "pro/editor (without core, dom, tzslot dom)": 10948,
   "pro/slots (without core, slots)": 1740,
   "dom/templates (without core)": 1017,
