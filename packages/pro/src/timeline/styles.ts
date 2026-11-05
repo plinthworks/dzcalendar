@@ -48,6 +48,8 @@ export const TIMELINE_CSS = `
   font: var(--dz-tl-tick-font, 400 0.5625rem/1 ui-monospace, SFMono-Regular, Menlo, monospace); font-variant-numeric: tabular-nums;
   color: var(--dz-fg-muted, var(--dzc-fg-muted)); opacity: 0.8;
 }
+/* A ruler's minute between two written ticks: a shorter mark, no time. */
+.dz-tl__tick--small { height: 0.375rem; padding: 0; }
 .dz-tl__row {
   position: absolute; inset-inline-start: 0; top: calc(var(--y, 0) * 1px); width: 100%; display: flex; box-sizing: border-box;
   height: var(--dz-tl-row, calc(var(--dz-tl-lanes, 3) * var(--dz-tl-lane) + 8px));

@@ -330,7 +330,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       if (it.label !== it.text) seen.setAttribute('aria-hidden', 'true');
       // The small ticks (every 5 minutes): seen, not said — the slot's own label says where one is.
       const ticks = (it.ticks ?? []).map((t) => {
-        const n = h(doc, 'span', 'dz-tl__tick', t.text);
+        const n = h(doc, 'span', t.text ? 'dz-tl__tick' : 'dz-tl__tick dz-tl__tick--small', t.text);
         n.style.setProperty('--t', String(t.at));
         n.setAttribute('aria-hidden', 'true');
         return n;
@@ -405,8 +405,10 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     const dayStarts = new Set(a.groups.map((g) => g.start.epochMilliseconds));
     const items: HeadItem[] = [];
     const ls: { key: string; sig: string; x: number; major: boolean; minor?: boolean }[] = [];
-    // Small ticks: minutes that divide the slot, fewer than it (5 in quarters of an hour).
-    const every = ctx.kernel.getOptions().timeline?.ticks;
+    // Small ticks, as on a ruler: one every `every` minutes, the time written every `label` (5 in quarters of an hour).
+    const tk = ctx.kernel.getOptions().timeline?.ticks;
+    const every = tk === undefined ? undefined : typeof tk === 'number' ? tk : tk.every;
+    const label = tk === undefined ? 0 : typeof tk === 'number' ? tk : (tk.label ?? tk.every);
     const per = every !== undefined && a.unit !== 'day' && a.slotMinutes % every === 0 && every < a.slotMinutes ? a.slotMinutes / every : 0;
     a.slots.forEach((s, i) => {
       const from = a.toPosition(s.start);
@@ -423,10 +425,13 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         const ms = s0 + k * every! * 60_000;
         const at = Temporal.Instant.fromEpochMilliseconds(ms);
         const x = a.toPosition(at);
-        ticks.push({ at: (ms - s0) / (s1 - s0), text: formatTemporal(at.toZonedDateTimeISO(ctx.zone).toPlainTime(), HM, ctx.locale) });
-        ls.push({ key: `${key}+${k}`, sig: `${x}|minor`, x, major: false, minor: true });
+        // Written on its wall minute's multiples of `label`; the others a short mark alone (no line through the rows).
+        const wall = at.toZonedDateTimeISO(ctx.zone).toPlainTime();
+        const labelled = (wall.hour * 60 + wall.minute) % label === 0;
+        ticks.push({ at: (ms - s0) / (s1 - s0), text: labelled ? formatTemporal(wall, HM, ctx.locale) : '' });
+        if (labelled) ls.push({ key: `${key}+${k}`, sig: `${x}|minor`, x, major: false, minor: true });
       }
-      items.push({ key, sig: `${from}|${to}|${ctx.epoch}|${per}`, from, to, ...t, ...(ticks.length > 0 && { ticks }) });
+      items.push({ key, sig: `${from}|${to}|${ctx.epoch}|${per}|${label}`, from, to, ...t, ...(ticks.length > 0 && { ticks }) });
       const major = a.unit === 'day' ? s.date.day === 1 : dayStarts.has(s.start.epochMilliseconds);
       ls.push({ key, sig: `${from}|${major}`, x: from, major });
     });

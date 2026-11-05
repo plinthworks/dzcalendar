@@ -319,6 +319,8 @@ describe('the timeline’s step and following the present', () => {
       [{ follow: { before: { days: 1 } } }, 'hours and minutes'],
       [{ ticks: 7 }, 'dividing a day'],
       [{ ticks: 0 }, 'dividing a day'],
+      [{ ticks: { every: 2, label: 5 } }, 'a multiple of every'],
+      [{ ticks: { every: 7 } }, 'dividing a day'],
     ] as const) {
       expect(() => mount([], { timeline: bad })).toThrow(said);
       document.body.innerHTML = '';
@@ -371,6 +373,13 @@ describe('the timeline’s step and following the present', () => {
     off();
     const ticks = [...host.querySelectorAll('.dz-tl__slot')].find((x) => x.textContent?.startsWith('10:00'))?.querySelectorAll('.dz-tl__tick');
     expect([states, [...(ticks ?? [])].map((t) => t.textContent), host.querySelectorAll('.dz-tl__line--minor').length > 0]).toEqual([0, ['10:05', '10:10'], true]);
+  });
+
+  it('a ruler: a mark each minute, the time written every fifth (the quarter’s own head says 10:00)', () => {
+    const host = mount([], { timeline: { slot: 15, ticks: { every: 1, label: 5 } } });
+    const slot = [...host.querySelectorAll('.dz-tl__slot')].find((x) => x.firstElementChild?.textContent === '10:00');
+    const marks = [...(slot?.querySelectorAll('.dz-tl__tick') ?? [])].map((t) => (t.classList.contains('dz-tl__tick--small') ? '·' : t.textContent)).join(' ');
+    expect(marks).toBe('· · · · 10:05 · · · · 10:10 · · · ·');
   });
 
   it('ticks across a clock change: at Lord Howe on 4 October 2026 (02:00 → 02:30), the 01:00 slot lasts 90 minutes — its half-hour ticks at 01:30 and 02:30', () => {

@@ -194,7 +194,9 @@
   smooth one; at once under reduced motion) — a glide that does not pause
   following. `timeline.ticks: 5`: a small tick every 5 minutes inside each
   slot, its time written smaller in a font of its own (`--dz-tl-tick-font`),
-  a dotted line through the rows. The supervision playground uses both.
+  a dotted line through the rows; `{ every: 1, label: 5 }` is a ruler — a
+  mark each minute, the time every fifth. The supervision playground uses
+  both, and picks its scheme (auto, light, dark).
 
 - The timeline slides along time and follows the present (supervision:
   processes as rows, runs arriving by SSE as cards). `timeline.step` (hours

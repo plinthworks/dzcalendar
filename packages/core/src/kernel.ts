@@ -73,10 +73,11 @@ export interface ModelOptions {
      */
     readonly follow?: boolean | { readonly before?: DurationLike } | undefined;
     /**
-     * Minutes between small ticks inside each slot (`5` in quarters of an hour: 10:05, 10:10), their time
-     * written smaller (`--dz-tl-tick-font`). Drawn when they divide the slot.
+     * Small ticks inside each slot, as on a ruler: `5` — one every 5 minutes, its time written smaller
+     * (`--dz-tl-tick-font`); `{ every: 1, label: 5 }` — one each minute, the time written on every fifth.
+     * Drawn when they divide the slot.
      */
-    readonly ticks?: number | undefined;
+    readonly ticks?: number | { readonly every: number; readonly label?: number } | undefined;
     /**
      * The time shown at once (`{ hours: 4 }`): a slot's width is the room shared by that many slots, measured again
      * when the calendar's size changes. Days, hours and minutes; longer than the period, the period fits. A change keeps
@@ -398,7 +399,12 @@ export function assertTimeline(t: NonNullable<ModelOptions['timeline']>): void {
     if (typeof t.follow !== 'object' || t.follow === null) throw new RangeError(`timeline.follow is true, false or { before }: ${String(t.follow)}`);
     followBefore(t.follow);
   }
-  if (t.ticks !== undefined && !(Number.isInteger(t.ticks) && t.ticks >= 1 && 1440 % t.ticks === 0)) throw new RangeError(`timeline.ticks must be whole minutes dividing a day (1, 5, 10…): ${String(t.ticks)}`);
+  if (t.ticks !== undefined) {
+    const { every, label } = typeof t.ticks === 'number' ? { every: t.ticks, label: t.ticks } : { every: t.ticks.every, label: t.ticks.label ?? t.ticks.every };
+    const minutes = (v: unknown) => Number.isInteger(v) && (v as number) >= 1 && 1440 % (v as number) === 0;
+    if (!minutes(every) || !minutes(label)) throw new RangeError(`timeline.ticks must be whole minutes dividing a day (1, 5, 10…): ${JSON.stringify(t.ticks)}`);
+    if (label % every !== 0) throw new RangeError(`timeline.ticks.label is a multiple of every: ${JSON.stringify(t.ticks)}`);
+  }
 }
 
 /** The step kept as its ISO text: the same step given again (a framework's new object each render) changes nothing. */

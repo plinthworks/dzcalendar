@@ -113,8 +113,8 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   headerViews: [],
   resources: processes,
   events: history,
-  // The present 5 minutes from the left edge, the axis gliding each minute; a small tick every 5 minutes.
-  timeline: { slot: slotOf(spanOf()), span: spanOf(), step: stepOf(), follow: FOLLOW, ticks: 5, maxLanes: 2 },
+  // The present 5 minutes from the left edge, the axis gliding each minute; a ruler: a mark each minute, the time every 5.
+  timeline: { slot: slotOf(spanOf()), span: spanOf(), step: stepOf(), follow: FOLLOW, ticks: { every: 1, label: 5 }, maxLanes: 2 },
   // A screen left open: what ended more than two days ago is forgotten.
   forget: { olderThan: { days: 2 } },
   hooks: {
@@ -246,6 +246,11 @@ cal.kernel.subscribe((e) => {
 });
 summarize();
 
+// Light, dark, or the system's: the calendar's `scheme`; the page around it follows (its own colours by data-scheme).
+const schemeOf = () => document.querySelector<HTMLSelectElement>('#scheme')!.value as 'auto' | 'light' | 'dark';
+const paintPage = () => (document.documentElement.dataset['scheme'] = schemeOf());
+document.querySelector<HTMLSelectElement>('#scheme')!.addEventListener('change', () => (cal.update({ scheme: schemeOf() }), paintPage()));
+paintPage();
 document.querySelector<HTMLSelectElement>('#span')!.addEventListener('change', () => cal.update({ timeline: { span: spanOf(), slot: slotOf(spanOf()) } }));
 document.querySelector<HTMLSelectElement>('#step')!.addEventListener('change', () => cal.update({ timeline: { step: stepOf() } }));
 document.querySelector<HTMLInputElement>('#follow')!.addEventListener('change', (e) => cal.update({ timeline: { follow: (e.target as HTMLInputElement).checked ? FOLLOW : false } }));

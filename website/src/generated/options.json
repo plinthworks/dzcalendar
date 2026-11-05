@@ -979,7 +979,7 @@
     },
     {
       "name": "timeline",
-      "type": "{ readonly slot?: number | 'day'; readonly maxLanes?: number; readonly fillLanes?: number; readonly step?: DurationLike | undefined; readonly follow?: boolean | { readonly before?: DurationLike } | undefined; readonly ticks?: number | undefined; readonly span?: DurationLike | undefined }",
+      "type": "{ readonly slot?: number | 'day'; readonly maxLanes?: number; readonly fillLanes?: number; readonly step?: DurationLike | undefined; readonly follow?: boolean | { readonly before?: DurationLike } | undefined; readonly ticks?: number | { readonly every: number; readonly label?: number } | undefined; readonly span?: DurationLike | undefined }",
       "resolved": null,
       "doc": "A timeline's scale and rows (the Pro's family reads them).",
       "default": null,
@@ -1044,9 +1044,9 @@
         },
         {
           "name": "ticks",
-          "type": "number | undefined",
+          "type": "number | { readonly every: number; readonly label?: number } | undefined",
           "resolved": null,
-          "doc": "Minutes between small ticks inside each slot (`5` in quarters of an hour: 10:05, 10:10), their time written smaller (`--dz-tl-tick-font`). Drawn when they divide the slot.",
+          "doc": "Small ticks inside each slot, as on a ruler: `5` — one every 5 minutes, its time written smaller (`--dz-tl-tick-font`); `{ every: 1, label: 5 }` — one each minute, the time written on every fifth. Drawn when they divide the slot.",
           "default": null,
           "source": "packages/core/src/kernel.ts"
         }

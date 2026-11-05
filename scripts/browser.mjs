@@ -1912,12 +1912,15 @@ try {
         const area = document.querySelector('.dz-tl__corner').getBoundingClientRect().width;
         const box = sc.getBoundingClientRect();
         const now = document.querySelector('.dz-tl__now').getBoundingClientRect();
-        const ticks = [...document.querySelectorAll('.dz-tl__tick')].filter((t) => { const r = t.getBoundingClientRect(); return r.left >= box.left + area && r.right <= box.right; });
-        return { past: Math.round(((now.left - box.left - area) / (box.width - area)) * 60 * 10) / 10, ticks: ticks.map((t) => t.textContent), font: ticks[0] ? getComputedStyle(ticks[0]).fontFamily : '', slot: getComputedStyle(document.querySelector('.dz-tl__slot span')).fontFamily };
+        const all = [...document.querySelectorAll('.dz-tl__tick')].filter((t) => { const r = t.getBoundingClientRect(); return r.left >= box.left + area && r.right <= box.right; });
+        // The ruler: a mark each minute; the ones with their time, every fifth.
+        const ticks = all.filter((t) => t.textContent);
+        const small = all.length - ticks.length;
+        return { past: Math.round(((now.left - box.left - area) / (box.width - area)) * 60 * 10) / 10, ticks: ticks.map((t) => t.textContent), small, font: ticks[0] ? getComputedStyle(ticks[0]).fontFamily : '', slot: getComputedStyle(document.querySelector('.dz-tl__slot span')).fontFamily };
       });
       // 09:37:30Z is 11:37:30 in Paris: the left edge at 11:32:30, an hour shown — ticks at 11:35, 11:40, 11:50, 11:55, 12:05… (not the quarters).
       check('follow before: the present 5 minutes from the left edge', Math.abs(seen.past - 5) < 0.3, JSON.stringify(seen));
-      check('ticks: every 5 minutes between the quarters, in a font of their own', seen.ticks.slice(0, 4).join() === '11:35,11:40,11:50,11:55' && seen.font !== seen.slot, JSON.stringify(seen));
+      check('ticks: a ruler — the time every 5 minutes between the quarters, in a font of their own, a mark each minute between', seen.ticks.slice(0, 4).join() === '11:35,11:40,11:50,11:55' && seen.font !== seen.slot && seen.small >= 40, JSON.stringify(seen));
       // Another margin, live: placed at once (not at the next minute).
       await p.evaluate(() => window.__cal.update({ timeline: { follow: { before: { minutes: 10 } } } }));
       await p.waitForTimeout(400);
