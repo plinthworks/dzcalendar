@@ -46,7 +46,10 @@ keeps the area and the heads in place.
   (`--dz-tl-tick-font`), and a dotted line, inside each slot it divides.
   `{ every: 1, label: 5 }` is a ruler: a short mark each minute
   (`.dz-tl__tick--small`, no time, no line), the time and the line every
-  fifth wall minute.
+  fifth wall minute. As dense as the room allows: the times are written
+  only with about 2.75rem between two (`.dz-tl--tick-text`), the minute
+  marks only 4 px apart (`.dz-tl--tick-marks`) — at 4 hours shown, the
+  marks alone.
 - `timeline.span` (days, hours and minutes) is the time shown at once: a
   slot's width is the room shared by that many slots (measured again on a
   resize; the period at most, one slot at least), written as `--dz-tl-slot`.

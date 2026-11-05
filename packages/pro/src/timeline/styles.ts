@@ -50,6 +50,10 @@ export const TIMELINE_CSS = `
 }
 /* A ruler's minute between two written ticks: a shorter mark, no time. */
 .dz-tl__tick--small { height: 0.375rem; padding: 0; }
+/* No room for the times (an hour's quarters a few pixels wide): the marks alone; too dense for the minutes: those go. */
+.dz-tl:not(.dz-tl--tick-text) .dz-tl__tick { font-size: 0; padding: 0; height: 0.625rem; }
+.dz-tl:not(.dz-tl--tick-text) .dz-tl__tick--small { height: 0.3125rem; }
+.dz-tl:not(.dz-tl--tick-marks) .dz-tl__tick--small { display: none; }
 .dz-tl__row {
   position: absolute; inset-inline-start: 0; top: calc(var(--y, 0) * 1px); width: 100%; display: flex; box-sizing: border-box;
   height: var(--dz-tl-row, calc(var(--dz-tl-lanes, 3) * var(--dz-tl-lane) + 8px));

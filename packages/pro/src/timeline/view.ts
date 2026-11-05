@@ -1343,6 +1343,16 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         const nextRow = lane > 0 ? m.maxLanes * lane + 8 : 0;
         const changed = scale !== px || nextRow !== rowPx;
         px = scale;
+        // A ruler as dense as the room allows: the ticks' times written only with room for them (about 2.75rem
+        // between two), the minute marks only a few pixels apart — at 4 hours shown, marks alone.
+        const tk = ctx.kernel.getOptions().timeline?.ticks;
+        if (tk !== undefined && scale > 0) {
+          const every = typeof tk === 'number' ? tk : tk.every;
+          const label = typeof tk === 'number' ? tk : (tk.label ?? tk.every);
+          const em = parseFloat(doc.defaultView?.getComputedStyle(root).fontSize ?? '16') || 16;
+          root.classList.toggle('dz-tl--tick-text', (scale * label) / m.axis.slotMinutes >= 2.75 * em);
+          root.classList.toggle('dz-tl--tick-marks', (scale * every) / m.axis.slotMinutes >= 4);
+        }
         // A span sets the width the stylesheet would (the sheet drawn at the scale computed).
         root.style.setProperty('--dz-tl-slot', ctx.kernel.getOptions().timeline?.span !== undefined && scale > 0 ? `${scale}px` : '');
         measuredAxis = m.axis;

@@ -79,7 +79,7 @@ Des heures et des minutes (`{ minutes: 15 }`, `{ hours: 1 }`, `'PT30M'`). Avec l
 
 <OptionFacts name="timeline.ticks" />
 
-Comme sur une règle : `{ every: 1, label: 5 }` dessine un court trait chaque minute et écrit l'heure toutes les cinq (`label`, un multiple de `every`) ; un nombre vaut pour les deux. Des minutes entre de petits repères dans chaque créneau : `5` en quarts d'heure dessine 10:05 et 10:10 entre 10:00 et 10:15 — un court trait et son heure dans l'en-tête, écrite plus petite dans une police à chasse fixe (`--dz-tl-tick-font`), et une fine ligne pointillée à travers les lignes. Dessinés quand ils divisent le créneau et sont plus courts que lui ; des minutes entières qui divisent un jour, sinon une `RangeError`.
+Comme sur une règle : `{ every: 1, label: 5 }` dessine un court trait chaque minute et écrit l'heure toutes les cinq (`label`, un multiple de `every`) ; un nombre vaut pour les deux. Aussi dense que la place le permet : les heures seulement quand elles tiennent, les traits de minute seulement à quelques pixels d'écart — à 4 heures à l'écran, les traits seuls. Des minutes entre de petits repères dans chaque créneau : `5` en quarts d'heure dessine 10:05 et 10:10 entre 10:00 et 10:15 — un court trait et son heure dans l'en-tête, écrite plus petite dans une police à chasse fixe (`--dz-tl-tick-font`), et une fine ligne pointillée à travers les lignes. Dessinés quand ils divisent le créneau et sont plus courts que lui ; des minutes entières qui divisent un jour, sinon une `RangeError`.
 
 ### `span`
 

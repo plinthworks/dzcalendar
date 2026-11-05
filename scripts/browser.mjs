@@ -1921,6 +1921,17 @@ try {
       // 09:37:30Z is 11:37:30 in Paris: the left edge at 11:32:30, an hour shown — ticks at 11:35, 11:40, 11:50, 11:55, 12:05… (not the quarters).
       check('follow before: the present 5 minutes from the left edge', Math.abs(seen.past - 5) < 0.3, JSON.stringify(seen));
       check('ticks: a ruler — the time every 5 minutes between the quarters, in a font of their own, a mark each minute between', seen.ticks.slice(0, 4).join() === '11:35,11:40,11:50,11:55' && seen.font !== seen.slot && seen.small >= 40, JSON.stringify(seen));
+      // Four hours shown: no room for the times — the ruler's marks alone (no text drawn), the minutes still marked.
+      await p.selectOption('#span', 'PT4H');
+      await p.waitForTimeout(400);
+      const dense = await p.evaluate(() => {
+        const t = [...document.querySelectorAll('.dz-tl__tick:not(.dz-tl__tick--small)')];
+        const small = [...document.querySelectorAll('.dz-tl__tick--small')].filter((x) => getComputedStyle(x).display !== 'none');
+        return { written: t.filter((x) => x.getBoundingClientRect().width > 4 && parseFloat(getComputedStyle(x).fontSize) > 0).length, marks: t.length, small: small.length };
+      });
+      check('ticks: 4 hours shown — marks alone, no time written (no room), the minutes still marked', dense.written === 0 && dense.marks > 0 && dense.small > 0, JSON.stringify(dense));
+      await p.selectOption('#span', 'PT1H');
+      await p.waitForTimeout(400);
       // Another margin, live: placed at once (not at the next minute).
       await p.evaluate(() => window.__cal.update({ timeline: { follow: { before: { minutes: 10 } } } }));
       await p.waitForTimeout(400);

@@ -201,6 +201,7 @@ The --dzc-… and --dzp-… properties are the theme's own palette, private: the
 | `.dz-tl__rows`, `.dz-tl__row`, `.dz-tl__row--group`, `.dz-tl__row--unassigned`, `.dz-tl__area`, `.dz-tl__cell`, `.dz-tl__cell--group`, `.dz-tl__title`, `.dz-tl__expander`, `.dz-tl__group-name` | a row (a group's, "Unassigned"), its resource cells, title, fold button |
 | `.dz-tl__lane`, `.dz-tl__lines`, `.dz-tl__line`, `.dz-tl__line--major`, `.dz-tl__line--minor`, `.dz-tl__line-host`, `.dz-tl__offs`, `.dz-tl__off` | a row's lane, the slot lines (minor: `timeline.ticks`), closed hours |
 | `.dz-tl__tick`, `.dz-tl__tick--small` | a small tick in a slot's head and its time (`timeline.ticks`); a ruler's minute without its time |
+| `.dz-tl--tick-text`, `.dz-tl--tick-marks` | room for the ticks' times; room for the minute marks (else they are not drawn) |
 | `.dz-tl__bars`, `.dz-tl__bgs`, `.dz-tl__ev`, `.dz-tl__ev--bg`, `.dz-tl__ev--labelled`, `.dz-tl__ev--cont-start`, `.dz-tl__ev--cont-end`, `.dz-tl__ev-label`, `.dz-tl__ev-title`, `.dz-tl__ev-time`, `.dz-tl__mores` | events, backgrounds (one with a label), "+N" |
 | `.dz-tl__now`, `.dz-tl__cursor` | the now line, the keyboard's place |
 
