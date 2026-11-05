@@ -40,19 +40,31 @@ export const TIMELINE_CSS = `
 .dz-tl__lines { position: absolute; top: 0; bottom: 0; inset-inline-start: var(--dz-tl-area, 0px); width: calc(var(--dz-tl-len, 0) * var(--dz-tl-slot)); pointer-events: none; }
 .dz-tl__line { position: absolute; top: 0; bottom: 0; inset-inline-start: calc(var(--x) * var(--dz-tl-slot)); border-inline-start: 1px solid var(--dz-tl-line); }
 .dz-tl__line--major { border-inline-start-color: var(--dz-border, var(--dzc-border)); }
-/* timeline.ticks: a fine line every 5 minutes in the grid, a short mark and its time in the head — smaller, lighter. */
-.dz-tl__line--minor { border-inline-start-style: dotted; opacity: 0.55; }
-.dz-tl__tick {
-  position: absolute; bottom: 0; inset-inline-start: calc(var(--t) * 100%); padding-inline-start: 0.1875rem; height: 0.875rem;
-  border-inline-start: 1px solid var(--dz-tl-line); white-space: nowrap; line-height: 1;
-  font: var(--dz-tl-tick-font, 400 0.5625rem/1 ui-monospace, SFMono-Regular, Menlo, monospace); font-variant-numeric: tabular-nums;
-  color: var(--dz-fg-muted, var(--dzc-fg-muted)); opacity: 0.8;
+/*
+ * timeline.ticks, a ruler: each time centred above its mark — the slot's own (13:30) above a long one, a tick's
+ * (13:35) above a middle one, a minute's mark short and bare. Marks in --dz-tl-tick-color (the text, half strength:
+ * seen on light and dark alike); the tick's times in --dz-tl-tick-font. A dotted line through the rows at each time.
+ */
+.dz-tl--ruler { --dz-tl-tick-color: color-mix(in srgb, var(--dz-fg, var(--dzc-fg)) 55%, transparent); }
+.dz-tl__line--minor { border-inline-start-style: dotted; border-inline-start-color: var(--dz-tl-tick-color, var(--dz-tl-line)); opacity: 0.45; }
+.dz-tl--ruler .dz-tl__slot { border-inline-start: 0; padding: 0; }
+.dz-tl--ruler .dz-tl__slot::before { content: ''; position: absolute; inset-inline-start: 0; bottom: 0; height: 0.625rem; border-inline-start: 1.5px solid var(--dz-tl-tick-color); }
+.dz-tl--ruler .dz-tl__slot > span:first-child {
+  position: absolute; top: 0.25rem; inset-inline-start: -2rem; width: 4rem; text-align: center;
+  font-weight: 600; color: var(--dz-fg, var(--dzc-fg));
 }
-/* A ruler's minute between two written ticks: a shorter mark, no time. */
-.dz-tl__tick--small { height: 0.375rem; padding: 0; }
-/* No room for the times (an hour's quarters a few pixels wide): the marks alone; too dense for the minutes: those go. */
-.dz-tl:not(.dz-tl--tick-text) .dz-tl__tick { font-size: 0; padding: 0; height: 0.625rem; }
-.dz-tl:not(.dz-tl--tick-text) .dz-tl__tick--small { height: 0.3125rem; }
+.dz-tl__tick {
+  position: absolute; bottom: 0.5rem; inset-inline-start: calc(var(--t) * 100% - 1.5rem); width: 3rem; text-align: center;
+  white-space: nowrap; line-height: 1; font: var(--dz-tl-tick-font, 500 0.5625rem/1 ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-variant-numeric: tabular-nums; color: var(--dz-fg-muted, var(--dzc-fg-muted));
+}
+.dz-tl__tick::after { content: ''; position: absolute; inset-inline-start: 50%; top: calc(100% + 0.0625rem); height: 0.4375rem; border-inline-start: 1px solid var(--dz-tl-tick-color); }
+/* A minute between two written ticks: a short bare mark at the bottom. */
+.dz-tl__tick--small { bottom: 0; height: 0.25rem; font-size: 0; }
+.dz-tl__tick--small::after { top: 0; height: 100%; }
+/* No room for the times (4 hours shown): the marks alone; too dense for the minutes: those go. */
+.dz-tl:not(.dz-tl--tick-text) .dz-tl__tick:not(.dz-tl__tick--small) { font-size: 0; bottom: 0; height: 0.4375rem; }
+.dz-tl:not(.dz-tl--tick-text) .dz-tl__tick:not(.dz-tl__tick--small)::after { top: 0; height: 100%; }
 .dz-tl:not(.dz-tl--tick-marks) .dz-tl__tick--small { display: none; }
 .dz-tl__row {
   position: absolute; inset-inline-start: 0; top: calc(var(--y, 0) * 1px); width: 100%; display: flex; box-sizing: border-box;

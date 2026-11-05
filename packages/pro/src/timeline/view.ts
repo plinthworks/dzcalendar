@@ -1346,6 +1346,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         // A ruler as dense as the room allows: the ticks' times written only with room for them (about 2.75rem
         // between two), the minute marks only a few pixels apart — at 4 hours shown, marks alone.
         const tk = ctx.kernel.getOptions().timeline?.ticks;
+        root.classList.toggle('dz-tl--ruler', tk !== undefined && m.axis.unit !== 'day');
         if (tk !== undefined && scale > 0) {
           const every = typeof tk === 'number' ? tk : tk.every;
           const label = typeof tk === 'number' ? tk : (tk.label ?? tk.every);
