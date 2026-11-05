@@ -374,6 +374,18 @@ describe('the rest of the event', () => {
   });
 });
 
+describe('a marker (display: marker): a moment', () => {
+  it('ends where it starts, whatever end or duration came with it (said); a date alone is refused', () => {
+    const plain = timed({ start: '2026-10-21T14:32:07[Europe/Paris]', display: 'marker' });
+    const ended = timed({ start: '2026-10-21T14:32:07[Europe/Paris]', end: '2026-10-21T15:00[Europe/Paris]', display: 'marker' });
+    const lasting = timed({ start: '2026-10-21T14:32:07[Europe/Paris]', duration: { minutes: 30 }, display: 'marker' });
+    expect([plain.event.end.toString(), ended.event.end.toString(), plain.codes.length]).toEqual(['2026-10-21T14:32:07+02:00[Europe/Paris]', '2026-10-21T14:32:07+02:00[Europe/Paris]', 0]);
+    expect(ended.codes).toEqual(['marker-length-ignored']);
+    expect(lasting.codes).toEqual(['marker-length-ignored']);
+    expect(rejectedWith(normalizeEvent({ start: '2026-10-21', display: 'marker' }, ctx()))).toEqual(['marker-all-day']);
+  });
+});
+
 describe('normalizeMany', () => {
   it('judges each input alone, reports paths, keeps the first of two equal ids', () => {
     const { items, report } = normalizeMany(

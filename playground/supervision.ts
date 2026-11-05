@@ -34,15 +34,14 @@ const run = (id: string, process: string, start: Instant, minutes: number, statu
   tone: TONE[status],
   extendedProps: { kind: 'run', status, detail, ended: ended?.toString() },
 });
-// Two other kinds on the same rows: an alert, and a maintenance window behind the runs (the row's whole height, its name at its start).
+// Two other kinds on the same rows: an alert (a marker: a moment, a line and its flag), and a maintenance window behind the runs.
 const alert = (id: string, process: string, when: Instant, detail: string): EventInput => ({
   id,
   title: 'Alerte',
   start: at(when),
-  duration: { minutes: 75 },
   resourceId: process,
+  display: 'marker',
   tone: 'amber',
-  classNames: ['kind-alert'],
   extendedProps: { kind: 'alert', detail },
 });
 const maintenance = (id: string, process: string, from: Instant, hours: number): EventInput => ({
@@ -55,7 +54,7 @@ const maintenance = (id: string, process: string, from: Instant, hours: number):
   tone: 'violet',
   extendedProps: { kind: 'maintenance', detail: 'fenêtre prévue' },
 });
-type Props = { kind: 'run'; status: Status; detail: string; ended?: string } | { kind: 'alert' | 'maintenance'; detail: string };
+type Props = { kind: 'run'; status: Status; detail: string; ended?: string } | { kind: 'alert'; detail: string } | { kind: 'maintenance'; detail: string };
 
 // What already ran: one run every six hours or so per process, an hour and a half or more each — few cards, wide enough to read.
 const t0 = now().round({ smallestUnit: 'second', roundingMode: 'floor' });
@@ -108,13 +107,13 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
         const ev = instance.event;
         const start = ev.allDay ? '' : ev.start.toInstant().toString();
         if (x.kind === 'maintenance') return el('span', 'maint', `🛠 ${instance.event.title} · ${x.detail}`);
-        const card = el('div', `card card--${x.kind === 'run' ? x.status : 'alert'}`);
+        // An alert is a marker: its flag says what and when, to the second.
+        if (x.kind === 'alert') return Object.assign(el('span', 'flag', `⚠ ${x.detail} · ${stamp(start).slice(-8)}`), { title: `${x.detail} — ${stamp(start)}` });
+        const card = el('div', `card card--${x.status}`);
         const head = el('div', 'card__head');
-        head.append(el('b', 'card__title', x.kind === 'alert' ? `⚠ ${x.detail}` : instance.event.title));
-        if (x.kind === 'run') head.append(el('span', 'card__pill', SAID[x.status]));
+        head.append(el('b', 'card__title', instance.event.title), el('span', 'card__pill', SAID[x.status]));
         card.append(head);
-        card.append(el('span', 'card__detail', x.kind === 'run' ? x.detail : 'Alerte reçue'));
-        card.append(el('time', 'card__when', x.kind === 'run' && x.ended ? `${stamp(start)} → ${stamp(x.ended).slice(-8)}` : stamp(start)));
+        card.append(el('span', 'card__detail', x.detail), el('time', 'card__when', x.ended ? `${stamp(start)} → ${stamp(x.ended).slice(-8)}` : stamp(start)));
         return card;
       },
     },

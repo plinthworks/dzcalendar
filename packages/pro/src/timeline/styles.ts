@@ -92,6 +92,14 @@ export const TIMELINE_CSS = `
 /* A background with its own content: the tint mixed in, the label at full strength, kept in view while the row scrolls by. */
 .dz-tl__ev--bg.dz-tl__ev--labelled { opacity: 1; background: color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 22%, transparent); color: var(--dz-fg, var(--dzc-fg)); pointer-events: none; }
 .dz-tl__ev--bg.dz-tl__ev--labelled > * { position: sticky; inset-inline-start: calc(var(--dz-tl-area, 0px) + 0.25rem); }
+/* A marker (display: 'marker'): a line across its row where it happened, its flag (the title) in its lane beside it. */
+.dz-tl__ev[data-marker] { overflow: visible; border-inline-start-width: 2px; border-start-start-radius: 0; border-end-start-radius: 0; padding-inline-start: 0.3125rem; }
+.dz-tl__ev[data-marker] > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dz-tl__ev[data-marker]::before {
+  content: ''; position: absolute; inset-inline-start: -2px; width: 0; pointer-events: none;
+  top: calc(-4px - var(--lane, 0) * var(--dz-tl-lane)); height: var(--dz-tl-row, calc(var(--dz-tl-lanes, 3) * var(--dz-tl-lane) + 8px));
+  border-inline-start: 2px solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
+}
 .dz-tl__ev:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: 1px; }
 .dz-more--tl { z-index: 2; margin: 0; padding: 0 0.375rem; text-align: start; }
 .dz-tl__now { position: absolute; top: 0; bottom: 0; inset-inline-start: calc(var(--dz-tl-area, 0px) + var(--x) * var(--dz-tl-slot)); border-inline-start: 2px solid var(--dz-now, var(--dzc-danger)); z-index: 2; pointer-events: none; }

@@ -22,6 +22,10 @@ export type ProblemCode =
   | 'foreign-temporal'
   | 'allday-with-time'
   | 'allday-zone-ignored'
+  /** A marker (an event displayed as a marker) is a moment: on a date alone, refused. */
+  | 'marker-all-day'
+  /** A marker's end or duration: it has none, ignored. */
+  | 'marker-length-ignored'
   | 'unknown-resource'
   | 'invalid-rrule'
   /** An event with `rrule` while `@dzcalendar/core/recurrence` is not imported. */

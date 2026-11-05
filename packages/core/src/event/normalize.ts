@@ -126,10 +126,20 @@ function normalizeObject(input: EventInput, ctx: NormalizeContext, path: string)
   const endParsed = end?.ok ? end.parsed : null;
   const allDay = input.allDay ?? (start.parsed.kind === 'date' && (!endParsed || endParsed.kind === 'date'));
 
+  // A marker is a moment: its start alone (a date is no moment), whatever end or duration came with it.
+  const marker = input.display === 'marker';
+  if (marker && allDay) {
+    problems.push(problem('marker-all-day', 'error', `${path}.start`, String(input.start)));
+    return failed();
+  }
+  if (marker && (endParsed || duration)) problems.push(problem('marker-length-ignored', 'warning', endParsed ? `${path}.end` : `${path}.duration`, String(endParsed ? input.end : input.duration)));
+
   const common = buildCommon(input, ctx, path, problems);
   const span = allDay
     ? allDaySpan(input, ctx, path, start.parsed, endParsed, duration, problems)
-    : timedSpan(input, ctx, path, start.parsed, endParsed, duration, problems);
+    : marker
+      ? timedSpan(input, ctx, path, start.parsed, null, new Temporal.Duration(), problems)
+      : timedSpan(input, ctx, path, start.parsed, endParsed, duration, problems);
 
   if (!span || isError()) return failed();
   let event = Object.freeze({ ...common, ...span }) as CalEvent;

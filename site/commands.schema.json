@@ -134,6 +134,7 @@
                     "list-item",
                     "background",
                     "inverse-background",
+                    "marker",
                     "none"
                   ]
                 },
@@ -474,6 +475,7 @@
                     "list-item",
                     "background",
                     "inverse-background",
+                    "marker",
                     "none"
                   ]
                 },
@@ -734,6 +736,7 @@
             "list-item",
             "background",
             "inverse-background",
+            "marker",
             "none"
           ]
         },

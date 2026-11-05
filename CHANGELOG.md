@@ -182,6 +182,13 @@
   Vue controllers and `<dz-calendar>`). `timeline.follow` keeps the present
   in view, paused by the person's own move along time, taken up by "Today".
   `playground/supervision.html` shows both.
+- `display: 'marker'` (owner, 2026-11-05): a moment without length — an
+  alert, a deployment. In a timeline, a line across its row where it
+  happened and a flag with its title in a lane beside it; in a time grid, a
+  line across the column. A start only: an end or a duration is ignored
+  (`marker-length-ignored`, a warning), a date alone is refused
+  (`marker-all-day`). A moment's time is written once ("14:32", not
+  "14:32 – 14:32"). The supervision playground's alerts are markers.
 - `onFollowChange(following)` (owner, 2026-11-05): a timeline following the
   present paused or took it up again — for a "Back to live" button. With
   `timeline.step`, PageUp/PageDown slide the timeline by it, as ◀ ▶ do.

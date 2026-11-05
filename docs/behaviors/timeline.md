@@ -39,6 +39,13 @@ keeps the area and the heads in place.
   resize; the period at most, one slot at least), written as `--dz-tl-slot`.
   A change by `update()` keeps the minute at the centre in place, the
   present while following. Without it, the stylesheet's width.
+- A marker (`display: 'marker'`, owner 2026-11-05) is a moment: a line
+  across its row where it happened, its flag (the title, or the content
+  hook's) in a lane beside it, three slots wide — the room its lane keeps.
+  It has a start only: an end or a duration given is ignored
+  (`marker-length-ignored`), a date alone refused (`marker-all-day`). In a
+  time grid, a line across its column, the title under it; in a month or a
+  list, a line as a timed event's. Its time is written once ("14:32").
 - A background event (a maintenance window) is a tint behind the row's
   events; the event content hook gives it a label (`background: true`),
   drawn at its start and kept in view while the row scrolls by.

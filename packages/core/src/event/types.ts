@@ -14,7 +14,11 @@ export type RecurrenceKey = string;
 /** What can be written where a moment is expected. Never a `Date` — see `date-object-rejected`. */
 export type TemporalInput = ZonedDateTime | PlainDate | PlainDateTime | Instant | string;
 
-export type EventDisplay = 'auto' | 'block' | 'list-item' | 'background' | 'inverse-background' | 'none';
+/**
+ * How an event is drawn. `'marker'` (owner, 2026-11-05): a moment without length — an alert, a deployment —
+ * a line where it happened and a flag with its title; it has a start only (an end or a duration given is ignored, said).
+ */
+export type EventDisplay = 'auto' | 'block' | 'list-item' | 'background' | 'inverse-background' | 'marker' | 'none';
 export type EventStatus = 'confirmed' | 'tentative' | 'cancelled';
 
 /**

@@ -248,6 +248,8 @@ dz-calendar { display: block; }
 .dz-ev--cont-start { border-start-start-radius: 0; border-start-end-radius: 0; }
 .dz-ev--cont-end { border-end-start-radius: 0; border-end-end-radius: 0; }
 .dz-ev--bg { z-index: 0; opacity: 0.35; border: 0; }
+/* A marker (display: 'marker') in a column: a line across it at its moment, its title under the line. */
+.dz-ev[data-marker] { border-inline-start: 0; border-top: 2px solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))); border-radius: 0; background: transparent; padding-top: 0; }
 /* A background with its own content: the tint mixed in, the label at full strength. */
 .dz-ev--bg.dz-ev--labelled { overflow: visible; opacity: 1; background: color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 22%, transparent); color: var(--dz-fg, var(--dzc-fg)); pointer-events: none; }
 /* Its label stays at the top of what is shown: the column starts at midnight, the grid is scrolled to the morning. */

@@ -103,9 +103,11 @@ function buildRow(key: string, instances: readonly EventInstance[], axis: Timeli
       from: Temporal.Instant.fromEpochMilliseconds(Math.max(s, a)),
       to: Temporal.Instant.fromEpochMilliseconds(Math.min(e, b)),
     };
-    const bar = { segment, from: axis.toPosition(s), to: axis.toPosition(e), lane: 0 };
+    // A marker is a moment: its line, and its flag three slots wide beside it — the room its lane keeps for the title.
+    const flag = inst.event.display === 'marker' ? 3 * unit : 0;
+    const bar = { segment, from: axis.toPosition(s), to: axis.toPosition(flag ? Math.min(s + flag, b) : e), lane: 0 };
     if (isBackground(inst)) background.push(bar);
-    else bars.push({ bar, s: Math.max(s, a), e: Math.max(Math.min(e, b), Math.max(s, a) + minMs), rank: i });
+    else bars.push({ bar, s: Math.max(s, a), e: Math.max(Math.min(flag ? s + flag : e, b), Math.max(s, a) + minMs), rank: i });
   });
   const packed = packLanes(bars.map((x) => ({ key: x.bar.segment.key, start: x.s, end: x.e, rank: [x.rank] })));
   const placed = bars.map((x) => ({ ...x.bar, lane: packed.lanes.get(x.bar.segment.key)! }));

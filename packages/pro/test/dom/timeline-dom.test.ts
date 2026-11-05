@@ -299,6 +299,14 @@ describe('a background event on a timeline row', () => {
   });
 });
 
+describe('a marker on a timeline row', () => {
+  it('a moment: marked, its flag three slots wide in a lane, its time written once', () => {
+    const host = mount([{ id: 'x', title: 'Déploiement', start: '2026-10-21T10:15[Europe/Paris]', resourceId: 'irm', display: 'marker' }], { timeline: { slot: 30 } });
+    const el = host.querySelector<HTMLElement>('.dz-tl__ev[data-event-id="x"]') ?? host.querySelector<HTMLElement>('.dz-tl__ev[data-marker]');
+    expect([el?.hasAttribute('data-marker'), el?.style.getPropertyValue('--w'), el?.querySelector('.dz-tl__ev-time')?.textContent]).toEqual([true, '3', '10:15']);
+  });
+});
+
 describe('the timeline’s step and following the present', () => {
   it('a step is hours and minutes, longer than nothing; follow is true or false — anything else refused at creation and by update()', () => {
     for (const [bad, said] of [

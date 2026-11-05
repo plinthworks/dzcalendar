@@ -1869,6 +1869,15 @@ try {
       const thin = await at();
       check('span: a resize, not following, keeps the minute at the centre', thin.shown === 60 && Math.abs(thin.centre - wide.centre) <= 1, JSON.stringify({ wide, thin }));
       check('span: a narrower window still shows the hour asked', thin.shown === 60, JSON.stringify(thin));
+      // A marker (the alerts): a line across its whole row, its flag in a lane beside it.
+      const marker = await p.evaluate(() => {
+        const m = document.querySelector('.dz-tl__ev[data-marker]');
+        if (!m) return null;
+        const row = m.closest('.dz-tl__row').getBoundingClientRect();
+        const line = getComputedStyle(m, '::before');
+        return { row: Math.round(row.height), line: Math.round(parseFloat(line.height)), flag: Math.round(m.getBoundingClientRect().width), text: m.textContent };
+      });
+      check('marker: a line across its row, a flag with its title beside it', marker !== null && Math.abs(marker.line - marker.row) <= 2 && marker.flag > 40 && marker.text.includes('⚠'), JSON.stringify(marker));
       check('span: no console error', errors.length === 0, errors.join('\n'));
       await p.close();
     }
