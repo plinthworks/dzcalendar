@@ -1843,8 +1843,8 @@ try {
       await p.selectOption('#span', 'PT1H');
       await settle();
       const one = await at();
-      // The page shows an hour in slots of 5 minutes: 11:35 at the edge, the present 2 minutes in.
-      check('span: another span, live — 1 hour shown, the present’s slot still at the left edge', one.shown === 60 && Math.abs(one.past - 2) < 0.5, JSON.stringify(one));
+      // An hour in four quarters: 11:30 at the edge, the present 7 minutes in.
+      check('span: another span, live — 1 hour shown, the present’s quarter still at the left edge', one.shown === 60 && Math.abs(one.past - 7) < 0.5, JSON.stringify(one));
       await p.selectOption('#span', '');
       await settle();
       const all = await at();

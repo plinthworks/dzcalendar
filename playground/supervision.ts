@@ -99,7 +99,7 @@ const spanAsked = new URLSearchParams(location.search).get('span');
 if (spanAsked !== null) document.querySelector<HTMLSelectElement>('#span')!.value = spanAsked;
 const spanOf = () => document.querySelector<HTMLSelectElement>('#span')!.value || undefined;
 // A slot that suits the time shown: its head says a time that fits (24 h in quarters of an hour would be 96 heads).
-const slotOf = (span: string | undefined) => (span === 'P1D' ? 60 : span === 'PT12H' ? 30 : span === 'PT1H' ? 5 : 15);
+const slotOf = (span: string | undefined) => (span === 'P1D' ? 60 : span === 'PT12H' ? 30 : 15);
 const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   motion: createGsapMotion(),
   timeZone: ZONE,
