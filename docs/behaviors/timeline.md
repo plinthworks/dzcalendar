@@ -47,6 +47,15 @@ keeps the area and the heads in place.
   going by (still under reduced motion); its time reads "11:02 – running".
   `event.update({ ongoing: false })` finishes it: at its `end` if given,
   else now. A date alone or a series cannot run (`ongoing-not-timed`).
+- Recipe (owner 2026-11-05): a process's last status, its failures and
+  what runs now in its row head — the store tells what changed
+  (`kernel.subscribe`, `store` events), the application reads each
+  process's summary again and gives the resources anew (`extendedProps`)
+  only when one differs; `hooks.resource.content` draws it. In
+  `playground/supervision.ts`; the timeline guide (18j-3, batch 5) tells it.
+- A scroll asked (the present followed, a slide, "Today") is kept when
+  another model on the same axis arrives before the frame (the resources
+  or the events given anew at once).
 - `forget: { olderThan }` (owner 2026-11-05, a calendar option, live):
   each minute, and when the calendar is made, the events that ended more
   than that long ago leave the store (`kernel.forgetBefore`, cause 'api': no

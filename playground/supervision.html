@@ -24,6 +24,16 @@
       .card--failed .card__title { color: #b91c1c; }
       .flag { font-weight: 650; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .maint { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; background: rgb(255 255 255 / 0.7); }
+      /* A process's head: its name, then how it goes. */
+      .proc { display: grid; gap: 3px; min-width: 0; }
+      .proc__name { overflow: hidden; text-overflow: ellipsis; }
+      .proc__line { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 11.5px; color: #52525b; }
+      .proc__dot::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 4px; background: currentColor; }
+      .proc__dot--ok { color: #15803d; }
+      .proc__dot--failed { color: #b91c1c; }
+      .proc__run { color: #1d4ed8; }
+      .proc__fail { color: #b91c1c; font-weight: 600; }
+      #cal .dz-tl__cell { white-space: normal; }
       @media (prefers-reduced-motion: reduce) { .card--running .card__pill { animation: none; } }
       @keyframes pulse { 50% { opacity: 0.55; } }
     </style>

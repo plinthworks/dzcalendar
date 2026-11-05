@@ -40,6 +40,11 @@
 
 ### Fixed
 
+- A timeline whose resources or events were given anew right after it was
+  made (before the next frame) lost the scroll it had asked for — the
+  present followed, the hour shown first: a scroll is now kept when the new
+  model has the same axis.
+
 - A view's `dateIncrement: { minutes: 15 }` (or a `duration` in hours) was
   taken and did nothing: a date plus minutes is the same date. A view's
   `duration` and `dateIncrement` are now whole days or more, anything else a
@@ -182,6 +187,9 @@
   Vue controllers and `<dz-calendar>`). `timeline.follow` keeps the present
   in view, paused by the person's own move along time, taken up by "Today".
   `playground/supervision.html` shows both.
+- The supervision playground's process heads show the last run's status,
+  the failures of the last 24 hours and what runs now (a recipe with
+  `hooks.resource` and `kernel.subscribe`).
 - `@dzcalendar/core/live` (owner, 2026-11-05), an entry apart: `liveSource(id,
   { connect(emit) })` for any feed (a WebSocket, MQTT…) and `sseSource(id,
   url, { map })` for Server-Sent Events. Each message is `{ create }`,

@@ -1509,6 +1509,11 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     return m.axis.fromPosition(Math.floor(m.axis.toPosition(now))).epochMilliseconds;
   }
 
+  /** Two models on the same axis (the same period and scale): a place in one is the same moment in the other. */
+  function sameAxis(a: TimelineModel, b: TimelineModel): boolean {
+    return a === b || (a.axis.start.equals(b.axis.start) && a.axis.slotMinutes === b.axis.slotMinutes && a.axis.length === b.axis.length);
+  }
+
   /** Scrolls so an instant (epoch ms) sits at `frac` of the time shown (0: the left edge), once the scale is read. */
   function scrollAt(ms: number, frac: number, then?: () => void): void {
     const m = model;
@@ -1520,7 +1525,9 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       },
       write: ({ scale, shown }) => {
         then?.();
-        if (model !== m || !(scale > 0) || !Number.isFinite(scale)) return;
+        // Another period or scale since: this place means another moment there. Another model on the same axis (the
+        // resources or the events given anew before the frame): still the place asked.
+        if (!model || !sameAxis(model, m) || !(scale > 0) || !Number.isFinite(scale)) return;
         scrollAlong(Math.max(0, m.axis.toPosition(ms) * scale - frac * shown));
         lastAlong = scrolledAlong();
         lastRoom = room();

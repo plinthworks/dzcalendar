@@ -86,6 +86,12 @@ const stamp = (i: string) =>
 const el = (tag: string, cls: string, text = '') => Object.assign(document.createElement(tag), { className: cls, textContent: text });
 
 const log = document.querySelector<HTMLElement>('#log')!;
+// What a process's head says, read from its runs: the last one finished, how many failed in 24 hours, one running.
+interface Summary {
+  readonly last: Status | null;
+  readonly failures: number;
+  readonly running: boolean;
+}
 const stepOf = () => document.querySelector<HTMLSelectElement>('#step')!.value || undefined;
 // `?span=` (the browser checks): another time shown at first, empty for the whole period.
 const spanAsked = new URLSearchParams(location.search).get('span');
@@ -108,6 +114,20 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   // A screen left open: what ended more than two days ago is forgotten.
   forget: { olderThan: { days: 2 } },
   hooks: {
+    // A process's row head: its name, how its last run went, its failures of the last 24 hours, whether one runs now.
+    resource: {
+      content: ({ resource }) => {
+        const x = resource.extendedProps as Partial<Summary>;
+        const box = el('div', 'proc');
+        box.append(el('b', 'proc__name', resource.title));
+        const line = el('div', 'proc__line');
+        if (x.last) line.append(el('span', `proc__dot proc__dot--${x.last}`, SAID[x.last]));
+        if (x.running) line.append(el('span', 'proc__run', '▶ en cours'));
+        if (x.failures) line.append(el('span', 'proc__fail', `${x.failures} échec${x.failures > 1 ? 's' : ''} / 24 h`));
+        box.append(line);
+        return box;
+      },
+    },
     event: {
       // The card, by kind: what happened, how it went, and when — to the second.
       content: ({ instance }) => {
@@ -159,6 +179,40 @@ const feed = liveSource('feed', {
   },
 });
 if (!fixed) cal.update({ sources: [feed] });
+
+// The recipe: the store tells what changed; each process's summary is read again, and the resources given anew
+// only when one differs — the heads redraw, nothing else.
+let said = '';
+function summarize(): void {
+  const t = now().epochMilliseconds;
+  const by = new Map<string, { last: Status | null; lastEnd: number; failures: number; running: boolean }>(processes.map((p) => [p.id as string, { last: null, lastEnd: -Infinity, failures: 0, running: false }]));
+  for (const e of cal.kernel.store.snapshot.allEvents()) {
+    const x = e.props as Partial<Props>;
+    const s = by.get(e.resourceIds[0] ?? '');
+    if (!s || x.kind !== 'run' || e.allDay) continue;
+    if (e.ongoing) s.running = true;
+    else {
+      const end = e.end.epochMilliseconds;
+      if (end > s.lastEnd) [s.last, s.lastEnd] = [x.status ?? null, end];
+      if (x.status === 'failed' && t - end < 86_400_000) s.failures++;
+    }
+  }
+  const resources = processes.map((p) => {
+    const { last, failures, running } = by.get(p.id as string)!;
+    return { ...p, extendedProps: { last, failures, running } satisfies Summary };
+  });
+  const text = JSON.stringify(resources);
+  if (text === said) return;
+  said = text;
+  cal.update({ resources });
+}
+let queued = false;
+cal.kernel.subscribe((e) => {
+  if (e.type !== 'store' || queued) return;
+  queued = true;
+  queueMicrotask(() => ((queued = false), summarize()));
+});
+summarize();
 
 document.querySelector<HTMLSelectElement>('#span')!.addEventListener('change', () => cal.update({ timeline: { span: spanOf(), slot: slotOf(spanOf()) } }));
 document.querySelector<HTMLSelectElement>('#step')!.addEventListener('change', () => cal.update({ timeline: { step: stepOf() } }));
