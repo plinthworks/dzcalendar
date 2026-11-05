@@ -1,7 +1,7 @@
 import { itemEvent, normalizeMany } from '../event/normalize.js';
 import type { NormalizationReport, NormalizeContext, Normalized } from '../event/normalize.js';
 import type { Problem } from '../event/problems.js';
-import type { EventInput } from '../event/types.js';
+import type { CalEvent, EventInput } from '../event/types.js';
 import type { Series } from '../recurrence/series.js';
 import { problem } from '../event/problems.js';
 import type { Mutation } from '../store/changes.js';
@@ -43,6 +43,8 @@ export interface SourceManagerOptions {
   readonly keepChunks?: number;
   /** Ids the owner loads by other means (the kernel's `events`): refused, with a `duplicate-id` problem. */
   readonly reserved?: readonly string[];
+  /** The events that ended before this (epoch ms) are forgotten (`forget`): a delivery does not bring them back. */
+  readonly forgotten?: () => number | null;
 }
 
 export interface SourceManager {
@@ -66,6 +68,8 @@ export interface SourceManager {
    * could not be loaded (`source:chunk`): what the file lacks.
    */
   hold(start: PlainDate, end: PlainDate): { readonly ready: Promise<{ readonly failed: readonly string[] }>; release(): void };
+  /** Events of these sources were forgotten (`forget`): a source that keeps them (`liveSource`) lets them go. */
+  forgot(bySource: ReadonlyMap<string, readonly string[]>): void;
   destroy(): void;
 }
 
@@ -370,7 +374,12 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
   function apply(src: SourceState, chunks: readonly Chunk[], inputs: readonly EventInput[], problems: readonly Problem[]): void {
     const { defaults, id } = src.spec;
     const withDefaults = defaults ? inputs.map((e) => ({ ...defaults, ...e })) : inputs;
-    const { items, report } = normalizeMany(withDefaults, o.normalize(), id);
+    const normalized = normalizeMany(withDefaults, o.normalize(), id);
+    const { report } = normalized;
+    // What is forgotten stays so: an event that ended before the mark is not brought back (a series is its rule's).
+    const mark = o.forgotten?.() ?? null;
+    const ended = (e: CalEvent) => (e.allDay ? e.end.toZonedDateTime({ timeZone: o.normalize().displayZone }).epochMilliseconds : e.ongoing ? Infinity : e.end.epochMilliseconds);
+    const items = mark === null ? normalized.items : normalized.items.filter((n) => n.kind !== 'event' || ended(n.event) > mark);
     if (problems.length + report.problems.length > 0) {
       notify({ type: 'problems', sourceId: id, report: { ...report, problems: [...problems.map((p) => ({ ...p, sourceId: id })), ...report.problems] } });
     }
@@ -610,6 +619,9 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
           for (const src of sources.values()) sync(src);
         },
       };
+    },
+    forgot(bySource) {
+      for (const [id, ids] of bySource) sources.get(id)?.spec.forgot?.(ids);
     },
     destroy() {
       destroyed = true;

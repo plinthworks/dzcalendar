@@ -1,6 +1,7 @@
 import type { CalEvent } from '../event/types.js';
 import type { Series } from '../recurrence/series.js';
 import { invert, mutationId, mutationKey } from '../store/changes.js';
+import { eventEquals } from '../store/diff.js';
 import type { Mutation, StoreChange } from '../store/changes.js';
 import type { EventStore } from '../store/store.js';
 import { applyCommand } from './apply.js';
@@ -115,6 +116,8 @@ function compact(mutations: readonly Mutation[]): Mutation[] {
   return out;
 }
 
+/** A running event whose end alone moved (to now): the same event, grown. */
+const onlyGrew = (a: CalEvent, b: CalEvent) => !a.allDay && !b.allDay && a.ongoing === true && b.ongoing === true && eventEquals({ ...a, end: b.end }, b);
 const touches = (e: Entry, keys: ReadonlySet<string>) => e.mutations.some((m) => keys.has(mutationKey(m)));
 
 /**
@@ -144,10 +147,20 @@ export function createHistory(store: EventStore, ctx: CommandContext | (() => Co
     }
   };
 
-  // Anyone else's change to an event or a series invalidates every entry that touches it.
+  // Anyone else's change to an event or a series invalidates every entry that touches it — except a running event
+  // grown to now (`refreshOngoing`): the entries follow it, its undo kept.
   const unsubscribe = store.subscribe((change) => {
     if (writing) return;
-    const ids = new Set([...[...change.added, ...change.updated, ...change.removed].map((id) => `event:${id}`), ...change.seriesChanged.map((id) => `series:${id}`)]);
+    const grown = new Map<CalEvent, CalEvent>();
+    for (const m of change.applied) if (m.kind === 'event' && m.before && m.after && onlyGrew(m.before, m.after)) (grown.set(m.before, m.after), grewTo.set(m.before, m.after));
+    if (grown.size > 0) {
+      const follow = (e: Entry) => {
+        e.mutations = e.mutations.map((m) => (m.kind !== 'event' ? m : { ...m, ...(m.before && grown.has(m.before) && { before: grown.get(m.before)! }), ...(m.after && grown.has(m.after) && { after: grown.get(m.after)! }) }));
+      };
+      for (const e of [...done, ...undone]) follow(e);
+    }
+    const kept = new Set([...grown.values()].map((e) => e.id));
+    const ids = new Set([...[...change.added, ...change.updated.filter((id) => !kept.has(id)), ...change.removed].map((id) => `event:${id}`), ...change.seriesChanged.map((id) => `series:${id}`)]);
     const dropped = [...done, ...undone].filter((e) => touches(e, ids)).map((e) => e.label);
     if (dropped.length === 0) return;
     done = done.filter((e) => !touches(e, ids));
@@ -155,6 +168,15 @@ export function createHistory(store: EventStore, ctx: CommandContext | (() => Co
     options.onDropped?.(dropped);
   });
 
+  /** A running event grown since: what it is now (an application's `applied`, kept from before, read through it). */
+  const grewTo = new WeakMap<CalEvent, CalEvent>();
+  const latest = (e: CalEvent | undefined): CalEvent | undefined => {
+    let x = e;
+    while (x && grewTo.has(x)) x = grewTo.get(x);
+    return x;
+  };
+  const nowOf = (applied: readonly Mutation[]): readonly Mutation[] =>
+    applied.map((m) => (m.kind !== 'event' ? m : { kind: 'event' as const, ...(m.before && { before: latest(m.before)! }), ...(m.after && { after: latest(m.after)! }) }));
   /** The entry each command's applied mutations went into: what `revert` takes out. */
   const origin = new WeakMap<readonly Mutation[], Entry>();
   /** What each write was (a command, an undo, a redo), and the write going on now. */
@@ -216,14 +238,14 @@ export function createHistory(store: EventStore, ctx: CommandContext | (() => Co
    */
   /** Whether this change can be taken back as it stands: its events unchanged since, its entry where it should be. */
   function mayTakeBack(applied: readonly Mutation[], kind: 'command' | 'undo' | 'redo', entry: Entry | undefined): boolean {
-    if (!entry || !stillApplies(store, applied)) return false;
-    if (restoresOrphan(store, [...applied].reverse().map(invert))) return false;
+    if (!entry || !stillApplies(store, nowOf(applied))) return false;
+    if (restoresOrphan(store, [...nowOf(applied)].reverse().map(invert))) return false;
     if (kind === 'command') return !((commands.get(entry) ?? 0) > 1 || entry === open);
     return kind === 'undo' ? undone.includes(entry) : done.includes(entry);
   }
   function takeBack(applied: readonly Mutation[], kind: 'command' | 'undo' | 'redo', entry: Entry | undefined): boolean {
     if (!entry || !mayTakeBack(applied, kind, entry)) return false;
-    const steps = [...applied].reverse().map(invert);
+    const steps = [...nowOf(applied)].reverse().map(invert);
     if (kind === 'command') {
       if ((commands.get(entry) ?? 0) > 1 || entry === open) return false;
       done = done.filter((e) => e !== entry);

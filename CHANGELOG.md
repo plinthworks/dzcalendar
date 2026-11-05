@@ -196,7 +196,10 @@
   `{ update, patch }`, `{ remove }` or `{ reset }`; the connection opens when
   the source is added and closes when it is removed or the calendar
   destroyed (an `EventSourceSpec`'s new `live` member). A stream the server
-  closed for good is opened again with the last id. The supervision
+  closed for good is opened again with the last id. The feed is the
+  authority: a person's edit to one of its events lasts until its next
+  message. What `forget` let go is not brought back by a delivery, and a
+  live source lets it go too (`EventSourceSpec.forgot`). The supervision
   playground's feed is a `liveSource`.
 - `forget: { olderThan: { days: 7 } }` (owner, 2026-11-05): each minute,
   the events that ended more than that long ago leave the calendar, whatever
@@ -209,7 +212,9 @@
   dashed end with stripes going by (`data-ongoing`); its time reads
   "11:02 – running" (`messages.ongoing`, in the five languages).
   `event.update({ ongoing: false })` finishes it at its `end`, else now. A
-  date alone or a series is refused (`ongoing-not-timed`).
+  date alone or a series is refused (`ongoing-not-timed`). Dragged or moved,
+  it keeps its expected length (none: it still runs to now); its undo and
+  `revert` survive the minutes that grow it.
 - `display: 'marker'` (owner, 2026-11-05): a moment without length — an
   alert, a deployment. In a timeline, a line across its row where it
   happened and a flag with its title in a lane beside it; in a time grid, a

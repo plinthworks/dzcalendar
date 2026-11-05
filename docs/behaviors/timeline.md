@@ -25,7 +25,9 @@ keeps the area and the heads in place.
   slide goes comes in (an aligned one still holding it: the next), landing
   where it was going. A one-day view stops at midnight on the way, a view of
   several days slides across it. `calendar.shift(by)` slides by any hours and minutes (a day or more throws, as the option).
-  PageUp/PageDown slide by it too, the cursor going on by as much.
+  PageUp/PageDown slide by it too, the cursor going on by as much (as far as
+  the slide really went: at a fixed period's end, "no further", the cursor
+  stays).
 - `timeline.follow` keeps the present's slot at the left edge (owner,
   2026-11-04: at 22:47 in quarters of an hour, 22:45 — what comes is what a
   supervisor watches), a step on when the next slot begins, the period after it brought in past midnight. The
@@ -47,6 +49,9 @@ keeps the area and the heads in place.
   going by (still under reduced motion); its time reads "11:02 – running".
   `event.update({ ongoing: false })` finishes it: at its `end` if given,
   else now. A date alone or a series cannot run (`ongoing-not-timed`).
+  Moved (a drag, `event.move`), it keeps its expected length — none: still
+  from its new start to now; resized from its start, its expected end stays.
+  The history follows its growth: its undo and `revert` stay.
 - Recipe (owner 2026-11-05): a process's last status, its failures and
   what runs now in its row head — the store tells what changed
   (`kernel.subscribe`, `store` events), the application reads each

@@ -84,4 +84,6 @@ export interface EventSourceSpec {
    * removed or replaced, or the calendar destroyed.
    */
   readonly live?: (changed: () => void) => () => void;
+  /** Its events the calendar forgot (`forget`), by id: a source that keeps its events lets these go. */
+  readonly forgot?: (ids: readonly string[]) => void;
 }

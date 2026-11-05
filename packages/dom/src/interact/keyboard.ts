@@ -243,8 +243,13 @@ export function attachKeyboard<G>(ctx: ViewCtx, shared: InteractionShared<G>): K
         const slid = at.kind === 'slot' ? ctx.slideStep(intent.dir) : null;
         if (slid !== null && at.kind === 'slot') {
           const instant = Temporal.Instant.fromEpochMilliseconds(at.instant.epochMilliseconds + slid);
-          const f = keys!.fit({ ...at, instant, date: instant.toZonedDateTimeISO(ctx.zone).toPlainDate() });
-          return moveCursor(at, f && typeof f === 'object' ? f : keys!.home(), false);
+          const f = slid === 0 ? null : keys!.fit({ ...at, instant, date: instant.toZonedDateTimeISO(ctx.zone).toPlainDate() });
+          // Nowhere to go (a fixed period's end) or past what is drawn: said, the cursor where it was.
+          if (!f || typeof f !== 'object') {
+            ctx.announce(m().noFurther);
+            return true;
+          }
+          return moveCursor(at, f, false);
         }
         // The cursor's date moves by the view's own step (a month: the 31st becomes the 30th), the way the view did.
         const before = ctx.kernel.getState();

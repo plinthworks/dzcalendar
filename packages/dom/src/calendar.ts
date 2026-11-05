@@ -807,7 +807,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
       const step = kernel.getOptions().timeline?.step;
       if (step === undefined) return null;
       const ms = (dir === 'next' ? 1 : -1) * timeStep(step);
-      return view?.slide?.(ms) ? ms : null;
+      return view?.slide?.(ms) ?? null;
     },
     announce(text) {
       // Emptied first, so the same words twice are said twice.
@@ -898,7 +898,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   /** ◀ ▶ and `navigate()`: a timeline with a step slides by it; "Today" also takes up following the present. */
   const go = (dir: NavDirection) => {
     const step = kernel.getOptions().timeline?.step;
-    if ((dir === 'prev' || dir === 'next') && step !== undefined && view?.slide?.((dir === 'next' ? 1 : -1) * timeStep(step))) return;
+    if ((dir === 'prev' || dir === 'next') && step !== undefined && (view?.slide?.((dir === 'next' ? 1 : -1) * timeStep(step)) ?? null) !== null) return;
     // Following first: the period's drawing then lands on the present, not on an eased "an hour before now" it would pause on.
     if (dir === 'today') view?.follow?.(kernel.now(), true);
     kernel.navigate(dir);
@@ -1633,7 +1633,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
     navigate: (dir) => go(dir),
     shift(by) {
       const d = Temporal.Duration.from(by);
-      return view?.slide?.(d.sign < 0 ? -timeStep(d.negated()) : timeStep(d)) ?? false;
+      return (view?.slide?.(d.sign < 0 ? -timeStep(d.negated()) : timeStep(d)) ?? null) !== null;
     },
     run: (cmd, opts) => kernel.run(cmd, opts),
     undo: () => kernel.history.undo(),

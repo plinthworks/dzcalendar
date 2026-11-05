@@ -93,3 +93,41 @@ describe('forgetting what is old (forgetBefore)', () => {
     expect([went, left, k.store.snapshot.getSeries('weekly') !== undefined, k.history.canUndo]).toEqual([3, ['recent', 'running'], true, false]);
   });
 });
+
+describe('a running event and what a person does to it (review)', () => {
+  it('its undo survives the minute that grows it; so does reverting the change the application was told of', () => {
+    clock = Temporal.Instant.from('2026-10-21T09:37:00Z');
+    const k = createKernel({ timeZone: 'Europe/Paris', locale: 'fr-FR', now, events: [{ id: 'run', title: 'Import', start: '2026-10-21T11:00[Europe/Paris]', ongoing: true }] });
+    k.run({ type: 'event.update', id: 'run', patch: { title: 'Import (lot 2)' } });
+    const renamed = k.history.run({ type: 'event.update', id: 'run', patch: { title: 'Import (lot 3)' } });
+    clock = Temporal.Instant.from('2026-10-21T09:52:00Z');
+    k.refreshOngoing();
+    const reverted = k.history.revert(renamed.change!.applied);
+    const afterRevert = k.store.snapshot.getEvent('run')?.title;
+    clock = Temporal.Instant.from('2026-10-21T09:58:00Z');
+    k.refreshOngoing();
+    const could = k.history.canUndo;
+    k.history.undo();
+    expect([reverted, afterRevert, could, k.store.snapshot.getEvent('run')?.title]).toEqual([true, 'Import (lot 2)', true, 'Import']);
+  });
+
+  it('moved: from its new start to now (no expected end made up); with an expected end, that end moves with it', () => {
+    clock = Temporal.Instant.from('2026-10-21T09:37:00Z');
+    const k = createKernel({
+      timeZone: 'Europe/Paris',
+      locale: 'fr-FR',
+      now,
+      events: [
+        { id: 'open', start: '2026-10-21T10:00[Europe/Paris]', ongoing: true },
+        { id: 'planned', start: '2026-10-21T11:00[Europe/Paris]', end: '2026-10-21T12:30[Europe/Paris]', ongoing: true },
+      ],
+    });
+    // As a drag sends it: the start and the drawn end, both an hour later.
+    k.run({ type: 'event.move', id: 'open', start: '2026-10-21T11:00[Europe/Paris]', end: '2026-10-21T12:37[Europe/Paris]' });
+    k.run({ type: 'event.move', id: 'planned', start: '2026-10-21T11:20[Europe/Paris]', end: '2026-10-21T12:50[Europe/Paris]' });
+    expect([ends(k.store.snapshot.getEvent('open')), ends(k.store.snapshot.getEvent('planned'))]).toEqual([
+      ['2026-10-21T11:37:00+02:00[Europe/Paris]', null, true],
+      ['2026-10-21T12:50:00+02:00[Europe/Paris]', '2026-10-21T12:50:00+02:00[Europe/Paris]', true],
+    ]);
+  });
+});

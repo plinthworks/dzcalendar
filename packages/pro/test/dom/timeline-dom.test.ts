@@ -358,14 +358,17 @@ describe('the timeline’s step and following the present', () => {
     off();
   });
 
-  it('onFollowChange says each change of following — not the option as first read', () => {
+  it('onFollowChange says each change of following, once the drawing is done — not the option as first read', async () => {
     const said: boolean[] = [];
     mount([], { timeline: { follow: true }, onFollowChange: (f: boolean) => void said.push(f) });
+    await Promise.resolve();
     const first = [...said];
     cal!.update({ timeline: { follow: false } });
+    const during = [...said];
     cal!.update({ timeline: { follow: true } });
     cal!.update({ timeline: { follow: true } });
-    expect([first, said]).toEqual([[], [false, true]]);
+    await Promise.resolve();
+    expect([first, during, said]).toEqual([[], [], [false, true]]);
   });
 
   it('a view that is not a timeline does not slide: shift() says so, ◀ ▶ change period', () => {

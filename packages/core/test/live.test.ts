@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { Temporal, createKernel } from '../src/index.js';
 import { liveSource, sseSource } from '../src/live.js';
 import type { LiveMessage } from '../src/live.js';
+import type { EventInput } from '../src/index.js';
 
 // Sources that are told, not asked (owner, 2026-11-05): `@dzcalendar/core/live`.
 const now = () => Temporal.Instant.from('2026-10-21T08:00:00Z');
@@ -110,6 +111,23 @@ describe('sseSource', () => {
   it('without an EventSource (a server render): nothing opened, nothing thrown', () => {
     const k = make([sseSource('runs', '/api/runs', { map: () => null })]);
     expect(FakeES.made.length).toBe(0);
+    k.destroy();
+  });
+});
+
+describe('liveSource and forget (review)', () => {
+  it('what the calendar forgot is not brought back by the next message, nor kept by the source', async () => {
+    let emit: (m: LiveMessage | readonly LiveMessage[]) => void = () => undefined;
+    let fetched: readonly EventInput[] = [];
+    const spec = liveSource('feed', { connect: (e) => ((emit = e), () => undefined) });
+    const k = make([{ ...spec, fetch: (r) => (fetched = spec.fetch(r) as readonly EventInput[]) }]);
+    emit([{ create: { id: 'old', title: 'Old', start: '2026-10-10T09:00[Europe/Paris]', duration: { hours: 1 } } }, { create: run('new', 'New') }]);
+    await k.sources.idle();
+    k.forgetBefore(Temporal.Instant.from('2026-10-14T08:00:00Z'));
+    emit({ create: run('newer', 'Newer', { start: '2026-10-21T10:00[Europe/Paris]' }) });
+    await k.sources.idle();
+    const ids = [...k.store.snapshot.allEvents()].map((e) => e.id).sort();
+    expect([ids, fetched.length]).toEqual([['new', 'newer'], 2]);
     k.destroy();
   });
 });

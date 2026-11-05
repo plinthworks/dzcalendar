@@ -484,6 +484,8 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   const now = o.now ?? systemNow;
   // A face handed back (`store: cal.kernel.store`) is the store it shows.
   const store = rawOf(o.store ?? createEventStore());
+  /** `forgetBefore`'s mark (epoch ms): what ended before it is not delivered again by a source. */
+  let forgottenBefore: number | null = null;
   const listeners = new Set<(e: KernelEvent) => void>();
 
   let timeZone = o.timeZone;
@@ -622,6 +624,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   const sources = createSourceManager({
     store: writerFace(store),
     normalize: () => ({ displayZone: timeZone, newId: idGen, now }),
+    forgotten: () => forgottenBefore,
     now,
     // The `events` option is its own array source, loaded apart.
     reserved: ['events'],
@@ -887,13 +890,18 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     },
     forgetBefore(at) {
       const ms = at.epochMilliseconds;
+      forgottenBefore = Math.max(forgottenBefore ?? -Infinity, ms);
       const gone: Mutation[] = [];
+      const bySource = new Map<string, string[]>();
       for (const e of store.snapshot.allEvents()) {
         if (!e.allDay && e.ongoing) continue;
         const end = e.allDay ? e.end.toZonedDateTime({ timeZone }).epochMilliseconds : e.end.epochMilliseconds;
-        if (end <= ms) gone.push({ kind: 'event', before: e });
+        if (end > ms) continue;
+        gone.push({ kind: 'event', before: e });
+        if (e.sourceId !== undefined) bySource.set(e.sourceId, [...(bySource.get(e.sourceId) ?? []), e.id]);
       }
       if (gone.length > 0) store.apply(gone, 'api');
+      if (bySource.size > 0) sources.forgot(bySource);
       return gone.length;
     },
     refreshOngoing() {

@@ -171,7 +171,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
   const follows = (v: boolean) => {
     if (v === following) return;
     following = v;
-    ctx.live().onFollowChange?.(v);
+    // Told once the drawing is done: the application may update the calendar from it (the first drawing too).
+    queueMicrotask(() => ctx.live().onFollowChange?.(v));
   };
   /** The option as last read: turned on by `update()`, following starts. */
   let followAsked: boolean | null = null;
@@ -1437,7 +1438,7 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
 
     slide(ms) {
       const m = model;
-      if (!m || !(px > 0) || m.axis.length === 0) return false;
+      if (!m || !(px > 0) || m.axis.length === 0) return null;
       follows(false);
       const unit = m.axis.slotMinutes * 60_000;
       const start = m.axis.start.epochMilliseconds;
@@ -1448,10 +1449,10 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
       const t = left + ms;
       // A pixel's worth of time: positions are rounded.
       const eps = unit / px;
-      if (t >= start - eps && t <= last + eps) return (scrollAt(t, 0), true);
+      if (t >= start - eps && t <= last + eps) return (scrollAt(t, 0), t - left);
       // Short of the edge: up to it first, the next press brings in the next period.
-      if (ms > 0 && left < last - eps) return (scrollAt(last, 0), true);
-      if (ms < 0 && left > start + eps) return (scrollAt(start, 0), true);
+      if (ms > 0 && left < last - eps) return (scrollAt(last, 0), last - left);
+      if (ms < 0 && left > start + eps) return (scrollAt(start, 0), start - left);
       // The period that holds where it goes; a period aligned (a week) that still holds it: the one after it.
       const dateOf = (x: number) => Temporal.Instant.fromEpochMilliseconds(x).toZonedDateTimeISO(ctx.zone).toPlainDate();
       const before = ctx.kernel.getState().range.start;
@@ -1462,8 +1463,8 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         ctx.kernel.navigate({ to: dateOf(end) });
       }
       // A fixed period: nowhere further.
-      if (ctx.kernel.getState().range.start.equals(before)) landAt = null;
-      return true;
+      if (ctx.kernel.getState().range.start.equals(before)) return (landAt = null), 0;
+      return landAt - left;
     },
 
     follow(now, resume) {

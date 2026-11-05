@@ -199,7 +199,11 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
       case 'event.update':
         return edit(c.id, c.patch, c, path);
       case 'event.move': {
-        const patch: EventPatch = { start: c.start, ...(c.end !== undefined && { end: c.end }), ...(c.resourceIds !== undefined && { resourceIds: c.resourceIds }) };
+        // A running event moved: its start, and its expected length kept — its drawn end is now's, not a length.
+        // (a series' occurrence never runs: only a single event is read here)
+        const running = current.getEvent(c.id);
+        const end = running && !running.allDay && running.ongoing ? undefined : c.end;
+        const patch: EventPatch = { start: c.start, ...(end !== undefined && { end }), ...(c.resourceIds !== undefined && { resourceIds: c.resourceIds }) };
         return edit(c.id, patch, c, path);
       }
       case 'event.resize': {
@@ -208,7 +212,9 @@ export function applyCommand(snap: StoreSnapshot, cmd: Command, ctx: CommandCont
         const now = shown(t);
         if (!now) return false;
         // The other edge stays where it is.
-        const patch: EventPatch = c.edge === 'start' ? { start: c.to, end: now.end } : { end: c.to };
+        // A running event's other edge is its expected end (none: it still runs to now).
+        const other = !now.allDay && now.ongoing ? now.expectedEnd : now.end;
+        const patch: EventPatch = c.edge === 'start' ? { start: c.to, ...(other !== undefined && { end: other }) } : { end: c.to };
         return edit(c.id, patch, c, path);
       }
       case 'event.delete': {

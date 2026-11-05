@@ -215,9 +215,10 @@ export interface ViewController {
   scrollTo?(minutes: number): void;
   /**
    * Slides along time by `ms` (negative: back) — the timeline's `step`, `shift()`: the axis
-   * scrolls, and the period moves when it ends. False: this view does not slide.
+   * scrolls, and the period moves when it ends. How far it really went (ms; 0: nowhere — a fixed period's end,
+   * clamped at an edge less than asked); null: this view does not slide.
    */
-  slide?(ms: number): boolean;
+  slide?(ms: number): number | null;
   /** Once a minute and at "Today": the timeline's `follow` keeps the present in view (`resume`: following again). */
   follow?(now: Instant, resume: boolean): void;
   /**

@@ -27,7 +27,8 @@ export interface LiveSourceOptions {
 /**
  * A source that is told, not asked: `connect` opens the feed, each message changes the source's events, and the
  * calendar draws what changed. An event without an `id` cannot be changed later: it is given one (`<source>-<n>`).
- * A person's edit to one lasts until the feed changes it.
+ * The feed is the authority: a person's edit to one of its events lasts until its next message, whichever event
+ * that message is about (each message delivers the source anew).
  */
 export function liveSource(id: string, o: LiveSourceOptions): EventSourceSpec {
   const events = new Map<string, EventInput>();
@@ -59,6 +60,10 @@ export function liveSource(id: string, o: LiveSourceOptions): EventSourceSpec {
     chunk: { unit: 'none', prefetch: 0 },
     ...(o.defaults && { defaults: o.defaults }),
     fetch: () => [...events.values()],
+    // What the calendar forgot is not kept here either: the list does not grow for as long as the page is open.
+    forgot: (ids) => {
+      for (const x of ids) events.delete(x);
+    },
     live(onChange) {
       changed = onChange;
       const stop = o.connect((message) => {
