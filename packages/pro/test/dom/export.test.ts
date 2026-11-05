@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { Temporal } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import type { CalendarInstance } from '@dzcalendar/dom';
-import { exportCSV, exportICS, exportPDF, exportPNG, exportXLSX } from '../../src/export-entry.js';
+import { downloadExport, exportCSV, exportICS, exportPDF, exportPNG, exportXLSX } from '../../src/export-entry.js';
 import { printPages } from '../../src/print-entry.js';
 
 // The public functions in jsdom: what bad input returns (never a throw), what the ICS keeps.
@@ -40,6 +40,11 @@ describe('exports and print, bad input', () => {
     ]);
     expect(r.map(codes)).toEqual([['options:object'], ['separator:ab'], ['view:toString'], ['paper:b5'], ['to:not-after-from'], ['view:toString']]);
     expect([r[0]!.blob, document.querySelector('.dz-print')]).toEqual([null, null]);
+  });
+  it('downloadExport of a kind named after an Object method ("toString", "constructor"): a problem, not undefined', async () => {
+    const c = mount();
+    const r = await Promise.all([downloadExport(c, 'toString' as never, 'x'), downloadExport(c, 'constructor' as never, 'x')]);
+    expect(r.map((p) => p.map((x) => `${x.path}:${x.detail}`))).toEqual([['kind:toString'], ['kind:constructor']]);
   });
 });
 

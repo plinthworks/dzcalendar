@@ -131,3 +131,17 @@ describe('liveSource and forget (review)', () => {
     k.destroy();
   });
 });
+
+describe('liveSource and the calendar clock (1.1.0)', () => {
+  it('a run said finished without an end ends at the calendar’s now, not the real clock', async () => {
+    let emit: (m: LiveMessage | readonly LiveMessage[]) => void = () => undefined;
+    const k = make([liveSource('runs', { connect: (e) => ((emit = e), () => undefined) })]);
+    // Started 09:00 Paris (07:00Z), the calendar's clock at 08:00Z: an hour on.
+    emit({ create: { id: 'r', title: 'Import', start: '2026-10-21T09:00[Europe/Paris]', ongoing: true } });
+    await k.sources.idle();
+    emit({ update: 'r', patch: { ongoing: false } });
+    await k.sources.idle();
+    const e = k.store.snapshot.getEvent('r');
+    expect(e && !e.allDay ? e.end.toInstant().toString() : null).toBe('2026-10-21T08:00:00Z');
+  });
+});

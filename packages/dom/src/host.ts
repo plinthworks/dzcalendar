@@ -211,6 +211,11 @@ export interface ViewController {
   render(model: unknown, state: KernelState): HTMLElement[];
   /** Once a minute: the now line, today's cell. */
   tick(now: Instant, state: KernelState): void;
+  /**
+   * Once a minute, with the same now the running events grow to (`kernel.refreshOngoing()`):
+   * a running event's piece split again where now falls (`data-expected`, `--dz-ongoing-now`).
+   */
+  ongoing?(now: Instant): void;
   /** First paint only: scroll to this many minutes from the start of the axis. */
   scrollTo?(minutes: number): void;
   /**

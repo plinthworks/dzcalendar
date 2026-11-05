@@ -60,7 +60,7 @@ contract test fails, as for a part.
 | Where | States |
 |---|---|
 | a day: `.dz-dg__cell`, `.dz-tg__col`, `.dz-tg__dayhead`, `.dz-list__day` (a year's cells too) | `data-date`, `data-weekday` (ISO, Monday `1` … Sunday `7`), `data-today`, `data-past`, `data-future`, `data-outside` (a month's padding day), `data-closed` (business hours closed all that day), `data-folded` (a day that did not exist in the zone), `data-resource` (its column's resource) |
-| an event, every view: `.dz-ev`, `.dz-bar`, `.dz-list__ev`, `.dz-tl__ev` (the "+N" panel's bars too) | `data-event-id`, `data-series-id`, `data-tone` (its tone's name), `data-all-day`, `data-background`, `data-marker` (a moment: `display: 'marker'`; its flag at most `--dz-marker-flag` wide, 16rem), `data-ongoing` (still running), `data-past` / `data-future`, `data-selected` (touch), `data-moving` (being moved by a pointer or the keyboard), `data-editable` (`move`, `resize` or both: what it may do by its own say — `startEditable`, `durationEditable` or `editable: true` — even in a calendar that is not); on a grid's blocks and bars (`.dz-ev`, `.dz-bar` in a grid, `.dz-tl__ev` — not a list's entries nor the panel's bars): `data-continues-before` / `data-continues-after`, the same as the classes ending in `--cont-start` / `--cont-end` (cut by the period's edge) |
+| an event, every view: `.dz-ev`, `.dz-bar`, `.dz-list__ev`, `.dz-tl__ev` (the "+N" panel's bars too) | `data-event-id`, `data-series-id`, `data-tone` (its tone's name), `data-all-day`, `data-background`, `data-marker` (a moment: `display: 'marker'`; its flag at most `--dz-marker-flag` wide, 16rem), `data-ongoing` (still running), `data-expected` (a running event's piece reaching past now, its expected end ahead: past `--dz-ongoing-now` the expected part — a time grid's block, a timeline's bar), `data-past` / `data-future`, `data-selected` (touch), `data-moving` (being moved by a pointer or the keyboard), `data-editable` (`move`, `resize` or both: what it may do by its own say — `startEditable`, `durationEditable` or `editable: true` — even in a calendar that is not); on a grid's blocks and bars (`.dz-ev`, `.dz-bar` in a grid, `.dz-tl__ev` — not a list's entries nor the panel's bars): `data-continues-before` / `data-continues-after`, the same as the classes ending in `--cont-start` / `--cont-end` (cut by the period's edge) |
 | a preview: `.dz-ghost` | `data-invalid` (the rules refuse that place); `data-time` holds the time shown (a value, not a state) |
 | a free slot: `.dz-slot` | `data-seats` (seats left, a group session) |
 | the calendar: `.dz-cal` | `data-view` (the view's type), `data-dz-theme`, `data-dz-scheme` (`light` / `dark` when forced), `data-dz-density`, `data-dz-event-style`, `data-dz-look` (`none` when unstyled), `data-editable`, `data-loading` |
@@ -107,6 +107,7 @@ calendar) and `dz-calendar::part(toolbar)` (its header).
 | `--dz-list-head`, `--dz-tl-head` | the room a focused row keeps under the list's sticky day head (2.75rem), the timeline's time head (3.25rem, its height too) |
 | `--dz-closed-image`, `--dz-outside-fg` | a month's days out of service (pale hatching, an image; `none` to drop it), a padding day's number (muted) |
 | `--dz-line`, `--dz-today-bg`, `--dz-outside-bg`, `--dz-off-bg`, `--dz-now` | grid lines, today, a month's padding days, closed hours, the now line |
+| `--dz-ongoing-expected-bg` | a running event's expected part, past now (the background: no fill; on a solid block none either — its fill stays under the text, the part only dashed) |
 | `--dz-gap-stripe`, `--dz-repeat-bg` | a skipped hour's stripes, a repeated hour's band (clock changes) |
 | `--dz-event-bg`, `--dz-event-fg`, `--dz-on-tone`, `--dz-tone-*` | an event's surface and text; text on a solid tone; each tone (the green one is --dz-tone-green; your `defineTheme` tones) |
 | `--dz-slot-bg`, `--dz-slot-border`, `--dz-slot-fg`, `--dz-slot-hover-bg` | free slots (`availableSlots`) |
@@ -122,7 +123,7 @@ a grid's columns, where the hour lines fall), `--dz-mm-cols`,
 `--dz-tl-area-cols`, `--dz-tl-grouprow`, `--dz-tl-lane`, `--dz-tl-lanes`,
 `--dz-tl-len`, `--dz-tl-line`, `--dz-tl-row`, `--dz-tl-slot` (the
 timeline's geometry), `--dz-tl-tick-font` (the font of `timeline.ticks`' times),
-`--dz-tl-tick-color` (the ruler's marks: the text, half strength). Unprefixed ones (`--t`, `--h`, `--gx`…) are
+`--dz-tl-tick-color` (the ruler's marks: the text, half strength), `--dz-ongoing-now` (on a running event's piece, `data-expected`: where now falls along it, 0 to 1, once a minute). Unprefixed ones (`--t`, `--h`, `--gx`…) are
 positions, private.
 
 The --dzc-… and --dzp-… properties are the theme's own palette, private: the calendar reads a --dz-… one first, then the tzslot palette's --tz-… one, then its own. Set the --dz-… ones.
@@ -214,7 +215,7 @@ The --dzc-… and --dzp-… properties are the theme's own palette, private: the
 | `.dz-menu`, `.dz-menu__item`, `.dz-menu__label`, `.dz-menu__shortcut`, `.dz-menu__reason`, `.dz-menu__chevron`, `.dz-menu__sub` | the context menu |
 | `.dz-ghosts`, `.dz-ghost`, `.dz-ghost--armed`, `.dz-ghost--select`, `.dz-ghost__title`, `.dz-ghost__handle`, `.dz-ghost__handle--start`, `.dz-ghost__handle--end` | a drag's or a selection's preview |
 | `.dz-draggable`, `.dz-draggable--dragging`, `.dz-draggable--held`, `.dz-drag-avatar` | an element made draggable (`makeDraggable`), its picture under the pointer |
-| `.dz-editor`, `.dz-editor-backdrop`, `.dz-editor__form`, `.dz-editor__title`, `.dz-editor__row`, `.dz-editor__field`, `.dz-editor__label`, `.dz-editor__input`, `.dz-editor__num`, `.dz-editor__unit`, `.dz-editor__when`, `.dz-editor__group`, `.dz-editor__days`, `.dz-editor__radios`, `.dz-editor__checks`, `.dz-editor__check`, `.dz-editor__note`, `.dz-editor__error`, `.dz-editor__actions`, `.dz-editor__btn`, `.dz-editor__btn--primary`, `.dz-editor__btn--danger` | the Pro's event editor |
+| `.dz-editor`, `.dz-editor--readonly` (an event the person may not change), `.dz-editor__readonly` (its "Read only" line), `.dz-editor-backdrop`, `.dz-editor__form`, `.dz-editor__title`, `.dz-editor__row`, `.dz-editor__field`, `.dz-editor__label`, `.dz-editor__input`, `.dz-editor__num`, `.dz-editor__unit`, `.dz-editor__when`, `.dz-editor__group`, `.dz-editor__days`, `.dz-editor__radios`, `.dz-editor__checks`, `.dz-editor__check`, `.dz-editor__note`, `.dz-editor__error`, `.dz-editor__actions`, `.dz-editor__btn`, `.dz-editor__btn--primary`, `.dz-editor__btn--danger` | the Pro's event editor |
 | `.dz-custom` | a view of one's own (`defineView`) |
 
 ### Print (Pro)

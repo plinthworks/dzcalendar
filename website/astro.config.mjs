@@ -87,6 +87,7 @@ export default defineConfig({
             'unstyled',
             'languages',
             'resources-timeline',
+            'supervision',
             'editor',
             'print-export',
           ].map((page) => ({ slug: `guides/${page}` })),

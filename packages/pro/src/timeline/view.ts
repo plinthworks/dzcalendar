@@ -4,6 +4,7 @@ import {
   KeyedList,
   NodePool,
   applyEventLook,
+  markOngoing,
   attachMenuTriggers,
   contentsHost,
   ensureStyles,
@@ -681,8 +682,24 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
     reportToggle();
   }
 
+  /** Running events drawn, with where now falls along each (redone once a minute: `ongoing`). */
+  const running = new Map<HTMLElement, (now: Instant) => void>();
+  function splitAtNow(el: HTMLElement, it: BarItem): void {
+    const b = it.bar;
+    const ev = b.segment.instance.event;
+    const on = !it.bg && !ev.allDay && ev.ongoing === true;
+    // A running event is timed: its piece's ends are instants.
+    const from = b.segment.from as Instant;
+    const to = b.segment.to as Instant;
+    const mark = (now: Instant) => markOngoing(el, on, now, from, to, () => (model && b.to > b.from ? (model.axis.toPosition(now) - b.from) / (b.to - b.from) : 1));
+    if (on) running.set(el, mark);
+    else running.delete(el);
+    mark(drawNow(ctx));
+  }
+
   function drawBar(el: HTMLElement, it: BarItem, changed: { pos: boolean; content: boolean; created: boolean }): void {
     const b = it.bar;
+    if (changed.pos || changed.content) splitAtNow(el, it);
     if (changed.pos) {
       place(el, b.from, b.to);
       el.style.setProperty('--lane', String(b.lane));
@@ -1493,6 +1510,13 @@ export function createTimelineView(ctx: ViewCtx): ViewController {
         else scrollToMinutes(scrollMinutes);
       }
       return created;
+    },
+
+    ongoing(now) {
+      for (const [el, mark] of running) {
+        if (el.isConnected) mark(now);
+        else running.delete(el);
+      }
     },
 
     tick(now) {

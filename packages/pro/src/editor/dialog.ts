@@ -1,20 +1,35 @@
 import { Temporal, UNASSIGNED, formatTemporal, serializeRRule } from '@dzcalendar/core';
-import type { CalEvent, Command, CommandResult, CreateRequest, EditScope, EventInput, EventInstance, EventPatch, PlainDate, RRuleWeekday as Weekday, ZoneId } from '@dzcalendar/core';
-import { ensureStyles, messagesForLocale } from '@dzcalendar/dom';
-import { activeIn, targetOf } from '@dzcalendar/dom/toolkit';
+import type { CalEvent, Command, CommandResult, CreateRequest, EditScope, EventInput, EventInstance, EventPatch, Instant, PlainDate, Problem, RRuleWeekday as Weekday, ZonedDateTime, ZoneId } from '@dzcalendar/core';
+import { ensureStyles } from '@dzcalendar/dom';
+import { activeIn, mayDelete, mayMove, mayResize, messagesWithDefaults, targetOf } from '@dzcalendar/dom/toolkit';
 import type { CalendarInstance } from '@dzcalendar/dom';
 // The /lazy entry (tzslot 2.4): the widgets without the Temporal polyfill, which the application loads where it is
 // missing (`loadTemporal()`) — the default entry would put it in the editor's chunk for every browser (18i).
 import { createDateTimeRange, EN as TZ_EN, FR as TZ_FR, AR as TZ_AR } from '@tzslot/dom/lazy';
 import type { DateTimeRangeInstance } from '@tzslot/dom/lazy';
-import { editorMessagesFor } from './messages.js';
+import { EDITOR_EN, editorMessagesFor } from './messages.js';
 import type { EditorMessages } from './messages.js';
 import { nthOf, readRepeat, writeRepeat } from './recurrence.js';
 import type { RepeatForm, RepeatFreq } from './recurrence.js';
 import { EDITOR_CSS } from './styles.js';
 
-/** What the editor opens on: an event (or an occurrence of a series), or a new one from the calendar's request. */
-export type EditorTarget = { readonly instance: EventInstance } | { readonly create: CreateRequest };
+/**
+ * A new event: the calendar's request ("New event here", a `CreateRequest`) or a selection's range. `end`, when
+ * given, is where the form's event ends: a moment after `start` for a timed one (an `Instant`, or a
+ * `ZonedDateTime` as `onSelect` gives it), a date after `start` for a whole-day one (exclusive: the selection's
+ * `end`). Without it: `defaultMinutes` for a timed event, one day for a whole-day one. An end that cannot be
+ * used (another kind, not after the start) is left out, told as a warning `Problem` (`onProblem`).
+ */
+export type EditorCreate =
+  | (Extract<CreateRequest, { readonly allDay: false }> & { readonly end?: Instant | ZonedDateTime })
+  | (Extract<CreateRequest, { readonly allDay: true }> & { readonly end?: PlainDate });
+
+/**
+ * What the editor opens on: an event (or an occurrence of a series), or a new one from the calendar's request or a
+ * selection. An event the person may not change (the calendar's `editable`, the event's own, as the context menu
+ * reads them) opens read-only.
+ */
+export type EditorTarget = { readonly instance: EventInstance } | { readonly create: EditorCreate };
 
 export type EditorOutcome = 'saved' | 'deleted' | 'cancelled';
 
@@ -31,6 +46,11 @@ export interface EditorOptions {
   readonly tones?: readonly string[];
   /** False under a CSP without inline styles: include `EDITOR_CSS` yourself. Default true. */
   readonly injectStyles?: boolean;
+  /**
+   * What the editor could not use as given (a create target's `end` of another kind, or not after its start: left
+   * out, a warning). Without it, said once per code on the console.
+   */
+  readonly onProblem?: (problem: Problem) => void;
 }
 
 const TONES = ['blue', 'green', 'red', 'amber', 'violet', 'slate'] as const;
@@ -59,8 +79,10 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
   const state = cal.kernel.getState();
   const locale = state.locale;
   const calZone = state.timeZone;
-  const words: EditorMessages = { ...editorMessagesFor(locale), ...o.messages } as EditorMessages;
-  const cm = messagesForLocale(locale);
+  // English under a set defined before a version added words (`readOnly`, `close`).
+  const words: EditorMessages = { ...EDITOR_EN, ...editorMessagesFor(locale), ...o.messages } as EditorMessages;
+  // The calendar's words — scope, refusals — with its own `messages` over them, as the calendar speaks.
+  const cm = messagesWithDefaults(cal.getOptions().messages, locale);
   const host = o.container ?? cal.element;
   const doc = host.ownerDocument;
   // Layered or not as the calendar's own sheets are (its `cssLayers`: the first calendar of the root decided).
@@ -87,12 +109,22 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
       const e = ev.allDay ? ev.end.toZonedDateTime({ timeZone: calZone }).toInstant() : ev.end.toInstant();
       return { start: s, end: e, allDay: ev.allDay };
     }
+    const end = endOf(req!, o);
     if (req!.allDay) {
       const s = req!.start.toZonedDateTime({ timeZone: calZone }).toInstant();
-      return { start: s, end: req!.start.add({ days: 1 }).toZonedDateTime({ timeZone: calZone }).toInstant(), allDay: true };
+      return { start: s, end: ((end as PlainDate | null) ?? req!.start.add({ days: 1 })).toZonedDateTime({ timeZone: calZone }).toInstant(), allDay: true };
     }
-    return { start: req!.start, end: req!.start.add({ minutes: o.defaultMinutes ?? 60 }), allDay: false };
+    return { start: req!.start, end: (end as Instant | null) ?? req!.start.add({ minutes: o.defaultMinutes ?? 60 }), allDay: false };
   })();
+  // What the person may do to it, read as the context menu reads it (the calendar's `editable`, the event's own):
+  // nothing at all opens it read-only. A new event is the application's request: as the menu's "New event here".
+  const calEditable = cal.getOptions().editable;
+  const canMove = !ev || mayMove(ev, calEditable);
+  const canResize = !ev || mayResize(ev, calEditable);
+  const canDelete = Boolean(ev) && mayDelete(ev!, calEditable);
+  const readOnly = Boolean(ev) && !canMove && !canResize && !canDelete;
+  // Its start or its length fixed: the times (and the zone, the whole-day switch) are shown, not offered.
+  const timesFixed = !canMove || !canResize;
   const startDate = (): PlainDate => (dtr?.value.start ?? initial.start).toZonedDateTimeISO(zone).toPlainDate();
   const ruleText = series ? series.set.rules.map(serializeRRule).join('\n') : '';
   const firstDate = series ? (series.base.allDay ? (series.base.start as PlainDate) : series.base.start.toPlainDate()) : startDate();
@@ -114,7 +146,16 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
   heading.id = `${id}-h`;
   const form = el('form', 'dz-editor__form');
   form.noValidate = true;
-  dialog.append(heading, form);
+  dialog.append(heading);
+  if (readOnly) {
+    // Said with the dialog's name: assistive tech reads it on opening.
+    const note = el('p', 'dz-editor__note dz-editor__readonly', words.readOnly);
+    note.id = `${id}-ro`;
+    dialog.setAttribute('aria-describedby', note.id);
+    dialog.classList.add('dz-editor--readonly');
+    dialog.append(note);
+  }
+  dialog.append(form);
   backdrop.append(dialog);
   // In the document, hidden, before tzslot's widget is made: it injects its styles only once connected.
   backdrop.hidden = true;
@@ -155,6 +196,7 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
     stepMinutes: o.stepMinutes ?? 15,
     snapMinutes: o.stepMinutes ?? 15,
     today: state.today,
+    disabled: timesFixed,
     // The month's options name the start's day: they follow it.
     onChange: () => sync(),
   } as never);
@@ -168,6 +210,7 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
     endZone = zone;
     dtr?.update({ timeZone: zone });
   });
+  zoneSel.disabled = timesFixed;
   const zoneField = field(words.timeZone, zoneSel);
   form.append(zoneField);
 
@@ -284,7 +327,7 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
   // An occurrence: how far the edit reaches. The repeat is the whole series': shown with "all events" only.
   let scope: EditScope = 'this';
   const scopeRadios: HTMLInputElement[] = [];
-  if (ev?.ref) {
+  if (ev?.ref && !readOnly) {
     const radios = el('div', 'dz-editor__radios');
     for (const [value, label] of [['this', cm.scopeThis], ['following', cm.scopeFollowing], ['all', cm.scopeAll]] as const) {
       const r = el('input');
@@ -310,13 +353,20 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
   const footer = el('div', 'dz-editor__actions');
   const remove = el('button', 'dz-editor__btn dz-editor__btn--danger', words.remove);
   remove.type = 'button';
-  const cancel = el('button', 'dz-editor__btn', words.cancel);
+  const cancel = el('button', 'dz-editor__btn', readOnly ? words.close : words.cancel);
   cancel.type = 'button';
   const save = el('button', 'dz-editor__btn dz-editor__btn--primary', words.save);
   save.type = 'submit';
-  if (ev) footer.append(remove);
-  footer.append(cancel, save);
+  // Delete as the menu offers it; read-only: Close alone.
+  if (canDelete) footer.append(remove);
+  footer.append(cancel);
+  if (!readOnly) footer.append(save);
   form.append(footer);
+  if (readOnly) {
+    // Read, not changed: the title stays focusable (read-only, not disabled), the rest is shown disabled.
+    title.readOnly = true;
+    for (const n of form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select, textarea')) if (n !== title && !whenHost.contains(n)) n.disabled = true;
+  }
 
   /** The form's repeat now. */
   const repeatNow = (): RepeatForm => {
@@ -531,11 +581,13 @@ function editorOn(cal: CalendarInstance, target: EditorTarget, o: EditorOptions)
     };
     form.addEventListener('submit', (e) => {
       e.preventDefault();
+      // Read-only: Enter in the title writes nothing.
+      if (readOnly) return;
       run(commandFor(), 'saved');
     });
     cancel.addEventListener('click', () => close('cancelled'));
     remove.addEventListener('click', () => {
-      if (!ev) return;
+      if (!ev || !canDelete) return;
       run(ev.ref ? { type: 'event.delete', id: ev.ref.seriesId, key: ev.ref.key, scope } : { type: 'event.delete', id: ev.id }, 'deleted');
     });
     // A click outside closes an untouched form only: a stray click does not lose what was typed.
@@ -589,6 +641,46 @@ export function editorHandlers(cal: CalendarInstance, o: EditorOptions = {}) {
     onEventOpen: (instance: EventInstance) => void openEventEditor(cal, { instance }, o),
     onCreateRequest: (request: CreateRequest) => void openEventEditor(cal, { create: request }, o),
   };
+}
+
+/**
+ * A create target's end, when it can be used: after the start, of the start's kind (an `Instant` or a
+ * `ZonedDateTime` for a timed event, a `PlainDate` for a whole-day one). Else none, told as a warning.
+ */
+function endOf(req: EditorCreate, o: EditorOptions): Instant | PlainDate | null {
+  const end: unknown = req.end;
+  if (end === undefined || end === null) return null;
+  const warn = (code: 'invalid-end' | 'end-before-start', detail: string) => {
+    tell({ code, severity: 'warning', path: 'create.end', detail }, o);
+    return null;
+  };
+  if (req.allDay) {
+    if (!(end instanceof Temporal.PlainDate)) return warn('invalid-end', kindOf(end));
+    return Temporal.PlainDate.compare(end, req.start) > 0 ? end : warn('end-before-start', String(end));
+  }
+  const at = end instanceof Temporal.Instant ? end : end instanceof Temporal.ZonedDateTime ? end.toInstant() : null;
+  if (!at) return warn('invalid-end', kindOf(end));
+  return Temporal.Instant.compare(at, req.start) > 0 ? at : warn('end-before-start', String(at));
+}
+
+/** What was given instead, by its tag (`Temporal.PlainDate`, `Date`…): a name minifying keeps. */
+const kindOf = (x: unknown): string => (typeof x === 'object' ? Object.prototype.toString.call(x).slice(8, -1) : typeof x);
+
+/** Codes said on the console already (no `onProblem`): once each. */
+const SAID = new Set<string>();
+function tell(p: Problem, o: EditorOptions): void {
+  if (o.onProblem) {
+    try {
+      o.onProblem(p);
+    } catch (err) {
+      // The application's handler failing does not stop the editor: reported, as the calendar's are.
+      void Promise.reject(err);
+    }
+    return;
+  }
+  if (SAID.has(p.code)) return;
+  SAID.add(p.code);
+  console.warn(`dzcalendar editor: ${p.code} — ${p.path} ${p.detail ?? ''}`);
 }
 
 /** No change at all: the editor closes without writing. */

@@ -12,7 +12,7 @@ import type { Weekday, ActionItem, CalendarKernel, CreateRequest, DurationLike, 
 import type { CalendarHooks, MenuHook, ViewController, ViewCtx } from './host.js';
 import { viewFactory, hasRenderer } from './host.js';
 import { createMenu } from './menu.js';
-import { messagesForLocale } from './messages.js';
+import { messagesWithDefaults } from './messages.js';
 import type { DzMessages } from './messages.js';
 import { WAAPI_MOTION } from './motion-waapi.js';
 import type { MotionAdapter, MotionChange, MotionEnter } from './motion.js';
@@ -332,14 +332,8 @@ function checkDays(firstDay: number | null | undefined, hidden: readonly number[
   if (hiddenOf((hidden ?? current?.days) as readonly Weekday[] | undefined, weekends ?? current?.weekends).length >= 7) throw new RangeError('every day of the week is hidden');
 }
 
-/** The registered language's words (`defineLocale`, `@dzcalendar/dom/locales/*`), else English. */
-const messagesFor = (locale: string) => messagesForLocale(locale);
-/** An application's messages over the locale's: a set written before a version added keys still works. */
-/** The application's words over the locale's; the views' labels merged name by name (a label for a view of its own keeps the built-in ones). */
-const withDefaults = (given: Partial<DzMessages> | undefined, locale: string): DzMessages => {
-  const base = messagesFor(locale);
-  return given ? { ...base, ...given, views: { ...base.views, ...given.views } } : base;
-};
+/** The application's words over the locale's (`messagesWithDefaults`, shared with the Pro's editor). */
+const withDefaults = messagesWithDefaults;
 
 /** A locale whose dates are written in `calendar` (Intl's `-u-ca-`); none: the locale as it is. */
 function withCalendar(locale: string, calendar: string | null | undefined): string {
@@ -1340,6 +1334,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
     const f = settings.current.forget;
     if (f) kernel.forgetBefore(kernel.now().subtract(Temporal.Duration.from(f.olderThan).round({ largestUnit: 'hours' })));
     kernel.refreshOngoing();
+    // What still runs is split at now (its expected part ahead): the same now, whether or not the store moved.
+    view?.ongoing?.(kernel.now());
   };
   const tick = () => {
     const minute = Math.floor(kernel.now().epochMilliseconds / 60000);

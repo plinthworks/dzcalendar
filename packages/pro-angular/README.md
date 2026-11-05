@@ -75,9 +75,10 @@ It takes over `onEventOpen` and `onCreateRequest` on the calendar: the calendar'
 | `messages` | the locale's | Words of the form over the locale's (English, French, Arabic, Spanish and German are built in). |
 | `container` | the calendar's element (its theme applies) | Where the dialog goes. |
 | `stepMinutes` | `15` | Minutes the time arrows move by. |
-| `defaultMinutes` | `60` | Length of a new timed event. |
+| `defaultMinutes` | `60` | Length of a new timed event given no end. |
 | `tones` | the six of `@dzcalendar/theme` | The tones offered (`--dz-tone-*`). |
 | `injectStyles` | `true` | `false` under a CSP without inline styles: include `EDITOR_CSS` (from `@dzcalendar/pro/editor`) yourself. |
+| `onProblem` | the console, once per code | What the editor could not use as given (a new event's `end` of another kind, or not after its start): left out, a warning `Problem`. |
 
 ### `DzExport`
 
@@ -342,9 +343,10 @@ Elle prend en charge `onEventOpen` et `onCreateRequest` du calendrier : `(eventO
 | `messages` | ceux de la langue | Mots du formulaire par-dessus ceux de la langue (anglais, français, arabe, espagnol et allemand sont intégrés). |
 | `container` | l'élément du calendrier (son thème s'applique) | Où va la boîte de dialogue. |
 | `stepMinutes` | `15` | Minutes dont avancent les flèches de l'heure. |
-| `defaultMinutes` | `60` | Durée d'un nouvel événement horaire. |
+| `defaultMinutes` | `60` | Durée d'un nouvel événement horaire donné sans fin. |
 | `tones` | les six de `@dzcalendar/theme` | Les teintes proposées (`--dz-tone-*`). |
 | `injectStyles` | `true` | `false` sous une CSP sans styles en ligne : incluez `EDITOR_CSS` (de `@dzcalendar/pro/editor`) vous-même. |
+| `onProblem` | la console, une fois par code | Ce que l'éditeur n'a pas pu utiliser tel quel (la fin `end` d'un nouvel événement d'une autre sorte, ou pas après son début) : laissé de côté, un `Problem` d'avertissement. |
 
 #### `DzExport`
 

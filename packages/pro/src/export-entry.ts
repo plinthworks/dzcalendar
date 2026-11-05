@@ -247,7 +247,9 @@ export async function downloadExport(cal: CalendarInstance, kind: ExportKind, fi
     }
     return r.problems;
   }
-  const make = { pdf: exportPDF, xlsx: exportXLSX, csv: exportCSV, ics: exportICS }[kind];
+  const makers = { pdf: exportPDF, xlsx: exportXLSX, csv: exportCSV, ics: exportICS };
+  // Own keys only: a kind such as 'toString' from plain JavaScript is a problem, not Object's method.
+  const make = Object.hasOwn(makers, kind) ? makers[kind as keyof typeof makers] : undefined;
   if (!make) return [bad('kind', String(kind))];
   const r = await make(cal, o);
   if (r.blob) download(r.blob, filename, doc);

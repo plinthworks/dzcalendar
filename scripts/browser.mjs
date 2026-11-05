@@ -1897,6 +1897,18 @@ try {
         return ev && line ? { end: Math.round(ev.getBoundingClientRect().right), now: Math.round(line.getBoundingClientRect().left), dashed: getComputedStyle(ev).borderRightStyle } : null;
       });
       check('ongoing: a run with no expected end reaches the now line, its end open (dashed)', running !== null && Math.abs(running.end - running.now) <= 3 && running.dashed === 'dashed', JSON.stringify(running));
+      // Still running, its expected end ahead (the backup, 35 of 70 minutes): from the now line to its end the expected part — no fill, dashed (owner, 2026-11-05).
+      const expected = await p.evaluate(() => {
+        const ev = document.querySelector('.dz-tl__ev[data-event-id="backup-now"]');
+        const line = document.querySelector('.dz-tl__now');
+        if (!ev || !line) return null;
+        const r = ev.getBoundingClientRect();
+        const cs = getComputedStyle(ev);
+        const part = getComputedStyle(ev, '::before');
+        const from = r.left + parseFloat(cs.borderLeftWidth) + parseFloat(part.left);
+        return { flag: ev.hasAttribute('data-expected'), from: Math.round(from), now: Math.round(line.getBoundingClientRect().left), end: Math.round(from + parseFloat(part.width) + parseFloat(cs.borderRightWidth)), right: Math.round(r.right), style: part.borderTopStyle, fill: part.backgroundColor, bar: cs.backgroundColor };
+      });
+      check('ongoing: an expected end ahead — the part from the now line to the bar’s end drawn apart (dashed, its own fill)', expected !== null && expected.flag && Math.abs(expected.from - expected.now) <= 3 && Math.abs(expected.end - expected.right) <= 2 && expected.style === 'dashed' && expected.fill !== expected.bar, JSON.stringify(expected));
       check('marker: a line across its row, a flag with its title beside it', marker !== null && Math.abs(marker.line - marker.row) <= 2 && marker.flag > 40 && marker.text.includes('⚠'), JSON.stringify(marker));
       check('span: no console error', errors.length === 0, errors.join('\n'));
       await p.close();

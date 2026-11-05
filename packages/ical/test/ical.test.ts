@@ -289,6 +289,16 @@ describe('serializeICal', () => {
     expect(all).toContain('TZID:Asia/Kolkata|BEGIN:STANDARD|DTSTART:20250101T000000|TZOFFSETFROM:+0530|TZOFFSETTO:+0530|END:STANDARD|END:VTIMEZONE');
   });
 
+  it('writes a background as transparent (owner, 2026-11-05) unless said busy; an ordinary event stays opaque', () => {
+    const at = (id: string, extra: Partial<EventInput>): EventInput => ({ id, start: '2026-10-21T09:00:00Z', end: '2026-10-21T10:00:00Z', ...extra });
+    const blocks = unfold(serializeICal([at('bg', { display: 'background' }), at('busy-bg', { display: 'background', busy: true }), at('plain', {})], { stamp, vtimezone: false }))
+      .map((l) => l.text)
+      .join('\n')
+      .split('BEGIN:VEVENT')
+      .slice(1);
+    expect(blocks.map((b) => b.includes('TRANSP:TRANSPARENT'))).toEqual([true, false, false]);
+  });
+
   it('writes an override under its series’ UID, store objects as well as strings', () => {
     const { items } = normalizeMany(parseICal(fixture('05-series-override-7456')).events, { displayZone: 'UTC', newId: createIdGenerator('t') }, 'ics');
     const override = items.find((i) => i.kind === 'event')!;

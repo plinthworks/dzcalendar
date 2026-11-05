@@ -126,6 +126,8 @@ export const TIMELINE_CSS = `
   top: calc(-4px - var(--lane, 0) * var(--dz-tl-lane)); height: var(--dz-tl-row, calc(var(--dz-tl-lanes, 3) * var(--dz-tl-lane) + 8px));
   border-inline-start: 2px solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
 }
+/* A running event's expected part (past now, --dz-ongoing-now along the bar): the dashed end the bar already has closes it. */
+.dz-tl__ev[data-expected]::before { inset-block: 0; inset-inline: calc(var(--dz-ongoing-now, 1) * 100%) 0; border-inline-end: 0; }
 .dz-tl__ev:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: 1px; }
 .dz-more--tl { z-index: 2; margin: 0; padding: 0 0.375rem; text-align: start; }
 .dz-tl__now { position: absolute; top: 0; bottom: 0; inset-inline-start: calc(var(--dz-tl-area, 0px) + var(--x) * var(--dz-tl-slot)); margin-inline-start: -1px; border-inline-start: 2px solid var(--dz-now, var(--dzc-danger)); z-index: 2; pointer-events: none; }

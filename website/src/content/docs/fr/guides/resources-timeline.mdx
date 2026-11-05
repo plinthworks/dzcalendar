@@ -1,0 +1,404 @@
+---
+title: "Ressources et timeline (Pro)"
+description: "Réserver des événements sur des médecins, des salles ou des machines : colonnes et lignes par ressource, et les vues timeline du Pro."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+import LiveDemo from '../../../../components/LiveDemo.astro';
+
+Une **ressource** est ce sur quoi on réserve des événements : un médecin, une
+salle, une machine, une tâche planifiée. Donnez au calendrier une liste de
+ressources et il dessine une colonne par ressource (les vues en grille) ou une
+ligne par ressource (la timeline du Pro). Chaque ressource garde ses propres
+horaires d’ouverture, lus dans son propre fuseau, et vérifie ses propres règles.
+
+## Donner des ressources
+
+[`resources`](../../options/resources/) est une liste d’objets avec un `id` et,
+le plus souvent, un `title`. Tout autre champ est le vôtre : un service, un
+étage, un numéro de salle. Les événements se posent sur une ressource avec
+`resourceId` (voir [Événements sur des ressources](#événements-sur-des-ressources)).
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import type { EventInput, ResourceInput } from '@dzcalendar/core';
+
+const doctors: ResourceInput[] = [
+  { id: 'benali', title: 'Dr Benali' },
+  {
+    id: 'haddad',
+    title: 'Dr Haddad',
+    timeZone: 'Asia/Riyadh', // où ses horaires sont lus
+    businessHours: { daysOfWeek: [7, 1, 2, 3, 4], start: '08:00', end: '12:00' },
+  },
+];
+const visits: EventInput[] = [{ id: 'a', title: 'Visite', start: '2026-10-21T09:00[Europe/Paris]', resourceId: 'benali' }];
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimeGridDay',
+  resources: doctors,
+  events: visits,
+  onResourceProblems: (problems) => console.warn(problems),
+});
+
+// Plus tard : une autre liste (le même tableau ne change rien).
+calendar.update({ resources: doctors.slice(0, 1) });
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import type { EventInput, Problem, ResourceInput } from '@dzcalendar/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimeGridDay" [resources]="doctors" [events]="visits" (resourceProblems)="said($event)" />`,
+})
+export class Agenda {
+  readonly doctors: ResourceInput[] = [
+    { id: 'benali', title: 'Dr Benali' },
+    { id: 'haddad', title: 'Dr Haddad', timeZone: 'Asia/Riyadh', businessHours: { daysOfWeek: [7, 1, 2, 3, 4], start: '08:00', end: '12:00' } },
+  ];
+  readonly visits: EventInput[] = [{ id: 'a', title: 'Visite', start: '2026-10-21T09:00[Europe/Paris]', resourceId: 'benali' }];
+  said(problems: readonly Problem[]): void {
+    console.warn(problems);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import type { EventInput, ResourceInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/react';
+
+const DOCTORS: ResourceInput[] = [
+  { id: 'benali', title: 'Dr Benali' },
+  { id: 'haddad', title: 'Dr Haddad', timeZone: 'Asia/Riyadh', businessHours: { daysOfWeek: [7, 1, 2, 3, 4], start: '08:00', end: '12:00' } },
+];
+const VISITS: EventInput[] = [{ id: 'a', title: 'Visite', start: '2026-10-21T09:00[Europe/Paris]', resourceId: 'benali' }];
+
+export function Agenda() {
+  return <DzCalendar timeZone="Europe/Paris" defaultView="resourceTimeGridDay" resources={DOCTORS} events={VISITS} onResourceProblems={(p) => console.warn(p)} />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import type { EventInput, Problem, ResourceInput } from '@dzcalendar/core';
+import { DzCalendar } from '@dzcalendar/vue';
+
+const doctors: ResourceInput[] = [
+  { id: 'benali', title: 'Dr Benali' },
+  { id: 'haddad', title: 'Dr Haddad', timeZone: 'Asia/Riyadh', businessHours: { daysOfWeek: [7, 1, 2, 3, 4], start: '08:00', end: '12:00' } },
+];
+const visits: EventInput[] = [{ id: 'a', title: 'Visite', start: '2026-10-21T09:00[Europe/Paris]', resourceId: 'benali' }];
+const said = (problems: readonly Problem[]) => console.warn(problems);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimeGridDay" :resources="doctors" :events="visits" @resource-problems="said" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Une mauvaise entrée ne lève jamais d’exception : une ressource sans `id`, un
+doublon, un parent inconnu ou un cycle est signalé à
+[`onResourceProblems`](../../options/on-resource-problems/) et le reste est
+dessiné. Les colonnes sont dans le fuseau du calendrier ; le `timeZone` d’une
+ressource dit seulement où ses horaires sont lus : un médecin à Riyad ouvert de
+08:00 à 12:00 est grisé hors de 07:00–11:00 à Paris en octobre, et une heure
+plus tôt (hors de 06:00–10:00) une fois que Paris est passé à l’heure d’hiver.
+
+### Groupées, triées, et une ligne « non affecté »
+
+Les ressources viennent dans l’ordre donné. Pour en changer, nommez un champ :
+
+- [`resourceGroupField`](../../options/resource-group-field/) met un en-tête
+  au-dessus de chaque série de ressources qui partagent la valeur de ce champ ;
+- [`resourceOrder`](../../options/resource-order/) les trie (`'title'`,
+  `'-title'` pour l’ordre décroissant, `'floor,title'`, ou une fonction de
+  comparaison) ;
+- [`showUnassigned`](../../options/show-unassigned/) ajoute en premier une
+  ligne, ou une colonne, pour les événements sans ressource.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineDay',
+  resources: [
+    { id: 'benali', title: 'Dr Benali', service: 'Cardiologie' },
+    { id: 'haddad', title: 'Dr Haddad', service: 'Cardiologie' },
+    { id: 'room1', title: 'Salle 1', service: 'Imagerie' },
+  ],
+  resourceGroupField: 'service',
+  resourceOrder: '-title',
+  showUnassigned: true,
+  editable: true,
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import '@dzcalendar/pro';
+
+@Component({
+  selector: 'app-planning',
+  imports: [DZ_CALENDAR],
+  template: `<dz-calendar timeZone="Europe/Paris" view="resourceTimelineDay" [resources]="staff" [options]="options" />`,
+})
+export class Planning {
+  readonly staff = [
+    { id: 'benali', title: 'Dr Benali', service: 'Cardiologie' },
+    { id: 'haddad', title: 'Dr Haddad', service: 'Cardiologie' },
+    { id: 'room1', title: 'Salle 1', service: 'Imagerie' },
+  ];
+  readonly options = { resourceGroupField: 'service', resourceOrder: '-title', showUnassigned: true, editable: true };
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar } from '@dzcalendar/react';
+import '@dzcalendar/pro';
+
+const STAFF = [
+  { id: 'benali', title: 'Dr Benali', service: 'Cardiologie' },
+  { id: 'haddad', title: 'Dr Haddad', service: 'Cardiologie' },
+  { id: 'room1', title: 'Salle 1', service: 'Imagerie' },
+];
+
+export function Planning() {
+  return (
+    <DzCalendar
+      timeZone="Europe/Paris"
+      defaultView="resourceTimelineDay"
+      resources={STAFF}
+      resourceGroupField="service"
+      resourceOrder="-title"
+      showUnassigned
+      editable
+    />
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar } from '@dzcalendar/vue';
+import '@dzcalendar/pro';
+
+const staff = [
+  { id: 'benali', title: 'Dr Benali', service: 'Cardiologie' },
+  { id: 'haddad', title: 'Dr Haddad', service: 'Cardiologie' },
+  { id: 'room1', title: 'Salle 1', service: 'Imagerie' },
+];
+const options = { resourceGroupField: 'service', resourceOrder: '-title', showUnassigned: true, editable: true };
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" view="resourceTimelineDay" :resources="staff" :options="options" />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Déposer un événement sur la ligne « non affecté » le retire de la ressource
+d’où il vient (ses autres ressources restent) ; l’en sortir le pose sur la
+ligne où il tombe.
+
+### Un arbre, et le replier
+
+Une ressource avec un `parentId` se place sous son parent : un service
+au-dessus de ses médecins. Dans une timeline, une branche se replie. Ce qui est
+replié est gardé par le calendrier, donc survit à `update()` : lisez-le avec
+[`onResourceToggle`](../../options/on-resource-toggle/) pour le garder d’une
+visite à l’autre, et redonnez-le avec
+[`collapsedResources`](../../options/collapsed-resources/) (et
+[`collapsedGroups`](../../options/collapsed-groups/) pour les en-têtes de groupe).
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+
+const saved = JSON.parse(localStorage.getItem('tree') ?? '{}') as { collapsedResources?: string[]; collapsedGroups?: string[] };
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineWeek',
+  resources: [
+    { id: 'cardio', title: 'Cardiologie' },
+    { id: 'benali', title: 'Dr Benali', parentId: 'cardio' },
+    { id: 'haddad', title: 'Dr Haddad', parentId: 'cardio' },
+  ],
+  ...saved,
+  onResourceToggle: (state) => localStorage.setItem('tree', JSON.stringify(state)),
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+## Événements sur des ressources
+
+Un événement se pose sur une ressource avec `resourceId`, ou sur plusieurs avec
+`resourceIds` : un événement sur deux ressources est dessiné dans les deux.
+Les événements sans ressource ne sont pas montrés dans une vue de ressources,
+sauf si `showUnassigned` est actif. Un glisser d’une ressource à une autre
+remplace cette ressource par la nouvelle et garde les autres ; un
+redimensionnement les garde toutes. Depuis le code, `event.move` accepte aussi
+`resourceIds`.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import type { EventInput, ResourceInput } from '@dzcalendar/core';
+
+const staff: ResourceInput[] = [
+  { id: 'benali', title: 'Dr Benali', eventOverlap: false }, // deux de ses événements ne se chevauchent pas
+  { id: 'room1', title: 'Salle 1' },
+];
+const events: EventInput[] = [
+  { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 }, resourceId: 'benali' },
+  { id: 'b', title: 'Scanner avec Dr Benali', start: '2026-10-21T10:00[Europe/Paris]', duration: { hours: 1 }, resourceIds: ['benali', 'room1'] },
+];
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimeGridDay',
+  resources: staff,
+  events,
+  editable: true,
+});
+
+// Le scanner passe dans la salle seule, une heure plus tard.
+calendar.run({ type: 'event.move', id: 'b', start: '2026-10-21T11:00[Europe/Paris]', resourceIds: ['room1'] });
+```
+
+</Fragment>
+</CodeTabs>
+
+Chaque ressource d’un événement vérifie, dans son propre fuseau, son
+`eventConstraint` et son `eventOverlap` (les [`rules`](../../options/rules/) du
+calendrier s’appliquent là où elle ne dit rien). Un dépôt refusé est dit à
+`onCommandRefused`, avec ce qui l’a refusé.
+
+## Les vues timeline du Pro
+
+La timeline met les ressources en lignes et le temps en largeur. Son axe est le
+temps écoulé : un événement est aussi long à l’écran qu’il dure, une journée de
+25 heures fait 25 heures de large et une de 23 heures, 23. Les créneaux sont
+découpés sur l’horloge murale : la nuit du retour à l’heure d’hiver, 02:00
+apparaît deux fois. La timeline vient avec `@dzcalendar/pro` : importez-le une
+fois et ses huit vues sont enregistrées pour tous les calendriers créés
+ensuite. Il est MIT pour l’instant ; pas de clé.
+
+| Vue | Créneau par défaut |
+|---|---|
+| `timelineDay`, `resourceTimelineDay` | 30 minutes |
+| `timelineWeek`, `resourceTimelineWeek` | 1 heure |
+| `timelineMonth`, `resourceTimelineMonth` | 1 jour |
+| `timelineYear`, `resourceTimelineYear` | 1 jour |
+
+Les vues `resource…` dessinent une ligne par ressource ; les autres une seule
+ligne pour tous les événements. [`timeline`](../../options/timeline/) règle
+l’échelle (`slot`, en minutes divisant un jour, ou `'day'`) et `maxLanes`, les
+couloirs de la ligne d’une ressource, dont le dernier porte « +N » quand
+d’autres événements se chevauchent. Les colonnes de la
+zone des ressources sont `viewOptions.timeline.areaColumns`, et
+[`hooks.resource`](../../options/hooks/) dessine l’en-tête d’une ligne.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro'; // enregistre la famille timeline et ses vues
+
+createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  initialView: 'resourceTimelineWeek',
+  resources: [
+    { id: 'benali', title: 'Dr Benali', room: 'B12' },
+    { id: 'haddad', title: 'Dr Haddad', room: 'B14' },
+  ],
+  viewOptions: { timeline: { areaColumns: [{ field: 'title', header: 'Médecin', width: 170 }, { field: 'room', header: 'Salle' }] } },
+  timeline: { slot: 60, maxLanes: 3 },
+  editable: true,
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+<LiveDemo
+  label="Une journée de ressources en timeline, sous leur service"
+  height={560}
+  options={{
+    initialView: 'resourceTimelineDay',
+    initialDate: '2026-10-21',
+    locale: 'fr-FR',
+    timeZone: 'Europe/Paris',
+    resources: [
+      { id: 'benali', title: 'Dr Benali', service: 'Cardiologie' },
+      { id: 'haddad', title: 'Dr Haddad', service: 'Cardiologie' },
+      { id: 'room1', title: 'Salle 1', service: 'Imagerie' },
+    ],
+    resourceGroupField: 'service',
+    showUnassigned: true,
+    timeline: { slot: 60 },
+    editable: true,
+    events: [
+      { id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 }, resourceId: 'benali' },
+      { id: 'b', title: 'Suivi', start: '2026-10-21T10:30[Europe/Paris]', duration: { hours: 1 }, resourceId: 'haddad' },
+      { id: 'c', title: 'Scanner', start: '2026-10-21T14:00[Europe/Paris]', duration: { minutes: 30 }, resourceId: 'room1' },
+      { id: 'u', title: 'À affecter', start: '2026-10-21T11:00[Europe/Paris]', duration: { minutes: 30 } },
+    ],
+  }}
+/>
+
+Glissez un événement sur une autre ligne, ou « À affecter » sur une ressource.
+
+Pour garder une timeline ouverte sur un mur et qui surveille le présent, voir [Supervision en direct](../supervision/).
+
+## Voir aussi
+
+- [`resources`](../../options/resources/) et [`timeline`](../../options/timeline/) : chaque champ et chaque réglage.
+- [Vues](../views/) : les autres vues, et des vues à vous.
+- [Événements](../events/) : chaque champ d’un événement, et les commandes qui en changent un.
+- [Sources d’événements](../event-sources/) : sources URL, fonction et iCalendar.

@@ -14,8 +14,10 @@ import OptionFacts from '../../../../components/OptionFacts.astro';
 
 Avec elle, le menu contextuel d'un événement propose « Ouvrir » ; une fois
 choisi, vous recevez l'instance de l'événement — montrez votre fiche ou votre
-éditeur. Sans `onEventClick`, Entrée sur un événement qui a le focus appelle
-aussi celle-ci. L'éditeur du Pro (`@dzcalendar/pro/editor`) est une façon d'y
+éditeur. Sans `onEventClick`, Entrée ou Espace sur un événement qui a le focus
+l'appellent aussi, de même qu'un clic sur un événement dans les vues liste et
+une vue à vous qui appelle son `open` (dans les grilles et la timeline, un clic reste à
+`onEventClick`). L'éditeur du Pro (`@dzcalendar/pro/editor`) est une façon d'y
 répondre.
 
 ## Exemple

@@ -119,6 +119,28 @@ export function drawNow(ctx: ViewCtx): Instant {
   return now;
 }
 
+/**
+ * A running event's piece split at now (owner, 2026-11-05): from its start to
+ * now the running look, from now to its expected end the expected part. When
+ * this piece reaches past now, `data-expected` and `--dz-ongoing-now` (where now
+ * falls along the piece, 0 to 1: a piece wholly ahead of now is 0); else neither.
+ * `along` is asked only for a piece now falls inside: the view's own geometry
+ * (a wall-clock axis on a day the clocks change is not linear in time).
+ */
+export function markOngoing(el: HTMLElement, running: boolean, now: Instant, from: Instant, to: Instant, along: () => number): void {
+  const t = now.epochMilliseconds;
+  const f = !running || t >= to.epochMilliseconds ? 1 : t <= from.epochMilliseconds ? 0 : Math.min(1, Math.max(0, along()));
+  if (f >= 1) {
+    if (!el.hasAttribute('data-expected')) return;
+    el.removeAttribute('data-expected');
+    el.style.removeProperty('--dz-ongoing-now');
+    return;
+  }
+  const v = String(Math.round(f * 10000) / 10000);
+  if (el.style.getPropertyValue('--dz-ongoing-now') !== v) el.style.setProperty('--dz-ongoing-now', v);
+  state(el, 'expected', true);
+}
+
 /** A state as an attribute (`data-today`…, docs/styling.md): present when true, gone when not — for `[data-today]` and Tailwind's `data-[today]:`. */
 export function state(el: HTMLElement, name: string, on: boolean): void {
   // Nothing written when nothing changed (no style invalidation, no mutation record).

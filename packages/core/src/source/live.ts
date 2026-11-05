@@ -1,5 +1,6 @@
 import type { EventInput } from '../event/types.js';
 import { Temporal } from '../temporal.js';
+import type { Instant } from '../temporal.js';
 import type { EventSourceSpec } from './source.js';
 
 /**
@@ -34,6 +35,7 @@ export function liveSource(id: string, o: LiveSourceOptions): EventSourceSpec {
   const events = new Map<string, EventInput>();
   let made = 0;
   let changed: (() => void) | null = null;
+  let clock: () => Instant = () => Temporal.Now.instant();
   const take = (m: LiveMessage) => {
     if ('create' in m) {
       const key = m.create.id ?? `${id}-${++made}`;
@@ -43,10 +45,10 @@ export function liveSource(id: string, o: LiveSourceOptions): EventSourceSpec {
       if (!was) return;
       const props = m.patch.extendedProps && was.extendedProps ? { extendedProps: { ...was.extendedProps, ...m.patch.extendedProps } } : {};
       const next: EventInput = { ...was, ...m.patch, ...props, id: m.update };
-      // Finished without an end said: it ends when the feed says so — now (as `event.update` does).
+      // Finished without an end said: it ends when the feed says so — now, the calendar's (as `event.update` does).
       if (was.ongoing && m.patch.ongoing === false && m.patch.end === undefined && m.patch.duration === undefined) {
         delete next.duration;
-        next.end = Temporal.Now.instant().toString();
+        next.end = clock().toString();
       }
       events.set(m.update, next);
     } else if ('remove' in m) events.delete(m.remove);
@@ -64,8 +66,9 @@ export function liveSource(id: string, o: LiveSourceOptions): EventSourceSpec {
     forgot: (ids) => {
       for (const x of ids) events.delete(x);
     },
-    live(onChange) {
+    live(onChange, given) {
       changed = onChange;
+      if (given) clock = given.now;
       const stop = o.connect((message) => {
         const list = Array.isArray(message) ? (message as readonly LiveMessage[]) : [message as LiveMessage];
         for (const m of list) if (m && typeof m === 'object') take(m);

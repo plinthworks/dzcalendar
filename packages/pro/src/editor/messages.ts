@@ -1,6 +1,7 @@
 /**
- * The editor's words. Scope ("this event / following / all"), refusals and
- * "untitled" come from the calendar's own messages (`@dzcalendar/dom`);
+ * The editor's words. Scope ("this event / following / all") and refusals
+ * come from the calendar's own messages (`@dzcalendar/dom`, with the
+ * calendar's `messages` option over them);
  * these are the form's. English and French built in; Arabic, Spanish and
  * German too (the editor is one entry: its words are few).
  */
@@ -47,6 +48,13 @@ export interface EditorMessages {
   readonly save: string;
   readonly cancel: string;
   readonly remove: string;
+  /**
+   * Said under the heading of an event the person may not change (the calendar's `editable`, the event's own):
+   * its fields read-only, no Save, no Delete. Optional: a set written before 1.1 gets the English word.
+   */
+  readonly readOnly?: string;
+  /** The read-only dialog's only button. Optional: a set written before 1.1 gets the English word. */
+  readonly close?: string;
   readonly saved: string;
   readonly removed: string;
   refused(parts: { why: string }): string;
@@ -92,6 +100,8 @@ export const EDITOR_EN: EditorMessages = {
   save: 'Save',
   cancel: 'Cancel',
   remove: 'Delete',
+  readOnly: 'Read only',
+  close: 'Close',
   saved: 'Event saved',
   removed: 'Event deleted',
   refused: ({ why }) => `Not saved: ${why}`,
@@ -134,6 +144,8 @@ export const EDITOR_FR: EditorMessages = {
   save: 'Enregistrer',
   cancel: 'Annuler',
   remove: 'Supprimer',
+  readOnly: 'Lecture seule',
+  close: 'Fermer',
   saved: 'Événement enregistré',
   removed: 'Événement supprimé',
   refused: ({ why }) => `Non enregistré : ${why}`,
@@ -176,6 +188,8 @@ export const EDITOR_AR: EditorMessages = {
   save: 'حفظ',
   cancel: 'إلغاء',
   remove: 'حذف',
+  readOnly: 'للقراءة فقط',
+  close: 'إغلاق',
   saved: 'تم حفظ الحدث',
   removed: 'تم حذف الحدث',
   refused: ({ why }) => `لم يتم الحفظ: ${why}`,
@@ -218,6 +232,8 @@ export const EDITOR_ES: EditorMessages = {
   save: 'Guardar',
   cancel: 'Cancelar',
   remove: 'Eliminar',
+  readOnly: 'Solo lectura',
+  close: 'Cerrar',
   saved: 'Evento guardado',
   removed: 'Evento eliminado',
   refused: ({ why }) => `No guardado: ${why}`,
@@ -260,6 +276,8 @@ export const EDITOR_DE: EditorMessages = {
   save: 'Speichern',
   cancel: 'Abbrechen',
   remove: 'Löschen',
+  readOnly: 'Schreibgeschützt',
+  close: 'Schließen',
   saved: 'Termin gespeichert',
   removed: 'Termin gelöscht',
   refused: ({ why }) => `Nicht gespeichert: ${why}`,

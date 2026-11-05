@@ -517,9 +517,12 @@ export function createSourceManager(o: SourceManagerOptions): SourceManager {
     if (!live) return;
     const spec = src.spec;
     try {
-      src.stop = live(() => {
-        if (!destroyed && sources.get(spec.id) === src && src.spec === spec) refetch(spec.id);
-      });
+      src.stop = live(
+        () => {
+          if (!destroyed && sources.get(spec.id) === src && src.spec === spec) refetch(spec.id);
+        },
+        { now: () => (o.now ? o.now() : Temporal.Now.instant()) },
+      );
     } catch (e) {
       notify({ type: 'problems', sourceId: spec.id, report: { accepted: 0, rejected: 0, problems: [{ ...problem('invalid-event', 'error', `sources.${spec.id}`, `live: ${(e as Error)?.message ?? String(e)}`), sourceId: spec.id }] } });
     }

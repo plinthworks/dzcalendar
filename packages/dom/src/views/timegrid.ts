@@ -1,8 +1,8 @@
-import { dayStates, drawNow, moreText } from '../render/event.js';
+import { dayStates, drawNow, markOngoing, moreText } from '../render/event.js';
 import { weekWords } from '../render/formats.js';
 import { written } from '../render/formats.js';
 import { Temporal, formatTemporal, locateNow, weekNumber, weekRulesFor } from '@dzcalendar/core';
-import type { AllDayBar, AxisBand, Hit, MoreTimed, PlacedSlot, PlacedTimed, PlainDate, ResourceGroupHead, ResourceHead, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
+import type { AllDayBar, AxisBand, ColumnAxis, Hit, Instant, MoreTimed, PlacedSlot, PlacedTimed, PlainDate, ResourceGroupHead, ResourceHead, Segment, TimeGridColumn, TimeGridModel, ZonedDateTime } from '@dzcalendar/core';
 import type { Box, InteractionSurface, KeyboardSurface } from '../interact/surface.js';
 import { handles } from '../interact/handles.js';
 import type { ViewController, ViewCtx } from '../host.js';
@@ -46,6 +46,8 @@ interface EventItem {
   /** Content: the event's revision, its readings, the words in force. */
   readonly content: string;
   readonly placed: PlacedTimed;
+  /** Its column's axis: where now falls along a running event. */
+  readonly axis: ColumnAxis;
 }
 
 interface ColumnParts {
@@ -227,8 +229,8 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       parts.set(it.key, {
         hours,
         bands,
-        events: new KeyedList<EventItem>(evHost, () => eventPool.take(), (n, e, c) => drawEvent(n, e.placed, false, c), (n) => unmountEvent(ctx, n), (n) => eventPool.release(n)),
-        background: new KeyedList<EventItem>(bgHost, () => h(doc, 'div', 'dz-ev dz-ev--bg'), (n, e, c) => drawEvent(n, e.placed, true, c), (n) => unmountEvent(ctx, n)),
+        events: new KeyedList<EventItem>(evHost, () => eventPool.take(), (n, e, c) => drawEvent(n, e.placed, e.axis, false, c), (n) => unmountEvent(ctx, n), (n) => eventPool.release(n)),
+        background: new KeyedList<EventItem>(bgHost, () => h(doc, 'div', 'dz-ev dz-ev--bg'), (n, e, c) => drawEvent(n, e.placed, e.axis, true, c), (n) => unmountEvent(ctx, n)),
         more: new KeyedList<MoreItem>(
           moreHost,
           () => {
@@ -315,11 +317,11 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       }),
     );
     p.bands.replaceChildren(...column.axis.bands.map((b) => drawBand(b)));
-    p.background.sync(column.background.map(itemOf));
+    p.background.sync(column.background.map((x) => itemOf(x, column.axis)));
     // The slot object is in the signature: a new one at the same time (a refetch) is the one a click hands back.
     const bookable = Boolean(ctx.live().onSlotClick);
     p.slots.sync(column.slots.map((placed) => ({ key: placed.key, sig: `${placed.top}|${placed.height}|${idOf(placed.slot)}|${bookable}|${ctx.epoch}`, placed })));
-    created.push(...p.events.sync(shown(column).map(itemOf)));
+    created.push(...p.events.sync(shown(column).map((x) => itemOf(x, column.axis))));
     p.more.sync(column.more.map((m) => ({ key: m.key, sig: `${m.top}|${m.height}|${m.left}|${m.width}|${m.events.length}|${ctx.epoch}`, more: m, date: column.date, resource: column.resource })));
   }
 
@@ -440,7 +442,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     win = next;
     for (const column of model.columns) {
       if (column.folded) continue;
-      parts.get(column.key)?.events.sync(shown(column).map(itemOf));
+      parts.get(column.key)?.events.sync(shown(column).map((x) => itemOf(x, column.axis)));
     }
     return true;
   }
@@ -469,7 +471,7 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
     return el;
   }
 
-  const itemOf = (placed: PlacedTimed): EventItem => ({
+  const itemOf = (placed: PlacedTimed, axis: ColumnAxis): EventItem => ({
     key: placed.segment.key,
     sig: [placed.top, placed.visualHeight, placed.left, placed.width, placed.z].join('|'),
     content: [
@@ -482,9 +484,22 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
       ctx.epoch,
     ].join('|'),
     placed,
+    axis,
   });
 
-  function drawEvent(el: HTMLElement, p: PlacedTimed, bg: boolean, changed: { pos: boolean; content: boolean; created: boolean }): void {
+  /** Running events drawn, with where now falls along each (redone once a minute: `ongoing`). */
+  const running = new Map<HTMLElement, (now: Instant) => void>();
+  function splitAtNow(el: HTMLElement, p: PlacedTimed, axis: ColumnAxis, bg: boolean): void {
+    const ev = p.segment.instance.event;
+    const on = !bg && !ev.allDay && ev.ongoing === true;
+    const mark = (now: Instant) => markOngoing(el, on, now, p.segment.from, p.segment.to, () => (p.visualHeight > 0 ? (axis.toPosition(now) - p.top) / p.visualHeight : 1));
+    if (on) running.set(el, mark);
+    else running.delete(el);
+    mark(drawNow(ctx));
+  }
+
+  function drawEvent(el: HTMLElement, p: PlacedTimed, axis: ColumnAxis, bg: boolean, changed: { pos: boolean; content: boolean; created: boolean }): void {
+    if (changed.pos || changed.content) splitAtNow(el, p, axis, bg);
     if (changed.pos) {
       el.style.setProperty('--t', String(p.top));
       el.style.setProperty('--h', String(p.visualHeight));
@@ -1028,6 +1043,13 @@ export function createTimeGridView(ctx: ViewCtx): TimeGridController {
         if (el.parentElement !== colEl) colEl.append(el);
         decorate(ctx, ctx.hooks.nowIndicator, el, { view: viewType, now: now.toZonedDateTimeISO(ctx.zone), instant: now }, undefined, true);
       });
+    },
+
+    ongoing(now) {
+      for (const [el, mark] of running) {
+        if (el.isConnected) mark(now);
+        else running.delete(el);
+      }
     },
 
     scrollTo(minutes) {

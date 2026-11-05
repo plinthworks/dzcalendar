@@ -152,7 +152,7 @@ interface TimelineViewOptions {
 
 ### Events on a timeline
 
-- **Running events.** `ongoing: true` draws an event from its start to now; its end follows the present (moved each minute by the calendar, a change of cause `'api'`: no undo, no `onEventChange`), never before the expected end (its `end` or `duration` as given). Its end is open (dashed, with stripes, still under reduced motion) and its time reads "11:02 – running". `event.update({ ongoing: false })` finishes it, at its `end` if given, else now. A date alone or a series cannot run (problem `ongoing-not-timed`).
+- **Running events.** `ongoing: true` draws an event from its start to now; its end follows the present (moved each minute by the calendar, a change of cause `'api'`: no undo, no `onEventChange`), never before the expected end (its `end` or `duration` as given); while that end is ahead, the part past now is drawn only in dashes. Its end is open (dashed, with stripes, still under reduced motion) and its time reads "11:02 – running". `event.update({ ongoing: false })` finishes it, at its `end` if given, else now. A date alone or a series cannot run (problem `ongoing-not-timed`).
 - **Markers.** `display: 'marker'` is a moment: a line across its row, its flag (the title, or the content hook's) in a lane beside it. It has a start only: an `end` or `duration` is ignored (`marker-length-ignored`), a date alone refused (`marker-all-day`).
 - **Background events.** `display: 'background'` is a tint behind the row's events (a maintenance window). The event content hook gives it a label (`background: true` in its argument), drawn at its start and kept in view while the row scrolls.
 - **`forget`.** Each minute, and when the calendar is made, the events that ended more than `olderThan` ago leave the store (no undo, no `onEventChange`); a series and an event still running stay.
@@ -381,22 +381,26 @@ console.log(verdict.ok ? verdict.slot.seats : verdict.reason);
 
 ### `@dzcalendar/pro/editor`
 
-The event and recurrence editor: a modal dialog, the usual recurrences (daily, weekly on chosen days, monthly on the day, the n-th or the last weekday, yearly; every N; never, until a date or a count), a rule beyond them kept as written. It saves through the calendar's history (checked against its rules, undoable). An occurrence of a series asks how far an edit reaches; its recurrence is edited on the whole series. Importing it brings `@dzcalendar/core/recurrence` with it.
+The event and recurrence editor: a modal dialog, the usual recurrences (daily, weekly on chosen days, monthly on the day, the n-th or the last weekday, yearly; every N; never, until a date or a count), a rule beyond them kept as written. It saves through the calendar's history (checked against its rules, undoable). An occurrence of a series asks how far an edit reaches, in the calendar's words (its `messages` included); its recurrence is edited on the whole series. An event the person may not change (the calendar's `editable`, the event's own, as the context menu reads them) opens read-only: Close, no Save, no Delete. Importing it brings `@dzcalendar/core/recurrence` with it.
 
 ```text
 openEventEditor(cal: CalendarInstance, target: EditorTarget, o?: EditorOptions): Promise<EditorOutcome>
 editorHandlers(cal: CalendarInstance, o?: EditorOptions): { onEventOpen, onCreateRequest }
    // cal.update(editorHandlers(cal)): "Open" and "New event here" go to the editor
 
-EditorTarget  = { instance: EventInstance } | { create: CreateRequest }
+EditorTarget  = { instance: EventInstance } | { create: EditorCreate }
+EditorCreate  = CreateRequest & { end?: Instant | ZonedDateTime }   // timed: a selection's end (after start)
+              | CreateRequest & { end?: PlainDate }                 // whole days: exclusive end (after start)
+                                       // an unusable end is left out, a warning Problem (onProblem)
 EditorOutcome = 'saved' | 'deleted' | 'cancelled'
 EditorOptions {
   messages?: Partial<EditorMessages>   // words over the locale's
   container?: HTMLElement              // where the dialog goes; default the calendar's element (its theme applies)
   stepMinutes?: number                 // minutes the time arrows move by; default 15
-  defaultMinutes?: number              // length of a new timed event; default 60
+  defaultMinutes?: number              // length of a new timed event without an end; default 60
   tones?: readonly string[]            // theme tokens --dz-tone-*; default blue, green, red, amber, violet, slate
   injectStyles?: boolean               // false under a CSP without inline styles: include EDITOR_CSS; default true
+  onProblem?: (p: Problem) => void     // what it could not use (a create end); without it, the console once per code
 }
 
 readRepeat(rules: readonly RRule[] | null, start: PlainDate, zone: ZoneId, text: string): RepeatForm
@@ -776,7 +780,7 @@ interface TimelineViewOptions {
 
 #### Les événements sur une timeline
 
-- **Événements en cours.** `ongoing: true` dessine un événement de son début à maintenant ; sa fin suit le présent (déplacée chaque minute par le calendrier, un changement de cause `'api'` : ni annulation, ni `onEventChange`), jamais avant la fin attendue (son `end` ou sa `duration` tels que donnés). Sa fin est ouverte (pointillée, rayée, même avec mouvement réduit) et son heure se lit « 11:02 – en cours ». `event.update({ ongoing: false })` le termine, à son `end` s'il en a un, sinon maintenant. Une date seule ou une série ne peut pas être en cours (problème `ongoing-not-timed`).
+- **Événements en cours.** `ongoing: true` dessine un événement de son début à maintenant ; sa fin suit le présent (déplacée chaque minute par le calendrier, un changement de cause `'api'` : ni annulation, ni `onEventChange`), jamais avant la fin attendue (son `end` ou sa `duration` tels que donnés) ; tant que cette fin est à venir, la partie au-delà de maintenant n'est dessinée qu'en pointillés. Sa fin est ouverte (pointillée, rayée, même avec mouvement réduit) et son heure se lit « 11:02 – en cours ». `event.update({ ongoing: false })` le termine, à son `end` s'il en a un, sinon maintenant. Une date seule ou une série ne peut pas être en cours (problème `ongoing-not-timed`).
 - **Repères.** `display: 'marker'` est un instant : un trait sur sa ligne, son drapeau (le titre, ou celui du hook de contenu) dans un couloir à côté. Il n'a qu'un début : un `end` ou une `duration` est ignoré (`marker-length-ignored`), une date seule refusée (`marker-all-day`).
 - **Événements d'arrière-plan.** `display: 'background'` est une teinte derrière les événements de la ligne (une fenêtre de maintenance). Le hook de contenu d'événement lui donne une étiquette (`background: true` dans son argument), dessinée à son début et gardée en vue pendant que la ligne défile.
 - **`forget`.** Chaque minute, et à la création du calendrier, les événements terminés depuis plus de `olderThan` quittent le store (ni annulation, ni `onEventChange`) ; une série et un événement en cours restent.
@@ -1006,22 +1010,26 @@ console.log(verdict.ok ? verdict.slot.seats : verdict.reason);
 
 #### `@dzcalendar/pro/editor`
 
-L'éditeur d'événements et de récurrences : une boîte de dialogue modale, les récurrences usuelles (quotidienne, hebdomadaire sur des jours choisis, mensuelle le jour du mois, le n-ième ou le dernier jour de semaine, annuelle ; toutes les N ; jamais, jusqu'à une date ou un nombre de fois), une règle au-delà gardée telle qu'écrite. Il enregistre par l'historique du calendrier (vérifié contre ses règles, annulable). Une occurrence d'une série demande jusqu'où va la modification ; sa récurrence se modifie sur la série entière. L'importer apporte `@dzcalendar/core/recurrence`.
+L'éditeur d'événements et de récurrences : une boîte de dialogue modale, les récurrences usuelles (quotidienne, hebdomadaire sur des jours choisis, mensuelle le jour du mois, le n-ième ou le dernier jour de semaine, annuelle ; toutes les N ; jamais, jusqu'à une date ou un nombre de fois), une règle au-delà gardée telle qu'écrite. Il enregistre par l'historique du calendrier (vérifié contre ses règles, annulable). Une occurrence d'une série demande jusqu'où va la modification, dans les mots du calendrier (son `messages` compris) ; sa récurrence se modifie sur la série entière. Un événement que la personne ne peut pas modifier (le `editable` du calendrier, celui de l'événement, lus comme le menu contextuel les lit) s'ouvre en lecture seule : Fermer, ni Enregistrer ni Supprimer. L'importer apporte `@dzcalendar/core/recurrence`.
 
 ```text
 openEventEditor(cal: CalendarInstance, target: EditorTarget, o?: EditorOptions): Promise<EditorOutcome>
 editorHandlers(cal: CalendarInstance, o?: EditorOptions): { onEventOpen, onCreateRequest }
    // cal.update(editorHandlers(cal)) : « Ouvrir » et « Nouvel événement ici » vont à l'éditeur
 
-EditorTarget  = { instance: EventInstance } | { create: CreateRequest }
+EditorTarget  = { instance: EventInstance } | { create: EditorCreate }
+EditorCreate  = CreateRequest & { end?: Instant | ZonedDateTime }   // horaire : la fin d'une sélection (après le début)
+              | CreateRequest & { end?: PlainDate }                 // journées entières : fin exclue (après le début)
+                                       // une fin inutilisable est laissée, un Problem d'avertissement (onProblem)
 EditorOutcome = 'saved' | 'deleted' | 'cancelled'
 EditorOptions {
   messages?: Partial<EditorMessages>   // des mots par-dessus ceux de la langue
   container?: HTMLElement              // où va la boîte ; par défaut l'élément du calendrier (son thème s'applique)
   stepMinutes?: number                 // minutes dont avancent les flèches de l'heure ; 15 par défaut
-  defaultMinutes?: number              // durée d'un nouvel événement horaire ; 60 par défaut
+  defaultMinutes?: number              // durée d'un nouvel événement horaire sans fin ; 60 par défaut
   tones?: readonly string[]            // jetons de thème --dz-tone-* ; par défaut blue, green, red, amber, violet, slate
   injectStyles?: boolean               // false sous une CSP sans style en ligne : incluez EDITOR_CSS ; true par défaut
+  onProblem?: (p: Problem) => void     // ce qu'il n'a pu utiliser (une fin de création) ; sans lui, la console une fois par code
 }
 
 readRepeat(rules: readonly RRule[] | null, start: PlainDate, zone: ZoneId, text: string): RepeatForm

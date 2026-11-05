@@ -6,7 +6,7 @@
 // The editor writes recurrences: their entry comes with it.
 import '@dzcalendar/core/recurrence';
 export { openEventEditor, editorHandlers } from './editor/dialog.js';
-export type { EditorOptions, EditorOutcome, EditorTarget } from './editor/dialog.js';
+export type { EditorCreate, EditorOptions, EditorOutcome, EditorTarget } from './editor/dialog.js';
 export { readRepeat, writeRepeat, nthOf } from './editor/recurrence.js';
 export type { RepeatForm, RepeatFreq, RepeatEnd } from './editor/recurrence.js';
 export { editorMessagesFor, defineEditorLocale, EDITOR_EN, EDITOR_FR, EDITOR_AR, EDITOR_ES, EDITOR_DE } from './editor/messages.js';

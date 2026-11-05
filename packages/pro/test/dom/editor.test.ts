@@ -3,7 +3,8 @@ import { Temporal } from '@dzcalendar/core';
 import type { EventInput, EventInstance } from '@dzcalendar/core';
 import { createCalendar } from '@dzcalendar/dom';
 import type { CalendarInstance } from '@dzcalendar/dom';
-import { editorHandlers, openEventEditor } from '../../src/editor-entry.js';
+import { editorHandlers, editorMessagesFor, openEventEditor } from '../../src/editor-entry.js';
+import type { Problem } from '@dzcalendar/core';
 import { TIMELINE_CSS } from '../../src/timeline/styles.js';
 import { unlayered } from '../../../dom/src/styles.js';
 
@@ -228,6 +229,163 @@ describe('the editor', () => {
     cal!.destroy();
     cal = null;
     expect([await done, document.querySelector('.dz-editor')]).toEqual(['cancelled', null]);
+  });
+});
+
+describe('the editor reads editable (1.1): an event the person may not change opens read-only', () => {
+  const buttons = () => [...dialog().querySelectorAll<HTMLButtonElement>('.dz-editor__actions button')].map((b) => b.textContent);
+
+  it('a calendar not editable: the event is shown, nothing offered but Close; Enter writes nothing', async () => {
+    mount([{ id: 'a', title: 'A', start: '2026-10-21T09:00[Europe/Paris]' }], { editable: false });
+    const done = openEventEditor(cal!, { instance: instanceOf('a') });
+    const note = document.getElementById(dialog().getAttribute('aria-describedby')!)!;
+    expect([note.textContent, buttons()]).toEqual(['Lecture seule', ['Fermer']]);
+    const title = byLabel<HTMLInputElement>('Titre');
+    // Readable and focusable, not changeable; the colour and the zone disabled.
+    expect([title.readOnly, title.disabled, document.activeElement === title, byLabel<HTMLSelectElement>('Couleur').disabled, byLabel<HTMLSelectElement>('Fuseau horaire').disabled]).toEqual([true, false, true, true, true]);
+    // tzslot's range: its fields and its whole-day switch disabled (its hidden step buttons aside).
+    const when = [...$('.dz-editor__when').querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button')];
+    expect([when.length > 0, when.filter((n) => !n.disabled && !n.hidden).map((n) => n.outerHTML.slice(0, 80))]).toEqual([true, []]);
+    title.value = 'B';
+    dialog().querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(document.querySelector('.dz-editor')).not.toBeNull();
+    $<HTMLButtonElement>('.dz-editor__actions button').click();
+    expect([await done, ev('a')!.title, cal!.kernel.history.canUndo]).toEqual(['cancelled', 'A', false]);
+  });
+
+  it('an event editable: false in an editable calendar: read-only; an occurrence of such a series is asked no scope', async () => {
+    mount([
+      { id: 'a', title: 'A', start: '2026-10-21T09:00[Europe/Paris]', editable: false },
+      { id: 's', title: 'S', start: '2026-10-19T09:00[Europe/Paris]', rrule: 'FREQ=DAILY;COUNT=3', editable: false },
+    ]);
+    let done = openEventEditor(cal!, { instance: instanceOf('a') });
+    expect([dialog().classList.contains('dz-editor--readonly'), buttons()]).toEqual([true, ['Fermer']]);
+    $<HTMLButtonElement>('.dz-editor__actions button').click();
+    expect(await done).toBe('cancelled');
+    done = openEventEditor(cal!, { instance: instanceOf('s@2026-10-20T09:00:00+02:00[Europe/Paris]') });
+    expect([dialog().querySelector('input[type="radio"][value="following"]'), buttons()]).toEqual([null, ['Fermer']]);
+    $<HTMLButtonElement>('.dz-editor__actions button').click();
+    expect(await done).toBe('cancelled');
+  });
+
+  it('an event saying editable: true in a calendar that is not: edited and deleted as in the menu', async () => {
+    mount([{ id: 'a', title: 'A', start: '2026-10-21T09:00[Europe/Paris]', editable: true }, { id: 'b', title: 'B', start: '2026-10-22T09:00[Europe/Paris]', editable: true }], { editable: false });
+    let done = openEventEditor(cal!, { instance: instanceOf('a') });
+    expect([dialog().hasAttribute('aria-describedby'), buttons()]).toEqual([false, ['Supprimer', 'Annuler', 'Enregistrer']]);
+    byLabel<HTMLInputElement>('Titre').value = 'A2';
+    submit();
+    expect([await done, ev('a')!.title]).toEqual(['saved', 'A2']);
+    done = openEventEditor(cal!, { instance: instanceOf('b') });
+    $<HTMLButtonElement>('.dz-editor__btn--danger').click();
+    expect([await done, ev('b')]).toEqual(['deleted', undefined]);
+  });
+
+  it('startEditable: false alone: not read-only (its length may change) but its times fixed, its title saved; startEditable and durationEditable false: read-only', async () => {
+    mount([
+      { id: 'a', title: 'A', start: '2026-10-21T09:00[Europe/Paris]', startEditable: false },
+      { id: 'b', title: 'B', start: '2026-10-22T09:00[Europe/Paris]', startEditable: false, durationEditable: false },
+    ]);
+    let done = openEventEditor(cal!, { instance: instanceOf('a') });
+    // Its start fixed: the times and the zone shown, not offered; the title and the rest editable.
+    expect([buttons(), byLabel<HTMLSelectElement>('Fuseau horaire').disabled, byLabel<HTMLSelectElement>('Couleur').disabled, byLabel<HTMLInputElement>('Titre').readOnly]).toEqual([['Supprimer', 'Annuler', 'Enregistrer'], true, false, false]);
+    byLabel<HTMLInputElement>('Titre').value = 'A2';
+    submit();
+    expect([await done, ev('a')!.title]).toEqual(['saved', 'A2']);
+    done = openEventEditor(cal!, { instance: instanceOf('b') });
+    expect(buttons()).toEqual(['Fermer']);
+    $<HTMLButtonElement>('.dz-editor__actions button').click();
+    expect(await done).toBe('cancelled');
+  });
+
+  it('creating is the application’s request, as the menu’s "New event here": a calendar not editable still creates', async () => {
+    mount([], { editable: false });
+    const done = openEventEditor(cal!, { create: { allDay: false, start: Temporal.Instant.from('2026-10-21T07:00:00Z') } });
+    expect([dialog().hasAttribute('aria-describedby'), buttons()]).toEqual([false, ['Annuler', 'Enregistrer']]);
+    byLabel<HTMLInputElement>('Titre').value = 'N';
+    submit();
+    expect([await done, cal!.kernel.store.snapshot.counts.events]).toEqual(['saved', 1]);
+  });
+
+  it('the word in the five built-in languages, and English for a set defined before it existed', () => {
+    expect(['en', 'fr', 'ar', 'es', 'de'].map((l) => [editorMessagesFor(l).readOnly, editorMessagesFor(l).close])).toEqual([
+      ['Read only', 'Close'],
+      ['Lecture seule', 'Fermer'],
+      ['للقراءة فقط', 'إغلاق'],
+      ['Solo lectura', 'Cerrar'],
+      ['Schreibgeschützt', 'Schließen'],
+    ]);
+  });
+});
+
+describe('a new event from a range (1.1): the create target’s end', () => {
+  const made = () => [...cal!.kernel.store.snapshot.allEvents()].map((e) => [String(e.start), String(e.end), e.allDay]);
+
+  it('three whole days selected (21 to 24 exclusive) make a three-day event', async () => {
+    mount([]);
+    const done = openEventEditor(cal!, { create: { allDay: true, start: Temporal.PlainDate.from('2026-10-21'), end: Temporal.PlainDate.from('2026-10-24') } });
+    submit();
+    expect([await done, made()]).toEqual(['saved', [['2026-10-21', '2026-10-24', true]]]);
+  });
+
+  it('a timed range: the selection’s ZonedDateTime end, or an Instant; across the night Paris goes back to winter time (25 October 2026)', async () => {
+    mount([]);
+    let done = openEventEditor(cal!, { create: { allDay: false, start: Temporal.Instant.from('2026-10-21T07:00:00Z'), end: Temporal.ZonedDateTime.from('2026-10-21T10:30:00+02:00[Europe/Paris]') } });
+    submit();
+    expect(await done).toBe('saved');
+    // 01:00 summer time (23:00Z) to 04:00 winter time (03:00Z): four hours elapsed, the 02:00–03:00 hour twice.
+    done = openEventEditor(cal!, { create: { allDay: false, start: Temporal.Instant.from('2026-10-24T23:00:00Z'), end: Temporal.Instant.from('2026-10-25T03:00:00Z') } });
+    submit();
+    expect(await done).toBe('saved');
+    expect(made()).toEqual([
+      ['2026-10-21T09:00:00+02:00[Europe/Paris]', '2026-10-21T10:30:00+02:00[Europe/Paris]', false],
+      ['2026-10-25T01:00:00+02:00[Europe/Paris]', '2026-10-25T04:00:00+01:00[Europe/Paris]', false],
+    ]);
+  });
+
+  it('an end that cannot be used is left out with a warning, never thrown: the defaults then', async () => {
+    mount([]);
+    const told: Problem[] = [];
+    const onProblem = (p: Problem) => told.push(p);
+    // Not after the start (a whole day ending where it starts): one day.
+    let done = openEventEditor(cal!, { create: { allDay: true, start: Temporal.PlainDate.from('2026-10-21'), end: Temporal.PlainDate.from('2026-10-21') } }, { onProblem });
+    submit();
+    expect(await done).toBe('saved');
+    // Another kind (a date for a timed event): defaultMinutes.
+    done = openEventEditor(cal!, { create: { allDay: false, start: Temporal.Instant.from('2026-10-22T07:00:00Z'), end: Temporal.PlainDate.from('2026-10-23') as never } }, { onProblem, defaultMinutes: 30 });
+    submit();
+    expect(await done).toBe('saved');
+    // Before the start: an hour.
+    done = openEventEditor(cal!, { create: { allDay: false, start: Temporal.Instant.from('2026-10-23T07:00:00Z'), end: Temporal.Instant.from('2026-10-23T06:00:00Z') } }, { onProblem });
+    submit();
+    expect(await done).toBe('saved');
+    expect(told.map((p) => [p.code, p.severity, p.path])).toEqual([
+      ['end-before-start', 'warning', 'create.end'],
+      ['invalid-end', 'warning', 'create.end'],
+      ['end-before-start', 'warning', 'create.end'],
+    ]);
+    expect(made()).toEqual([
+      ['2026-10-21', '2026-10-22', true],
+      ['2026-10-22T09:00:00+02:00[Europe/Paris]', '2026-10-22T09:30:00+02:00[Europe/Paris]', false],
+      ['2026-10-23T09:00:00+02:00[Europe/Paris]', '2026-10-23T10:00:00+02:00[Europe/Paris]', false],
+    ]);
+  });
+});
+
+describe('the scope and refusal words follow the calendar’s messages (1.1)', () => {
+  it('scope labels and a refusal’s reason in the application’s words', async () => {
+    mount([{ id: 'x', title: 'X', start: '2026-10-21T09:00[Europe/Paris]' }, { id: 'y', title: 'Y', start: '2026-10-21T09:00[Europe/Paris]' }, { id: 's', title: 'S', start: '2026-10-19T09:00[Europe/Paris]', rrule: 'FREQ=DAILY;COUNT=3' }], {
+      rules: { overlap: false, allow: (p: { resourceIds: readonly string[] }) => !p.resourceIds.includes('b') },
+      resources: [{ id: 'a', title: 'Dre A' }, { id: 'b', title: 'Dr B' }],
+      messages: { scopeThis: 'Juste celle-ci', scopeFollowing: 'Celle-ci et après', scopeAll: 'Toute la série', violation: (code: string) => `refus ${code}` },
+    });
+    let done = openEventEditor(cal!, { instance: instanceOf('s@2026-10-20T09:00:00+02:00[Europe/Paris]') });
+    expect([...dialog().querySelectorAll<HTMLInputElement>('input[type="radio"][name$="-scope"]')].map((r) => r.parentElement!.textContent!.trim())).toEqual(['Juste celle-ci', 'Celle-ci et après', 'Toute la série']);
+    $<HTMLButtonElement>('.dz-editor__actions button:not(.dz-editor__btn--danger):not([type="submit"])').click();
+    expect(await done).toBe('cancelled');
+    done = openEventEditor(cal!, { instance: instanceOf('x') });
+    [...dialog().querySelectorAll<HTMLInputElement>('.dz-editor__checks input')].find((b) => b.value === 'b')!.checked = true;
+    submit();
+    expect($('.dz-editor__error').textContent).toBe('Non enregistré : refus overlap');
   });
 });
 

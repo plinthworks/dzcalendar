@@ -9,11 +9,33 @@
   to the site. Every code block compiled by `docs:check`, as the site's.
 - `@dzcalendar/theme/unlayered.scss`: the Sass source of `unlayered.css`,
   importable (it was shipped, not exported).
-- The guides *Resources & timeline* (with supervision), *Editor*, *Print &
-  export*, English and French. *(to come)*
+- The guides *Resources & timeline*, *Live supervision* (a sixteenth guide:
+  span, step, follow, the ruler, markers, running events, live sources,
+  `forget`, the process heads), *Editor*, *Print & export*, English and
+  French — every guide of the site is written.
+- The editor's create target takes an optional `end` (`EditorCreate`): a
+  selection opens the editor with its whole length — a Monday-to-Wednesday
+  all-day selection gave Monday alone. A bad end is a warning (`invalid-end`,
+  `end-before-start`, to `EditorOptions.onProblem`), the defaults apply.
+- `messagesWithDefaults` in `@dzcalendar/dom/toolkit` (a calendar's words,
+  its `messages` over its language's).
 
 ### Fixed
 
+- The editor read neither the calendar's nor the event's `editable`: an event
+  that may not change was changed and deleted from it. Now it opens read-only
+  ("Read only", one Close button, in the five languages), Delete only where the
+  menu offers it, its times fixed where it may not move or resize.
+- The editor's scope and refusal words skipped the calendar's `messages`.
+- A running event's expected length was not drawn: the part past now (its
+  `end` or `duration` still ahead) is now only outlined in dashes, in the time
+  grid and the timeline (`data-expected`, `--dz-ongoing-now`, moved each minute).
+- `liveSource` ended a run said finished without an end at the real clock, not
+  the calendar's `now`.
+- ICS: a background event was written busy; it is `TRANSP:TRANSPARENT` now
+  (unless said `busy: true`).
+- `downloadExport` with a kind such as `'toString'` resolved `undefined`
+  instead of its problem.
 - The example component `ng add` writes repeats a stand-up without the
   recurrence engine: it was left out, said in the console. It imports
   `@dzcalendar/core/recurrence` now.

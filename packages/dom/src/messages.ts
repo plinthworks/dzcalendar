@@ -363,6 +363,16 @@ export function defineLocale(code: string, messages: DzMessages | ((locale: stri
 const MADE = new Map<string, DzMessages>();
 
 /**
+ * The application's words over the locale's (the calendar's `messages` option): a set written before a version
+ * added keys still works; the views' labels merged name by name (a label for a view of its own keeps the built-in
+ * ones). What the calendar speaks, and what the Pro's editor reads to speak as it does.
+ */
+export function messagesWithDefaults(given: Partial<DzMessages> | undefined, locale: string): DzMessages {
+  const base = messagesForLocale(locale);
+  return given ? { ...base, ...given, views: { ...base.views, ...given.views } } : base;
+}
+
+/**
  * The words for a locale: its exact tag (`ar-SA`), then its language (`ar`),
  * else English. Unicode extensions (`-u-ca-…`) are ignored.
  */

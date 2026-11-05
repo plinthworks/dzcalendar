@@ -1304,10 +1304,39 @@ import { editorHandlers, openEventEditor } from '@dzcalendar/pro/editor';
 cal.update(editorHandlers(cal)); // "Open" and "New event here" (context menu) open it
 const outcome = await openEventEditor(cal, { instance }); // 'saved' | 'deleted' | 'cancelled'
 await openEventEditor(cal, { create: { allDay: false, start: instant, resourceId: 'r1' } });
+// A selection's range (1.1): its end, a ZonedDateTime/Instant, or a PlainDate (exclusive) for whole days.
+await openEventEditor(cal, { create: { allDay: true, start: sel.start, end: sel.end } });
 ```
 
 Angular: `<dz-calendar dzEventEditor (editorClosed)="…">` (`@dzcalendar/pro-angular`).
 It takes over `onEventOpen` and `onCreateRequest`.
+
+## A new event
+
+From the calendar's request ("New event here": a start) or a selection (a
+range): `{ create: { allDay, start, end?, resourceId? } }`. `end` (1.1) is a
+moment after the start for a timed event (`Instant`, or the selection's
+`ZonedDateTime`), a date after the start for a whole-day one (exclusive, as
+a selection gives it). Without it, `defaultMinutes` (60) or one day. An end
+of another kind or not after the start is left out — never thrown — and
+told as a warning `Problem` (`invalid-end` / `end-before-start`, path
+`create.end`) to the editor's `onProblem`, else once per code on the
+console. Creating is the application's request, as the menu's "New event
+here": a calendar not `editable` still creates.
+
+## Read-only (1.1)
+
+An event the person may not change opens read-only, by the predicates the
+context menu uses (`mayMove`, `mayResize`, `mayDelete` from
+`@dzcalendar/dom/toolkit`): the calendar's `editable`, the event's own
+`editable` / `startEditable` / `durationEditable`. Nothing allowed: a
+"Read only" line under the heading (the dialog's `aria-describedby`), the
+title read-only (still focusable), every other field disabled, no scope
+question, Close alone. Delete shows as far as the menu's Delete does. One of
+the two allowed (its start or its length): the form is editable but its
+times are fixed — tzslot's range, the zone and the whole-day switch shown
+disabled (the editor has no field for "the length only"); a drag still
+does what is allowed.
 
 ## What it edits
 
@@ -1323,7 +1352,7 @@ It takes over `onEventOpen` and `onCreateRequest`.
   shown as written, "custom", and kept unless another is picked. WKST is
   the calendar's (a rule created here takes the locale's first day).
 - **An occurrence**: "this event / this and following / all events" (the
-  calendar's words). The repeat belongs to the series: it shows with "all
+  calendar's words, its `messages` option over them). The repeat belongs to the series: it shows with "all
   events" only. "All events" with another rule → the series takes it
   (`series.rule` command: excluded dates and moved occurrences kept, its
   own WKST too); moved at the same time, the new rule moves with it (a
@@ -1349,7 +1378,8 @@ It takes over `onEventOpen` and `onCreateRequest`.
   `allow`) is said in the dialog, which stays open. A series is checked on
   its occurrences (a year of them, 500 at most), not only its first: a
   daily rule landing on a booked day is refused. A problem code is said in
-  words (`problem(code)`).
+  words (`problem(code)`); a refusal's reason is the calendar's
+  `violation(code)`, its `messages` option included.
 
 ## Accessibility
 
@@ -1372,14 +1402,18 @@ leaves `.tz-dtr` out and checks the rest of the dialog in full.
 ## Words and look
 
 `editorMessagesFor(locale)` — English, French, Arabic, Spanish, German;
-`defineEditorLocale` adds one; `messages` overrides some. tzslot's widget
+`defineEditorLocale` adds one; `messages` overrides some. `readOnly` and
+`close` (1.1) are optional in `EditorMessages`: a set defined before them
+gets the English words. The scope and refusal words are the calendar's,
+with its `messages` option over them (`messagesWithDefaults`, shared with
+`@dzcalendar/dom`). tzslot's widget
 has its own words in English, French and Arabic: under Spanish or German its
 few labels (the length, "all day") are in English until tzslot has them.
 The look reads the calendar's palette (the page's `--tz-*` first, as
 `.dz-cal`) and hands it to tzslot's widget and pickers; `EDITOR_CSS` under
 `injectStyles: false`.
 
-Size: 10.3 kB gzip; with tzslot's widget, 36.4 kB — what opening the editor
+Size: 11.4 kB gzip; with tzslot's widget, 37.7 kB — what opening the editor
 costs. `@tzslot/dom` is an optional peer dependency (install it with the
 editor); `@dzcalendar/pro-angular` fetches the editor on its first opening,
 not with the application.

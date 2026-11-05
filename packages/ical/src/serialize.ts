@@ -98,7 +98,8 @@ export function serializeICal(inputs: readonly EventInput[], opts: SerializeICal
     for (const x of e.rdate ?? []) write('RDATE', valueOf(x));
     if (e.title !== undefined) out.push(`SUMMARY:${escapeText(e.title)}`);
     if (e.status !== undefined) out.push(`STATUS:${e.status.toUpperCase()}`);
-    if (e.busy === false) out.push('TRANSP:TRANSPARENT');
+    // A background (closed hours, a maintenance window) takes no one's time where it is imported (owner, 2026-11-05).
+    if (e.busy === false || (e.display === 'background' && e.busy !== true)) out.push('TRANSP:TRANSPARENT');
     if (e.url !== undefined) out.push(`URL:${e.url}`);
     const p = (e.extendedProps ?? {}) as Record<string, unknown>;
     if (typeof p['description'] === 'string') out.push(`DESCRIPTION:${escapeText(p['description'])}`);

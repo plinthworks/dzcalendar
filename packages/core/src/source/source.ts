@@ -1,7 +1,7 @@
 import type { Problem } from '../event/problems.js';
 import type { CalEvent, EventInput } from '../event/types.js';
 import type { Series } from '../recurrence/series.js';
-import type { Duration } from '../temporal.js';
+import type { Duration, Instant } from '../temporal.js';
 import type { ViewWindow } from '../store/store.js';
 
 /**
@@ -81,9 +81,10 @@ export interface EventSourceSpec {
   /**
    * A source that is told rather than asked (`liveSource`, `sseSource`): called once when it is added, with what
    * makes the calendar fetch it again (its events changed); it answers how to stop — called when the source is
-   * removed or replaced, or the calendar destroyed.
+   * removed or replaced, or the calendar destroyed. `now` is the calendar's clock (its `now` option), for what a
+   * message dates by itself.
    */
-  readonly live?: (changed: () => void) => () => void;
+  readonly live?: (changed: () => void, clock?: { readonly now: () => Instant }) => () => void;
   /** Its events the calendar forgot (`forget`), by id: a source that keeps its events lets these go. */
   readonly forgot?: (ids: readonly string[]) => void;
 }

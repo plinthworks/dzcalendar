@@ -252,6 +252,22 @@ dz-calendar { display: block; }
 .dz-cal [data-ongoing] { border-inline-end: 2px dashed var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))); background-image: repeating-linear-gradient(-45deg, transparent 0 6px, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 14%, transparent) 6px 12px); background-size: 17px 17px; }
 @media (prefers-reduced-motion: no-preference) { .dz-cal [data-ongoing] { animation: dzRunning 1.2s linear infinite; } }
 @keyframes dzRunning { to { background-position: 17px 0; } }
+/* In a column its end is its bottom edge. */
+.dz-ev[data-ongoing] { border-inline-end: 0; }
+.dz-ev[data-ongoing]:not([data-continues-after]) { border-block-end: 2px dashed var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))); }
+/*
+ * Its expected end still ahead (owner, 2026-11-05): past now (--dz-ongoing-now, 0 to 1 along the piece, written by
+ * the view once a minute) the expected part — no fill, a dashed outline. Under the text (a stacking context's
+ * z-index -1), over the fill and its stripes. --dz-ongoing-expected-bg: what it is filled with (the page's background).
+ */
+.dz-cal [data-expected]::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none; box-sizing: border-box;
+  background: var(--dz-ongoing-expected-bg, var(--dz-bg, var(--dzc-bg)));
+  border: 1px dashed var(--dz-event-accent, var(--dz-accent, var(--dzc-accent)));
+}
+.dz-ev[data-expected]::before { inset-inline: 0; inset-block: calc(var(--dz-ongoing-now, 1) * 100%) 0; border-inline-start: 0; border-block-end: 0; }
+/* A solid block keeps its fill under its text (a wash would take the text below AA): the expected part only dashed, in the text's colour. */
+.dz-cal[data-dz-event-style='solid'] [data-expected]::before { background: var(--dz-ongoing-expected-bg, transparent); border: 2px dashed currentColor; }
 /* A marker (display: 'marker') in a column: a line across it at its moment, its title under the line. */
 .dz-ev[data-marker] { border-inline-start: 0; border-top: 2px solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))); border-radius: 0; background: transparent; padding-top: 0; }
 /* A background with its own content: the tint mixed in, the label at full strength. */
