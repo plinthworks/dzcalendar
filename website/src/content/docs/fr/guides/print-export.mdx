@@ -1,0 +1,357 @@
+---
+title: "Impression et export (Pro)"
+description: "Impression, exports PDF, PNG, Excel, CSV et iCalendar."
+---
+
+import CodeTabs from '../../../../components/CodeTabs.astro';
+
+Un calendrier finit sur du papier, dans un tableur, ou dans l'application
+d'agenda de quelqu'un d'autre. Le Pro (`@dzcalendar/pro`) sait faire les
+trois sans aucune dépendance : il imprime de vraies feuilles, écrit un PDF,
+des images PNG, une feuille Excel, un fichier CSV et un fichier iCalendar,
+et chacun garde le fuseau horaire de chaque événement ainsi que la vraie
+durée d'un jour de changement d'heure. Rien n'est chargé avant d'être
+utilisé : l'impression et les exports sont deux entrées,
+`@dzcalendar/pro/print` et `@dzcalendar/pro/export`.
+
+## Imprimer le calendrier tel quel
+
+Sans le Pro, l'impression du navigateur fonctionne déjà, avec un bémol : un
+calendrier fenêtre ce qui est hors de l'écran et cache les jours chargés
+derrière « +N ». Demandez-lui de tout dessiner d'abord, puis de remettre les
+choses en place :
+
+```ts
+const restore = calendar.preparePrint();
+window.print();
+restore();
+```
+
+Avec [`autoPrint`](../../options/auto-print/) à `true` à la création du
+calendrier, il le fait seul autour des événements `beforeprint` et
+`afterprint` du navigateur : la commande Imprimer (Ctrl+P) suffit. Ce qui
+sort est ce qu'on voit à l'écran, dans la page telle que le navigateur la
+met en forme.
+
+Les couleurs s'impriment comme à l'écran (le thème demande au navigateur de
+ne pas éclaircir les fonds). Si votre page charge le CSS du calendrier en
+couches, voyez [`cssLayers`](../../options/css-layers/) avant de surcharger
+des règles d'impression.
+
+## Imprimer des feuilles
+
+Quand le calendrier doit sortir en vraies feuilles, une semaine par feuille,
+utilisez `printPages` :
+
+```ts
+import { printPages } from '@dzcalendar/pro/print';
+
+const job = await printPages(calendar); // la période affichée, A4 en paysage
+```
+
+Elle construit, hors de l'écran, une copie du calendrier pour chaque
+période de la vue (un jour, une semaine, un mois), ajustée à la feuille,
+avec le titre de la période en haut et « 1 / 3 » en pied ; puis elle appelle
+`window.print()`. Les copies partagent le magasin du calendrier : rien n'est
+chargé de nouveau. Elles gardent son apparence et ses options, mais aucun de
+ses gestionnaires, ni son animation, ni son menu contextuel. Le papier est
+toujours clair, quel que soit le thème à l'écran.
+
+Ce que montrent les feuilles :
+
+- **Une grille horaire** voit ses heures étirées pour remplir la hauteur de
+  la feuille.
+- **Un mois** voit ses semaines étirées aussi, chaque jour montrant autant
+  d'événements qu'il a de place (un lien « +N » au-delà, comme à l'écran).
+- **Une liste** s'étend sur autant de feuilles qu'il faut, en portrait par
+  défaut.
+- **Une frise** voit ses créneaux étirés sur la largeur. Une frise de
+  ressources est répartie entre les feuilles par ressources de premier
+  niveau entières (un parent reste avec ses enfants) ; `rowsPerPage` fixe le
+  nombre de lignes d'une feuille.
+- **Une vue multi-mois** s'imprime à raison d'un mois par feuille.
+- Il n'y a pas de ligne « maintenant » sur le papier.
+
+Le navigateur dessine le texte : tous les alphabets s'impriment, et
+« Enregistrer au format PDF » dans la boîte d'impression le garde
+sélectionnable. Il n'existe qu'une impression à la fois par document :
+rappeler `printPages`, ou détruire le calendrier, ferme la première. Les
+feuilles sont retirées d'elles-mêmes après l'impression.
+
+Pour regarder les feuilles avant d'imprimer, demandez `print: false` : le
+travail les tient dans `job.pages`, et `job.close()` les retire.
+
+## Choisir la période et le papier
+
+L'impression et les exports en images (PDF et PNG) prennent les mêmes
+options :
+
+```ts
+import { Temporal } from '@dzcalendar/core';
+import { printPages } from '@dzcalendar/pro/print';
+
+await printPages(calendar, {
+  view: 'dayGridMonth',
+  from: Temporal.PlainDate.from('2026-10-01'),
+  to: Temporal.PlainDate.from('2026-12-01'), // exclue : octobre et novembre
+  paper: 'letter',
+  orientation: 'portrait',
+});
+```
+
+| Option | Effet |
+|---|---|
+| `view` | La vue à mettre sur papier ; celle qui est affichée par défaut. Ce n'est pas forcément celle de l'écran : imprimez le mois depuis une vue en semaine |
+| `from`, `to` | `[from, to)`, des dates dans le fuseau du calendrier ; par défaut une période de la vue autour de la date affichée |
+| `paper` | `'a4'` (par défaut), `'letter'` ou `'a3'` |
+| `orientation` | `'landscape'` (paysage), ou `'portrait'` pour une liste, par défaut |
+
+Les dates sont découpées selon les périodes propres à la vue : trois mois
+d'une vue mensuelle font trois feuilles. Au plus 60 périodes et 300 feuilles
+sortent ; au-delà, un avertissement `cut:60` ou `cut:300` le dit.
+
+## Une fonction par format
+
+Chaque export prend le calendrier et rend un fichier en mémoire, un `Blob`,
+avec les problèmes rencontrés en chemin :
+
+| Fonction | Fichier | Sur |
+|---|---|---|
+| `exportPDF` | PDF, une feuille par page | une vue et ses dates, comme l'impression |
+| `exportPNG` | images PNG, une par feuille | une vue et ses dates, comme l'impression |
+| `exportXLSX` | feuille Excel | une plage de dates |
+| `exportCSV` | CSV, séparé par virgule, point-virgule ou tabulation | une plage de dates |
+| `exportICS` | iCalendar (`.ics`) | une plage de dates, ou tout |
+
+Les trois qui listent des événements prennent aussi `from` et `to`
+(`[from, to)`, des dates dans le fuseau du calendrier) et reprennent par
+défaut ce que la vue montre. Ils chargent d'abord la plage, par vos
+[sources](../event-sources/), et une plage qui n'a pu être chargée est un
+avertissement : le fichier ne la contient pas, et le dit.
+
+## Un tableur : XLSX et CSV
+
+```ts
+import { exportCSV, exportXLSX } from '@dzcalendar/pro/export';
+
+const { blob, problems } = await exportXLSX(calendar, { from, to });
+const csv = await exportCSV(calendar, { separator: ';' }); // un Excel français
+```
+
+Les deux écrivent le même tableau, une ligne par occurrence : un événement
+récurrent est déroulé en ses occurrences, chacune une fois. Les colonnes
+sont le titre ; le début et son fuseau ; la fin et son propre fuseau ; le
+début et la fin dans le [`timeZone`](../../options/time-zone/) du
+calendrier ; la durée en minutes ; la journée entière ; les ressources par
+leur titre ; le statut.
+
+C'est ainsi que les fuseaux survivent à un tableur, qui n'en a pas :
+
+- Le début est écrit dans **le fuseau de l'événement**, avec ce fuseau à
+  côté. La fin a le sien : un vol Paris-Tokyo se termine à 07:00 en
+  Asia/Tokyo.
+- Les mêmes instants sont écrits de nouveau dans le fuseau du calendrier,
+  pour qui veut une seule horloge.
+- La durée est le temps réellement écoulé : de 00:00 à 06:00 la nuit où les
+  pendules reculent, elle dit 420 minutes, pas 360.
+
+Dans le XLSX, les dates sont de vraies dates Excel (ce que dit la cellule
+est ce que disait l'horloge de ce fuseau), la ligne d'en-tête est figée et
+filtrée, et la feuille se lit de droite à gauche en arabe et en hébreu.
+Excel ne connaît aucune date avant 1900 : une telle heure est écrite en
+texte. Le CSV est en UTF-8 avec une marque d'ordre des octets et des fins de
+ligne CRLF, qu'Excel ouvre correctement ; un titre qui commence par `=`,
+`+`, `-` ou `@` est écrit comme du texte, pour qu'un tableur ne l'exécute
+jamais comme une formule.
+
+## Un PDF ou des images
+
+```ts
+import { exportPDF, exportPNG } from '@dzcalendar/pro/export';
+
+const { blob } = await exportPDF(calendar, { from, to, paper: 'a4', title: 'Octobre' });
+const { blobs } = await exportPNG(calendar, { scale: 2 }); // une image par feuille
+```
+
+Contrairement à l'impression, ces exports dessinent la vue sur un canevas à
+partir du modèle du calendrier, sans boîte d'impression : une grille
+horaire avec ses ressources, un mois, une liste sur autant de feuilles qu'il
+faut (l'en-tête d'un jour répété sur chacune), une frise dont les en-têtes
+sont répétés. Un jour de 23 ou 25 heures est dessiné tel qu'il est : l'heure
+répétée est hachurée, et un jour de frise fait 25 heures de large. De droite
+à gauche en arabe et en hébreu. Le fuseau du calendrier est écrit dans le
+coin de chaque feuille.
+
+Deux choses à savoir. Le PDF contient les feuilles sous forme d'images : son
+texte n'est pas sélectionnable (pour un texte sélectionnable, passez par
+l'impression et « Enregistrer au format PDF ») ; une feuille pèse de 150 à
+300 ko avec le `scale` par défaut. Et les couleurs sont celles de la palette
+claire, quel que soit le thème à l'écran.
+
+`scale` est le nombre de pixels de l'appareil par pixel CSS, 2 par défaut
+(192 ppp), jusqu'à 4. `title` nomme le PDF ; par défaut c'est la période.
+
+## Un fichier iCalendar
+
+```ts
+import { exportICS } from '@dzcalendar/pro/export';
+
+const { blob } = await exportICS(calendar, { from, to, name: 'Cabinet' });
+const everything = await exportICS(calendar, { all: true });
+```
+
+Un fichier `.ics` garde ce qu'un tableur aplatit. Un événement est écrit tel
+qu'il est, dans son propre fuseau, avec un `VTIMEZONE` pour chaque fuseau,
+afin que toute application d'agenda le place au bon instant. Une série
+récurrente est écrite **entière**, une seule fois : sa règle, ses dates
+exclues, et les occurrences déplacées ou modifiées, quelle que soit celle de
+ses occurrences que la plage montre (voir [Récurrence](../recurrence/)). Un
+événement sur la journée est une date, sans fuseau.
+
+Par défaut le fichier contient ce que la plage montre ; `all: true` écrit
+tout ce que le calendrier détient. `name` devient le nom du calendrier dans
+le fichier. C'est le format à donner à une autre application d'agenda ; pour
+lire un flux en entrée, voyez [Sources d'événements](../event-sources/).
+
+## Les mots des fichiers
+
+Les en-têtes de colonnes, les statuts et « 1 / 3 » existent en anglais, en
+français, en arabe, en espagnol et en allemand, choisis par la
+[`locale`](../../options/locale/) du calendrier ; toute autre langue retombe
+sur l'anglais. Changez n'importe lequel avec `messages`, qui ne prend que les
+mots à remplacer, ou ajoutez une langue entière avec `defineExportLocale` :
+
+```ts
+await exportCSV(calendar, { messages: { title: 'Intitulé', allDay: 'Toute la journée' } });
+```
+
+« Journée entière » et « Aucun événement » suivent les
+[`messages`](../../options/messages/) du calendrier. Plus sur les langues
+dans [Langues](../languages/).
+
+## Enregistrer le fichier
+
+Un `Blob` n'est pas encore un téléchargement. `download` en enregistre un
+par le navigateur :
+
+```ts
+import { download, exportXLSX } from '@dzcalendar/pro/export';
+
+const { blob } = await exportXLSX(calendar);
+if (blob) download(blob, 'agenda.xlsx');
+```
+
+Ou faites et enregistrez en un seul appel avec `downloadExport(calendar,
+kind, filename, options)`, où `kind` vaut `'pdf'`, `'png'`, `'xlsx'`,
+`'csv'` ou `'ics'`. Il rend les problèmes, une liste vide quand le fichier a
+été enregistré. Un export PNG de plusieurs feuilles est enregistré en une
+archive zip d'images.
+
+## Un bouton dans chaque framework
+
+Les paquets Pro des frameworks font la même chose par le calendrier qu'ils
+tiennent, et chargent l'impression et les exports à la première utilisation.
+Créez le contrôleur du calendrier, donnez-le au calendrier, et appelez les
+exports depuis vos propres boutons :
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import '@dzcalendar/pro';
+import { downloadExport } from '@dzcalendar/pro/export';
+import { printPages } from '@dzcalendar/pro/print';
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Paris', initialView: 'timeGridWeek' });
+
+document.getElementById('print')!.addEventListener('click', () => void printPages(calendar));
+document.getElementById('csv')!.addEventListener('click', async () => {
+  const problems = await downloadExport(calendar, 'csv', 'agenda.csv', { separator: ';' });
+  if (problems.length > 0) console.warn(problems);
+});
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component, inject } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import { DzExport } from '@dzcalendar/pro-angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR],
+  template: `
+    <dz-calendar #cal timeZone="Europe/Paris" />
+    <button (click)="exports.print(cal.controller)">Imprimer</button>
+    <button (click)="exports.download(cal.controller, 'pdf', 'agenda.pdf')">PDF</button>
+    <button (click)="exports.download(cal.controller, 'csv', 'agenda.csv', { separator: ';' })">CSV</button>`,
+})
+export class Agenda {
+  readonly exports = inject(DzExport);
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+import { useDzExport } from '@dzcalendar/pro-react';
+
+export function Agenda() {
+  const cal = useCalendarController();
+  const exports = useDzExport(cal);
+  return (
+    <>
+      <DzCalendar timeZone="Europe/Paris" controller={cal} />
+      <button onClick={() => void exports.print()}>Imprimer</button>
+      <button onClick={() => void exports.download('pdf', 'agenda.pdf')}>PDF</button>
+      <button onClick={() => void exports.download('csv', 'agenda.csv', { separator: ';' })}>CSV</button>
+    </>
+  );
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+import { useDzExport } from '@dzcalendar/pro-vue';
+
+const cal = createCalendarController();
+const exports = useDzExport(cal);
+</script>
+
+<template>
+  <DzCalendar time-zone="Europe/Paris" :controller="cal" />
+  <button @click="exports.print()">Imprimer</button>
+  <button @click="exports.download('pdf', 'agenda.pdf')">PDF</button>
+  <button @click="exports.download('csv', 'agenda.csv', { separator: ';' })">CSV</button>
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+En Angular, `DzExport` accepte le `controller` du composant (comme
+ci-dessus), le `<dz-calendar>` lui-même, ou le calendrier de
+`@dzcalendar/dom`. Les mêmes exports, `pdf`, `png`, `xlsx`, `csv`, `ics` et
+`print`, sont des méthodes de `exports` en React et en Vue, et de `DzExport`
+en Angular (avec le calendrier en premier argument).
+
+## Quand quelque chose se passe mal
+
+Une entrée incorrecte ne lève jamais d'exception. Un résultat porte des
+`problems`, chacun avec le code `invalid-export` : une vue inconnue, une
+plage qui finit avant de commencer, un papier qui n'est ni `a4`, ni
+`letter`, ni `a3`, un calendrier pas encore monté. Un fichier qui n'a pu
+être fait a `blob: null`. Un avertissement signifie qu'un fichier a été fait
+avec quelque chose en moins : une feuille qui n'a pu tout contenir
+(`clipped:2`, le nombre étant la feuille), une plage de dates qui n'a pu
+être chargée (`sources`), ou une coupe au-delà de 60 périodes ou de 300
+feuilles.

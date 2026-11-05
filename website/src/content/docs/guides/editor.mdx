@@ -1,0 +1,390 @@
+---
+title: "Editor (Pro)"
+description: "Open an event, create one from a selection or the context menu, change its time zone and its repeats, save, delete and undo, in the Pro's ready-made dialog — and translate, style and load it."
+---
+
+import CodeTabs from '../../../components/CodeTabs.astro';
+
+The editor is a ready-made dialog for the Pro: a person opens an event,
+changes what they need, and saves. The change goes through the calendar's
+own history, so it is checked against your rules and can be undone. It
+creates and edits; where the event is stored is still your decision, through
+your [sources and store](../event-sources/). This guide covers wiring it,
+what a person can do in it, and how it ends.
+
+```bash
+npm install @dzcalendar/pro @tzslot/dom
+```
+
+`@tzslot/dom` is an optional peer dependency of `@dzcalendar/pro`: install it
+with the editor, which uses its date and time-zone widget. The editor comes
+from its own entry, `@dzcalendar/pro/editor`; the Angular, React and Vue
+wrappers (`@dzcalendar/pro-angular`, `-react`, `-vue`) load it for you.
+
+## Open an event
+
+Two callbacks of the calendar lead to the editor: [`onEventOpen`](../../options/on-event-open/)
+("Open" in an event's context menu, and Enter on a focused event) and
+[`onCreateRequest`](../../options/on-create-request/) ("New event here" in
+the menu of empty time). Giving the editor to the calendar means answering
+both with it — which also makes the context menu offer those two entries.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import { editorHandlers } from '@dzcalendar/pro/editor';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  events: [{ id: 'a', title: 'Consultation', start: '2026-10-21T09:00[Europe/Paris]', duration: { minutes: 45 } }],
+});
+
+// "Open" and "New event here" now open the editor.
+calendar.update(editorHandlers(calendar, { stepMinutes: 5, defaultMinutes: 30 }));
+```
+
+</Fragment>
+<Fragment slot="angular">
+
+```ts
+import { Component } from '@angular/core';
+import { DZ_CALENDAR } from '@dzcalendar/angular';
+import { DzEventEditor } from '@dzcalendar/pro-angular';
+import type { EditorOptions, EditorOutcome } from '@dzcalendar/pro-angular';
+
+@Component({
+  selector: 'app-agenda',
+  imports: [DZ_CALENDAR, DzEventEditor],
+  template: `<dz-calendar timeZone="Europe/Paris" [editable]="true" [dzEventEditor]="options" (editorClosed)="closed($event)" />`,
+})
+export class Agenda {
+  readonly options: EditorOptions = { stepMinutes: 5, defaultMinutes: 30 };
+  closed(outcome: EditorOutcome): void {
+    console.log(outcome);
+  }
+}
+```
+
+</Fragment>
+<Fragment slot="react">
+
+```tsx
+import { DzCalendar, useCalendarController } from '@dzcalendar/react';
+import { useEventEditor } from '@dzcalendar/pro-react';
+import type { EditorOptions } from '@dzcalendar/pro-react';
+
+const OPTIONS: EditorOptions = { stepMinutes: 5, defaultMinutes: 30 };
+
+export function Agenda() {
+  const cal = useCalendarController();
+  useEventEditor(cal, { options: OPTIONS, onClosed: (outcome) => console.log(outcome) });
+  return <DzCalendar controller={cal} timeZone="Europe/Paris" editable />;
+}
+```
+
+</Fragment>
+<Fragment slot="vue">
+
+```vue
+<script setup lang="ts">
+import { DzCalendar, createCalendarController } from '@dzcalendar/vue';
+import { useEventEditor } from '@dzcalendar/pro-vue';
+
+const cal = createCalendarController();
+useEventEditor(cal, { options: { stepMinutes: 5, defaultMinutes: 30 }, onClosed: (outcome) => console.log(outcome) });
+</script>
+
+<template>
+  <DzCalendar :controller="cal" time-zone="Europe/Paris" editable />
+</template>
+```
+
+</Fragment>
+</CodeTabs>
+
+Things to know about the wiring:
+
+- **The editor takes the two callbacks over.** In Angular `dzEventEditor` makes
+  `(eventOpen)` and `(createRequest)` stop firing; in React and Vue
+  `useEventEditor` does the same for their props and events, until the
+  component goes. If you need your own answer for some events, call
+  `openEventEditor` yourself, from your handler (see below).
+- **A click is yours.** The editor answers "Open" and Enter. If you also give
+  [`onEventClick`](../../options/on-event-click/), Enter goes to that one
+  instead, and a click or tap is never "open" — decide there whether it
+  should be.
+- **One editor per calendar.** Asking for a second while one is open gets the
+  first, not a stack of dialogs.
+- **Without a wrapper, `editorHandlers(calendar, options)`** is the plain
+  JavaScript way, as above. `calendar.update` replaces what an earlier call
+  gave, so call it once the calendar exists.
+
+## Create from a selection, or from the menu
+
+"New event here" gives the editor a point: `{ allDay, start, resourceId? }`
+from [`onCreateRequest`](../../options/on-create-request/), already snapped
+to [`snapMinutes`](../../options/snap-minutes/). The editor fills the form
+from it: an hour long (`defaultMinutes` changes that) in the calendar's
+time zone, or a whole day when the request was for a day, in the resource it
+was made on. Nothing is created until the person saves.
+
+A [selection](../selection/) is a range, and the editor takes a start; so
+read the length of the selection and hand it over as `defaultMinutes`. The
+selection stays drawn while the dialog is open: clear it when it closes.
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { Temporal } from '@dzcalendar/core';
+import { createCalendar } from '@dzcalendar/dom';
+import { openEventEditor } from '@dzcalendar/pro/editor';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  selectable: true,
+  snapMinutes: 30,
+  onSelect: (selection) => {
+    const { start, end, resourceId } = selection;
+    const where = resourceId === undefined ? {} : { resourceId };
+    let done: Promise<unknown> | null = null;
+    if (start instanceof Temporal.ZonedDateTime && end instanceof Temporal.ZonedDateTime) {
+      const minutes = Math.round((end.epochMilliseconds - start.epochMilliseconds) / 60_000);
+      done = openEventEditor(calendar, { create: { allDay: false, start: start.toInstant(), ...where } }, { defaultMinutes: minutes });
+    } else if (start instanceof Temporal.PlainDate) {
+      done = openEventEditor(calendar, { create: { allDay: true, start, ...where } });
+    }
+    void (done ?? Promise.resolve()).then(() => calendar.select(null));
+  },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+A selection across a clock change keeps its real length: the example measures
+it in elapsed time, not by subtracting two clock readings. A whole-day
+selection opens a one-day event; the person stretches it in the dialog.
+The frameworks do the same from their `onSelect` handler, calling
+`openEventEditor` with the controller's calendar, as in the
+[Selection guide](../selection/).
+
+## What a person can change
+
+The dialog is one form, in the order of what people change most:
+
+- **Title.** It has the focus when the dialog opens.
+- **When.** A start and an end, each a date and a time, with a switch for
+  whole days. The widget is tzslot's date-and-time range: it shows the
+  measured length, so a night across a clock change says its real hours.
+  See [Time zones](../time-zones/).
+- **Time zone.** Each event keeps its own. The field edits the event's wall
+  clock: changing the zone keeps the *moments*, and shows them on the new
+  zone's clock. An event that ends in another zone than it starts (a flight,
+  Paris to Tokyo) keeps both ends as they are unless the person changes the
+  zone in the dialog.
+- **Resources**, when the calendar has [resources](../resources-timeline/):
+  the rows or columns the event belongs to.
+- **Colour**, one of the tones (six by default; `tones` offers others).
+- **Repeats**, below.
+- **Delete**, for an event that already exists.
+
+Only what changed is sent. A title edited on an event that already overlaps
+another is not refused for its times, because its times were not touched.
+When nothing changed, saving writes nothing, so an occurrence is not turned
+into an override for no reason.
+
+Before saving, the dialog checks what it can read: a start and an end; for a
+repeat, a whole interval and count of at least one, at least one weekday for
+a weekly rule, a last date that is not before the first. It says what is
+wrong in the dialog, marks the field with `aria-invalid` and moves the focus
+to it.
+
+## Repeating events
+
+The repeat is the usual set: does not repeat; every N days; every N weeks on
+chosen weekdays; every N months, on the day, on the n-th weekday ("the
+third Wednesday") or on the last one; every N years. It ends never, on a
+date (that whole day included), or after N times. The week starts as the
+calendar's locale says.
+
+A rule beyond that — hours, set positions, several rules — is shown as
+written, under "custom", and is kept exactly as it is unless the person
+picks another repeat. A rule written another way (its own week start,
+`COUNT` instead of a date) is compared as a form, not as text, so saving a
+title never rewrites it. The rules themselves are in the
+[Recurrence guide](../recurrence/).
+
+An **occurrence** of a series opens with the question of how far the edit
+reaches, in the calendar's own words:
+
+| The person picks | The edit reaches |
+|---|---|
+| This event | That occurrence only, kept as an exception of the series |
+| This and following events | That occurrence and the ones after it (the series is split there) |
+| All events | The series, every occurrence |
+
+[`chooseScope`](../../options/choose-scope/) is the same question for drags
+and the Delete key; the editor asks it in the form instead, because the
+person is already looking at it.
+
+The repeat itself belongs to the series, so it shows only with "All
+events", and "This and following" with another rule is not offered. With
+"All events", another rule is given to the series, which keeps its excluded
+dates and moved occurrences and its own week start; when the series is moved
+in the same save, the rule moves with it (a Wednesday rule moved to Thursday
+repeats on Thursdays). Choosing "does not repeat" stops the series: its
+first occurrence becomes an ordinary event with the same id and every field
+kept, and the occurrences that were moved stand alone. A single event made
+to repeat keeps its id and its fields.
+
+## Save, cancel, delete, undo
+
+A promise tells you how the dialog ended. `openEventEditor(calendar, target)`
+resolves, `onClosed` and `(editorClosed)` receive it, with one of three
+outcomes:
+
+- `'saved'`, after the change was applied;
+- `'deleted'`, after the Delete button (on an occurrence it deletes what the
+  scope says);
+- `'cancelled'`, for Cancel, Escape, a click outside an untouched form, the
+  calendar being destroyed, or the editor's chunk failing to load.
+
+A saved change is an ordinary command in the calendar's history: Ctrl/Cmd+Z
+undoes it (see [`keyboardUndo`](../../options/keyboard-undo/)), as does
+`calendar.undo()`; a save that touched an event and its series at once is
+undone as one step. Here the application confirms the save with a way back:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import { openEventEditor } from '@dzcalendar/pro/editor';
+
+declare function showToast(text: string, undo?: () => void): void;
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventOpen: async (instance) => {
+    const outcome = await openEventEditor(calendar, { instance });
+    if (outcome === 'saved') showToast('Saved', () => calendar.undo());
+    if (outcome === 'deleted') showToast('Deleted', () => calendar.undo());
+  },
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+A click outside the dialog cancels only a form nobody touched, so a stray
+click does not lose what was typed. The focus goes back to where it came
+from: the event, or the calendar when it was opened from the context menu.
+If the calendar is destroyed while the editor is open, the editor closes
+with it.
+
+## When a save is refused
+
+A change is saved with the calendar's [`rules`](../../options/rules/) on:
+a constraint, an overlap, a resource's own rules, `allow`. When one refuses,
+the dialog stays open and says why in a `role="alert"` line, in the
+calendar's words for that refusal, so the person can fix the time and save
+again. A series is checked on its occurrences, not only its first: a daily
+rule that lands on a booked day is refused, the check looking at a year of
+occurrences, 500 at most. Input the dialog cannot make sense of is said in
+words too, never thrown.
+
+The refusal is the same one a drag would meet; see
+[Drag and drop](../drag-and-drop/) for the rules and how they say no. Your
+server can still refuse after the editor: see [Events](../events/) for
+saving what a person changed.
+
+## Words and look
+
+The editor speaks the calendar's [`locale`](../../options/locale/): English,
+French, Arabic, Spanish and German are built in, from `editorMessagesFor`.
+Its scope and refusal sentences are the calendar's own
+[`messages`](../../options/messages/) (the form's words are the editor's).
+Change a few with the `messages` option; add a language with
+`defineEditorLocale`, which takes a complete set — start from `EDITOR_EN`:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+import { EDITOR_EN, defineEditorLocale, editorHandlers } from '@dzcalendar/pro/editor';
+
+defineEditorLocale('nl', { ...EDITOR_EN, newEvent: 'Nieuwe afspraak', editEvent: 'Afspraak wijzigen', save: 'Opslaan', cancel: 'Annuleren', remove: 'Verwijderen' });
+
+const calendar = createCalendar(element, { timeZone: 'Europe/Amsterdam', locale: 'nl' });
+calendar.update(editorHandlers(calendar, { messages: { save: 'Book it' }, tones: ['blue', 'green', 'red'] }));
+```
+
+</Fragment>
+</CodeTabs>
+
+tzslot's own widget has its words in English, French and Arabic: under
+Spanish, German or a language of yours, its few labels (the length, "all
+day") stay in English until it has them.
+
+**Look.** The dialog reads the calendar's palette — the page's `--tz-*`
+tokens first, as the calendar does — and hands it on to tzslot's widget and
+its pickers, so a [theme](../theming/) reaches the editor with no extra
+work. It is appended to the calendar's element (`container` puts it
+elsewhere) and its styles follow the calendar's: layered as
+[`cssLayers`](../../options/css-layers/) decided, and unstyled under
+[`look: 'none'`](../unstyled/). Under a strict Content Security Policy, give
+`injectStyles: false` to the editor and include `EDITOR_CSS` in your own
+stylesheet, as the calendar's own [`injectStyles`](../../options/inject-styles/)
+asks for its sheets.
+
+The dialog is a `role="dialog"` with `aria-modal`, named by its heading. Tab
+stays inside it, Escape cancels (while one of the date pickers is open, Escape
+closes the picker first), and the dialog opens from the event and closes back
+into it through the calendar's motion. The keys of the grid are in
+[Keyboard and accessibility](../keyboard-accessibility/).
+
+## Load it when it is needed
+
+The editor is not part of the calendar's first load. The Angular, React and
+Vue wrappers fetch it, with tzslot's widget, on the first opening, not with
+the application; if that fetch fails, the outcome is `'cancelled'` and the
+error is reported. In plain JavaScript, do the same with a dynamic import:
+
+<CodeTabs>
+<Fragment slot="js">
+
+```ts
+import { createCalendar } from '@dzcalendar/dom';
+
+const calendar = createCalendar(element, {
+  timeZone: 'Europe/Paris',
+  editable: true,
+  onEventOpen: (instance) => void import('@dzcalendar/pro/editor').then((m) => m.openEventEditor(calendar, { instance })),
+  onCreateRequest: (request) => void import('@dzcalendar/pro/editor').then((m) => m.openEventEditor(calendar, { create: request })),
+});
+```
+
+</Fragment>
+</CodeTabs>
+
+What it weighs, in round numbers: about 10 kB gzipped for the editor itself,
+and about 36 kB with tzslot's widget — that is what the first opening costs,
+on top of the calendar. The widget comes without the Temporal polyfill; the
+application loads that only where the browser lacks Temporal, so it is not in
+the editor's chunk.
+
+## See also
+
+- [`onEventOpen`](../../options/on-event-open/), [`onCreateRequest`](../../options/on-create-request/), [`onSelect`](../../options/on-select/) — the three ways in.
+- [`chooseScope`](../../options/choose-scope/), [`editable`](../../options/editable/) — what a gesture may do, and how far it reaches on a series.
+- [Recurrence](../recurrence/) — the rules the editor writes.
+- [Selection](../selection/) — starting an event from empty time.
+- [Events](../events/) — commands, history, saving what a person changed.
+- [Theming](../theming/) and [Unstyled](../unstyled/) — the look the editor follows.

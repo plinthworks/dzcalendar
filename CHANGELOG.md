@@ -1,5 +1,28 @@
 # Changes
 
+## Unreleased — 1.1.0 (owner: after the guides of batch 5)
+
+### Added
+
+- A README for each of the 17 packages and for the repository, English and
+  French: what it is, install, a quick start, every export, options, links
+  to the site. Every code block compiled by `docs:check`, as the site's.
+- `@dzcalendar/theme/unlayered.scss`: the Sass source of `unlayered.css`,
+  importable (it was shipped, not exported).
+- The guides *Resources & timeline* (with supervision), *Editor*, *Print &
+  export*, English and French. *(to come)*
+
+### Fixed
+
+- The example component `ng add` writes repeats a stand-up without the
+  recurrence engine: it was left out, said in the console. It imports
+  `@dzcalendar/core/recurrence` now.
+- `dz-migrate`'s notes named a document that does not exist
+  (`docs/migrating-from-fullcalendar.md`) and a phase long past: they give
+  the site's migration guide.
+- JSDoc in the published types announced work already done (an event's
+  `origin`, `actionsFor`, `createCalendar`).
+
 ## 1.0.0 — 2026-11-05
 
 The first release on npm: every package at 1.0.0 (`@dzcalendar/core`, `dom`,
