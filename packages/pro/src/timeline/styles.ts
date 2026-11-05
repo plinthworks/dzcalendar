@@ -128,7 +128,7 @@ export const TIMELINE_CSS = `
 }
 .dz-tl__ev:focus-visible { outline: 2px solid var(--dz-accent, var(--dzc-accent)); outline-offset: 1px; }
 .dz-more--tl { z-index: 2; margin: 0; padding: 0 0.375rem; text-align: start; }
-.dz-tl__now { position: absolute; top: 0; bottom: 0; inset-inline-start: calc(var(--dz-tl-area, 0px) + var(--x) * var(--dz-tl-slot)); border-inline-start: 2px solid var(--dz-now, var(--dzc-danger)); z-index: 2; pointer-events: none; }
+.dz-tl__now { position: absolute; top: 0; bottom: 0; inset-inline-start: calc(var(--dz-tl-area, 0px) + var(--x) * var(--dz-tl-slot)); margin-inline-start: -1px; border-inline-start: 2px solid var(--dz-now, var(--dzc-danger)); z-index: 2; pointer-events: none; }
 .dz-tl__lane > .dz-cursor { grid-row: auto; inset-inline: auto; inset-block: 2px; inset-inline-start: calc(var(--x, 0) * var(--dz-tl-slot)); width: calc(var(--w, 0) * var(--dz-tl-slot)); }
 .dz-tl__timehead > .dz-cursor { grid-row: auto; inset-inline: auto; inset-block: 0; inset-inline-start: 0; width: 1px; }
 /* Not placed yet: stuck beside the resource column in what is shown, so focusing it scrolls nothing (2.4.7, 2.4.11). */
