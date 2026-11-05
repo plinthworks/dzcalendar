@@ -34,6 +34,14 @@
       .proc__run { color: #1d4ed8; }
       .proc__fail { color: #b91c1c; font-weight: 600; }
       #cal .dz-tl__cell { white-space: normal; }
+      .paused { padding: 2px 10px; border-radius: 999px; background: #fef3c7; color: #92400e; font-weight: 600; }
+      /* The calendar follows the system's scheme: the heads too. */
+      @media (prefers-color-scheme: dark) {
+        .proc__line { color: #a1a1aa; }
+        .proc__dot--ok { color: #4ade80; }
+        .proc__dot--failed, .proc__fail { color: #f87171; }
+        .proc__run { color: #93c5fd; }
+      }
       @media (prefers-reduced-motion: reduce) { .card--running .card__pill { animation: none; } }
       @keyframes pulse { 50% { opacity: 0.55; } }
     </style>
@@ -57,6 +65,7 @@
           <option value="">aucun (jour par jour)</option>
         </select></label>
         <label><input type="checkbox" id="follow" checked /> Suivre l'heure actuelle</label>
+        <span id="paused" class="paused" hidden>⏸ Suivi en pause — « Aujourd'hui » pour revenir au direct</span>
         <button type="button" id="back45">− 45 min</button>
         <span id="log" role="status"></span>
       </div>

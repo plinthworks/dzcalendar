@@ -86,6 +86,7 @@ const stamp = (i: string) =>
 const el = (tag: string, cls: string, text = '') => Object.assign(document.createElement(tag), { className: cls, textContent: text });
 
 const log = document.querySelector<HTMLElement>('#log')!;
+const paused = document.querySelector<HTMLElement>('#paused')!;
 // What a process's head says, read from its runs: the last one finished, how many failed in 24 hours, one running.
 interface Summary {
   readonly last: Status | null;
@@ -146,6 +147,10 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
       },
     },
   },
+  // Following paused (the person went into the past or the future): said beside the controls, until "Today".
+  onFollowChange: (following) => {
+    paused.hidden = following;
+  },
   onEventClick: (i) => (log.textContent = `${i.event.title} : ${String((i.event.props as { detail?: string } | undefined)?.detail ?? '')}`),
 });
 
@@ -155,25 +160,27 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
 // run ends then (`ongoing: false`). Now and then, an alert (a marker).
 const feed = liveSource('feed', {
   connect(emit) {
-    const live = new Map<string, string>();
     let n = 0;
     const timer = setInterval(() => {
       const t = now().round({ smallestUnit: 'second', roundingMode: 'floor' });
       const p = processes[n++ % processes.length]!;
       const pid = p.id as string;
-      const cur = live.get(pid);
       if (n % 7 === 0) return emit({ create: alert(`alert-${n}`, pid, t, 'Mémoire à 90 %') });
+      // One run at a time per process: the one running now (the feed's, or one the page started with), if any.
+      const mine = [...cal.kernel.store.snapshot.allEvents()].filter((e) => e.resourceIds[0] === pid && (e.props as Partial<Props>).kind === 'run');
+      const cur = mine.find((e) => !e.allDay && e.ongoing);
       if (cur) {
-        live.delete(pid);
         const failed = Math.random() < 0.25;
-        const detail = failed ? 'Délai dépassé' : `${Math.round(Math.random() * 900)} éléments traités`;
-        return emit({ update: cur, patch: { ongoing: false, end: t.toString(), tone: TONE[failed ? 'failed' : 'ok'], extendedProps: { status: failed ? 'failed' : 'ok', detail, ended: t.toString() } } });
+        const props = { kind: 'run', status: failed ? 'failed' : 'ok', detail: failed ? 'Délai dépassé' : `${Math.round(Math.random() * 900)} éléments traités`, ended: t.toString() };
+        const patch = { ongoing: false, end: t.toString(), tone: TONE[failed ? 'failed' : 'ok'], extendedProps: props };
+        // The feed's own run through the feed; one the page was given, by a command (the feed does not own it).
+        if (cur.sourceId === 'feed') return emit({ update: cur.id, patch });
+        return void cal.run({ type: 'event.update', id: cur.id, patch });
       }
-      // Heard of while running: started a while ago (the feed tells when), expected to take an hour or so.
-      const id = `live-${n}`;
-      live.set(pid, id);
-      const started = t.subtract({ minutes: 20 + Math.round(Math.random() * 40), seconds: Math.round(Math.random() * 59) });
-      emit({ create: { ...run(id, pid, started, 60 + Math.round(Math.random() * 30), 'running', 'En cours'), ongoing: true } });
+      // Heard of while running: started after the process's last run ended (the feed tells when), expected to take an hour or so.
+      const lastEnd = Math.max(...mine.map((e) => (e.allDay ? 0 : e.end.epochMilliseconds)), t.epochMilliseconds - 3_600_000);
+      const started = Temporal.Instant.fromEpochMilliseconds(Math.min(t.epochMilliseconds, lastEnd + 60_000 * (2 + Math.round(Math.random() * 8)))).round({ smallestUnit: 'second', roundingMode: 'floor' });
+      emit({ create: { ...run(`live-${n}`, pid, started, 60 + Math.round(Math.random() * 30), 'running', 'En cours'), ongoing: true } });
     }, 5000);
     return () => clearInterval(timer);
   },
