@@ -39,6 +39,14 @@ keeps the area and the heads in place.
   resize; the period at most, one slot at least), written as `--dz-tl-slot`.
   A change by `update()` keeps the minute at the centre in place, the
   present while following. Without it, the stylesheet's width.
+- An event still running (`ongoing: true`, owner 2026-11-05) is drawn from
+  its start to now: its end follows the present, moved each minute by the
+  kernel (`refreshOngoing`, a store change of cause 'api' — no undo, no
+  `onEventChange`), never before the end expected (its `end` or `duration`
+  as given, kept as `expectedEnd`). Its end is open — dashed — with stripes
+  going by (still under reduced motion); its time reads "11:02 – running".
+  `event.update({ ongoing: false })` finishes it: at its `end` if given,
+  else now. A date alone or a series cannot run (`ongoing-not-timed`).
 - A marker (`display: 'marker'`, owner 2026-11-05) is a moment: a line
   across its row where it happened, its flag (the title, or the content
   hook's) in a lane beside it, three slots wide — the room its lane keeps.

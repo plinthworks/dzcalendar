@@ -50,9 +50,11 @@ export function timeLabels(ctx: ViewCtx, ev: CalEvent, r: { start?: Reading; end
   const startText = `${seen(startWall)}${mark(r.start)}`;
   const endText = `${seen(endWall)}${mark(r.end)}`;
   const range = ctx.formats.eventTimeRange;
-  // A moment (a marker, a milestone): its time once, not "14:32 – 14:32".
-  const moment = ev.end.equals(ev.start);
-  const text = moment
+  // A moment (a marker, a milestone): its time once, not "14:32 – 14:32"; still running, no end to write yet.
+  const moment = ev.end.equals(ev.start) && !ev.ongoing;
+  const text = ev.ongoing
+    ? `${startText} – ${ctx.messages.ongoing}`
+    : moment
     ? startText
     : range === undefined
       ? `${startText} – ${endText}`
@@ -65,7 +67,7 @@ export function timeLabels(ctx: ViewCtx, ev: CalEvent, r: { start?: Reading; end
     if (Math.round(wall) !== Math.round(r.realMinutes)) real = ctx.messages.realDuration({ duration: formatMinutes(r.realMinutes, ctx.locale) });
   }
   const spoken = [
-    `${hm(startWall)}${r.start?.pass ? ` (${r.start.offset})` : ''}${moment ? '' : ` – ${hm(endWall)}${r.end?.pass ? ` (${r.end.offset})` : ''}`}`,
+    `${hm(startWall)}${r.start?.pass ? ` (${r.start.offset})` : ''}${ev.ongoing ? ` – ${ctx.messages.ongoing}` : moment ? '' : ` – ${hm(endWall)}${r.end?.pass ? ` (${r.end.offset})` : ''}`}`,
     real,
     ev.start.timeZoneId !== ctx.zone ? ev.start.timeZoneId : '',
   ]
@@ -142,13 +144,14 @@ export function dayStates(el: HTMLElement, date: PlainDate, today: PlainDate | n
 
 /**
  * The event's own look and states on its node (any view): its classes, its
- * tone (\`--dz-event-accent\`, \`data-tone\`), all-day, background, marker, and — when
+ * tone (\`--dz-event-accent\`, \`data-tone\`), all-day, background, marker, ongoing, and — when
  * \`now\` is given — past or future (read when it is drawn).
  */
 export function applyEventLook(el: HTMLElement, ev: CalEvent, now?: Instant): void {
   state(el, 'all-day', ev.allDay);
   state(el, 'background', ev.display === 'background' || ev.display === 'inverse-background');
   state(el, 'marker', ev.display === 'marker');
+  state(el, 'ongoing', !ev.allDay && ev.ongoing === true);
   // Editable by its own say (`editable`, `startEditable` or `durationEditable: true`), whatever the calendar's default: what it may do.
   const own = ev.perms.own;
   if (own) el.dataset['editable'] = [own.start && 'move', own.duration && 'resize'].filter(Boolean).join(' ');

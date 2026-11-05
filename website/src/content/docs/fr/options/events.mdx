@@ -31,6 +31,7 @@ un événement ; les champs les plus utilisés :
 | `tone` | `string` | Une couleur par son nom : `blue`, `green`, `red`, `amber`, `violet`, `slate`, ou la vôtre |
 | `editable`, `startEditable`, `durationEditable` | `boolean` | Par événement, par-dessus `editable` du calendrier |
 | `display` | `string` | `'background'` pour une teinte derrière les autres événements (un jour fermé) ; `'marker'` pour un instant sans durée (une alerte, un déploiement) : un trait et un fanion avec son titre, son début seulement |
+| `ongoing` | `boolean` | toujours en cours : dessiné de son début jusqu'à maintenant, grandissant chaque minute ; son `end` ou sa `duration`, la durée prévue ; terminé par `event.update` avec `ongoing: false` (et sa `end`, sinon maintenant) |
 | `resourceId`, `resourceIds` | `string`, `string[]` | Les ressources auxquelles il appartient |
 | `classNames`, `url`, `extendedProps` | | Vos classes, un lien, vos propres données |
 

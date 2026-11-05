@@ -54,6 +54,7 @@ return {
   previous: 'السابق',
   next: 'التالي',
   allDay: 'طوال اليوم',
+  ongoing: 'جارٍ',
   dayDoesNotExist: 'هذا اليوم غير موجود في هذه المنطقة الزمنية',
   gapBand: ({ from, to }) => `الفترة ${iso(`${from}–${to}`)} غير موجودة`,
   repeatBand: ({ from, to }) => `الفترة ${iso(`${from}–${to}`)} تتكرر مرتين`,

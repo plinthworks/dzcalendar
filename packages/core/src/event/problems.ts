@@ -26,6 +26,8 @@ export type ProblemCode =
   | 'marker-all-day'
   /** A marker's end or duration: it has none, ignored. */
   | 'marker-length-ignored'
+  /** Still running (ongoing) is said of a timed event: on a date alone, or with a rule, refused. */
+  | 'ongoing-not-timed'
   | 'unknown-resource'
   | 'invalid-rrule'
   /** An event with `rrule` while `@dzcalendar/core/recurrence` is not imported. */

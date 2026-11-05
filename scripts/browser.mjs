@@ -1877,6 +1877,13 @@ try {
         const line = getComputedStyle(m, '::before');
         return { row: Math.round(row.height), line: Math.round(parseFloat(line.height)), flag: Math.round(m.getBoundingClientRect().width), text: m.textContent };
       });
+      // Still running without an expected end (the reports): its end is where the now line is.
+      const running = await p.evaluate(() => {
+        const ev = document.querySelector('.dz-tl__ev[data-event-id="reports-now"]') ?? [...document.querySelectorAll('.dz-tl__ev[data-ongoing]')].find((e) => e.textContent.includes('Rapports'));
+        const line = document.querySelector('.dz-tl__now');
+        return ev && line ? { end: Math.round(ev.getBoundingClientRect().right), now: Math.round(line.getBoundingClientRect().left), dashed: getComputedStyle(ev).borderRightStyle } : null;
+      });
+      check('ongoing: a run with no expected end reaches the now line, its end open (dashed)', running !== null && Math.abs(running.end - running.now) <= 3 && running.dashed === 'dashed', JSON.stringify(running));
       check('marker: a line across its row, a flag with its title beside it', marker !== null && Math.abs(marker.line - marker.row) <= 2 && marker.flag > 40 && marker.text.includes('⚠'), JSON.stringify(marker));
       check('span: no console error', errors.length === 0, errors.join('\n'));
       await p.close();

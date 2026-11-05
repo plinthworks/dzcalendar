@@ -1326,6 +1326,8 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   let timer: ReturnType<typeof setTimeout> | undefined;
   const untilNextMinute = () => 60000 - (kernel.now().epochMilliseconds % 60000);
   const tick = () => {
+    // The events still running grow to now (a store change: the views redraw them, nothing else).
+    if (root.isConnected) kernel.refreshOngoing();
     if (root.isConnected && !kernel.refreshToday() && nowOn) {
       view?.tick(kernel.now(), kernel.getState());
       ctx.motion.nowTick?.([...root.querySelectorAll<HTMLElement>('.dz-now')]);
@@ -1340,6 +1342,7 @@ function createCalendarNow(host: HTMLElement, options: CalendarOptions): Calenda
   };
   scope.on(doc, 'visibilitychange', () => {
     if (doc.hidden) return clearTimeout(timer);
+    kernel.refreshOngoing();
     if (!kernel.refreshToday() && nowOn) view?.tick(kernel.now(), kernel.getState());
     view?.follow?.(kernel.now(), false);
     startTicking();

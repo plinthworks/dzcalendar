@@ -13,6 +13,7 @@ return {
   previous: 'Zurück',
   next: 'Weiter',
   allDay: 'Ganztägig',
+  ongoing: 'läuft',
   dayDoesNotExist: 'Diesen Tag gibt es in dieser Zeitzone nicht',
   gapBand: ({ from, to }) => `${from}–${to} gibt es nicht`,
   repeatBand: ({ from, to }) => `${from}–${to} gibt es zweimal`,

@@ -248,6 +248,10 @@ dz-calendar { display: block; }
 .dz-ev--cont-start { border-start-start-radius: 0; border-start-end-radius: 0; }
 .dz-ev--cont-end { border-end-start-radius: 0; border-end-end-radius: 0; }
 .dz-ev--bg { z-index: 0; opacity: 0.35; border: 0; }
+/* Still running (ongoing): its end open — dashed — and stripes going by, still behind prefers-reduced-motion. */
+.dz-cal [data-ongoing] { border-inline-end: 2px dashed var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))); background-image: repeating-linear-gradient(-45deg, transparent 0 6px, color-mix(in srgb, var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))) 14%, transparent) 6px 12px); background-size: 17px 17px; }
+@media (prefers-reduced-motion: no-preference) { .dz-cal [data-ongoing] { animation: dzRunning 1.2s linear infinite; } }
+@keyframes dzRunning { to { background-position: 17px 0; } }
 /* A marker (display: 'marker') in a column: a line across it at its moment, its title under the line. */
 .dz-ev[data-marker] { border-inline-start: 0; border-top: 2px solid var(--dz-event-accent, var(--dz-accent, var(--dzc-accent))); border-radius: 0; background: transparent; padding-top: 0; }
 /* A background with its own content: the tint mixed in, the label at full strength. */

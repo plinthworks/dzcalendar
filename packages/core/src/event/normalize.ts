@@ -23,6 +23,8 @@ export interface NormalizeContext {
   /** True: a moment without a zone is an error rather than a guess. */
   readonly strictZones?: boolean;
   readonly newId: IdGenerator;
+  /** The present, for an event still running (its end follows it); absent, its expected end stands. */
+  readonly now?: () => Instant;
   /** When given, a resource id outside it is reported. */
   readonly knownResources?: ReadonlySet<ResourceId>;
 }
@@ -132,17 +134,24 @@ function normalizeObject(input: EventInput, ctx: NormalizeContext, path: string)
     problems.push(problem('marker-all-day', 'error', `${path}.start`, String(input.start)));
     return failed();
   }
+  // Still running: a timed event, one (a series repeats what has an end).
+  const ongoing = input.ongoing === true && !marker;
+  if (ongoing && (allDay || given(input.rrule))) {
+    problems.push(problem('ongoing-not-timed', 'error', `${path}.ongoing`, allDay ? String(input.start) : 'rrule'));
+    return failed();
+  }
   if (marker && (endParsed || duration)) problems.push(problem('marker-length-ignored', 'warning', endParsed ? `${path}.end` : `${path}.duration`, String(endParsed ? input.end : input.duration)));
 
   const common = buildCommon(input, ctx, path, problems);
   const span = allDay
     ? allDaySpan(input, ctx, path, start.parsed, endParsed, duration, problems)
-    : marker
+    : marker || (ongoing && !endParsed && !duration)
       ? timedSpan(input, ctx, path, start.parsed, null, new Temporal.Duration(), problems)
       : timedSpan(input, ctx, path, start.parsed, endParsed, duration, problems);
 
   if (!span || isError()) return failed();
   let event = Object.freeze({ ...common, ...span }) as CalEvent;
+  if (ongoing && !event.allDay) event = Object.freeze(stillRunning(event, Boolean(endParsed || duration), ctx.now?.())) as CalEvent;
   if (given(input.recurrenceId)) {
     const ref = overrideRef(input, path, event, problems);
     if (!ref) return failed();
@@ -367,6 +376,12 @@ function toZoned(
     case 'date':
       return { value: parsed.value.toZonedDateTime({ timeZone: zone }), guessed };
   }
+}
+
+/** A running event: its end where now is (never before its start or its expected end), the expected end kept. */
+function stillRunning(e: TimedEvent, expected: boolean, now: Instant | undefined): TimedEvent {
+  const end = now && now.epochMilliseconds > e.end.epochMilliseconds ? now.toZonedDateTimeISO(e.end.timeZoneId) : e.end;
+  return { ...e, end, ongoing: true, ...(expected && { expectedEnd: e.end }) };
 }
 
 function timedSpan(

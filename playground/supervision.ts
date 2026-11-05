@@ -67,6 +67,11 @@ processes.forEach((p, i) => {
     history.push(run(`${p.id}-${h}`, p.id as string, start, minutes, failed ? 'failed' : 'ok', failed ? 'code 2 · 3 lignes rejetées' : `${120 * (i + 1)} éléments traités`, start.add({ minutes: minutes - 4, seconds: 27 })));
   }
 });
+// Still running: one with its expected length (dashed past now), one with none (it ends where now is).
+history.push(
+  { ...run('backup-now', 'backup', t0.subtract({ minutes: 35, seconds: 12 }), 70, 'running', 'En cours'), ongoing: true },
+  (({ duration: _, ...r }) => ({ ...r, ongoing: true }))(run('reports-now', 'reports', t0.subtract({ minutes: 50, seconds: 41 }), 1, 'running', 'En cours')),
+);
 history.push(
   maintenance('maint-backup', 'backup', t0.subtract({ hours: 3 }), 2),
   maintenance('maint-billing', 'billing', t0.add({ hours: 1 }), 3),
@@ -121,9 +126,10 @@ const cal = createCalendar(document.querySelector<HTMLElement>('#cal')!, {
   onEventClick: (i) => (log.textContent = `${i.event.title} : ${String((i.event.props as { detail?: string } | undefined)?.detail ?? '')}`),
 });
 
-// The live feed (an EventSource in a real application). A process runs one thing at a time: a run starts (“En cours”),
-// a later message says how it ended, to the second; the next one starts once its span is over. Now and then, an alert.
-const live = new Map<string, { id: string; until: number; done: boolean }>();
+// The live feed (an EventSource in a real application). A process runs one thing at a time: the feed says a run is
+// going (`ongoing`: drawn up to now, growing; its expected length dashed), then how it ended, to the second — the
+// run ends then (`ongoing: false`, its end now). Now and then, an alert (a marker).
+const live = new Map<string, string>();
 let n = 0;
 function feed(): void {
   const t = now().round({ smallestUnit: 'second', roundingMode: 'floor' });
@@ -131,16 +137,17 @@ function feed(): void {
   const pid = p.id as string;
   const cur = live.get(pid);
   if (n % 7 === 0) return void cal.run({ type: 'event.create', event: alert(`alert-${n}`, pid, t, 'Mémoire à 90 %') });
-  if (cur && !cur.done) {
-    cur.done = true;
+  if (cur) {
+    live.delete(pid);
     const failed = Math.random() < 0.25;
     const detail = failed ? 'Délai dépassé' : `${Math.round(Math.random() * 900)} éléments traités`;
-    return void cal.run({ type: 'event.update', id: cur.id, patch: { tone: TONE[failed ? 'failed' : 'ok'], extendedProps: { kind: 'run', status: failed ? 'failed' : 'ok', detail, ended: t.toString() } } });
+    return void cal.run({ type: 'event.update', id: cur, patch: { ongoing: false, tone: TONE[failed ? 'failed' : 'ok'], extendedProps: { kind: 'run', status: failed ? 'failed' : 'ok', detail, ended: t.toString() } } });
   }
-  if (cur && t.epochMilliseconds < cur.until) return;
+  // Heard of while running: started a while ago (the feed tells when), expected to take an hour or so.
   const id = `live-${n}`;
-  live.set(pid, { id, until: t.add({ minutes: 90 }).epochMilliseconds, done: false });
-  cal.run({ type: 'event.create', event: run(id, pid, t, 90, 'running', 'Démarré') });
+  live.set(pid, id);
+  const started = t.subtract({ minutes: 20 + Math.round(Math.random() * 40), seconds: Math.round(Math.random() * 59) });
+  cal.run({ type: 'event.create', event: { ...run(id, pid, started, 60 + Math.round(Math.random() * 30), 'running', 'En cours'), ongoing: true } });
 }
 if (!fixed) setInterval(feed, 5000);
 

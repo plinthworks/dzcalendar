@@ -172,6 +172,10 @@
                   "properties": {},
                   "additionalProperties": {}
                 },
+                "ongoing": {
+                  "type": "boolean",
+                  "description": "Still running, its end not known (owner, 2026-11-05): drawn from its start to now, growing as time passes. An `end` or a `duration` given is the length expected; finished by `event.update` with `ongoing: false` (and its `end`, else now). A timed event, not a series."
+                },
                 "groupId": {
                   "anyOf": [
                     {
@@ -513,6 +517,10 @@
                   "properties": {},
                   "additionalProperties": {}
                 },
+                "ongoing": {
+                  "type": "boolean",
+                  "description": "Still running, its end not known (owner, 2026-11-05): drawn from its start to now, growing as time passes. An `end` or a `duration` given is the length expected; finished by `event.update` with `ongoing: false` (and its `end`, else now). A timed event, not a series."
+                },
                 "groupId": {
                   "anyOf": [
                     {
@@ -780,6 +788,10 @@
           "type": "object",
           "properties": {},
           "additionalProperties": {}
+        },
+        "ongoing": {
+          "type": "boolean",
+          "description": "Still running, its end not known (owner, 2026-11-05): drawn from its start to now, growing as time passes. An `end` or a `duration` given is the length expected; finished by `event.update` with `ongoing: false` (and its `end`, else now). A timed event, not a series."
         }
       },
       "additionalProperties": false,

@@ -10,7 +10,7 @@ import { arraySource, loadStaticSource } from './source/array-source.js';
 import { createSourceManager, globalTimers } from './source/manager.js';
 import type { SourceManager, SourceNotice, Timers } from './source/manager.js';
 import type { EventSourceSpec } from './source/source.js';
-import type { StoreChange } from './store/changes.js';
+import type { Mutation, StoreChange } from './store/changes.js';
 import { createHistory } from './commands/history.js';
 import type { History } from './commands/history.js';
 import type { Command, CommandContext, CommandResult } from './commands/types.js';
@@ -315,6 +315,11 @@ export interface CalendarKernel {
   batch(fn: () => void): void;
   /** Re-reads today from the clock (call it from a timer). True when it changed. */
   refreshToday(): boolean;
+  /**
+   * The events still running (`ongoing`) brought up to now: their ends moved (a store change, cause 'api' — not a
+   * person's: no undo, no `onEventChange`). True when one moved. The DOM calls it each minute.
+   */
+  refreshOngoing(): boolean;
   /** Memoized; after a store change only what changed is rebuilt (where the family can). */
   viewModel(): ViewModel;
   /** What building the shown model had to say: a series cut short there (`too-many-occurrences`, its path `series:<id>`). */
@@ -557,7 +562,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
     deferred?.cancel();
     deferred = null;
     // Who waited for the cancelled load waits for this one (told at its end, or now when it is small).
-    const ctx = { displayZone: timeZone, newId: idGen };
+    const ctx = { displayZone: timeZone, newId: idGen, now };
     // Large: the shown period now, the rest while the page is idle (its problems told when done).
     if (events.length > DEFER_ABOVE) {
       const d = loadDeferred(store, 'events', events, ctx, { from: isoDay(state.range.start), to: isoDay(state.range.end) }, o.timers ?? idleTimers(globalTimers), eventChunks, (report) => {
@@ -601,7 +606,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   const history = createHistory(
     store,
     (): CommandContext => ({
-      normalize: { displayZone: timeZone, newId: idGen },
+      normalize: { displayZone: timeZone, newId: idGen, now },
       weekStart: firstDay,
       ...(validating && { rules: rulesNow() }),
       ...(validating && externalRun && { external: true }),
@@ -610,7 +615,7 @@ export function createKernel(o: KernelOptions): CalendarKernel {
   );
   const sources = createSourceManager({
     store: writerFace(store),
-    normalize: () => ({ displayZone: timeZone, newId: idGen }),
+    normalize: () => ({ displayZone: timeZone, newId: idGen, now }),
     now,
     // The `events` option is its own array source, loaded apart.
     reserved: ['events'],
@@ -873,6 +878,18 @@ export function createKernel(o: KernelOptions): CalendarKernel {
         held--;
         flush();
       }
+    },
+    refreshOngoing() {
+      const at = now();
+      const ms = at.epochMilliseconds;
+      const moved: Mutation[] = [];
+      for (const e of store.snapshot.allEvents()) {
+        if (e.allDay || !e.ongoing || e.end.epochMilliseconds >= ms) continue;
+        moved.push({ kind: 'event', before: e, after: { ...e, end: at.toZonedDateTimeISO(e.end.timeZoneId) } });
+      }
+      if (moved.length === 0) return false;
+      store.apply(moved, 'api');
+      return true;
     },
     refreshToday() {
       if (todayIn(timeZone).equals(state.today)) return false;

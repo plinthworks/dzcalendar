@@ -65,6 +65,12 @@ export interface EventInput {
   tone?: string;
   url?: string;
   extendedProps?: Readonly<Record<string, unknown>>;
+  /**
+   * Still running, its end not known (owner, 2026-11-05): drawn from its start to now, growing as time passes.
+   * An `end` or a `duration` given is the length expected; finished by `event.update` with `ongoing: false`
+   * (and its `end`, else now). A timed event, not a series.
+   */
+  ongoing?: boolean;
 }
 
 interface EventCommon {
@@ -117,6 +123,10 @@ export interface TimedEvent extends EventCommon {
    * a person does not write that zone into it.
    */
   readonly zoneGuessed: boolean;
+  /** Still running: `end` follows now (moved on each minute), never before `expectedEnd`. */
+  readonly ongoing?: true;
+  /** An ongoing event's expected end, as given (an `end`, or its start plus a `duration`); absent when none was. */
+  readonly expectedEnd?: ZonedDateTime;
 }
 
 /**

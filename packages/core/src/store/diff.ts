@@ -40,7 +40,8 @@ export function eventEquals(a: CalEvent, b: CalEvent): boolean {
   if (a.allDay && b.allDay) {
     if (!a.start.equals(b.start) || !a.end.equals(b.end)) return false;
   } else if (!a.allDay && !b.allDay) {
-    if (!a.start.equals(b.start) || !a.end.equals(b.end) || a.zoneGuessed !== b.zoneGuessed) return false;
+    if (!a.start.equals(b.start) || !a.end.equals(b.end) || a.zoneGuessed !== b.zoneGuessed || a.ongoing !== b.ongoing) return false;
+    if (a.expectedEnd !== b.expectedEnd && !(a.expectedEnd && b.expectedEnd && a.expectedEnd.equals(b.expectedEnd))) return false;
   } else {
     return false;
   }

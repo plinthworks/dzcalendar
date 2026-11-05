@@ -21,6 +21,8 @@ export interface DzMessages {
   readonly previous: string;
   readonly next: string;
   readonly allDay: string;
+  /** Where a running event's end would be written (`ongoing`): "14:32 – running". */
+  readonly ongoing: string;
   /** The column of a day the zone skipped entirely (Apia, 30 December 2011). */
   readonly dayDoesNotExist: string;
   /** Across a band of wall times that never happen: "02:00–03:00 does not exist". */
@@ -153,6 +155,7 @@ export const EN: DzMessages = {
   previous: 'Previous',
   next: 'Next',
   allDay: 'All day',
+  ongoing: 'running',
   dayDoesNotExist: 'This day does not exist in this time zone',
   gapBand: ({ from, to }) => `${from}–${to} does not exist`,
   repeatBand: ({ from, to }) => `${from}–${to} happens twice`,
@@ -249,6 +252,7 @@ export const FR: DzMessages = {
   previous: 'Précédent',
   next: 'Suivant',
   allDay: 'Journée',
+  ongoing: 'en cours',
   dayDoesNotExist: "Ce jour n'existe pas dans ce fuseau",
   gapBand: ({ from, to }) => `${from}–${to} n'existe pas`,
   repeatBand: ({ from, to }) => `${from}–${to} a lieu deux fois`,

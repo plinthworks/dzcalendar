@@ -31,6 +31,7 @@ event; the fields used most:
 | `tone` | `string` | A colour by name: `blue`, `green`, `red`, `amber`, `violet`, `slate`, or yours |
 | `editable`, `startEditable`, `durationEditable` | `boolean` | Per event, over the calendar's `editable` |
 | `display` | `string` | `'background'` for a tint behind the other events (a closed day); `'marker'` for a moment without length (an alert, a deployment): a line and a flag with its title, its start only |
+| `ongoing` | `boolean` | still running: drawn from its start to now, growing each minute; its `end` or `duration`, the length expected; finished by `event.update` with `ongoing: false` (and its `end`, else now) |
 | `resourceId`, `resourceIds` | `string`, `string[]` | The resources it belongs to |
 | `classNames`, `url`, `extendedProps` | | Your classes, a link, your own data |
 

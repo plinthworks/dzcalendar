@@ -24,7 +24,9 @@ export function toInput(e: CalEvent): EventInput {
     ...(e.groupId !== undefined && { groupId: e.groupId }),
     title: e.title,
     start: e.start,
-    end: e.end,
+    // Still running: its end follows now — what it says is the end expected, if any.
+    ...(e.allDay || !e.ongoing ? { end: e.end } : e.expectedEnd && { end: e.expectedEnd }),
+    ...(!e.allDay && e.ongoing && { ongoing: true }),
     allDay: e.allDay,
     resourceIds: e.resourceIds,
     display: e.display,
@@ -85,7 +87,10 @@ export function patchedBase(before: CalEvent, p: EventPatch): EventInput {
   // turns an edit into end-before-start.
   if ((has('start') || has('duration')) && !has('end') && !toTimed && !toAllDay) {
     delete base.end;
-    base.duration = p.duration ?? lengthOf(before);
+    // A running event moved keeps the length it was expected to have (none: still from its start to now).
+    const expected = !before.allDay && before.ongoing ? (before.expectedEnd ? Temporal.Duration.from({ milliseconds: before.expectedEnd.epochMilliseconds - before.start.epochMilliseconds }) : undefined) : lengthOf(before);
+    const length = p.duration ?? expected;
+    if (length) base.duration = length;
   }
   // A wall time written without a zone is read in the event's own zone —
   // unless that zone was itself a guess, which keeps following the calendar.
@@ -101,6 +106,11 @@ export function patchedBase(before: CalEvent, p: EventPatch): EventInput {
  */
 export function patchEvent(before: CalEvent, p: EventPatch, ctx: NormalizeContext, path: string, problems: Problem[]): CalEvent | null {
   const base = patchedBase(before, p);
+  // Finished without an end said: it ends now (where it was drawn up to, at the latest).
+  if (!before.allDay && before.ongoing && p.ongoing === false && !('end' in p) && !('duration' in p)) {
+    const now = ctx.now?.();
+    base.end = now && now.epochMilliseconds > before.start.epochMilliseconds ? now.toZonedDateTimeISO(before.end.timeZoneId) : before.end;
+  }
   // A `null` in the patch is read as absent (normalize: what JSON writes for a field taken away).
   const r = normalizeEvent({ ...base, ...p, id: before.id } as EventInput, ctx, path);
   problems.push(...r.problems);

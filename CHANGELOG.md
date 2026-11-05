@@ -182,6 +182,14 @@
   Vue controllers and `<dz-calendar>`). `timeline.follow` keeps the present
   in view, paused by the person's own move along time, taken up by "Today".
   `playground/supervision.html` shows both.
+- `ongoing: true` on an event (owner, 2026-11-05): still running, drawn from
+  its start to now and growing each minute in every view (the kernel moves
+  its end: `refreshOngoing()`, no undo entry). Its `end` or `duration` is
+  the length expected (`expectedEnd`), drawn until now passes it. An open,
+  dashed end with stripes going by (`data-ongoing`); its time reads
+  "11:02 – running" (`messages.ongoing`, in the five languages).
+  `event.update({ ongoing: false })` finishes it at its `end`, else now. A
+  date alone or a series is refused (`ongoing-not-timed`).
 - `display: 'marker'` (owner, 2026-11-05): a moment without length — an
   alert, a deployment. In a timeline, a line across its row where it
   happened and a flag with its title in a lane beside it; in a time grid, a
