@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased — 1.1.0 (owner: after the guides of batch 5)
+## 1.1.0 — 2026-11-06
 
 ### Added
 

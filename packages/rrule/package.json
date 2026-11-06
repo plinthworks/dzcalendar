@@ -1,6 +1,6 @@
 {
   "name": "@dzcalendar/rrule",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "RFC 5545 recurrence rules on Temporal: wall-clock days across clock changes, elapsed-time hours. No event model.",
   "type": "module",
   "license": "MIT",

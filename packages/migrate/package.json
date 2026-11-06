@@ -1,6 +1,6 @@
 {
   "name": "@dzcalendar/migrate",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "dz-migrate: rewrites a FullCalendar application for DzCalendar — imports and plugins, new Calendar(...), the common calendar calls, Angular's <full-calendar> — and marks what needs a person (// dz-migrate:). A tool: never a dependency of an application.",
   "type": "module",
   "license": "MIT",
