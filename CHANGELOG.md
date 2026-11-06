@@ -12,7 +12,7 @@
 - The guides *Resources & timeline*, *Live supervision* (a sixteenth guide:
   span, step, follow, the ruler, markers, running events, live sources,
   `forget`, the process heads), *Editor*, *Print & export*, English and
-  French — every guide of the site is written.
+  French — every guide of the site is written; the READMEs link them.
 - The editor's create target takes an optional `end` (`EditorCreate`): a
   selection opens the editor with its whole length — a Monday-to-Wednesday
   all-day selection gave Monday alone. A bad end is a warning (`invalid-end`,

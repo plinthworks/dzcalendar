@@ -256,7 +256,7 @@ export class Supervision {
 - [Angular guide](https://plinthworks.github.io/dzcalendar/getting-started/angular/)
 - [Editor (Pro)](https://plinthworks.github.io/dzcalendar/guides/editor/)
 - [Print and export (Pro)](https://plinthworks.github.io/dzcalendar/guides/print-export/)
-- [Resources and timeline](https://plinthworks.github.io/dzcalendar/guides/resources-timeline/)
+- [Resources and timeline](https://plinthworks.github.io/dzcalendar/guides/resources-timeline/), [Live supervision](https://plinthworks.github.io/dzcalendar/guides/supervision/)
 - [`timeline`](https://plinthworks.github.io/dzcalendar/options/timeline/), [`onFollowChange`](https://plinthworks.github.io/dzcalendar/options/on-follow-change/), [`resources`](https://plinthworks.github.io/dzcalendar/options/resources/)
 - [Installation](https://plinthworks.github.io/dzcalendar/getting-started/installation/), [Options](https://plinthworks.github.io/dzcalendar/options/), [API](https://plinthworks.github.io/dzcalendar/api/)
 
@@ -524,7 +524,7 @@ export class Supervision {
 - [Guide Angular](https://plinthworks.github.io/dzcalendar/fr/getting-started/angular/)
 - [Éditeur (Pro)](https://plinthworks.github.io/dzcalendar/fr/guides/editor/)
 - [Impression et export (Pro)](https://plinthworks.github.io/dzcalendar/fr/guides/print-export/)
-- [Ressources et timeline](https://plinthworks.github.io/dzcalendar/fr/guides/resources-timeline/)
+- [Ressources et timeline](https://plinthworks.github.io/dzcalendar/fr/guides/resources-timeline/), [Supervision en direct](https://plinthworks.github.io/dzcalendar/fr/guides/supervision/)
 - [`timeline`](https://plinthworks.github.io/dzcalendar/fr/options/timeline/), [`onFollowChange`](https://plinthworks.github.io/dzcalendar/fr/options/on-follow-change/), [`resources`](https://plinthworks.github.io/dzcalendar/fr/options/resources/)
 - [Installation](https://plinthworks.github.io/dzcalendar/fr/getting-started/installation/), [Options](https://plinthworks.github.io/dzcalendar/fr/options/), [API](https://plinthworks.github.io/dzcalendar/fr/api/)
 

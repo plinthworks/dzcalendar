@@ -161,14 +161,14 @@ export function Rooms() {
 }
 ```
 
-Timeline settings (`slot`, `span`, `follow`, `ticks`…), `onFollowChange` and a supervision screen are covered in [`timeline`](https://plinthworks.github.io/dzcalendar/options/timeline/) and [`onFollowChange`](https://plinthworks.github.io/dzcalendar/options/on-follow-change/); in React they are props of `<DzCalendar>`.
+Timeline settings (`slot`, `span`, `follow`, `ticks`…), `onFollowChange` and a supervision screen are covered in the [Live supervision](https://plinthworks.github.io/dzcalendar/guides/supervision/) guide and in [`timeline`](https://plinthworks.github.io/dzcalendar/options/timeline/) and [`onFollowChange`](https://plinthworks.github.io/dzcalendar/options/on-follow-change/); in React they are props of `<DzCalendar>`.
 
 ## Documentation
 
 - [React guide](https://plinthworks.github.io/dzcalendar/getting-started/react/)
 - [Editor (Pro)](https://plinthworks.github.io/dzcalendar/guides/editor/)
 - [Print and export (Pro)](https://plinthworks.github.io/dzcalendar/guides/print-export/)
-- [Resources and timeline](https://plinthworks.github.io/dzcalendar/guides/resources-timeline/)
+- [Resources and timeline](https://plinthworks.github.io/dzcalendar/guides/resources-timeline/), [Live supervision](https://plinthworks.github.io/dzcalendar/guides/supervision/)
 - [`timeline`](https://plinthworks.github.io/dzcalendar/options/timeline/), [`onFollowChange`](https://plinthworks.github.io/dzcalendar/options/on-follow-change/), [`resources`](https://plinthworks.github.io/dzcalendar/options/resources/)
 - [Installation](https://plinthworks.github.io/dzcalendar/getting-started/installation/), [Options](https://plinthworks.github.io/dzcalendar/options/), [API](https://plinthworks.github.io/dzcalendar/api/)
 
@@ -341,14 +341,14 @@ export function Salles() {
 }
 ```
 
-Les réglages de la timeline (`slot`, `span`, `follow`, `ticks`…), `onFollowChange` et un écran de supervision sont décrits dans [`timeline`](https://plinthworks.github.io/dzcalendar/fr/options/timeline/) et [`onFollowChange`](https://plinthworks.github.io/dzcalendar/fr/options/on-follow-change/) ; en React ce sont des props de `<DzCalendar>`.
+Les réglages de la timeline (`slot`, `span`, `follow`, `ticks`…), `onFollowChange` et un écran de supervision sont décrits dans le guide [Supervision en direct](https://plinthworks.github.io/dzcalendar/fr/guides/supervision/) et dans [`timeline`](https://plinthworks.github.io/dzcalendar/fr/options/timeline/) et [`onFollowChange`](https://plinthworks.github.io/dzcalendar/fr/options/on-follow-change/) ; en React ce sont des props de `<DzCalendar>`.
 
 ### Documentation
 
 - [Guide React](https://plinthworks.github.io/dzcalendar/fr/getting-started/react/)
 - [Éditeur (Pro)](https://plinthworks.github.io/dzcalendar/fr/guides/editor/)
 - [Impression et export (Pro)](https://plinthworks.github.io/dzcalendar/fr/guides/print-export/)
-- [Ressources et timeline](https://plinthworks.github.io/dzcalendar/fr/guides/resources-timeline/)
+- [Ressources et timeline](https://plinthworks.github.io/dzcalendar/fr/guides/resources-timeline/), [Supervision en direct](https://plinthworks.github.io/dzcalendar/fr/guides/supervision/)
 - [`timeline`](https://plinthworks.github.io/dzcalendar/fr/options/timeline/), [`onFollowChange`](https://plinthworks.github.io/dzcalendar/fr/options/on-follow-change/), [`resources`](https://plinthworks.github.io/dzcalendar/fr/options/resources/)
 - [Installation](https://plinthworks.github.io/dzcalendar/fr/getting-started/installation/), [Options](https://plinthworks.github.io/dzcalendar/fr/options/), [API](https://plinthworks.github.io/dzcalendar/fr/api/)
 
