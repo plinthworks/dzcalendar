@@ -20,8 +20,9 @@ Elles priment sur le reste du document quand il dit autre chose.
 | Polyfill (K.2) | ~~Import statique conservé, comme dans tzslot.~~ **Révisé le 2026-10-23 (Phase 18i)** : le polyfill n'est chargé que là où Temporal manque (import dynamique, `calendar.ready`). |
 | Premier jour de semaine des règles (2026-10-16) | Une règle **sans `WKST`** se lit avec le lundi (RFC 5545), partout, quelle que soit la locale : la même règle donne les mêmes dates que Google, Outlook ou le serveur. Une série **créée dans DzCalendar** (commandes, interface) reçoit `WKST` = premier jour de la locale, **écrit explicitement** dans la règle. L'affichage (grilles, numéros de semaine) suit la locale. |
 | Menu contextuel (2026-10-16) | **Toutes les actions accessibles par un menu contextuel** sur la cellule et sur l'événement (clic droit, appui long tactile, touche Menu / Maj+F10). Voir D.3 bis et `docs/behaviors/context-menu.md`. |
+| Natif (K.14, 2026-11-08) | **Voie A : ports écrits à la main**, pilotés par `conformance/` (pas de Rust/UniFFI). Livrables : Apple — un **Swift Package** (SPM, un seul paquet iOS/iPadOS/macOS, versions = tags Git semver) dans un **dépôt GitHub à part** (`plinthworks/DzCalendarKit`), produits `DzCalendarCore` (noyau pur) et `DzCalendarKit` (SwiftUI) ; les cas de conformité y sont copiés par un script, la CI vérifie la copie. Android plus tard — `dzcalendar-core` (JAR Kotlin/JVM) et `dzcalendar-compose` (AAR) sur Maven Central. |
 
-Restent ouvertes : K.3, K.4, K.7, K.10, K.12–K.16 (K.8 tranché en Phase 9, K.5 et K.6 en Phase 15).
+Restent ouvertes : K.3, K.4, K.7, K.10, K.12, K.13, K.15, K.16 (K.8 tranché en Phase 9, K.5 et K.6 en Phase 15).
 
 ### Ajustements après la Phase 0 (spikes et revues, détail dans ROADMAP.md)
 
@@ -1681,7 +1682,7 @@ Ordre : modèle de temps et store → projection/layout → **timeGrid d'abord**
 
 **K.13 Éditeur de récurrence : `following` crée deux séries** (pas de `RANGE=THISANDFUTURE` à l'export). Compatibilité d'échange avec Google/Outlook à tester en phase 16.
 
-**K.14 Natif : voie pragmatique** (ports Swift/Kotlin + conformité) contre la voie Rust/UniFFI. Le plan prépare la première. Décision à reporter, mais **la suite de conformité doit être publiée dès la Phase 1**, sinon le portage dérivera.
+**K.14 Natif : voie pragmatique** (ports Swift/Kotlin + conformité) contre la voie Rust/UniFFI. Le plan prépare la première. Décision à reporter, mais **la suite de conformité doit être publiée dès la Phase 1**, sinon le portage dérivera. **Tranché le 2026-11-08 : voie A** (voir le tableau des décisions validées).
 
 **K.15 Date-free et migration.** L'API refuse les `Date` (`date-object-rejected`). Les équipes qui migrent depuis FullCalendar ont des `Date` partout. Le paquet `compat-fullcalendar` (qui utilise `@tzslot/core/interop`) fait la conversion. Confirmer que c'est le bon compromis, et que `Date` n'apparaît **nulle part ailleurs**, y compris dans les types publics.
 
